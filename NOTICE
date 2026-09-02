@@ -1,0 +1,17 @@
+Lokalized-JS
+Copyright 2017-2022 Product Mog LLC, 2022-2026 Revetware LLC.
+
+This product includes software developed at Revetware LLC (https://www.revetware.com).
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+--------------------------------------------------------------------------------
+Third-party notices
+--------------------------------------------------------------------------------
+
+This package will include data derived from Unicode CLDR, licensed under
+Unicode License v3. The full notice must accompany any build that ships that
+data; see THIRD-PARTY-NOTICES.md in the lokalized-spec repository.
+
+No CLDR-derived data is present in this package yet. This notice is staged so
+that the first build to include it cannot ship without one.

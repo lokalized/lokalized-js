@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [master, develop, "feature/**"]
+  pull_request:
+    branches: [master, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22", "24", "current"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Plan validators reject shallow repositories: they verify capacity
+          # and start-record commit ancestry with `git merge-base --is-ancestor`.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci || npm install
+      - name: Type-check JSDoc
+        run: npm run check
+      - name: Emit declarations
+        run: npm run types
+      - name: Unit tests
+        run: npm test
+      # M2 is tracked by engineering measurement rather than frozen thresholds, so these ARE the
+      # gate. Conformance enforces zero failures plus a ratchet on the passing-ID set; 0a ratchets
+      # the deterministic size/module figures and reports the noisy timings without gating them.
+      - name: Behavioral conformance against the Java corpus
+        run: npm run conformance
+      - name: Scenario 0a static integration measurement
+        run: npm run scenario:0a
+
+  packed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci || npm install
+      - run: npm run types
+      # Plan section 9.1: release verification runs against `npm pack`,
+      # not the working tree.
+      - name: Verify packed artifact
+        run: |
+          npm pack --silent
+          tar -tzf lokalized-*.tgz | sort > packed-files.txt
+          echo "--- packed contents ---"; cat packed-files.txt
+          for required in package/LICENSE package/NOTICE package/package.json; do
+            grep -qx "$required" packed-files.txt || { echo "missing $required"; exit 1; }
+          done
+          for forbidden in '^package/test/' '^package/\.github/' '^package/tsconfig\.json$'; do
+            if grep -qE "$forbidden" packed-files.txt; then
+              echo "must not be packed: $forbidden"; exit 1
+            fi
+          done
+          echo "packed artifact OK"

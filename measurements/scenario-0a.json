@@ -1,0 +1,36 @@
+{
+  "scenario": "0a",
+  "note": "Baseline, not a threshold. M2 is tracked by engineering measurement; no go/no-go line exists.",
+  "environments": [
+    "node"
+  ],
+  "node": [
+    {
+      "label": "root + raw-text catalog",
+      "modules": 19,
+      "sourceBytes": 375500,
+      "importMs": 0.275,
+      "constructionMs": 0.0335,
+      "firstRenderMs": 0.3309,
+      "retainedBytes": -253568
+    },
+    {
+      "label": "core + parsed equivalent",
+      "modules": 18,
+      "sourceBytes": 369075,
+      "importMs": 0.211,
+      "constructionMs": 0.0454,
+      "firstRenderMs": 0.1931,
+      "retainedBytes": 35680
+    }
+  ],
+  "rebaselines": [
+    {
+      "reason": "M4: src/internal/plural.js grew to 1,068 lines implementing exact BigInt decimal arithmetic, CLDR operands, compact exponents, and the pinned JDK double-to-decimal contract. The M4 gate requires exact numeric conversion 'with an explicit JS implementation rather than assuming Number.prototype.toString is identical', so this growth is the milestone's substance, not incidental. Module count is unchanged at 19: the optional ordinal and range data stayed out of the root graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 361714 -> 375500 bytes",
+        "core + parsed equivalent: source graph grew 356241 -> 369075 bytes"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>lokalized — scenario 0a (browser)</title>
+<style>
+  body { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; margin: 24px; max-width: 900px; }
+  h1 { font-size: 15px; } table { border-collapse: collapse; margin: 12px 0; }
+  th, td { border: 1px solid #ccc; padding: 4px 10px; text-align: right; } th:first-child, td:first-child { text-align: left; }
+  #status { padding: 8px; background: #eee; } .done { background: #d7f5d7 !important; }
+</style>
+<h1>scenario 0a — browser half</h1>
+<div id="status">running…</div>
+<div id="out"></div>
+<script type="module">
+  // The same fixed small raw-text catalog the Node half uses, so the two are comparable.
+  const CATALOG = {
+    en: {
+      "Greeting": "Hello, {{name}}",
+      "I read {{bookCount}} books": {
+        translation: "I read {{bookCount}} {{books}}",
+        placeholders: { books: { value: "bookCount", translations: { CARDINALITY_ONE: "book", CARDINALITY_OTHER: "books" } } },
+      },
+    },
+    "en-001": { "Greeting": "Hello there, {{name}}" },
+    fr: { "Greeting": "Bonjour, {{name}}" },
+  };
+  const TIEBREAKERS = { en: ["en", "en-001"] };
+  const ITERATIONS = 9;
+  const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+
+  async function measure(label, entry) {
+    // COLD import first: network plus parse plus evaluate, which is what a real first visit pays.
+    const cold0 = performance.now();
+    await import(entry);
+    const coldImportMs = performance.now() - cold0;
+
+    // Then cache-busted repeats for a stable parse+evaluate figure.
+    const imports = [], constructions = [], renders = [];
+    let firstRender = null, mod = null;
+    for (let i = 0; i < ITERATIONS; i++) {
+      const t0 = performance.now();
+      mod = await import(`${entry}?m=${i}`);
+      imports.push(performance.now() - t0);
+
+      const c0 = performance.now();
+      const strings = mod.createStrings({ fallbackLocale: "en", locale: "en-AU", strings: CATALOG, tiebreakers: TIEBREAKERS });
+      constructions.push(performance.now() - c0);
+
+      const r0 = performance.now();
+      firstRender = strings.get("I read {{bookCount}} books", { bookCount: 3 });
+      renders.push(performance.now() - r0);
+    }
+
+    // Transfer sizes from the resource timeline: the browser-relevant "bytes", not source length.
+    const prefix = new URL(entry, location.href).href.split("?")[0];
+    const base = prefix.slice(0, prefix.lastIndexOf("/"));
+    let encoded = 0, decoded = 0, resources = 0;
+    for (const e of performance.getEntriesByType("resource")) {
+      if (!e.name.startsWith(base.slice(0, base.lastIndexOf("/")))) continue;
+      if (e.name.includes("?m=")) continue; // count the cold graph once
+      encoded += e.encodedBodySize || 0; decoded += e.decodedBodySize || 0; resources++;
+    }
+
+    return { label, coldImportMs, importMs: median(imports), constructionMs: median(constructions),
+             firstRenderMs: median(renders), encodedBytes: encoded, decodedBytes: decoded, resources, firstRender };
+  }
+
+  // ONE VARIANT PER PAGE LOAD. Measuring both in a single document is worthless for the second: the
+  // root graph already contains `core`, so its cold import, resource count and transfer bytes all
+  // come back zero from a warm module cache. `?variant=` selects which one this document measures,
+  // and the driver loads the page twice.
+  const VARIANTS = {
+    root: ["root + raw-text catalog", "/src/index.js"],
+    core: ["core + parsed equivalent", "/src/core/index.js"],
+  };
+  const which = new URL(location.href).searchParams.get("variant") ?? "root";
+  const [label, entry] = VARIANTS[which] ?? VARIANTS.root;
+  const rows = [await measure(label, entry)];
+
+  // Memory, where the browser exposes it at all. Labelled rather than assumed.
+  let memory = null, memoryKind = "unavailable";
+  if (performance.measureUserAgentSpecificMemory && crossOriginIsolated) {
+    try { memory = (await performance.measureUserAgentSpecificMemory()).bytes; memoryKind = "measureUserAgentSpecificMemory"; } catch {}
+  } else if (performance.memory) {
+    memory = performance.memory.usedJSHeapSize; memoryKind = "performance.memory (coarse, whole-page)";
+  }
+
+  const results = { userAgent: navigator.userAgent, variant: which, memory, memoryKind, rows };
+  window.__RESULTS__ = results;
+
+  const fmt = (n, d = 3) => (n === null || n === undefined ? "n/a" : Number(n).toFixed(d));
+  document.getElementById("out").innerHTML =
+    `<table><tr><th>variant</th><th>resources</th><th>encoded B</th><th>decoded B</th><th>cold import ms</th><th>import ms</th><th>construct ms</th><th>1st render ms</th></tr>` +
+    rows.map((r) => `<tr><td>${r.label}</td><td>${r.resources}</td><td>${r.encodedBytes}</td><td>${r.decodedBytes}</td><td>${fmt(r.coldImportMs, 1)}</td><td>${fmt(r.importMs)}</td><td>${fmt(r.constructionMs, 4)}</td><td>${fmt(r.firstRenderMs, 4)}</td></tr>`).join("") +
+    `</table><p>rendered: <b>${rows[0].firstRender}</b> &nbsp; memory: ${memory === null ? "unavailable" : memory + " B"} (${memoryKind})</p>` +
+    `<pre id="json">${JSON.stringify(results)}</pre>`;
+  const s = document.getElementById("status");
+  s.textContent = "done"; s.className = "done";
+</script>

@@ -1,0 +1,85 @@
+{
+  "name": "lokalized",
+  "version": "0.0.0",
+  "description": "Natural-sounding software translations for JavaScript.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "src/",
+    "types/",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./core": {
+      "types": "./types/core/index.d.ts",
+      "import": "./src/core/index.js"
+    },
+    "./parse": {
+      "types": "./types/parse/index.d.ts",
+      "import": "./src/parse/index.js"
+    },
+    "./load": {
+      "types": "./types/load/index.d.ts",
+      "import": "./src/load/index.js"
+    },
+    "./ssr": {
+      "types": "./types/ssr/index.d.ts",
+      "import": "./src/ssr/index.js"
+    },
+    "./negotiate": {
+      "types": "./types/negotiate/index.d.ts",
+      "import": "./src/negotiate/index.js"
+    },
+    "./node": {
+      "types": "./types/node/index.d.ts",
+      "import": "./src/node/index.js"
+    },
+    "./data/ordinal": {
+      "types": "./types/data/ordinal.d.ts",
+      "import": "./src/data/ordinal.js"
+    },
+    "./data/ranges": {
+      "types": "./types/data/ranges.d.ts",
+      "import": "./src/data/ranges.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "types": "tsc --emitDeclarationOnly",
+    "test": "node --test",
+    "verify": "npm run check && npm run types && npm test && npm run conformance && npm run scenario:0a && npm run spike:placeholders",
+    "conformance": "node tools/conformance.mjs",
+    "conformance:write": "node tools/conformance.mjs --write",
+    "scenario:0a": "node --expose-gc tools/scenario-0a.mjs",
+    "serve:0a": "node tools/browser-0a/serve.mjs",
+    "spike:placeholders": "node spike/generated-placeholders/run.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lokalized/lokalized-js.git"
+  },
+  "homepage": "https://www.lokalized.com",
+  "keywords": [
+    "i18n",
+    "l10n",
+    "internationalization",
+    "localization",
+    "translation",
+    "cldr",
+    "plural"
+  ]
+}
