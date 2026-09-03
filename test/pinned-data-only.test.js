@@ -104,7 +104,16 @@ test("the root graph carries no optional plural data", () => {
 
   // The cardinal table, by contrast, is strict-core data and MUST be in the root graph.
   assert.ok([...reached].some((file) => file.endsWith("data/cardinal.js")));
-  assert.equal(reached.size, 19, "the root module graph changed size");
+  // 19 at M4 close; 21 at M6, which added `src/internal/expression.js` and its tokenizer to the root
+  // graph; 22 at M5a, which added `src/internal/json-parse.js` — the bounded duplicate-aware reader
+  // that `JSON.parse` cannot stand in for. M5b adds `src/internal/bidi.js` with its `src/data/rtl.js`
+  // table, which is root-graph work by necessity rather than by choice: the default isolation mode is
+  // `rtl-locales`, so the 37 right-to-left scripts are consulted on lookups nobody configured, and a
+  // table that every default render needs cannot live behind an optional subpath. That growth is each
+  // milestone's substance, and the assertions that actually protect the root are the ones above and
+  // below: no optional plural data is reachable, and the set of GENERATED tables is exactly the list
+  // named here.
+  assert.equal(reached.size, 25, "the root module graph changed size");
 
   // The exact set of generated tables the root pulls in. `scenario:0a`'s byte ratchet is a PROXY for
   // this invariant, and a weak one: it is re-recorded whenever hand-written code legitimately grows,
@@ -124,6 +133,7 @@ test("the root graph carries no optional plural data", () => {
       "data/cardinal.js",
       "data/likely-subtags.js",
       "data/parents.js",
+      "data/rtl.js",
       "data/valid-languages.js",
       "data/valid-regions.js",
       "data/valid-scripts.js",

@@ -56,50 +56,90 @@ test("only core and parse are re-exported by the root", { skip }, () => {
   assert.deepEqual([...allowlist.rootReExportsOwners].sort(), ["core", "parse"]);
 });
 
-test("every exported symbol is on the allowlist", { skip }, async () => {
-  // Enforcement tightens automatically as symbols land: today the entry points are scaffolds and
-  // export nothing, so this passes vacuously. The moment a symbol appears that section 3.1 does
-  // not name, this fails — which is the point of freezing the allowlist before the API exists.
-  const named = new Set([
-    ...allowlist.owners.flatMap((/** @type {any} */ o) => o.namedSymbols),
-    ...allowlist.languageFormConstants,
+test("every exported symbol is on its OWN subpath's allowlist", { skip }, async () => {
+  // Per-OWNER, not against the union of every owner's symbols. The union let any subpath export any
+  // other subpath's symbol -- `lokalized/parse` could have exported `createStrings` and passed --
+  // which is the one thing the owner table in plan 3.1 exists to prevent. Cross-owner re-exports are
+  // real but ENUMERATED there ("re-exports core's LanguageRange type and IANA metadata"), so they
+  // are declared below rather than assumed.
+  /** @param {string} owner @returns {any} */
+  const ownerRow = (owner) => {
+    const row = allowlist.owners.find((/** @type {any} */ o) => o.owner === owner);
+    assert.ok(row, `plan 3.1 declares no owner named '${owner}'`);
+    return row;
+  };
+
+  // Section 3.1 permits some symbol FAMILIES without naming each member -- `unenumeratedCategories`.
+  // Accepting a category wholesale would gut this gate, so each such export is classified here
+  // explicitly, against the OWNER that declares the category. Adding an export still costs a
+  // reviewed line, and now it also costs naming the owner it belongs to.
+  const CATEGORIZED = /** @type {[string, string, string][]} */ ([
+    ["core", "cardinalityForNumber", "cardinal classifiers/support probes"],
+    ["core", "cardinalityForOperands", "cardinal classifiers/support probes"],
+    ["core", "supportedCardinalitiesForLocale", "cardinal classifiers/support probes"],
+    ["core", "getSupportedCardinalityLocaleTags", "cardinal classifiers/support probes"],
+    ["data/ordinal", "ordinalityForNumber", "number/operand ordinal classifiers and support probes"],
+    ["data/ordinal", "ordinalityForOperands", "number/operand ordinal classifiers and support probes"],
+    ["data/ordinal", "supportedOrdinalitiesForLocale", "number/operand ordinal classifiers and support probes"],
+    ["data/ordinal", "getSupportedOrdinalityLocaleTags", "number/operand ordinal classifiers and support probes"],
   ]);
 
-  // Section 3.1 permits some symbol FAMILIES without naming each member — `unenumeratedCategories`.
-  // Accepting a category wholesale would gut this gate, so each such export is classified here
-  // explicitly and the category is checked to exist. Adding an export still costs a reviewed line.
-  const CATEGORIZED = /** @type {Record<string, string>} */ ({
-    cardinalityForNumber: "cardinal classifiers/support probes",
-    cardinalityForOperands: "cardinal classifiers/support probes",
-    supportedCardinalitiesForLocale: "cardinal classifiers/support probes",
-    getSupportedCardinalityLocaleTags: "cardinal classifiers/support probes",
-    ordinalityForNumber: "number/operand ordinal classifiers and support probes",
-    ordinalityForOperands: "number/operand ordinal classifiers and support probes",
-    supportedOrdinalitiesForLocale: "number/operand ordinal classifiers and support probes",
-    getSupportedOrdinalityLocaleTags: "number/operand ordinal classifiers and support probes",
-  });
-  const categories = new Set(allowlist.owners.flatMap((/** @type {any} */ o) => o.unenumeratedCategories));
-  for (const [symbol, category] of Object.entries(CATEGORIZED)) {
-    assert.ok(
-      categories.has(category),
-      `${symbol} is classified as '${category}', which no owner declares as an unenumerated category`,
-    );
-    named.add(symbol);
-  }
+  /** @param {string} owner @returns {Set<string>} */
+  const symbolsOwnedBy = (owner) => {
+    const row = ownerRow(owner);
+    const symbols = new Set(row.namedSymbols);
+    // `core` owns the 61 constants through a category rather than by name.
+    if (row.unenumeratedCategories.includes("all 61 named language-form constants"))
+      for (const constant of allowlist.languageFormConstants) symbols.add(constant);
+    for (const [categorizedOwner, symbol, category] of CATEGORIZED) {
+      if (categorizedOwner !== owner) continue;
+      assert.ok(
+        row.unenumeratedCategories.includes(category),
+        `${symbol} is classified under '${owner}' as '${category}', which that owner does not declare`,
+      );
+      symbols.add(symbol);
+    }
+    return symbols;
+  };
 
-  const unlisted = [];
+  /**
+   * The owners each subpath may export from. More than one only where plan 3.1 says so in words:
+   * the root re-exports `core` and `parse` (`rootReExportsOwners`), `negotiate` re-exports core's
+   * `LanguageRange` and IANA metadata, and `node` re-exports the shared load types.
+   */
+  const OWNERS_BY_SUBPATH = /** @type {Record<string, string[]>} */ ({
+    ".": [...allowlist.rootReExportsOwners],
+    "./core": ["core"],
+    "./parse": ["parse"],
+    "./load": ["load"],
+    "./ssr": ["ssr"],
+    "./negotiate": ["negotiate", "core"],
+    "./node": ["node", "load"],
+    "./data/ordinal": ["data/ordinal"],
+    "./data/ranges": ["data/ranges"],
+  });
+
+  const misplaced = [];
   for (const [subpath, target] of Object.entries(pkg.exports)) {
     if (subpath === "./package.json") continue;
+
+    const owners = OWNERS_BY_SUBPATH[subpath];
+    assert.ok(owners, `${subpath} is exported but this test names no owner for it`);
+
+    /** @type {Set<string>} */
+    const permitted = new Set();
+    for (const owner of owners) for (const symbol of symbolsOwnedBy(owner)) permitted.add(symbol);
+
     const moduleUrl = new URL(/** @type {any} */ (target).import, root).href;
-    for (const symbol of Object.keys(await import(moduleUrl))) {
-      if (!named.has(symbol)) unlisted.push(`${subpath}: ${symbol}`);
-    }
+    for (const symbol of Object.keys(await import(moduleUrl)))
+      if (!permitted.has(symbol)) misplaced.push(`${subpath}: ${symbol} (owners: ${owners.join(", ")})`);
   }
 
   assert.deepEqual(
-    unlisted,
+    misplaced,
     [],
-    "exported symbols absent from the allowlist; add them to plan 3.1 and regenerate, or stop exporting them",
+    "exported symbols absent from their subpath's owner in plan 3.1; move them, add them to the " +
+      "plan and regenerate, or stop exporting them",
   );
 });
 

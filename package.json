@@ -62,8 +62,13 @@
     "conformance": "node tools/conformance.mjs",
     "conformance:write": "node tools/conformance.mjs --write",
     "scenario:0a": "node --expose-gc tools/scenario-0a.mjs",
+    "size:graph": "node tools/graph-size.mjs",
     "serve:0a": "node tools/browser-0a/serve.mjs",
-    "spike:placeholders": "node spike/generated-placeholders/run.mjs"
+    "spike:placeholders": "node spike/generated-placeholders/run.mjs",
+    "diff:tokenizer": "node tools/tokenizer-diff/run.mjs",
+    "diff:parse": "node tools/parse-diff/run.mjs",
+    "diff:phonetic": "node tools/phonetic-diff/run.mjs",
+    "diff:interpolate": "node tools/interpolate-diff/run.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

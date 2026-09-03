@@ -14,7 +14,78 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { parseCatalog } from "../src/internal/catalog.js";
+import { compile, evaluate as evaluateCompiled } from "../src/internal/expression.js";
 import { render } from "../src/internal/interpolate.js";
+import { cardinalityForRange } from "../src/data/ranges.js";
+import { ordinalData, ordinalityForNumber } from "../src/data/ordinal.js";
+import * as root from "../src/index.js";
+
+/** @type {Map<object, ReturnType<typeof compile>>} */
+const COMPILED = new Map();
+
+// `n == ORDINALITY_TWO` classifies a NUMBER, which needs the optional ordinal table. The evaluator
+// takes it PER EVALUATION, the same way `createStrings` hands it over when the caller supplies
+// `pluralData.ordinal`; a test that skipped this would silently under-cover the corpus.
+const ORDINAL_CATEGORY_FOR_OPERANDS =
+  /** @type {any} */ (ordinalData)[Symbol.for("lokalized.plural-data-runtime.v1")]
+    .ordinalCategoryForOperands;
+
+/**
+ * Whether a case needs a `PhoneticResolver`, which this module deliberately does not have.
+ *
+ * Phonetics are the one axis that accepts a raw string, and it hands that string to a resolver
+ * rather than reading it as a constant — in a placeholder AND in an expression operand. Both shapes
+ * are out of scope here and neither is detectable from a parsed definition alone.
+ *
+ * @param {any} testCase
+ * @returns {boolean}
+ */
+function needsPhoneticResolver(testCase) {
+  const fixture = corpus.fixtures[testCase.fixture];
+  return Boolean(fixture.phoneticResolver) || JSON.stringify(fixture.files ?? {}).includes("PHONETIC_");
+}
+
+/**
+ * The render context core builds.
+ *
+ * `render` takes the ordinal and cardinal-range classifiers as INJECTED services rather than
+ * importing them, because `lokalized/data/ordinal` and `lokalized/data/ranges` are optional modules
+ * the root graph must not reach. A test is not in the root graph, so it may import them directly —
+ * which is also the smallest possible check that the seam is wired the way core will wire it.
+ *
+ * @param {string} key
+ * @param {string} evaluationLocale
+ * @returns {import("../src/internal/interpolate.js").RenderContext}
+ */
+function contextFor(key, evaluationLocale) {
+  return {
+    key,
+    evaluationLocale,
+    // The shipping compiler and evaluator, wired the way core wires them: compiled once per
+    // alternative node, evaluated against RAW caller input under the SUPPLYING locale.
+    evaluateExpression: (alternative, values) => {
+      const node = /** @type {{ expression: string }} */ (alternative);
+      let compiled = COMPILED.get(alternative);
+
+      if (compiled === undefined) {
+        compiled = compile(node.expression);
+        COMPILED.set(alternative, compiled);
+      }
+
+      return evaluateCompiled(compiled, values, evaluationLocale, {
+        ordinalCategoryResolver: ORDINAL_CATEGORY_FOR_OPERANDS,
+      });
+    },
+    ordinalityNameFor: (value, locale) =>
+      ordinalityForNumber(/** @type {any} */ (value), locale).name,
+    rangeCardinalityNameFor: (startName, endName, locale) =>
+      cardinalityForRange(
+        /** @type {any} */ (/** @type {any} */ (root)[startName]),
+        /** @type {any} */ (/** @type {any} */ (root)[endName]),
+        locale,
+      ).name,
+  };
+}
 
 const corpus = JSON.parse(
   readFileSync(
@@ -66,16 +137,9 @@ function decodeInputs(placeholders) {
  * @returns {string | null} why M2 cannot render this entry, or null when it can
  */
 function unsupportedReason(definition) {
-  if (definition.alternatives.length > 0) return "whole-message alternatives (M6)";
-
   for (const placeholder of definition.placeholders.values()) {
-    if (placeholder.kind === "expression") {
-      if (placeholder.alternatives.length > 0) return "fragment alternatives (M6)";
-      continue;
-    }
+    if (placeholder.kind === "expression") continue;
 
-    if (placeholder.range !== null) return "cardinal ranges (data/ranges not generated)";
-    if (placeholder.axis === "ordinality") return "ordinality (data/ordinal not generated)";
     if (placeholder.axis === "phonetic") return "phonetic (needs a PhoneticResolver)";
   }
 
@@ -115,7 +179,8 @@ describe("render under the supplying locale (evaluation-locale corpus family)", 
       const expected = testCase.expected.result;
 
       if (expected.status !== "TRANSLATED") continue;
-      if (BIDI_ISOLATES.test(expected.translation)) continue; // bidi isolation is not M2
+      if (BIDI_ISOLATES.test(expected.translation)) continue; // bidi isolation is out of scope here
+      if (needsPhoneticResolver(testCase)) continue;
 
       const donor = donorFor(testCase);
 
@@ -132,10 +197,11 @@ describe("render under the supplying locale (evaluation-locale corpus family)", 
       if (unsupportedReason(definition) !== null) continue;
 
       try {
-        const actual = render(definition, decodeInputs(testCase.input.placeholders), {
-          key: testCase.input.key,
-          evaluationLocale: donor.locale,
-        });
+        const actual = render(
+            definition,
+            decodeInputs(testCase.input.placeholders),
+            contextFor(testCase.input.key, donor.locale),
+          );
 
         if (actual !== expected.translation)
           failures.push(
@@ -157,12 +223,11 @@ describe("render under the supplying locale (evaluation-locale corpus family)", 
     assert.deepEqual(failures, [], "evaluation-locale cases that disagree with the corpus");
     // Pinned, not a floor: the corpus is a fixed artifact, so a drop here means the filter above
     // silently stopped selecting cases rather than that the corpus changed.
-    assert.equal(rendered, 95, `expected 95 rendered evaluation-locale cases, saw ${rendered}`);
+    assert.equal(rendered, 110, `expected 110 rendered evaluation-locale cases, saw ${rendered}`);
     // The whole point of the family: categories the REQUESTED locale cannot produce.
     assert.equal(
-      arabicOnlyCategories,
-      41,
-      `expected 41 donor-only categories to be reached, saw ${arabicOnlyCategories}`,
+      arabicOnlyCategories, 46,
+      `expected 46 donor-only categories to be reached, saw ${arabicOnlyCategories}`,
     );
   });
 
@@ -188,11 +253,12 @@ describe("render under the supplying locale (evaluation-locale corpus family)", 
       assert.ok(definition);
       assert.throws(
         () =>
-          render(definition, decodeInputs(testCase.input.placeholders), {
-            key: testCase.input.key,
-            evaluationLocale: donorLocale,
-          }),
-        /Missing cardinality translation for CARDINALITY_/,
+          render(
+            definition,
+            decodeInputs(testCase.input.placeholders),
+            contextFor(testCase.input.key, donorLocale),
+          ),
+        /Missing Cardinality translation for /,
         `${testCase.id}: expected a resolution failure under the supplying locale`,
       );
       ++checked;
@@ -201,7 +267,7 @@ describe("render under the supplying locale (evaluation-locale corpus family)", 
     assert.ok(checked >= 3, `expected the sparse-donor cases, saw ${checked}`);
   });
 
-  it("does not yet classify ordinals from a number (data/ordinal is not generated)", () => {
+  it("classifies ordinals under the supplying locale, and only with the optional module", () => {
     let checked = 0;
 
     for (const testCase of cases) {
@@ -217,29 +283,46 @@ describe("render under the supplying locale (evaluation-locale corpus family)", 
       });
       const definition = definitions.get(testCase.input.key);
 
-      if (
-        !definition ||
-        unsupportedReason(definition) !== "ordinality (data/ordinal not generated)"
-      )
-        continue;
+      if (!definition || unsupportedReason(definition) !== null) continue;
 
+      const selectsOrdinality = [...definition.placeholders.values()].some(
+        (/** @type {any} */ placeholder) =>
+          placeholder.kind === "language-form" && placeholder.axis === "ordinality",
+      );
+
+      if (!selectsOrdinality) continue;
+
+      assert.equal(
+        render(
+          definition,
+          decodeInputs(testCase.input.placeholders),
+          contextFor(testCase.input.key, donor.locale),
+        ),
+        testCase.expected.result.translation,
+        testCase.id,
+      );
+
+      // And WITHOUT the injected classifier the same render fails cleanly instead of falling back
+      // to the cardinal answer, which is wrong at almost every locale: Russian ordinals are
+      // {other} alone while its cardinals are four-way.
       assert.throws(
         () =>
           render(definition, decodeInputs(testCase.input.placeholders), {
             key: testCase.input.key,
             evaluationLocale: donor.locale,
           }),
-        /numeric ordinality selection is not implemented in M2/,
+        /lokalized\/data\/ordinal/,
+        testCase.id,
       );
       ++checked;
     }
 
-    assert.equal(checked, 6, "the known ordinal gap should cover exactly six corpus cases");
+    assert.equal(checked, 6, "the ordinal evaluation-locale cases should all render");
   });
 });
 
 describe("render across every renderable getResult case", () => {
-  it("matches the corpus translation wherever M2 covers the entry", () => {
+  it("matches the corpus translation wherever this module covers the entry", () => {
     let rendered = 0;
     /** @type {string[]} */
     const failures = [];
@@ -283,12 +366,14 @@ describe("render across every renderable getResult case", () => {
       const definition = definitions.get(testCase.input.key);
 
       if (!definition || unsupportedReason(definition) !== null) continue;
+      if (needsPhoneticResolver(testCase)) continue;
 
       try {
-        const actual = render(definition, decodeInputs(testCase.input.placeholders), {
-          key: testCase.input.key,
-          evaluationLocale: donor.locale,
-        });
+        const actual = render(
+            definition,
+            decodeInputs(testCase.input.placeholders),
+            contextFor(testCase.input.key, donor.locale),
+          );
 
         if (actual !== expected.translation)
           failures.push(
@@ -304,7 +389,7 @@ describe("render across every renderable getResult case", () => {
     }
 
     assert.deepEqual(failures, [], "getResult cases that disagree with the corpus");
-    assert.equal(rendered, 468, `expected 468 rendered getResult cases, saw ${rendered}`);
+    assert.equal(rendered, 539, `expected 539 rendered getResult cases, saw ${rendered}`);
   });
 });
 
@@ -316,7 +401,7 @@ describe("render across every renderable getResult case", () => {
  */
 describe("resolution failures the corpus records must also fail here", () => {
   /**
-   * The only recorded resolution failures M2 cannot reproduce: Java's default output budgets
+   * The only recorded resolution failures this module cannot reproduce: Java's default output budgets
    * (`maximumInterpolatedOutputCharacters`, `maximumGeneratedExpansionCharacters`), which live on
    * TranslationRuntimeLimits and are not part of RenderContext.
    */
@@ -326,7 +411,7 @@ describe("resolution failures the corpus records must also fail here", () => {
     "runtime-limits.interpolated-output.default.one-past-the-maximum",
   ]);
 
-  it("throws for every RESOLUTION_FAILURE whose donor entry M2 can evaluate", () => {
+  it("throws for every RESOLUTION_FAILURE whose donor entry this module can evaluate", () => {
     let checked = 0;
     /** @type {string[]} */
     const survivors = [];
@@ -343,47 +428,65 @@ describe("resolution failures the corpus records must also fail here", () => {
 
       if (fixture.runtimeLimits) continue; // retuned budgets this module does not own
 
-      // The donor is the candidate that actually held the key and then failed to resolve.
-      const donorLocale = /** @type {string[]} */ (expected.attemptedLocales ?? []).find(
-        (locale) => fixture.files?.[locale] && testCase.input.key in fixture.files[locale],
-      );
+      if (needsPhoneticResolver(testCase)) continue; // the resolver decides, and this module has none
 
-      if (donorLocale === undefined) continue;
+      // Walk the candidates in the order the recorded result attempted them, exactly as core does.
+      // The first one that HOLDS the key and produces something decides — and "produces something"
+      // is three-valued now: a string ends the walk, a throw is the failure being asserted, and a
+      // null (no alternative matched, no translation of its own) means the walk moves on. Taking
+      // only the first donor was right until alternatives were evaluated; `failure-handler.final-
+      // reason.no-match-then-resolution-failure-reports-resolution-failure` is the case that names
+      // the difference — its first donor legitimately renders nothing at all.
+      /** @type {"threw" | "rendered" | null} */
+      let outcome = null;
+      let evaluable = false;
 
-      /** @type {Map<string, any>} */
-      let definitions;
+      for (const donorLocale of /** @type {string[]} */ (expected.attemptedLocales ?? [])) {
+        if (!fixture.files?.[donorLocale] || !(testCase.input.key in fixture.files[donorLocale])) continue;
 
-      try {
-        definitions = parseCatalog(fixture.files[donorLocale], {
-          locale: donorLocale,
-          source: donorLocale,
-        });
-      } catch {
-        continue;
+        /** @type {Map<string, any>} */
+        let definitions;
+
+        try {
+          definitions = parseCatalog(fixture.files[donorLocale], {
+            locale: donorLocale,
+            source: donorLocale,
+          });
+        } catch {
+          break;
+        }
+
+        const definition = definitions.get(testCase.input.key);
+
+        if (!definition || unsupportedReason(definition) !== null) break;
+
+        evaluable = true;
+
+        try {
+          const rendered = render(
+            definition,
+            decodeInputs(testCase.input.placeholders),
+            contextFor(testCase.input.key, donorLocale),
+          );
+
+          if (rendered !== null) {
+            outcome = "rendered";
+            break;
+          }
+        } catch {
+          outcome = "threw";
+          break;
+        }
       }
 
-      const definition = definitions.get(testCase.input.key);
-
-      if (!definition || unsupportedReason(definition) !== null) continue;
-      if (fixture.phoneticResolver) continue; // the resolver decides, and M2 has none
-
-      let threw = false;
-
-      try {
-        render(definition, decodeInputs(testCase.input.placeholders), {
-          key: testCase.input.key,
-          evaluationLocale: donorLocale,
-        });
-      } catch {
-        threw = true;
-      }
+      if (!evaluable) continue;
 
       ++checked;
-      if (!threw) survivors.push(testCase.id);
+      if (outcome !== "threw") survivors.push(testCase.id);
     }
 
     assert.deepEqual(survivors, [], "resolution failures that render silently survived");
-    assert.equal(checked, 60, `expected 60 negative cases, saw ${checked}`);
+    assert.equal(checked, 72, `expected 72 negative cases, saw ${checked}`);
   });
 });
 
@@ -566,7 +669,7 @@ describe("render dispatch", () => {
 
     assert.throws(
       () => render(definition, { bookCount: 3n }, { key: "Books", evaluationLocale: "ru" }),
-      /Missing cardinality translation for CARDINALITY_FEW/,
+      /Missing Cardinality translation for FEW/,
     );
     assert.throws(
       () => render(definition, {}, { key: "Books", evaluationLocale: "en" }),
@@ -618,5 +721,162 @@ describe("render dispatch", () => {
       render(definition, { name: "Sarah" }, { key: "Esc", evaluationLocale: "en" }),
       "{{name}} is Sarah \\ }}",
     );
+  });
+});
+
+describe("alternative selection", () => {
+  /**
+   * The renderer takes its evaluator through the context, so a test can supply a real one without
+   * this module acquiring an edge to it. `compile` is the shipping compiler; the map is keyed by the
+   * parsed alternative NODE, exactly as core keys it.
+   *
+   * @param {string} evaluationLocale
+   * @returns {import("../src/internal/interpolate.js").RenderContext}
+   */
+  const evaluatingContext = (evaluationLocale = "en") => ({
+    key: "K",
+    evaluationLocale,
+    evaluateExpression: (alternative, values) =>
+      evaluateCompiled(
+        compile(/** @type {{ expression: string }} */ (alternative).expression),
+        values,
+        evaluationLocale,
+      ),
+  });
+
+  /**
+   * @param {Record<string, unknown>} catalog
+   * @param {string} key
+   */
+  const entry = (catalog, key) => {
+    const definition = parseCatalog(catalog, { locale: "en", source: "en" }).get(key);
+    assert.ok(definition);
+    return definition;
+  };
+
+  it("takes the first matching branch and never a later sibling", () => {
+    const definition = entry(
+      {
+        K: {
+          translation: "default",
+          alternatives: [
+            { "n > 100": "big" },
+            { "n > 10": "medium" },
+            { "n > 1": "small" },
+          ],
+        },
+      },
+      "K",
+    );
+
+    assert.equal(render(definition, { n: 500 }, evaluatingContext()), "big");
+    assert.equal(render(definition, { n: 50 }, evaluatingContext()), "medium");
+    assert.equal(render(definition, { n: 0 }, evaluatingContext()), "default");
+  });
+
+  it("returns null — not a throw — when no alternative matches and there is no translation", () => {
+    // Java's `Optional.empty()`. The distinction is load-bearing: the default fallback policy walks
+    // PAST this to the next donor locale, while a thrown resolution failure halts the walk.
+    const definition = entry({ K: { alternatives: [{ "n > 10": "big" }] } }, "K");
+
+    assert.equal(render(definition, { n: 50 }, evaluatingContext()), "big");
+    assert.equal(render(definition, { n: 1 }, evaluatingContext()), null);
+  });
+
+  it("does not fall through from an unmatched NESTED subtree to a later sibling", () => {
+    const definition = entry(
+      {
+        K: {
+          alternatives: [
+            { "n > 10": { alternatives: [{ "n > 1000": "huge" }] } },
+            { "n > 1": "small" },
+          ],
+        },
+      },
+      "K",
+    );
+
+    // 50 selects the first branch, whose own alternatives all miss. `small` is NOT reached.
+    assert.equal(render(definition, { n: 50 }, evaluatingContext()), null);
+    assert.equal(render(definition, { n: 5 }, evaluatingContext()), "small");
+  });
+
+  it("inherits a placeholder the branch does not mention and replaces one it does, WHOLE", () => {
+    // Two rules that are easy to conflate. Bindings accumulate BY NAME — a branch keeps ancestor
+    // definitions for names it says nothing about (`DefaultStrings.getInternal` builds
+    // `effectivePlaceholderBindings` as inherited-plus-own). But a name the branch DOES redefine is
+    // swapped whole, never merged form-by-form, so a branch table declaring only CARDINALITY_OTHER
+    // fails for a value selecting ONE instead of borrowing the parent's ONE.
+    const catalog = {
+      K: {
+        translation: "{{n}} {{books}} {{shelf}}",
+        placeholders: {
+          books: {
+            value: "n",
+            translations: { CARDINALITY_ONE: "book", CARDINALITY_OTHER: "books" },
+          },
+          shelf: { translation: "on the shelf" },
+        },
+        alternatives: [
+          {
+            "mode == 1": {
+              translation: "{{n}} {{books}} {{shelf}}",
+              placeholders: {
+                books: { value: "n", translations: { CARDINALITY_OTHER: "volumes" } },
+              },
+            },
+          },
+        ],
+      },
+    };
+    const definition = entry(catalog, "K");
+
+    // `shelf` is inherited untouched; `books` is the branch's partial table and serves its own form.
+    assert.equal(
+      render(definition, { n: 5, mode: 1 }, evaluatingContext()),
+      "5 volumes on the shelf",
+    );
+    // ... and fails for the form the branch omitted rather than borrowing the parent's `book`.
+    assert.throws(
+      () => render(definition, { n: 1, mode: 1 }, evaluatingContext()),
+      /Missing Cardinality translation for ONE/,
+    );
+    // The unselected path still has the parent's complete table.
+    assert.equal(render(definition, { n: 1, mode: 0 }, evaluatingContext()), "1 book on the shelf");
+  });
+
+  it("selects a generated fragment's own alternatives against RAW caller input", () => {
+    // `{{size}}` is a fragment whose branches read `n` — the caller's value, not the generated text
+    // that `{{n}}` would interpolate.
+    const definition = entry(
+      {
+        K: {
+          translation: "{{size}}",
+          placeholders: {
+            size: {
+              translation: "a shelf",
+              alternatives: [{ "n > 1000": "an enormous library" }, { "n > 100": "a large library" }],
+            },
+          },
+        },
+      },
+      "K",
+    );
+
+    assert.equal(render(definition, { n: 5000 }, evaluatingContext()), "an enormous library");
+    assert.equal(render(definition, { n: 500 }, evaluatingContext()), "a large library");
+    assert.equal(render(definition, { n: 5 }, evaluatingContext()), "a shelf");
+  });
+
+  it("evaluates alternatives under the SUPPLYING locale", () => {
+    // `n == CARDINALITY_ONE` classifies 0 differently in French and English, and a fallback-served
+    // entry must classify under the locale whose text it is.
+    const definition = entry(
+      { K: { translation: "other", alternatives: [{ "n == CARDINALITY_ONE": "one" }] } },
+      "K",
+    );
+
+    assert.equal(render(definition, { n: 0 }, evaluatingContext("fr")), "one");
+    assert.equal(render(definition, { n: 0 }, evaluatingContext("en")), "other");
   });
 });

@@ -55,6 +55,25 @@ import { jdkLanguageTag, parseJdkTag } from "./locale-jdk-tag.js";
 
 /** @typedef {"zero"|"one"|"two"|"few"|"many"|"other"} CardinalCategory */
 
+/**
+ * The hidden key under which an OPTIONAL plural-data carrier hangs the classifier core needs.
+ *
+ * `lokalized/data/ordinal` and `lokalized/data/ranges` are outside the root graph on purpose — the
+ * root must never reach their tables — so `createStrings` cannot import their classifiers. Plan
+ * section 3.2 has the consumer hand the data over instead (`pluralData: { ordinal: ordinalData }`),
+ * and section 3.2's `OrdinalData`/`CardinalRangeData` are declared as provenance carriers alone. The
+ * capability therefore travels on the carrier under a key that is not part of the published shape: a
+ * symbol is invisible to `Object.keys`, `JSON.stringify`, and the generated declarations, so the
+ * public type stays exactly what the plan says it is.
+ *
+ * `Symbol.for` rather than `Symbol()` deliberately. An application may legitimately install a
+ * separate copy of the optional module — that is precisely the case the provenance comparison in
+ * those modules exists to catch — and two copies of this file would mint two unequal private
+ * symbols, making a perfectly compatible module unreadable. The registry key is versioned so a
+ * future incompatible capability shape cannot be silently accepted.
+ */
+export const PLURAL_DATA_RUNTIME = Symbol.for("lokalized.plural-data-runtime.v1");
+
 /** Thrown when no CLDR cardinal rules exist for the requested locale. */
 export class UnsupportedLocaleError extends Error {
   /** @param {string} localeTag */

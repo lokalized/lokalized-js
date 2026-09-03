@@ -1,0 +1,9854 @@
+{
+ "description": "Ground truth for src/internal/expression-tokenizer.js, produced by running lokalized-java 3.0.0 com.lokalized.ExpressionTokenizer over each expression. Tokens are \"TOKEN_TYPE:symbol\"; error is the ExpressionEvaluationException message verbatim.",
+ "producedBy": "lokalized-java 3.0.0 target/classes, JDK 21 (Corretto 21.0.11)",
+ "vectorCount": 1473,
+ "vectors": [
+  {
+   "expression": "count == 1",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "count == 0",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "count == 2",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:2"
+   ]
+  },
+  {
+   "expression": "count == 3",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:3"
+   ]
+  },
+  {
+   "expression": "count == 4",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:4"
+   ]
+  },
+  {
+   "expression": "count == 5",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:5"
+   ]
+  },
+  {
+   "expression": "count == 6",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:6"
+   ]
+  },
+  {
+   "expression": "count == 7",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:7"
+   ]
+  },
+  {
+   "expression": "count == 8",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:8"
+   ]
+  },
+  {
+   "expression": "count == 9",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:9"
+   ]
+  },
+  {
+   "expression": "count == 10",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:10"
+   ]
+  },
+  {
+   "expression": "count == 11",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:11"
+   ]
+  },
+  {
+   "expression": "count == 12",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:12"
+   ]
+  },
+  {
+   "expression": "count == 13",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:13"
+   ]
+  },
+  {
+   "expression": "count == 14",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:14"
+   ]
+  },
+  {
+   "expression": "count == 15",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:15"
+   ]
+  },
+  {
+   "expression": "count == 16",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:16"
+   ]
+  },
+  {
+   "expression": "count == 17",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:17"
+   ]
+  },
+  {
+   "expression": "count == 18",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:18"
+   ]
+  },
+  {
+   "expression": "count == 19",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:19"
+   ]
+  },
+  {
+   "expression": "count == 20",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:20"
+   ]
+  },
+  {
+   "expression": "count == 21",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:21"
+   ]
+  },
+  {
+   "expression": "count == 22",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:22"
+   ]
+  },
+  {
+   "expression": "count == 23",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:23"
+   ]
+  },
+  {
+   "expression": "count == 24",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:24"
+   ]
+  },
+  {
+   "expression": "count == 25",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:25"
+   ]
+  },
+  {
+   "expression": "count == 26",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:26"
+   ]
+  },
+  {
+   "expression": "count == 27",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:27"
+   ]
+  },
+  {
+   "expression": "count == 28",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:28"
+   ]
+  },
+  {
+   "expression": "count == 29",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:29"
+   ]
+  },
+  {
+   "expression": "count == 30",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:30"
+   ]
+  },
+  {
+   "expression": "count == 31",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:31"
+   ]
+  },
+  {
+   "expression": "count == 32",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:32"
+   ]
+  },
+  {
+   "expression": "count == 33",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:33"
+   ]
+  },
+  {
+   "expression": "count == 34",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:34"
+   ]
+  },
+  {
+   "expression": "count == 35",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:35"
+   ]
+  },
+  {
+   "expression": "count == 36",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:36"
+   ]
+  },
+  {
+   "expression": "count == 37",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:37"
+   ]
+  },
+  {
+   "expression": "count == 38",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:38"
+   ]
+  },
+  {
+   "expression": "count == 39",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:39"
+   ]
+  },
+  {
+   "expression": "count == 40",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:40"
+   ]
+  },
+  {
+   "expression": "count == 41",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:41"
+   ]
+  },
+  {
+   "expression": "count == 42",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:42"
+   ]
+  },
+  {
+   "expression": "count == 43",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:43"
+   ]
+  },
+  {
+   "expression": "count == 44",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:44"
+   ]
+  },
+  {
+   "expression": "count == 45",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:45"
+   ]
+  },
+  {
+   "expression": "count == 46",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:46"
+   ]
+  },
+  {
+   "expression": "count == 47",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:47"
+   ]
+  },
+  {
+   "expression": "count == 48",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:48"
+   ]
+  },
+  {
+   "expression": "count == 49",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:49"
+   ]
+  },
+  {
+   "expression": "count == 50",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:50"
+   ]
+  },
+  {
+   "expression": "count == 51",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:51"
+   ]
+  },
+  {
+   "expression": "count == 52",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:52"
+   ]
+  },
+  {
+   "expression": "count == 53",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:53"
+   ]
+  },
+  {
+   "expression": "count == 54",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:54"
+   ]
+  },
+  {
+   "expression": "count == 55",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:55"
+   ]
+  },
+  {
+   "expression": "count == 56",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:56"
+   ]
+  },
+  {
+   "expression": "count == 57",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:57"
+   ]
+  },
+  {
+   "expression": "count == 58",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:58"
+   ]
+  },
+  {
+   "expression": "count == 59",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:59"
+   ]
+  },
+  {
+   "expression": "count == 60",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:60"
+   ]
+  },
+  {
+   "expression": "count == 61",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:61"
+   ]
+  },
+  {
+   "expression": "count == 62",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:62"
+   ]
+  },
+  {
+   "expression": "count == 63",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:63"
+   ]
+  },
+  {
+   "expression": "count == 64",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:64"
+   ]
+  },
+  {
+   "expression": "count == 65",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:65"
+   ]
+  },
+  {
+   "expression": "count == 66",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:66"
+   ]
+  },
+  {
+   "expression": "count == 67",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:67"
+   ]
+  },
+  {
+   "expression": "count == 68",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:68"
+   ]
+  },
+  {
+   "expression": "count == 69",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:69"
+   ]
+  },
+  {
+   "expression": "count == 70",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:70"
+   ]
+  },
+  {
+   "expression": "count == 71",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:71"
+   ]
+  },
+  {
+   "expression": "count == 72",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:72"
+   ]
+  },
+  {
+   "expression": "count == 73",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:73"
+   ]
+  },
+  {
+   "expression": "count == 74",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:74"
+   ]
+  },
+  {
+   "expression": "count == 75",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:75"
+   ]
+  },
+  {
+   "expression": "count == 76",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:76"
+   ]
+  },
+  {
+   "expression": "count == 77",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:77"
+   ]
+  },
+  {
+   "expression": "count == 78",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:78"
+   ]
+  },
+  {
+   "expression": "count == 79",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:79"
+   ]
+  },
+  {
+   "expression": "count == 80",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:80"
+   ]
+  },
+  {
+   "expression": "count == 81",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:81"
+   ]
+  },
+  {
+   "expression": "count == 82",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:82"
+   ]
+  },
+  {
+   "expression": "count == 83",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:83"
+   ]
+  },
+  {
+   "expression": "count == 84",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:84"
+   ]
+  },
+  {
+   "expression": "count == 85",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:85"
+   ]
+  },
+  {
+   "expression": "count == 86",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:86"
+   ]
+  },
+  {
+   "expression": "count == 87",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:87"
+   ]
+  },
+  {
+   "expression": "count == 88",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:88"
+   ]
+  },
+  {
+   "expression": "count == 89",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:89"
+   ]
+  },
+  {
+   "expression": "count == 90",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:90"
+   ]
+  },
+  {
+   "expression": "count == 91",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:91"
+   ]
+  },
+  {
+   "expression": "count == 92",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:92"
+   ]
+  },
+  {
+   "expression": "count == 93",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:93"
+   ]
+  },
+  {
+   "expression": "count == 94",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:94"
+   ]
+  },
+  {
+   "expression": "count == 95",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:95"
+   ]
+  },
+  {
+   "expression": "count == 96",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:96"
+   ]
+  },
+  {
+   "expression": "count == 97",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:97"
+   ]
+  },
+  {
+   "expression": "count == 98",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:98"
+   ]
+  },
+  {
+   "expression": "count == 99",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:99"
+   ]
+  },
+  {
+   "expression": "count == 100",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:100"
+   ]
+  },
+  {
+   "expression": "count == 101",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:101"
+   ]
+  },
+  {
+   "expression": "count == 102",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:102"
+   ]
+  },
+  {
+   "expression": "count == 103",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:103"
+   ]
+  },
+  {
+   "expression": "count == 104",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:104"
+   ]
+  },
+  {
+   "expression": "count == 105",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:105"
+   ]
+  },
+  {
+   "expression": "count == 106",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:106"
+   ]
+  },
+  {
+   "expression": "count == 107",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:107"
+   ]
+  },
+  {
+   "expression": "count == 108",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:108"
+   ]
+  },
+  {
+   "expression": "count == 109",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:109"
+   ]
+  },
+  {
+   "expression": "count == 110",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:110"
+   ]
+  },
+  {
+   "expression": "count == 111",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:111"
+   ]
+  },
+  {
+   "expression": "count == 112",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:112"
+   ]
+  },
+  {
+   "expression": "count == 113",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:113"
+   ]
+  },
+  {
+   "expression": "count == 114",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:114"
+   ]
+  },
+  {
+   "expression": "count == 115",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:115"
+   ]
+  },
+  {
+   "expression": "count == 116",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:116"
+   ]
+  },
+  {
+   "expression": "count == 117",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:117"
+   ]
+  },
+  {
+   "expression": "count == 118",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:118"
+   ]
+  },
+  {
+   "expression": "count == 119",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:119"
+   ]
+  },
+  {
+   "expression": "count == 120",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:120"
+   ]
+  },
+  {
+   "expression": "count == 121",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:121"
+   ]
+  },
+  {
+   "expression": "count == 122",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:122"
+   ]
+  },
+  {
+   "expression": "count == 123",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:123"
+   ]
+  },
+  {
+   "expression": "count == 124",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:124"
+   ]
+  },
+  {
+   "expression": "count == 125",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:125"
+   ]
+  },
+  {
+   "expression": "count == 126",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:126"
+   ]
+  },
+  {
+   "expression": "count == 127",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:127"
+   ]
+  },
+  {
+   "expression": "count == 128",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:128"
+   ]
+  },
+  {
+   "expression": "count == 129",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:129"
+   ]
+  },
+  {
+   "expression": "count == 130",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:130"
+   ]
+  },
+  {
+   "expression": "count == 131",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:131"
+   ]
+  },
+  {
+   "expression": "count == 132",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:132"
+   ]
+  },
+  {
+   "expression": "count == 133",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:133"
+   ]
+  },
+  {
+   "expression": "count == 134",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:134"
+   ]
+  },
+  {
+   "expression": "count == 135",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:135"
+   ]
+  },
+  {
+   "expression": "count == 136",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:136"
+   ]
+  },
+  {
+   "expression": "count == 137",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:137"
+   ]
+  },
+  {
+   "expression": "count == 138",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:138"
+   ]
+  },
+  {
+   "expression": "count == 139",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:139"
+   ]
+  },
+  {
+   "expression": "count == 140",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:140"
+   ]
+  },
+  {
+   "expression": "count == 141",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:141"
+   ]
+  },
+  {
+   "expression": "count == 142",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:142"
+   ]
+  },
+  {
+   "expression": "count == 143",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:143"
+   ]
+  },
+  {
+   "expression": "count == 144",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:144"
+   ]
+  },
+  {
+   "expression": "count == 145",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:145"
+   ]
+  },
+  {
+   "expression": "count == 146",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:146"
+   ]
+  },
+  {
+   "expression": "count == 147",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:147"
+   ]
+  },
+  {
+   "expression": "count == 148",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:148"
+   ]
+  },
+  {
+   "expression": "count == 149",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:149"
+   ]
+  },
+  {
+   "expression": "count == 150",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:150"
+   ]
+  },
+  {
+   "expression": "count == 151",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:151"
+   ]
+  },
+  {
+   "expression": "count == 152",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:152"
+   ]
+  },
+  {
+   "expression": "count == 153",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:153"
+   ]
+  },
+  {
+   "expression": "count == 154",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:154"
+   ]
+  },
+  {
+   "expression": "count == 155",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:155"
+   ]
+  },
+  {
+   "expression": "count == 156",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:156"
+   ]
+  },
+  {
+   "expression": "count == 157",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:157"
+   ]
+  },
+  {
+   "expression": "count == 158",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:158"
+   ]
+  },
+  {
+   "expression": "count == 159",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:159"
+   ]
+  },
+  {
+   "expression": "count == 160",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:160"
+   ]
+  },
+  {
+   "expression": "count == 161",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:161"
+   ]
+  },
+  {
+   "expression": "count == 162",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:162"
+   ]
+  },
+  {
+   "expression": "count == 163",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:163"
+   ]
+  },
+  {
+   "expression": "count == 164",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:164"
+   ]
+  },
+  {
+   "expression": "count == 165",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:165"
+   ]
+  },
+  {
+   "expression": "count == 166",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:166"
+   ]
+  },
+  {
+   "expression": "count == 167",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:167"
+   ]
+  },
+  {
+   "expression": "count == 168",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:168"
+   ]
+  },
+  {
+   "expression": "count == 169",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:169"
+   ]
+  },
+  {
+   "expression": "count == 170",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:170"
+   ]
+  },
+  {
+   "expression": "count == 171",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:171"
+   ]
+  },
+  {
+   "expression": "count == 172",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:172"
+   ]
+  },
+  {
+   "expression": "count == 173",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:173"
+   ]
+  },
+  {
+   "expression": "count == 174",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:174"
+   ]
+  },
+  {
+   "expression": "count == 175",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:175"
+   ]
+  },
+  {
+   "expression": "count == 176",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:176"
+   ]
+  },
+  {
+   "expression": "count == 177",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:177"
+   ]
+  },
+  {
+   "expression": "count == 178",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:178"
+   ]
+  },
+  {
+   "expression": "count == 179",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:179"
+   ]
+  },
+  {
+   "expression": "count == 180",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:180"
+   ]
+  },
+  {
+   "expression": "count == 181",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:181"
+   ]
+  },
+  {
+   "expression": "count == 182",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:182"
+   ]
+  },
+  {
+   "expression": "count == 183",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:183"
+   ]
+  },
+  {
+   "expression": "count == 184",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:184"
+   ]
+  },
+  {
+   "expression": "count == 185",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:185"
+   ]
+  },
+  {
+   "expression": "count == 186",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:186"
+   ]
+  },
+  {
+   "expression": "count == 187",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:187"
+   ]
+  },
+  {
+   "expression": "count == 188",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:188"
+   ]
+  },
+  {
+   "expression": "count == 189",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:189"
+   ]
+  },
+  {
+   "expression": "count == 190",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:190"
+   ]
+  },
+  {
+   "expression": "count == 191",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:191"
+   ]
+  },
+  {
+   "expression": "count == 192",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:192"
+   ]
+  },
+  {
+   "expression": "count == 193",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:193"
+   ]
+  },
+  {
+   "expression": "count == 194",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:194"
+   ]
+  },
+  {
+   "expression": "count == 195",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:195"
+   ]
+  },
+  {
+   "expression": "count == 196",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:196"
+   ]
+  },
+  {
+   "expression": "count == 197",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:197"
+   ]
+  },
+  {
+   "expression": "count == 198",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:198"
+   ]
+  },
+  {
+   "expression": "count == 199",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:199"
+   ]
+  },
+  {
+   "expression": "visitCount > 5",
+   "tokens": [
+    "VARIABLE:visitCount",
+    "GREATER_THAN:>",
+    "NUMBER:5"
+   ]
+  },
+  {
+   "expression": "badCount > 5",
+   "tokens": [
+    "VARIABLE:badCount",
+    "GREATER_THAN:>",
+    "NUMBER:5"
+   ]
+  },
+  {
+   "expression": "guestGender == GENDER_FEMININE",
+   "tokens": [
+    "VARIABLE:guestGender",
+    "EQUAL_TO:==",
+    "GENDER_FEMININE:GENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "rank > 1",
+   "tokens": [
+    "VARIABLE:rank",
+    "GREATER_THAN:>",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "tier == 1",
+   "tokens": [
+    "VARIABLE:tier",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "itemCount == CARDINALITY_OTHER",
+   "tokens": [
+    "VARIABLE:itemCount",
+    "EQUAL_TO:==",
+    "CARDINALITY_OTHER:CARDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "itemCount == CARDINALITY_FEW",
+   "tokens": [
+    "VARIABLE:itemCount",
+    "EQUAL_TO:==",
+    "CARDINALITY_FEW:CARDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "itemCount == CARDINALITY_MANY",
+   "tokens": [
+    "VARIABLE:itemCount",
+    "EQUAL_TO:==",
+    "CARDINALITY_MANY:CARDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "itemCount == CARDINALITY_ONE",
+   "tokens": [
+    "VARIABLE:itemCount",
+    "EQUAL_TO:==",
+    "CARDINALITY_ONE:CARDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "left == right",
+   "tokens": [
+    "VARIABLE:left",
+    "EQUAL_TO:==",
+    "VARIABLE:right"
+   ]
+  },
+  {
+   "expression": "left != right",
+   "tokens": [
+    "VARIABLE:left",
+    "NOT_EQUAL_TO:!=",
+    "VARIABLE:right"
+   ]
+  },
+  {
+   "expression": "left < right",
+   "tokens": [
+    "VARIABLE:left",
+    "LESS_THAN:<",
+    "VARIABLE:right"
+   ]
+  },
+  {
+   "expression": "value < 5",
+   "tokens": [
+    "VARIABLE:value",
+    "LESS_THAN:<",
+    "NUMBER:5"
+   ]
+  },
+  {
+   "expression": "value == CARDINALITY_ONE",
+   "tokens": [
+    "VARIABLE:value",
+    "EQUAL_TO:==",
+    "CARDINALITY_ONE:CARDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "value == GENDER_FEMININE",
+   "tokens": [
+    "VARIABLE:value",
+    "EQUAL_TO:==",
+    "GENDER_FEMININE:GENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "value == 5",
+   "tokens": [
+    "VARIABLE:value",
+    "EQUAL_TO:==",
+    "NUMBER:5"
+   ]
+  },
+  {
+   "expression": "value == ORDINALITY_TWO",
+   "tokens": [
+    "VARIABLE:value",
+    "EQUAL_TO:==",
+    "ORDINALITY_TWO:ORDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "value == PHONETIC_VOWEL",
+   "tokens": [
+    "VARIABLE:value",
+    "EQUAL_TO:==",
+    "PHONETIC_VOWEL:PHONETIC_VOWEL"
+   ]
+  },
+  {
+   "expression": "absentLeft == 1",
+   "tokens": [
+    "VARIABLE:absentLeft",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "alpha == 1",
+   "tokens": [
+    "VARIABLE:alpha",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "beta == 1",
+   "tokens": [
+    "VARIABLE:beta",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "alpha == 1 || absentRight == 1",
+   "tokens": [
+    "VARIABLE:alpha",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "OR:||",
+    "VARIABLE:absentRight",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "alpha == 1 || beta == 1 && gamma == 1",
+   "tokens": [
+    "VARIABLE:alpha",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "OR:||",
+    "VARIABLE:beta",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "AND:&&",
+    "VARIABLE:gamma",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "alpha == 1 && absentRight == 1 || beta == 1",
+   "tokens": [
+    "VARIABLE:alpha",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "AND:&&",
+    "VARIABLE:absentRight",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "OR:||",
+    "VARIABLE:beta",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "alpha == 1 || absentLeft == 1 && absentRight == 1",
+   "tokens": [
+    "VARIABLE:alpha",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "OR:||",
+    "VARIABLE:absentLeft",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "AND:&&",
+    "VARIABLE:absentRight",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "(alpha == 1 || beta == 1) && gamma == 1",
+   "tokens": [
+    "GROUP_START:(",
+    "VARIABLE:alpha",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "OR:||",
+    "VARIABLE:beta",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "GROUP_END:)",
+    "AND:&&",
+    "VARIABLE:gamma",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "alpha == 1 && (beta == 1 || absentRight == 1)",
+   "tokens": [
+    "VARIABLE:alpha",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "AND:&&",
+    "GROUP_START:(",
+    "VARIABLE:beta",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "OR:||",
+    "VARIABLE:absentRight",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "alpha == 1 && absentRight == 1",
+   "tokens": [
+    "VARIABLE:alpha",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "AND:&&",
+    "VARIABLE:absentRight",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "absentLeft == 1 || alpha == 1",
+   "tokens": [
+    "VARIABLE:absentLeft",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "OR:||",
+    "VARIABLE:alpha",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "alpha == 1 || rawRight == 5",
+   "tokens": [
+    "VARIABLE:alpha",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "OR:||",
+    "VARIABLE:rawRight",
+    "EQUAL_TO:==",
+    "NUMBER:5"
+   ]
+  },
+  {
+   "expression": "itemCount > 100",
+   "tokens": [
+    "VARIABLE:itemCount",
+    "GREATER_THAN:>",
+    "NUMBER:100"
+   ]
+  },
+  {
+   "expression": "absentFlag == 1",
+   "tokens": [
+    "VARIABLE:absentFlag",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "orderCount == 0",
+   "tokens": [
+    "VARIABLE:orderCount",
+    "EQUAL_TO:==",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "recipientGender == GENDER_FEMININE",
+   "tokens": [
+    "VARIABLE:recipientGender",
+    "EQUAL_TO:==",
+    "GENDER_FEMININE:GENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "recipientGender == GENDER_MASCULINE",
+   "tokens": [
+    "VARIABLE:recipientGender",
+    "EQUAL_TO:==",
+    "GENDER_MASCULINE:GENDER_MASCULINE"
+   ]
+  },
+  {
+   "expression": "packageCount == 0",
+   "tokens": [
+    "VARIABLE:packageCount",
+    "EQUAL_TO:==",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "packageCount == 1",
+   "tokens": [
+    "VARIABLE:packageCount",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "packageCount > 1",
+   "tokens": [
+    "VARIABLE:packageCount",
+    "GREATER_THAN:>",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "guestGender == GENDER_MASCULINE",
+   "tokens": [
+    "VARIABLE:guestGender",
+    "EQUAL_TO:==",
+    "GENDER_MASCULINE:GENDER_MASCULINE"
+   ]
+  },
+  {
+   "expression": "visitCount > 0",
+   "tokens": [
+    "VARIABLE:visitCount",
+    "GREATER_THAN:>",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "winnerGender == GENDER_NEUTER",
+   "tokens": [
+    "VARIABLE:winnerGender",
+    "EQUAL_TO:==",
+    "GENDER_NEUTER:GENDER_NEUTER"
+   ]
+  },
+  {
+   "expression": "formality == FORMALITY_HONORIFIC",
+   "tokens": [
+    "VARIABLE:formality",
+    "EQUAL_TO:==",
+    "FORMALITY_HONORIFIC:FORMALITY_HONORIFIC"
+   ]
+  },
+  {
+   "expression": "mode == 1",
+   "tokens": [
+    "VARIABLE:mode",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "safe == 1",
+   "tokens": [
+    "VARIABLE:safe",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "bookCount > 100",
+   "tokens": [
+    "VARIABLE:bookCount",
+    "GREATER_THAN:>",
+    "NUMBER:100"
+   ]
+  },
+  {
+   "expression": "bookCount > 1000",
+   "tokens": [
+    "VARIABLE:bookCount",
+    "GREATER_THAN:>",
+    "NUMBER:1000"
+   ]
+  },
+  {
+   "expression": "itemCount > 0 && itemCount < 3",
+   "tokens": [
+    "VARIABLE:itemCount",
+    "GREATER_THAN:>",
+    "NUMBER:0",
+    "AND:&&",
+    "VARIABLE:itemCount",
+    "LESS_THAN:<",
+    "NUMBER:3"
+   ]
+  },
+  {
+   "expression": "itemCount == 0",
+   "tokens": [
+    "VARIABLE:itemCount",
+    "EQUAL_TO:==",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "level >= 1",
+   "tokens": [
+    "VARIABLE:level",
+    "GREATER_THAN_OR_EQUAL_TO:>=",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "level >= 2",
+   "tokens": [
+    "VARIABLE:level",
+    "GREATER_THAN_OR_EQUAL_TO:>=",
+    "NUMBER:2"
+   ]
+  },
+  {
+   "expression": "authorId == 7",
+   "tokens": [
+    "VARIABLE:authorId",
+    "EQUAL_TO:==",
+    "NUMBER:7"
+   ]
+  },
+  {
+   "expression": "jobCount > 0",
+   "tokens": [
+    "VARIABLE:jobCount",
+    "GREATER_THAN:>",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "finished == 1",
+   "tokens": [
+    "VARIABLE:finished",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "size == 10",
+   "tokens": [
+    "VARIABLE:size",
+    "EQUAL_TO:==",
+    "NUMBER:10"
+   ]
+  },
+  {
+   "expression": "vip == 1",
+   "tokens": [
+    "VARIABLE:vip",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "count ==",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:=="
+   ]
+  },
+  {
+   "expression": "(count == 0",
+   "tokens": [
+    "GROUP_START:(",
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "",
+   "tokens": []
+  },
+  {
+   "expression": "count == 0 &&",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:0",
+    "AND:&&"
+   ]
+  },
+  {
+   "expression": "count 0",
+   "tokens": [
+    "VARIABLE:count",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "count =? 0",
+   "error": "Unexpected code point U+003D at index 6 while evaluating expression 'count =? 0'. Did you mean '=='?"
+  },
+  {
+   "expression": "count == 0 == 1",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:0",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "count == 0)",
+   "tokens": [
+    "VARIABLE:count",
+    "EQUAL_TO:==",
+    "NUMBER:0",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "bookCount == 0",
+   "tokens": [
+    "VARIABLE:bookCount",
+    "EQUAL_TO:==",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "orderId == 9007199254740993",
+   "tokens": [
+    "VARIABLE:orderId",
+    "EQUAL_TO:==",
+    "NUMBER:9007199254740993"
+   ]
+  },
+  {
+   "expression": "orderId == 100000000000000000001",
+   "tokens": [
+    "VARIABLE:orderId",
+    "EQUAL_TO:==",
+    "NUMBER:100000000000000000001"
+   ]
+  },
+  {
+   "expression": "noun == PHONETIC_VOWEL",
+   "tokens": [
+    "VARIABLE:noun",
+    "EQUAL_TO:==",
+    "PHONETIC_VOWEL:PHONETIC_VOWEL"
+   ]
+  },
+  {
+   "expression": "noun == PHONETIC_CONSONANT",
+   "tokens": [
+    "VARIABLE:noun",
+    "EQUAL_TO:==",
+    "PHONETIC_CONSONANT:PHONETIC_CONSONANT"
+   ]
+  },
+  {
+   "expression": "n == 1",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "who == GENDER_FEMININE",
+   "tokens": [
+    "VARIABLE:who",
+    "EQUAL_TO:==",
+    "GENDER_FEMININE:GENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "(a > 0) && b == 1",
+   "tokens": [
+    "GROUP_START:(",
+    "VARIABLE:a",
+    "GREATER_THAN:>",
+    "NUMBER:0",
+    "GROUP_END:)",
+    "AND:&&",
+    "VARIABLE:b",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "(a > 1) && a == 2",
+   "tokens": [
+    "GROUP_START:(",
+    "VARIABLE:a",
+    "GREATER_THAN:>",
+    "NUMBER:1",
+    "GROUP_END:)",
+    "AND:&&",
+    "VARIABLE:a",
+    "EQUAL_TO:==",
+    "NUMBER:2"
+   ]
+  },
+  {
+   "expression": "a > 0 && b == 1",
+   "tokens": [
+    "VARIABLE:a",
+    "GREATER_THAN:>",
+    "NUMBER:0",
+    "AND:&&",
+    "VARIABLE:b",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "a > 1 && a == 2",
+   "tokens": [
+    "VARIABLE:a",
+    "GREATER_THAN:>",
+    "NUMBER:1",
+    "AND:&&",
+    "VARIABLE:a",
+    "EQUAL_TO:==",
+    "NUMBER:2"
+   ]
+  },
+  {
+   "expression": "n == 1.234",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1.234"
+   ]
+  },
+  {
+   "expression": "n > 0",
+   "tokens": [
+    "VARIABLE:n",
+    "GREATER_THAN:>",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "n > 1",
+   "tokens": [
+    "VARIABLE:n",
+    "GREATER_THAN:>",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "n > 100",
+   "tokens": [
+    "VARIABLE:n",
+    "GREATER_THAN:>",
+    "NUMBER:100"
+   ]
+  },
+  {
+   "expression": "n < 10",
+   "tokens": [
+    "VARIABLE:n",
+    "LESS_THAN:<",
+    "NUMBER:10"
+   ]
+  },
+  {
+   "expression": "n < 5",
+   "tokens": [
+    "VARIABLE:n",
+    "LESS_THAN:<",
+    "NUMBER:5"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ZERO",
+   "tokens": [
+    "CARDINALITY_ZERO:CARDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "x == CARDINALITY_ZERO",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CARDINALITY_ZERO:CARDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ZEROX",
+   "tokens": [
+    "VARIABLE:CARDINALITY_ZEROX"
+   ]
+  },
+  {
+   "expression": "myCARDINALITY_ZERO",
+   "tokens": [
+    "VARIABLE:myCARDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ZERO_",
+   "tokens": [
+    "VARIABLE:CARDINALITY_ZERO_"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ZERO1",
+   "tokens": [
+    "VARIABLE:CARDINALITY_ZERO1"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ZERO-y",
+   "tokens": [
+    "VARIABLE:CARDINALITY_ZERO-y"
+   ]
+  },
+  {
+   "expression": "(CARDINALITY_ZERO)",
+   "tokens": [
+    "GROUP_START:(",
+    "CARDINALITY_ZERO:CARDINALITY_ZERO",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ZEROCARDINALITY_ZERO",
+   "tokens": [
+    "VARIABLE:CARDINALITY_ZEROCARDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "_CARDINALITY_ZERO",
+   "tokens": [
+    "VARIABLE:_CARDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "cardinality_zero",
+   "tokens": [
+    "VARIABLE:cardinality_zero"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ZERO == CARDINALITY_ZERO",
+   "tokens": [
+    "CARDINALITY_ZERO:CARDINALITY_ZERO",
+    "EQUAL_TO:==",
+    "CARDINALITY_ZERO:CARDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "0CARDINALITY_ZERO",
+   "tokens": [
+    "NUMBER:0",
+    "CARDINALITY_ZERO:CARDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ZERO.",
+   "error": "Unexpected code point U+002E at index 16 while evaluating expression 'CARDINALITY_ZERO.'."
+  },
+  {
+   "expression": "CARDINALITY_ONE",
+   "tokens": [
+    "CARDINALITY_ONE:CARDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "x == CARDINALITY_ONE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CARDINALITY_ONE:CARDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ONEX",
+   "tokens": [
+    "VARIABLE:CARDINALITY_ONEX"
+   ]
+  },
+  {
+   "expression": "myCARDINALITY_ONE",
+   "tokens": [
+    "VARIABLE:myCARDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ONE_",
+   "tokens": [
+    "VARIABLE:CARDINALITY_ONE_"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ONE1",
+   "tokens": [
+    "VARIABLE:CARDINALITY_ONE1"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ONE-y",
+   "tokens": [
+    "VARIABLE:CARDINALITY_ONE-y"
+   ]
+  },
+  {
+   "expression": "(CARDINALITY_ONE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CARDINALITY_ONE:CARDINALITY_ONE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ONECARDINALITY_ONE",
+   "tokens": [
+    "VARIABLE:CARDINALITY_ONECARDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "_CARDINALITY_ONE",
+   "tokens": [
+    "VARIABLE:_CARDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "cardinality_one",
+   "tokens": [
+    "VARIABLE:cardinality_one"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ONE == CARDINALITY_ONE",
+   "tokens": [
+    "CARDINALITY_ONE:CARDINALITY_ONE",
+    "EQUAL_TO:==",
+    "CARDINALITY_ONE:CARDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "0CARDINALITY_ONE",
+   "tokens": [
+    "NUMBER:0",
+    "CARDINALITY_ONE:CARDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_ONE.",
+   "error": "Unexpected code point U+002E at index 15 while evaluating expression 'CARDINALITY_ONE.'."
+  },
+  {
+   "expression": "CARDINALITY_TWO",
+   "tokens": [
+    "CARDINALITY_TWO:CARDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "x == CARDINALITY_TWO",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CARDINALITY_TWO:CARDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_TWOX",
+   "tokens": [
+    "VARIABLE:CARDINALITY_TWOX"
+   ]
+  },
+  {
+   "expression": "myCARDINALITY_TWO",
+   "tokens": [
+    "VARIABLE:myCARDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_TWO_",
+   "tokens": [
+    "VARIABLE:CARDINALITY_TWO_"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_TWO1",
+   "tokens": [
+    "VARIABLE:CARDINALITY_TWO1"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_TWO-y",
+   "tokens": [
+    "VARIABLE:CARDINALITY_TWO-y"
+   ]
+  },
+  {
+   "expression": "(CARDINALITY_TWO)",
+   "tokens": [
+    "GROUP_START:(",
+    "CARDINALITY_TWO:CARDINALITY_TWO",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_TWOCARDINALITY_TWO",
+   "tokens": [
+    "VARIABLE:CARDINALITY_TWOCARDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "_CARDINALITY_TWO",
+   "tokens": [
+    "VARIABLE:_CARDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "cardinality_two",
+   "tokens": [
+    "VARIABLE:cardinality_two"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_TWO == CARDINALITY_TWO",
+   "tokens": [
+    "CARDINALITY_TWO:CARDINALITY_TWO",
+    "EQUAL_TO:==",
+    "CARDINALITY_TWO:CARDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "0CARDINALITY_TWO",
+   "tokens": [
+    "NUMBER:0",
+    "CARDINALITY_TWO:CARDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_TWO.",
+   "error": "Unexpected code point U+002E at index 15 while evaluating expression 'CARDINALITY_TWO.'."
+  },
+  {
+   "expression": "CARDINALITY_FEW",
+   "tokens": [
+    "CARDINALITY_FEW:CARDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "x == CARDINALITY_FEW",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CARDINALITY_FEW:CARDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_FEWX",
+   "tokens": [
+    "VARIABLE:CARDINALITY_FEWX"
+   ]
+  },
+  {
+   "expression": "myCARDINALITY_FEW",
+   "tokens": [
+    "VARIABLE:myCARDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_FEW_",
+   "tokens": [
+    "VARIABLE:CARDINALITY_FEW_"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_FEW1",
+   "tokens": [
+    "VARIABLE:CARDINALITY_FEW1"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_FEW-y",
+   "tokens": [
+    "VARIABLE:CARDINALITY_FEW-y"
+   ]
+  },
+  {
+   "expression": "(CARDINALITY_FEW)",
+   "tokens": [
+    "GROUP_START:(",
+    "CARDINALITY_FEW:CARDINALITY_FEW",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_FEWCARDINALITY_FEW",
+   "tokens": [
+    "VARIABLE:CARDINALITY_FEWCARDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "_CARDINALITY_FEW",
+   "tokens": [
+    "VARIABLE:_CARDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "cardinality_few",
+   "tokens": [
+    "VARIABLE:cardinality_few"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_FEW == CARDINALITY_FEW",
+   "tokens": [
+    "CARDINALITY_FEW:CARDINALITY_FEW",
+    "EQUAL_TO:==",
+    "CARDINALITY_FEW:CARDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "0CARDINALITY_FEW",
+   "tokens": [
+    "NUMBER:0",
+    "CARDINALITY_FEW:CARDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_FEW.",
+   "error": "Unexpected code point U+002E at index 15 while evaluating expression 'CARDINALITY_FEW.'."
+  },
+  {
+   "expression": "CARDINALITY_MANY",
+   "tokens": [
+    "CARDINALITY_MANY:CARDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "x == CARDINALITY_MANY",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CARDINALITY_MANY:CARDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_MANYX",
+   "tokens": [
+    "VARIABLE:CARDINALITY_MANYX"
+   ]
+  },
+  {
+   "expression": "myCARDINALITY_MANY",
+   "tokens": [
+    "VARIABLE:myCARDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_MANY_",
+   "tokens": [
+    "VARIABLE:CARDINALITY_MANY_"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_MANY1",
+   "tokens": [
+    "VARIABLE:CARDINALITY_MANY1"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_MANY-y",
+   "tokens": [
+    "VARIABLE:CARDINALITY_MANY-y"
+   ]
+  },
+  {
+   "expression": "(CARDINALITY_MANY)",
+   "tokens": [
+    "GROUP_START:(",
+    "CARDINALITY_MANY:CARDINALITY_MANY",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_MANYCARDINALITY_MANY",
+   "tokens": [
+    "VARIABLE:CARDINALITY_MANYCARDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "_CARDINALITY_MANY",
+   "tokens": [
+    "VARIABLE:_CARDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "cardinality_many",
+   "tokens": [
+    "VARIABLE:cardinality_many"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_MANY == CARDINALITY_MANY",
+   "tokens": [
+    "CARDINALITY_MANY:CARDINALITY_MANY",
+    "EQUAL_TO:==",
+    "CARDINALITY_MANY:CARDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "0CARDINALITY_MANY",
+   "tokens": [
+    "NUMBER:0",
+    "CARDINALITY_MANY:CARDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_MANY.",
+   "error": "Unexpected code point U+002E at index 16 while evaluating expression 'CARDINALITY_MANY.'."
+  },
+  {
+   "expression": "CARDINALITY_OTHER",
+   "tokens": [
+    "CARDINALITY_OTHER:CARDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "x == CARDINALITY_OTHER",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CARDINALITY_OTHER:CARDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_OTHERX",
+   "tokens": [
+    "VARIABLE:CARDINALITY_OTHERX"
+   ]
+  },
+  {
+   "expression": "myCARDINALITY_OTHER",
+   "tokens": [
+    "VARIABLE:myCARDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_OTHER_",
+   "tokens": [
+    "VARIABLE:CARDINALITY_OTHER_"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_OTHER1",
+   "tokens": [
+    "VARIABLE:CARDINALITY_OTHER1"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_OTHER-y",
+   "tokens": [
+    "VARIABLE:CARDINALITY_OTHER-y"
+   ]
+  },
+  {
+   "expression": "(CARDINALITY_OTHER)",
+   "tokens": [
+    "GROUP_START:(",
+    "CARDINALITY_OTHER:CARDINALITY_OTHER",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_OTHERCARDINALITY_OTHER",
+   "tokens": [
+    "VARIABLE:CARDINALITY_OTHERCARDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "_CARDINALITY_OTHER",
+   "tokens": [
+    "VARIABLE:_CARDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "cardinality_other",
+   "tokens": [
+    "VARIABLE:cardinality_other"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_OTHER == CARDINALITY_OTHER",
+   "tokens": [
+    "CARDINALITY_OTHER:CARDINALITY_OTHER",
+    "EQUAL_TO:==",
+    "CARDINALITY_OTHER:CARDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "0CARDINALITY_OTHER",
+   "tokens": [
+    "NUMBER:0",
+    "CARDINALITY_OTHER:CARDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "CARDINALITY_OTHER.",
+   "error": "Unexpected code point U+002E at index 17 while evaluating expression 'CARDINALITY_OTHER.'."
+  },
+  {
+   "expression": "ORDINALITY_ZERO",
+   "tokens": [
+    "ORDINALITY_ZERO:ORDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "x == ORDINALITY_ZERO",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "ORDINALITY_ZERO:ORDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ZEROX",
+   "tokens": [
+    "VARIABLE:ORDINALITY_ZEROX"
+   ]
+  },
+  {
+   "expression": "myORDINALITY_ZERO",
+   "tokens": [
+    "VARIABLE:myORDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ZERO_",
+   "tokens": [
+    "VARIABLE:ORDINALITY_ZERO_"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ZERO1",
+   "tokens": [
+    "VARIABLE:ORDINALITY_ZERO1"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ZERO-y",
+   "tokens": [
+    "VARIABLE:ORDINALITY_ZERO-y"
+   ]
+  },
+  {
+   "expression": "(ORDINALITY_ZERO)",
+   "tokens": [
+    "GROUP_START:(",
+    "ORDINALITY_ZERO:ORDINALITY_ZERO",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ZEROORDINALITY_ZERO",
+   "tokens": [
+    "VARIABLE:ORDINALITY_ZEROORDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "_ORDINALITY_ZERO",
+   "tokens": [
+    "VARIABLE:_ORDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "ordinality_zero",
+   "tokens": [
+    "VARIABLE:ordinality_zero"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ZERO == ORDINALITY_ZERO",
+   "tokens": [
+    "ORDINALITY_ZERO:ORDINALITY_ZERO",
+    "EQUAL_TO:==",
+    "ORDINALITY_ZERO:ORDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "0ORDINALITY_ZERO",
+   "tokens": [
+    "NUMBER:0",
+    "ORDINALITY_ZERO:ORDINALITY_ZERO"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ZERO.",
+   "error": "Unexpected code point U+002E at index 15 while evaluating expression 'ORDINALITY_ZERO.'."
+  },
+  {
+   "expression": "ORDINALITY_ONE",
+   "tokens": [
+    "ORDINALITY_ONE:ORDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "x == ORDINALITY_ONE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "ORDINALITY_ONE:ORDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ONEX",
+   "tokens": [
+    "VARIABLE:ORDINALITY_ONEX"
+   ]
+  },
+  {
+   "expression": "myORDINALITY_ONE",
+   "tokens": [
+    "VARIABLE:myORDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ONE_",
+   "tokens": [
+    "VARIABLE:ORDINALITY_ONE_"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ONE1",
+   "tokens": [
+    "VARIABLE:ORDINALITY_ONE1"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ONE-y",
+   "tokens": [
+    "VARIABLE:ORDINALITY_ONE-y"
+   ]
+  },
+  {
+   "expression": "(ORDINALITY_ONE)",
+   "tokens": [
+    "GROUP_START:(",
+    "ORDINALITY_ONE:ORDINALITY_ONE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ONEORDINALITY_ONE",
+   "tokens": [
+    "VARIABLE:ORDINALITY_ONEORDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "_ORDINALITY_ONE",
+   "tokens": [
+    "VARIABLE:_ORDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "ordinality_one",
+   "tokens": [
+    "VARIABLE:ordinality_one"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ONE == ORDINALITY_ONE",
+   "tokens": [
+    "ORDINALITY_ONE:ORDINALITY_ONE",
+    "EQUAL_TO:==",
+    "ORDINALITY_ONE:ORDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "0ORDINALITY_ONE",
+   "tokens": [
+    "NUMBER:0",
+    "ORDINALITY_ONE:ORDINALITY_ONE"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_ONE.",
+   "error": "Unexpected code point U+002E at index 14 while evaluating expression 'ORDINALITY_ONE.'."
+  },
+  {
+   "expression": "ORDINALITY_TWO",
+   "tokens": [
+    "ORDINALITY_TWO:ORDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "x == ORDINALITY_TWO",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "ORDINALITY_TWO:ORDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_TWOX",
+   "tokens": [
+    "VARIABLE:ORDINALITY_TWOX"
+   ]
+  },
+  {
+   "expression": "myORDINALITY_TWO",
+   "tokens": [
+    "VARIABLE:myORDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_TWO_",
+   "tokens": [
+    "VARIABLE:ORDINALITY_TWO_"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_TWO1",
+   "tokens": [
+    "VARIABLE:ORDINALITY_TWO1"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_TWO-y",
+   "tokens": [
+    "VARIABLE:ORDINALITY_TWO-y"
+   ]
+  },
+  {
+   "expression": "(ORDINALITY_TWO)",
+   "tokens": [
+    "GROUP_START:(",
+    "ORDINALITY_TWO:ORDINALITY_TWO",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_TWOORDINALITY_TWO",
+   "tokens": [
+    "VARIABLE:ORDINALITY_TWOORDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "_ORDINALITY_TWO",
+   "tokens": [
+    "VARIABLE:_ORDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "ordinality_two",
+   "tokens": [
+    "VARIABLE:ordinality_two"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_TWO == ORDINALITY_TWO",
+   "tokens": [
+    "ORDINALITY_TWO:ORDINALITY_TWO",
+    "EQUAL_TO:==",
+    "ORDINALITY_TWO:ORDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "0ORDINALITY_TWO",
+   "tokens": [
+    "NUMBER:0",
+    "ORDINALITY_TWO:ORDINALITY_TWO"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_TWO.",
+   "error": "Unexpected code point U+002E at index 14 while evaluating expression 'ORDINALITY_TWO.'."
+  },
+  {
+   "expression": "ORDINALITY_FEW",
+   "tokens": [
+    "ORDINALITY_FEW:ORDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "x == ORDINALITY_FEW",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "ORDINALITY_FEW:ORDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_FEWX",
+   "tokens": [
+    "VARIABLE:ORDINALITY_FEWX"
+   ]
+  },
+  {
+   "expression": "myORDINALITY_FEW",
+   "tokens": [
+    "VARIABLE:myORDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_FEW_",
+   "tokens": [
+    "VARIABLE:ORDINALITY_FEW_"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_FEW1",
+   "tokens": [
+    "VARIABLE:ORDINALITY_FEW1"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_FEW-y",
+   "tokens": [
+    "VARIABLE:ORDINALITY_FEW-y"
+   ]
+  },
+  {
+   "expression": "(ORDINALITY_FEW)",
+   "tokens": [
+    "GROUP_START:(",
+    "ORDINALITY_FEW:ORDINALITY_FEW",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_FEWORDINALITY_FEW",
+   "tokens": [
+    "VARIABLE:ORDINALITY_FEWORDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "_ORDINALITY_FEW",
+   "tokens": [
+    "VARIABLE:_ORDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "ordinality_few",
+   "tokens": [
+    "VARIABLE:ordinality_few"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_FEW == ORDINALITY_FEW",
+   "tokens": [
+    "ORDINALITY_FEW:ORDINALITY_FEW",
+    "EQUAL_TO:==",
+    "ORDINALITY_FEW:ORDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "0ORDINALITY_FEW",
+   "tokens": [
+    "NUMBER:0",
+    "ORDINALITY_FEW:ORDINALITY_FEW"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_FEW.",
+   "error": "Unexpected code point U+002E at index 14 while evaluating expression 'ORDINALITY_FEW.'."
+  },
+  {
+   "expression": "ORDINALITY_MANY",
+   "tokens": [
+    "ORDINALITY_MANY:ORDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "x == ORDINALITY_MANY",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "ORDINALITY_MANY:ORDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_MANYX",
+   "tokens": [
+    "VARIABLE:ORDINALITY_MANYX"
+   ]
+  },
+  {
+   "expression": "myORDINALITY_MANY",
+   "tokens": [
+    "VARIABLE:myORDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_MANY_",
+   "tokens": [
+    "VARIABLE:ORDINALITY_MANY_"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_MANY1",
+   "tokens": [
+    "VARIABLE:ORDINALITY_MANY1"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_MANY-y",
+   "tokens": [
+    "VARIABLE:ORDINALITY_MANY-y"
+   ]
+  },
+  {
+   "expression": "(ORDINALITY_MANY)",
+   "tokens": [
+    "GROUP_START:(",
+    "ORDINALITY_MANY:ORDINALITY_MANY",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_MANYORDINALITY_MANY",
+   "tokens": [
+    "VARIABLE:ORDINALITY_MANYORDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "_ORDINALITY_MANY",
+   "tokens": [
+    "VARIABLE:_ORDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "ordinality_many",
+   "tokens": [
+    "VARIABLE:ordinality_many"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_MANY == ORDINALITY_MANY",
+   "tokens": [
+    "ORDINALITY_MANY:ORDINALITY_MANY",
+    "EQUAL_TO:==",
+    "ORDINALITY_MANY:ORDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "0ORDINALITY_MANY",
+   "tokens": [
+    "NUMBER:0",
+    "ORDINALITY_MANY:ORDINALITY_MANY"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_MANY.",
+   "error": "Unexpected code point U+002E at index 15 while evaluating expression 'ORDINALITY_MANY.'."
+  },
+  {
+   "expression": "ORDINALITY_OTHER",
+   "tokens": [
+    "ORDINALITY_OTHER:ORDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "x == ORDINALITY_OTHER",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "ORDINALITY_OTHER:ORDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_OTHERX",
+   "tokens": [
+    "VARIABLE:ORDINALITY_OTHERX"
+   ]
+  },
+  {
+   "expression": "myORDINALITY_OTHER",
+   "tokens": [
+    "VARIABLE:myORDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_OTHER_",
+   "tokens": [
+    "VARIABLE:ORDINALITY_OTHER_"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_OTHER1",
+   "tokens": [
+    "VARIABLE:ORDINALITY_OTHER1"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_OTHER-y",
+   "tokens": [
+    "VARIABLE:ORDINALITY_OTHER-y"
+   ]
+  },
+  {
+   "expression": "(ORDINALITY_OTHER)",
+   "tokens": [
+    "GROUP_START:(",
+    "ORDINALITY_OTHER:ORDINALITY_OTHER",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_OTHERORDINALITY_OTHER",
+   "tokens": [
+    "VARIABLE:ORDINALITY_OTHERORDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "_ORDINALITY_OTHER",
+   "tokens": [
+    "VARIABLE:_ORDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "ordinality_other",
+   "tokens": [
+    "VARIABLE:ordinality_other"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_OTHER == ORDINALITY_OTHER",
+   "tokens": [
+    "ORDINALITY_OTHER:ORDINALITY_OTHER",
+    "EQUAL_TO:==",
+    "ORDINALITY_OTHER:ORDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "0ORDINALITY_OTHER",
+   "tokens": [
+    "NUMBER:0",
+    "ORDINALITY_OTHER:ORDINALITY_OTHER"
+   ]
+  },
+  {
+   "expression": "ORDINALITY_OTHER.",
+   "error": "Unexpected code point U+002E at index 16 while evaluating expression 'ORDINALITY_OTHER.'."
+  },
+  {
+   "expression": "PHONETIC_VOWEL",
+   "tokens": [
+    "PHONETIC_VOWEL:PHONETIC_VOWEL"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_VOWEL",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_VOWEL:PHONETIC_VOWEL"
+   ]
+  },
+  {
+   "expression": "PHONETIC_VOWELX",
+   "tokens": [
+    "VARIABLE:PHONETIC_VOWELX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_VOWEL",
+   "tokens": [
+    "VARIABLE:myPHONETIC_VOWEL"
+   ]
+  },
+  {
+   "expression": "PHONETIC_VOWEL_",
+   "tokens": [
+    "VARIABLE:PHONETIC_VOWEL_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_VOWEL1",
+   "tokens": [
+    "VARIABLE:PHONETIC_VOWEL1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_VOWEL-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_VOWEL-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_VOWEL)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_VOWEL:PHONETIC_VOWEL",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_VOWELPHONETIC_VOWEL",
+   "tokens": [
+    "VARIABLE:PHONETIC_VOWELPHONETIC_VOWEL"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_VOWEL",
+   "tokens": [
+    "VARIABLE:_PHONETIC_VOWEL"
+   ]
+  },
+  {
+   "expression": "phonetic_vowel",
+   "tokens": [
+    "VARIABLE:phonetic_vowel"
+   ]
+  },
+  {
+   "expression": "PHONETIC_VOWEL == PHONETIC_VOWEL",
+   "tokens": [
+    "PHONETIC_VOWEL:PHONETIC_VOWEL",
+    "EQUAL_TO:==",
+    "PHONETIC_VOWEL:PHONETIC_VOWEL"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_VOWEL",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_VOWEL:PHONETIC_VOWEL"
+   ]
+  },
+  {
+   "expression": "PHONETIC_VOWEL.",
+   "error": "Unexpected code point U+002E at index 14 while evaluating expression 'PHONETIC_VOWEL.'."
+  },
+  {
+   "expression": "PHONETIC_CONSONANT",
+   "tokens": [
+    "PHONETIC_CONSONANT:PHONETIC_CONSONANT"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_CONSONANT",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_CONSONANT:PHONETIC_CONSONANT"
+   ]
+  },
+  {
+   "expression": "PHONETIC_CONSONANTX",
+   "tokens": [
+    "VARIABLE:PHONETIC_CONSONANTX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_CONSONANT",
+   "tokens": [
+    "VARIABLE:myPHONETIC_CONSONANT"
+   ]
+  },
+  {
+   "expression": "PHONETIC_CONSONANT_",
+   "tokens": [
+    "VARIABLE:PHONETIC_CONSONANT_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_CONSONANT1",
+   "tokens": [
+    "VARIABLE:PHONETIC_CONSONANT1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_CONSONANT-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_CONSONANT-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_CONSONANT)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_CONSONANT:PHONETIC_CONSONANT",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_CONSONANTPHONETIC_CONSONANT",
+   "tokens": [
+    "VARIABLE:PHONETIC_CONSONANTPHONETIC_CONSONANT"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_CONSONANT",
+   "tokens": [
+    "VARIABLE:_PHONETIC_CONSONANT"
+   ]
+  },
+  {
+   "expression": "phonetic_consonant",
+   "tokens": [
+    "VARIABLE:phonetic_consonant"
+   ]
+  },
+  {
+   "expression": "PHONETIC_CONSONANT == PHONETIC_CONSONANT",
+   "tokens": [
+    "PHONETIC_CONSONANT:PHONETIC_CONSONANT",
+    "EQUAL_TO:==",
+    "PHONETIC_CONSONANT:PHONETIC_CONSONANT"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_CONSONANT",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_CONSONANT:PHONETIC_CONSONANT"
+   ]
+  },
+  {
+   "expression": "PHONETIC_CONSONANT.",
+   "error": "Unexpected code point U+002E at index 18 while evaluating expression 'PHONETIC_CONSONANT.'."
+  },
+  {
+   "expression": "PHONETIC_OTHER",
+   "tokens": [
+    "PHONETIC_OTHER:PHONETIC_OTHER"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_OTHER",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_OTHER:PHONETIC_OTHER"
+   ]
+  },
+  {
+   "expression": "PHONETIC_OTHERX",
+   "tokens": [
+    "VARIABLE:PHONETIC_OTHERX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_OTHER",
+   "tokens": [
+    "VARIABLE:myPHONETIC_OTHER"
+   ]
+  },
+  {
+   "expression": "PHONETIC_OTHER_",
+   "tokens": [
+    "VARIABLE:PHONETIC_OTHER_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_OTHER1",
+   "tokens": [
+    "VARIABLE:PHONETIC_OTHER1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_OTHER-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_OTHER-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_OTHER)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_OTHER:PHONETIC_OTHER",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_OTHERPHONETIC_OTHER",
+   "tokens": [
+    "VARIABLE:PHONETIC_OTHERPHONETIC_OTHER"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_OTHER",
+   "tokens": [
+    "VARIABLE:_PHONETIC_OTHER"
+   ]
+  },
+  {
+   "expression": "phonetic_other",
+   "tokens": [
+    "VARIABLE:phonetic_other"
+   ]
+  },
+  {
+   "expression": "PHONETIC_OTHER == PHONETIC_OTHER",
+   "tokens": [
+    "PHONETIC_OTHER:PHONETIC_OTHER",
+    "EQUAL_TO:==",
+    "PHONETIC_OTHER:PHONETIC_OTHER"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_OTHER",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_OTHER:PHONETIC_OTHER"
+   ]
+  },
+  {
+   "expression": "PHONETIC_OTHER.",
+   "error": "Unexpected code point U+002E at index 14 while evaluating expression 'PHONETIC_OTHER.'."
+  },
+  {
+   "expression": "PHONETIC_H_SILENT",
+   "tokens": [
+    "PHONETIC_H_SILENT:PHONETIC_H_SILENT"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_H_SILENT",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_H_SILENT:PHONETIC_H_SILENT"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_SILENTX",
+   "tokens": [
+    "VARIABLE:PHONETIC_H_SILENTX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_H_SILENT",
+   "tokens": [
+    "VARIABLE:myPHONETIC_H_SILENT"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_SILENT_",
+   "tokens": [
+    "VARIABLE:PHONETIC_H_SILENT_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_SILENT1",
+   "tokens": [
+    "VARIABLE:PHONETIC_H_SILENT1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_SILENT-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_H_SILENT-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_H_SILENT)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_H_SILENT:PHONETIC_H_SILENT",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_SILENTPHONETIC_H_SILENT",
+   "tokens": [
+    "VARIABLE:PHONETIC_H_SILENTPHONETIC_H_SILENT"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_H_SILENT",
+   "tokens": [
+    "VARIABLE:_PHONETIC_H_SILENT"
+   ]
+  },
+  {
+   "expression": "phonetic_h_silent",
+   "tokens": [
+    "VARIABLE:phonetic_h_silent"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_SILENT == PHONETIC_H_SILENT",
+   "tokens": [
+    "PHONETIC_H_SILENT:PHONETIC_H_SILENT",
+    "EQUAL_TO:==",
+    "PHONETIC_H_SILENT:PHONETIC_H_SILENT"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_H_SILENT",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_H_SILENT:PHONETIC_H_SILENT"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_SILENT.",
+   "error": "Unexpected code point U+002E at index 17 while evaluating expression 'PHONETIC_H_SILENT.'."
+  },
+  {
+   "expression": "PHONETIC_H_ASPIRATED",
+   "tokens": [
+    "PHONETIC_H_ASPIRATED:PHONETIC_H_ASPIRATED"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_H_ASPIRATED",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_H_ASPIRATED:PHONETIC_H_ASPIRATED"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_ASPIRATEDX",
+   "tokens": [
+    "VARIABLE:PHONETIC_H_ASPIRATEDX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_H_ASPIRATED",
+   "tokens": [
+    "VARIABLE:myPHONETIC_H_ASPIRATED"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_ASPIRATED_",
+   "tokens": [
+    "VARIABLE:PHONETIC_H_ASPIRATED_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_ASPIRATED1",
+   "tokens": [
+    "VARIABLE:PHONETIC_H_ASPIRATED1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_ASPIRATED-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_H_ASPIRATED-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_H_ASPIRATED)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_H_ASPIRATED:PHONETIC_H_ASPIRATED",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_ASPIRATEDPHONETIC_H_ASPIRATED",
+   "tokens": [
+    "VARIABLE:PHONETIC_H_ASPIRATEDPHONETIC_H_ASPIRATED"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_H_ASPIRATED",
+   "tokens": [
+    "VARIABLE:_PHONETIC_H_ASPIRATED"
+   ]
+  },
+  {
+   "expression": "phonetic_h_aspirated",
+   "tokens": [
+    "VARIABLE:phonetic_h_aspirated"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_ASPIRATED == PHONETIC_H_ASPIRATED",
+   "tokens": [
+    "PHONETIC_H_ASPIRATED:PHONETIC_H_ASPIRATED",
+    "EQUAL_TO:==",
+    "PHONETIC_H_ASPIRATED:PHONETIC_H_ASPIRATED"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_H_ASPIRATED",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_H_ASPIRATED:PHONETIC_H_ASPIRATED"
+   ]
+  },
+  {
+   "expression": "PHONETIC_H_ASPIRATED.",
+   "error": "Unexpected code point U+002E at index 20 while evaluating expression 'PHONETIC_H_ASPIRATED.'."
+  },
+  {
+   "expression": "PHONETIC_S_IMPURE",
+   "tokens": [
+    "PHONETIC_S_IMPURE:PHONETIC_S_IMPURE"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_S_IMPURE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_S_IMPURE:PHONETIC_S_IMPURE"
+   ]
+  },
+  {
+   "expression": "PHONETIC_S_IMPUREX",
+   "tokens": [
+    "VARIABLE:PHONETIC_S_IMPUREX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_S_IMPURE",
+   "tokens": [
+    "VARIABLE:myPHONETIC_S_IMPURE"
+   ]
+  },
+  {
+   "expression": "PHONETIC_S_IMPURE_",
+   "tokens": [
+    "VARIABLE:PHONETIC_S_IMPURE_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_S_IMPURE1",
+   "tokens": [
+    "VARIABLE:PHONETIC_S_IMPURE1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_S_IMPURE-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_S_IMPURE-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_S_IMPURE)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_S_IMPURE:PHONETIC_S_IMPURE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_S_IMPUREPHONETIC_S_IMPURE",
+   "tokens": [
+    "VARIABLE:PHONETIC_S_IMPUREPHONETIC_S_IMPURE"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_S_IMPURE",
+   "tokens": [
+    "VARIABLE:_PHONETIC_S_IMPURE"
+   ]
+  },
+  {
+   "expression": "phonetic_s_impure",
+   "tokens": [
+    "VARIABLE:phonetic_s_impure"
+   ]
+  },
+  {
+   "expression": "PHONETIC_S_IMPURE == PHONETIC_S_IMPURE",
+   "tokens": [
+    "PHONETIC_S_IMPURE:PHONETIC_S_IMPURE",
+    "EQUAL_TO:==",
+    "PHONETIC_S_IMPURE:PHONETIC_S_IMPURE"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_S_IMPURE",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_S_IMPURE:PHONETIC_S_IMPURE"
+   ]
+  },
+  {
+   "expression": "PHONETIC_S_IMPURE.",
+   "error": "Unexpected code point U+002E at index 17 while evaluating expression 'PHONETIC_S_IMPURE.'."
+  },
+  {
+   "expression": "PHONETIC_Z",
+   "tokens": [
+    "PHONETIC_Z:PHONETIC_Z"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_Z",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_Z:PHONETIC_Z"
+   ]
+  },
+  {
+   "expression": "PHONETIC_ZX",
+   "tokens": [
+    "VARIABLE:PHONETIC_ZX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_Z",
+   "tokens": [
+    "VARIABLE:myPHONETIC_Z"
+   ]
+  },
+  {
+   "expression": "PHONETIC_Z_",
+   "tokens": [
+    "VARIABLE:PHONETIC_Z_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_Z1",
+   "tokens": [
+    "VARIABLE:PHONETIC_Z1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_Z-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_Z-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_Z)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_Z:PHONETIC_Z",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_ZPHONETIC_Z",
+   "tokens": [
+    "VARIABLE:PHONETIC_ZPHONETIC_Z"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_Z",
+   "tokens": [
+    "VARIABLE:_PHONETIC_Z"
+   ]
+  },
+  {
+   "expression": "phonetic_z",
+   "tokens": [
+    "VARIABLE:phonetic_z"
+   ]
+  },
+  {
+   "expression": "PHONETIC_Z == PHONETIC_Z",
+   "tokens": [
+    "PHONETIC_Z:PHONETIC_Z",
+    "EQUAL_TO:==",
+    "PHONETIC_Z:PHONETIC_Z"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_Z",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_Z:PHONETIC_Z"
+   ]
+  },
+  {
+   "expression": "PHONETIC_Z.",
+   "error": "Unexpected code point U+002E at index 10 while evaluating expression 'PHONETIC_Z.'."
+  },
+  {
+   "expression": "PHONETIC_GN",
+   "tokens": [
+    "PHONETIC_GN:PHONETIC_GN"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_GN",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_GN:PHONETIC_GN"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GNX",
+   "tokens": [
+    "VARIABLE:PHONETIC_GNX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_GN",
+   "tokens": [
+    "VARIABLE:myPHONETIC_GN"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GN_",
+   "tokens": [
+    "VARIABLE:PHONETIC_GN_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GN1",
+   "tokens": [
+    "VARIABLE:PHONETIC_GN1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GN-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_GN-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_GN)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_GN:PHONETIC_GN",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GNPHONETIC_GN",
+   "tokens": [
+    "VARIABLE:PHONETIC_GNPHONETIC_GN"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_GN",
+   "tokens": [
+    "VARIABLE:_PHONETIC_GN"
+   ]
+  },
+  {
+   "expression": "phonetic_gn",
+   "tokens": [
+    "VARIABLE:phonetic_gn"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GN == PHONETIC_GN",
+   "tokens": [
+    "PHONETIC_GN:PHONETIC_GN",
+    "EQUAL_TO:==",
+    "PHONETIC_GN:PHONETIC_GN"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_GN",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_GN:PHONETIC_GN"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GN.",
+   "error": "Unexpected code point U+002E at index 11 while evaluating expression 'PHONETIC_GN.'."
+  },
+  {
+   "expression": "PHONETIC_PS",
+   "tokens": [
+    "PHONETIC_PS:PHONETIC_PS"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_PS",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_PS:PHONETIC_PS"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PSX",
+   "tokens": [
+    "VARIABLE:PHONETIC_PSX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_PS",
+   "tokens": [
+    "VARIABLE:myPHONETIC_PS"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PS_",
+   "tokens": [
+    "VARIABLE:PHONETIC_PS_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PS1",
+   "tokens": [
+    "VARIABLE:PHONETIC_PS1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PS-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_PS-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_PS)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_PS:PHONETIC_PS",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PSPHONETIC_PS",
+   "tokens": [
+    "VARIABLE:PHONETIC_PSPHONETIC_PS"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_PS",
+   "tokens": [
+    "VARIABLE:_PHONETIC_PS"
+   ]
+  },
+  {
+   "expression": "phonetic_ps",
+   "tokens": [
+    "VARIABLE:phonetic_ps"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PS == PHONETIC_PS",
+   "tokens": [
+    "PHONETIC_PS:PHONETIC_PS",
+    "EQUAL_TO:==",
+    "PHONETIC_PS:PHONETIC_PS"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_PS",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_PS:PHONETIC_PS"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PS.",
+   "error": "Unexpected code point U+002E at index 11 while evaluating expression 'PHONETIC_PS.'."
+  },
+  {
+   "expression": "PHONETIC_PN",
+   "tokens": [
+    "PHONETIC_PN:PHONETIC_PN"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_PN",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_PN:PHONETIC_PN"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PNX",
+   "tokens": [
+    "VARIABLE:PHONETIC_PNX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_PN",
+   "tokens": [
+    "VARIABLE:myPHONETIC_PN"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PN_",
+   "tokens": [
+    "VARIABLE:PHONETIC_PN_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PN1",
+   "tokens": [
+    "VARIABLE:PHONETIC_PN1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PN-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_PN-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_PN)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_PN:PHONETIC_PN",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PNPHONETIC_PN",
+   "tokens": [
+    "VARIABLE:PHONETIC_PNPHONETIC_PN"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_PN",
+   "tokens": [
+    "VARIABLE:_PHONETIC_PN"
+   ]
+  },
+  {
+   "expression": "phonetic_pn",
+   "tokens": [
+    "VARIABLE:phonetic_pn"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PN == PHONETIC_PN",
+   "tokens": [
+    "PHONETIC_PN:PHONETIC_PN",
+    "EQUAL_TO:==",
+    "PHONETIC_PN:PHONETIC_PN"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_PN",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_PN:PHONETIC_PN"
+   ]
+  },
+  {
+   "expression": "PHONETIC_PN.",
+   "error": "Unexpected code point U+002E at index 11 while evaluating expression 'PHONETIC_PN.'."
+  },
+  {
+   "expression": "PHONETIC_X",
+   "tokens": [
+    "PHONETIC_X:PHONETIC_X"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_X",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_X:PHONETIC_X"
+   ]
+  },
+  {
+   "expression": "PHONETIC_XX",
+   "tokens": [
+    "VARIABLE:PHONETIC_XX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_X",
+   "tokens": [
+    "VARIABLE:myPHONETIC_X"
+   ]
+  },
+  {
+   "expression": "PHONETIC_X_",
+   "tokens": [
+    "VARIABLE:PHONETIC_X_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_X1",
+   "tokens": [
+    "VARIABLE:PHONETIC_X1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_X-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_X-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_X)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_X:PHONETIC_X",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_XPHONETIC_X",
+   "tokens": [
+    "VARIABLE:PHONETIC_XPHONETIC_X"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_X",
+   "tokens": [
+    "VARIABLE:_PHONETIC_X"
+   ]
+  },
+  {
+   "expression": "phonetic_x",
+   "tokens": [
+    "VARIABLE:phonetic_x"
+   ]
+  },
+  {
+   "expression": "PHONETIC_X == PHONETIC_X",
+   "tokens": [
+    "PHONETIC_X:PHONETIC_X",
+    "EQUAL_TO:==",
+    "PHONETIC_X:PHONETIC_X"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_X",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_X:PHONETIC_X"
+   ]
+  },
+  {
+   "expression": "PHONETIC_X.",
+   "error": "Unexpected code point U+002E at index 10 while evaluating expression 'PHONETIC_X.'."
+  },
+  {
+   "expression": "PHONETIC_GLIDE_Y",
+   "tokens": [
+    "PHONETIC_GLIDE_Y:PHONETIC_GLIDE_Y"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_GLIDE_Y",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_GLIDE_Y:PHONETIC_GLIDE_Y"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_YX",
+   "tokens": [
+    "VARIABLE:PHONETIC_GLIDE_YX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_GLIDE_Y",
+   "tokens": [
+    "VARIABLE:myPHONETIC_GLIDE_Y"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_Y_",
+   "tokens": [
+    "VARIABLE:PHONETIC_GLIDE_Y_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_Y1",
+   "tokens": [
+    "VARIABLE:PHONETIC_GLIDE_Y1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_Y-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_GLIDE_Y-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_GLIDE_Y)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_GLIDE_Y:PHONETIC_GLIDE_Y",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_YPHONETIC_GLIDE_Y",
+   "tokens": [
+    "VARIABLE:PHONETIC_GLIDE_YPHONETIC_GLIDE_Y"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_GLIDE_Y",
+   "tokens": [
+    "VARIABLE:_PHONETIC_GLIDE_Y"
+   ]
+  },
+  {
+   "expression": "phonetic_glide_y",
+   "tokens": [
+    "VARIABLE:phonetic_glide_y"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_Y == PHONETIC_GLIDE_Y",
+   "tokens": [
+    "PHONETIC_GLIDE_Y:PHONETIC_GLIDE_Y",
+    "EQUAL_TO:==",
+    "PHONETIC_GLIDE_Y:PHONETIC_GLIDE_Y"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_GLIDE_Y",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_GLIDE_Y:PHONETIC_GLIDE_Y"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_Y.",
+   "error": "Unexpected code point U+002E at index 16 while evaluating expression 'PHONETIC_GLIDE_Y.'."
+  },
+  {
+   "expression": "PHONETIC_GLIDE_W",
+   "tokens": [
+    "PHONETIC_GLIDE_W:PHONETIC_GLIDE_W"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_GLIDE_W",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_GLIDE_W:PHONETIC_GLIDE_W"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_WX",
+   "tokens": [
+    "VARIABLE:PHONETIC_GLIDE_WX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_GLIDE_W",
+   "tokens": [
+    "VARIABLE:myPHONETIC_GLIDE_W"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_W_",
+   "tokens": [
+    "VARIABLE:PHONETIC_GLIDE_W_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_W1",
+   "tokens": [
+    "VARIABLE:PHONETIC_GLIDE_W1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_W-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_GLIDE_W-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_GLIDE_W)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_GLIDE_W:PHONETIC_GLIDE_W",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_WPHONETIC_GLIDE_W",
+   "tokens": [
+    "VARIABLE:PHONETIC_GLIDE_WPHONETIC_GLIDE_W"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_GLIDE_W",
+   "tokens": [
+    "VARIABLE:_PHONETIC_GLIDE_W"
+   ]
+  },
+  {
+   "expression": "phonetic_glide_w",
+   "tokens": [
+    "VARIABLE:phonetic_glide_w"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_W == PHONETIC_GLIDE_W",
+   "tokens": [
+    "PHONETIC_GLIDE_W:PHONETIC_GLIDE_W",
+    "EQUAL_TO:==",
+    "PHONETIC_GLIDE_W:PHONETIC_GLIDE_W"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_GLIDE_W",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_GLIDE_W:PHONETIC_GLIDE_W"
+   ]
+  },
+  {
+   "expression": "PHONETIC_GLIDE_W.",
+   "error": "Unexpected code point U+002E at index 16 while evaluating expression 'PHONETIC_GLIDE_W.'."
+  },
+  {
+   "expression": "PHONETIC_STRESSED_A",
+   "tokens": [
+    "PHONETIC_STRESSED_A:PHONETIC_STRESSED_A"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_STRESSED_A",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_STRESSED_A:PHONETIC_STRESSED_A"
+   ]
+  },
+  {
+   "expression": "PHONETIC_STRESSED_AX",
+   "tokens": [
+    "VARIABLE:PHONETIC_STRESSED_AX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_STRESSED_A",
+   "tokens": [
+    "VARIABLE:myPHONETIC_STRESSED_A"
+   ]
+  },
+  {
+   "expression": "PHONETIC_STRESSED_A_",
+   "tokens": [
+    "VARIABLE:PHONETIC_STRESSED_A_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_STRESSED_A1",
+   "tokens": [
+    "VARIABLE:PHONETIC_STRESSED_A1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_STRESSED_A-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_STRESSED_A-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_STRESSED_A)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_STRESSED_A:PHONETIC_STRESSED_A",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_STRESSED_APHONETIC_STRESSED_A",
+   "tokens": [
+    "VARIABLE:PHONETIC_STRESSED_APHONETIC_STRESSED_A"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_STRESSED_A",
+   "tokens": [
+    "VARIABLE:_PHONETIC_STRESSED_A"
+   ]
+  },
+  {
+   "expression": "phonetic_stressed_a",
+   "tokens": [
+    "VARIABLE:phonetic_stressed_a"
+   ]
+  },
+  {
+   "expression": "PHONETIC_STRESSED_A == PHONETIC_STRESSED_A",
+   "tokens": [
+    "PHONETIC_STRESSED_A:PHONETIC_STRESSED_A",
+    "EQUAL_TO:==",
+    "PHONETIC_STRESSED_A:PHONETIC_STRESSED_A"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_STRESSED_A",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_STRESSED_A:PHONETIC_STRESSED_A"
+   ]
+  },
+  {
+   "expression": "PHONETIC_STRESSED_A.",
+   "error": "Unexpected code point U+002E at index 19 while evaluating expression 'PHONETIC_STRESSED_A.'."
+  },
+  {
+   "expression": "PHONETIC_SOLAR",
+   "tokens": [
+    "PHONETIC_SOLAR:PHONETIC_SOLAR"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_SOLAR",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_SOLAR:PHONETIC_SOLAR"
+   ]
+  },
+  {
+   "expression": "PHONETIC_SOLARX",
+   "tokens": [
+    "VARIABLE:PHONETIC_SOLARX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_SOLAR",
+   "tokens": [
+    "VARIABLE:myPHONETIC_SOLAR"
+   ]
+  },
+  {
+   "expression": "PHONETIC_SOLAR_",
+   "tokens": [
+    "VARIABLE:PHONETIC_SOLAR_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_SOLAR1",
+   "tokens": [
+    "VARIABLE:PHONETIC_SOLAR1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_SOLAR-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_SOLAR-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_SOLAR)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_SOLAR:PHONETIC_SOLAR",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_SOLARPHONETIC_SOLAR",
+   "tokens": [
+    "VARIABLE:PHONETIC_SOLARPHONETIC_SOLAR"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_SOLAR",
+   "tokens": [
+    "VARIABLE:_PHONETIC_SOLAR"
+   ]
+  },
+  {
+   "expression": "phonetic_solar",
+   "tokens": [
+    "VARIABLE:phonetic_solar"
+   ]
+  },
+  {
+   "expression": "PHONETIC_SOLAR == PHONETIC_SOLAR",
+   "tokens": [
+    "PHONETIC_SOLAR:PHONETIC_SOLAR",
+    "EQUAL_TO:==",
+    "PHONETIC_SOLAR:PHONETIC_SOLAR"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_SOLAR",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_SOLAR:PHONETIC_SOLAR"
+   ]
+  },
+  {
+   "expression": "PHONETIC_SOLAR.",
+   "error": "Unexpected code point U+002E at index 14 while evaluating expression 'PHONETIC_SOLAR.'."
+  },
+  {
+   "expression": "PHONETIC_LUNAR",
+   "tokens": [
+    "PHONETIC_LUNAR:PHONETIC_LUNAR"
+   ]
+  },
+  {
+   "expression": "x == PHONETIC_LUNAR",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "PHONETIC_LUNAR:PHONETIC_LUNAR"
+   ]
+  },
+  {
+   "expression": "PHONETIC_LUNARX",
+   "tokens": [
+    "VARIABLE:PHONETIC_LUNARX"
+   ]
+  },
+  {
+   "expression": "myPHONETIC_LUNAR",
+   "tokens": [
+    "VARIABLE:myPHONETIC_LUNAR"
+   ]
+  },
+  {
+   "expression": "PHONETIC_LUNAR_",
+   "tokens": [
+    "VARIABLE:PHONETIC_LUNAR_"
+   ]
+  },
+  {
+   "expression": "PHONETIC_LUNAR1",
+   "tokens": [
+    "VARIABLE:PHONETIC_LUNAR1"
+   ]
+  },
+  {
+   "expression": "PHONETIC_LUNAR-y",
+   "tokens": [
+    "VARIABLE:PHONETIC_LUNAR-y"
+   ]
+  },
+  {
+   "expression": "(PHONETIC_LUNAR)",
+   "tokens": [
+    "GROUP_START:(",
+    "PHONETIC_LUNAR:PHONETIC_LUNAR",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "PHONETIC_LUNARPHONETIC_LUNAR",
+   "tokens": [
+    "VARIABLE:PHONETIC_LUNARPHONETIC_LUNAR"
+   ]
+  },
+  {
+   "expression": "_PHONETIC_LUNAR",
+   "tokens": [
+    "VARIABLE:_PHONETIC_LUNAR"
+   ]
+  },
+  {
+   "expression": "phonetic_lunar",
+   "tokens": [
+    "VARIABLE:phonetic_lunar"
+   ]
+  },
+  {
+   "expression": "PHONETIC_LUNAR == PHONETIC_LUNAR",
+   "tokens": [
+    "PHONETIC_LUNAR:PHONETIC_LUNAR",
+    "EQUAL_TO:==",
+    "PHONETIC_LUNAR:PHONETIC_LUNAR"
+   ]
+  },
+  {
+   "expression": "0PHONETIC_LUNAR",
+   "tokens": [
+    "NUMBER:0",
+    "PHONETIC_LUNAR:PHONETIC_LUNAR"
+   ]
+  },
+  {
+   "expression": "PHONETIC_LUNAR.",
+   "error": "Unexpected code point U+002E at index 14 while evaluating expression 'PHONETIC_LUNAR.'."
+  },
+  {
+   "expression": "GENDER_MASCULINE",
+   "tokens": [
+    "GENDER_MASCULINE:GENDER_MASCULINE"
+   ]
+  },
+  {
+   "expression": "x == GENDER_MASCULINE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "GENDER_MASCULINE:GENDER_MASCULINE"
+   ]
+  },
+  {
+   "expression": "GENDER_MASCULINEX",
+   "tokens": [
+    "VARIABLE:GENDER_MASCULINEX"
+   ]
+  },
+  {
+   "expression": "myGENDER_MASCULINE",
+   "tokens": [
+    "VARIABLE:myGENDER_MASCULINE"
+   ]
+  },
+  {
+   "expression": "GENDER_MASCULINE_",
+   "tokens": [
+    "VARIABLE:GENDER_MASCULINE_"
+   ]
+  },
+  {
+   "expression": "GENDER_MASCULINE1",
+   "tokens": [
+    "VARIABLE:GENDER_MASCULINE1"
+   ]
+  },
+  {
+   "expression": "GENDER_MASCULINE-y",
+   "tokens": [
+    "VARIABLE:GENDER_MASCULINE-y"
+   ]
+  },
+  {
+   "expression": "(GENDER_MASCULINE)",
+   "tokens": [
+    "GROUP_START:(",
+    "GENDER_MASCULINE:GENDER_MASCULINE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "GENDER_MASCULINEGENDER_MASCULINE",
+   "tokens": [
+    "VARIABLE:GENDER_MASCULINEGENDER_MASCULINE"
+   ]
+  },
+  {
+   "expression": "_GENDER_MASCULINE",
+   "tokens": [
+    "VARIABLE:_GENDER_MASCULINE"
+   ]
+  },
+  {
+   "expression": "gender_masculine",
+   "tokens": [
+    "VARIABLE:gender_masculine"
+   ]
+  },
+  {
+   "expression": "GENDER_MASCULINE == GENDER_MASCULINE",
+   "tokens": [
+    "GENDER_MASCULINE:GENDER_MASCULINE",
+    "EQUAL_TO:==",
+    "GENDER_MASCULINE:GENDER_MASCULINE"
+   ]
+  },
+  {
+   "expression": "0GENDER_MASCULINE",
+   "tokens": [
+    "NUMBER:0",
+    "GENDER_MASCULINE:GENDER_MASCULINE"
+   ]
+  },
+  {
+   "expression": "GENDER_MASCULINE.",
+   "error": "Unexpected code point U+002E at index 16 while evaluating expression 'GENDER_MASCULINE.'."
+  },
+  {
+   "expression": "GENDER_FEMININE",
+   "tokens": [
+    "GENDER_FEMININE:GENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "x == GENDER_FEMININE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "GENDER_FEMININE:GENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "GENDER_FEMININEX",
+   "tokens": [
+    "VARIABLE:GENDER_FEMININEX"
+   ]
+  },
+  {
+   "expression": "myGENDER_FEMININE",
+   "tokens": [
+    "VARIABLE:myGENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "GENDER_FEMININE_",
+   "tokens": [
+    "VARIABLE:GENDER_FEMININE_"
+   ]
+  },
+  {
+   "expression": "GENDER_FEMININE1",
+   "tokens": [
+    "VARIABLE:GENDER_FEMININE1"
+   ]
+  },
+  {
+   "expression": "GENDER_FEMININE-y",
+   "tokens": [
+    "VARIABLE:GENDER_FEMININE-y"
+   ]
+  },
+  {
+   "expression": "(GENDER_FEMININE)",
+   "tokens": [
+    "GROUP_START:(",
+    "GENDER_FEMININE:GENDER_FEMININE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "GENDER_FEMININEGENDER_FEMININE",
+   "tokens": [
+    "VARIABLE:GENDER_FEMININEGENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "_GENDER_FEMININE",
+   "tokens": [
+    "VARIABLE:_GENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "gender_feminine",
+   "tokens": [
+    "VARIABLE:gender_feminine"
+   ]
+  },
+  {
+   "expression": "GENDER_FEMININE == GENDER_FEMININE",
+   "tokens": [
+    "GENDER_FEMININE:GENDER_FEMININE",
+    "EQUAL_TO:==",
+    "GENDER_FEMININE:GENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "0GENDER_FEMININE",
+   "tokens": [
+    "NUMBER:0",
+    "GENDER_FEMININE:GENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "GENDER_FEMININE.",
+   "error": "Unexpected code point U+002E at index 15 while evaluating expression 'GENDER_FEMININE.'."
+  },
+  {
+   "expression": "GENDER_COMMON",
+   "tokens": [
+    "GENDER_COMMON:GENDER_COMMON"
+   ]
+  },
+  {
+   "expression": "x == GENDER_COMMON",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "GENDER_COMMON:GENDER_COMMON"
+   ]
+  },
+  {
+   "expression": "GENDER_COMMONX",
+   "tokens": [
+    "VARIABLE:GENDER_COMMONX"
+   ]
+  },
+  {
+   "expression": "myGENDER_COMMON",
+   "tokens": [
+    "VARIABLE:myGENDER_COMMON"
+   ]
+  },
+  {
+   "expression": "GENDER_COMMON_",
+   "tokens": [
+    "VARIABLE:GENDER_COMMON_"
+   ]
+  },
+  {
+   "expression": "GENDER_COMMON1",
+   "tokens": [
+    "VARIABLE:GENDER_COMMON1"
+   ]
+  },
+  {
+   "expression": "GENDER_COMMON-y",
+   "tokens": [
+    "VARIABLE:GENDER_COMMON-y"
+   ]
+  },
+  {
+   "expression": "(GENDER_COMMON)",
+   "tokens": [
+    "GROUP_START:(",
+    "GENDER_COMMON:GENDER_COMMON",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "GENDER_COMMONGENDER_COMMON",
+   "tokens": [
+    "VARIABLE:GENDER_COMMONGENDER_COMMON"
+   ]
+  },
+  {
+   "expression": "_GENDER_COMMON",
+   "tokens": [
+    "VARIABLE:_GENDER_COMMON"
+   ]
+  },
+  {
+   "expression": "gender_common",
+   "tokens": [
+    "VARIABLE:gender_common"
+   ]
+  },
+  {
+   "expression": "GENDER_COMMON == GENDER_COMMON",
+   "tokens": [
+    "GENDER_COMMON:GENDER_COMMON",
+    "EQUAL_TO:==",
+    "GENDER_COMMON:GENDER_COMMON"
+   ]
+  },
+  {
+   "expression": "0GENDER_COMMON",
+   "tokens": [
+    "NUMBER:0",
+    "GENDER_COMMON:GENDER_COMMON"
+   ]
+  },
+  {
+   "expression": "GENDER_COMMON.",
+   "error": "Unexpected code point U+002E at index 13 while evaluating expression 'GENDER_COMMON.'."
+  },
+  {
+   "expression": "GENDER_NEUTER",
+   "tokens": [
+    "GENDER_NEUTER:GENDER_NEUTER"
+   ]
+  },
+  {
+   "expression": "x == GENDER_NEUTER",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "GENDER_NEUTER:GENDER_NEUTER"
+   ]
+  },
+  {
+   "expression": "GENDER_NEUTERX",
+   "tokens": [
+    "VARIABLE:GENDER_NEUTERX"
+   ]
+  },
+  {
+   "expression": "myGENDER_NEUTER",
+   "tokens": [
+    "VARIABLE:myGENDER_NEUTER"
+   ]
+  },
+  {
+   "expression": "GENDER_NEUTER_",
+   "tokens": [
+    "VARIABLE:GENDER_NEUTER_"
+   ]
+  },
+  {
+   "expression": "GENDER_NEUTER1",
+   "tokens": [
+    "VARIABLE:GENDER_NEUTER1"
+   ]
+  },
+  {
+   "expression": "GENDER_NEUTER-y",
+   "tokens": [
+    "VARIABLE:GENDER_NEUTER-y"
+   ]
+  },
+  {
+   "expression": "(GENDER_NEUTER)",
+   "tokens": [
+    "GROUP_START:(",
+    "GENDER_NEUTER:GENDER_NEUTER",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "GENDER_NEUTERGENDER_NEUTER",
+   "tokens": [
+    "VARIABLE:GENDER_NEUTERGENDER_NEUTER"
+   ]
+  },
+  {
+   "expression": "_GENDER_NEUTER",
+   "tokens": [
+    "VARIABLE:_GENDER_NEUTER"
+   ]
+  },
+  {
+   "expression": "gender_neuter",
+   "tokens": [
+    "VARIABLE:gender_neuter"
+   ]
+  },
+  {
+   "expression": "GENDER_NEUTER == GENDER_NEUTER",
+   "tokens": [
+    "GENDER_NEUTER:GENDER_NEUTER",
+    "EQUAL_TO:==",
+    "GENDER_NEUTER:GENDER_NEUTER"
+   ]
+  },
+  {
+   "expression": "0GENDER_NEUTER",
+   "tokens": [
+    "NUMBER:0",
+    "GENDER_NEUTER:GENDER_NEUTER"
+   ]
+  },
+  {
+   "expression": "GENDER_NEUTER.",
+   "error": "Unexpected code point U+002E at index 13 while evaluating expression 'GENDER_NEUTER.'."
+  },
+  {
+   "expression": "CASE_NOMINATIVE",
+   "tokens": [
+    "CASE_NOMINATIVE:CASE_NOMINATIVE"
+   ]
+  },
+  {
+   "expression": "x == CASE_NOMINATIVE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CASE_NOMINATIVE:CASE_NOMINATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_NOMINATIVEX",
+   "tokens": [
+    "VARIABLE:CASE_NOMINATIVEX"
+   ]
+  },
+  {
+   "expression": "myCASE_NOMINATIVE",
+   "tokens": [
+    "VARIABLE:myCASE_NOMINATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_NOMINATIVE_",
+   "tokens": [
+    "VARIABLE:CASE_NOMINATIVE_"
+   ]
+  },
+  {
+   "expression": "CASE_NOMINATIVE1",
+   "tokens": [
+    "VARIABLE:CASE_NOMINATIVE1"
+   ]
+  },
+  {
+   "expression": "CASE_NOMINATIVE-y",
+   "tokens": [
+    "VARIABLE:CASE_NOMINATIVE-y"
+   ]
+  },
+  {
+   "expression": "(CASE_NOMINATIVE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CASE_NOMINATIVE:CASE_NOMINATIVE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CASE_NOMINATIVECASE_NOMINATIVE",
+   "tokens": [
+    "VARIABLE:CASE_NOMINATIVECASE_NOMINATIVE"
+   ]
+  },
+  {
+   "expression": "_CASE_NOMINATIVE",
+   "tokens": [
+    "VARIABLE:_CASE_NOMINATIVE"
+   ]
+  },
+  {
+   "expression": "case_nominative",
+   "tokens": [
+    "VARIABLE:case_nominative"
+   ]
+  },
+  {
+   "expression": "CASE_NOMINATIVE == CASE_NOMINATIVE",
+   "tokens": [
+    "CASE_NOMINATIVE:CASE_NOMINATIVE",
+    "EQUAL_TO:==",
+    "CASE_NOMINATIVE:CASE_NOMINATIVE"
+   ]
+  },
+  {
+   "expression": "0CASE_NOMINATIVE",
+   "tokens": [
+    "NUMBER:0",
+    "CASE_NOMINATIVE:CASE_NOMINATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_NOMINATIVE.",
+   "error": "Unexpected code point U+002E at index 15 while evaluating expression 'CASE_NOMINATIVE.'."
+  },
+  {
+   "expression": "CASE_ACCUSATIVE",
+   "tokens": [
+    "CASE_ACCUSATIVE:CASE_ACCUSATIVE"
+   ]
+  },
+  {
+   "expression": "x == CASE_ACCUSATIVE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CASE_ACCUSATIVE:CASE_ACCUSATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_ACCUSATIVEX",
+   "tokens": [
+    "VARIABLE:CASE_ACCUSATIVEX"
+   ]
+  },
+  {
+   "expression": "myCASE_ACCUSATIVE",
+   "tokens": [
+    "VARIABLE:myCASE_ACCUSATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_ACCUSATIVE_",
+   "tokens": [
+    "VARIABLE:CASE_ACCUSATIVE_"
+   ]
+  },
+  {
+   "expression": "CASE_ACCUSATIVE1",
+   "tokens": [
+    "VARIABLE:CASE_ACCUSATIVE1"
+   ]
+  },
+  {
+   "expression": "CASE_ACCUSATIVE-y",
+   "tokens": [
+    "VARIABLE:CASE_ACCUSATIVE-y"
+   ]
+  },
+  {
+   "expression": "(CASE_ACCUSATIVE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CASE_ACCUSATIVE:CASE_ACCUSATIVE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CASE_ACCUSATIVECASE_ACCUSATIVE",
+   "tokens": [
+    "VARIABLE:CASE_ACCUSATIVECASE_ACCUSATIVE"
+   ]
+  },
+  {
+   "expression": "_CASE_ACCUSATIVE",
+   "tokens": [
+    "VARIABLE:_CASE_ACCUSATIVE"
+   ]
+  },
+  {
+   "expression": "case_accusative",
+   "tokens": [
+    "VARIABLE:case_accusative"
+   ]
+  },
+  {
+   "expression": "CASE_ACCUSATIVE == CASE_ACCUSATIVE",
+   "tokens": [
+    "CASE_ACCUSATIVE:CASE_ACCUSATIVE",
+    "EQUAL_TO:==",
+    "CASE_ACCUSATIVE:CASE_ACCUSATIVE"
+   ]
+  },
+  {
+   "expression": "0CASE_ACCUSATIVE",
+   "tokens": [
+    "NUMBER:0",
+    "CASE_ACCUSATIVE:CASE_ACCUSATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_ACCUSATIVE.",
+   "error": "Unexpected code point U+002E at index 15 while evaluating expression 'CASE_ACCUSATIVE.'."
+  },
+  {
+   "expression": "CASE_GENITIVE",
+   "tokens": [
+    "CASE_GENITIVE:CASE_GENITIVE"
+   ]
+  },
+  {
+   "expression": "x == CASE_GENITIVE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CASE_GENITIVE:CASE_GENITIVE"
+   ]
+  },
+  {
+   "expression": "CASE_GENITIVEX",
+   "tokens": [
+    "VARIABLE:CASE_GENITIVEX"
+   ]
+  },
+  {
+   "expression": "myCASE_GENITIVE",
+   "tokens": [
+    "VARIABLE:myCASE_GENITIVE"
+   ]
+  },
+  {
+   "expression": "CASE_GENITIVE_",
+   "tokens": [
+    "VARIABLE:CASE_GENITIVE_"
+   ]
+  },
+  {
+   "expression": "CASE_GENITIVE1",
+   "tokens": [
+    "VARIABLE:CASE_GENITIVE1"
+   ]
+  },
+  {
+   "expression": "CASE_GENITIVE-y",
+   "tokens": [
+    "VARIABLE:CASE_GENITIVE-y"
+   ]
+  },
+  {
+   "expression": "(CASE_GENITIVE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CASE_GENITIVE:CASE_GENITIVE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CASE_GENITIVECASE_GENITIVE",
+   "tokens": [
+    "VARIABLE:CASE_GENITIVECASE_GENITIVE"
+   ]
+  },
+  {
+   "expression": "_CASE_GENITIVE",
+   "tokens": [
+    "VARIABLE:_CASE_GENITIVE"
+   ]
+  },
+  {
+   "expression": "case_genitive",
+   "tokens": [
+    "VARIABLE:case_genitive"
+   ]
+  },
+  {
+   "expression": "CASE_GENITIVE == CASE_GENITIVE",
+   "tokens": [
+    "CASE_GENITIVE:CASE_GENITIVE",
+    "EQUAL_TO:==",
+    "CASE_GENITIVE:CASE_GENITIVE"
+   ]
+  },
+  {
+   "expression": "0CASE_GENITIVE",
+   "tokens": [
+    "NUMBER:0",
+    "CASE_GENITIVE:CASE_GENITIVE"
+   ]
+  },
+  {
+   "expression": "CASE_GENITIVE.",
+   "error": "Unexpected code point U+002E at index 13 while evaluating expression 'CASE_GENITIVE.'."
+  },
+  {
+   "expression": "CASE_DATIVE",
+   "tokens": [
+    "CASE_DATIVE:CASE_DATIVE"
+   ]
+  },
+  {
+   "expression": "x == CASE_DATIVE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CASE_DATIVE:CASE_DATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_DATIVEX",
+   "tokens": [
+    "VARIABLE:CASE_DATIVEX"
+   ]
+  },
+  {
+   "expression": "myCASE_DATIVE",
+   "tokens": [
+    "VARIABLE:myCASE_DATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_DATIVE_",
+   "tokens": [
+    "VARIABLE:CASE_DATIVE_"
+   ]
+  },
+  {
+   "expression": "CASE_DATIVE1",
+   "tokens": [
+    "VARIABLE:CASE_DATIVE1"
+   ]
+  },
+  {
+   "expression": "CASE_DATIVE-y",
+   "tokens": [
+    "VARIABLE:CASE_DATIVE-y"
+   ]
+  },
+  {
+   "expression": "(CASE_DATIVE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CASE_DATIVE:CASE_DATIVE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CASE_DATIVECASE_DATIVE",
+   "tokens": [
+    "VARIABLE:CASE_DATIVECASE_DATIVE"
+   ]
+  },
+  {
+   "expression": "_CASE_DATIVE",
+   "tokens": [
+    "VARIABLE:_CASE_DATIVE"
+   ]
+  },
+  {
+   "expression": "case_dative",
+   "tokens": [
+    "VARIABLE:case_dative"
+   ]
+  },
+  {
+   "expression": "CASE_DATIVE == CASE_DATIVE",
+   "tokens": [
+    "CASE_DATIVE:CASE_DATIVE",
+    "EQUAL_TO:==",
+    "CASE_DATIVE:CASE_DATIVE"
+   ]
+  },
+  {
+   "expression": "0CASE_DATIVE",
+   "tokens": [
+    "NUMBER:0",
+    "CASE_DATIVE:CASE_DATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_DATIVE.",
+   "error": "Unexpected code point U+002E at index 11 while evaluating expression 'CASE_DATIVE.'."
+  },
+  {
+   "expression": "CASE_INSTRUMENTAL",
+   "tokens": [
+    "CASE_INSTRUMENTAL:CASE_INSTRUMENTAL"
+   ]
+  },
+  {
+   "expression": "x == CASE_INSTRUMENTAL",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CASE_INSTRUMENTAL:CASE_INSTRUMENTAL"
+   ]
+  },
+  {
+   "expression": "CASE_INSTRUMENTALX",
+   "tokens": [
+    "VARIABLE:CASE_INSTRUMENTALX"
+   ]
+  },
+  {
+   "expression": "myCASE_INSTRUMENTAL",
+   "tokens": [
+    "VARIABLE:myCASE_INSTRUMENTAL"
+   ]
+  },
+  {
+   "expression": "CASE_INSTRUMENTAL_",
+   "tokens": [
+    "VARIABLE:CASE_INSTRUMENTAL_"
+   ]
+  },
+  {
+   "expression": "CASE_INSTRUMENTAL1",
+   "tokens": [
+    "VARIABLE:CASE_INSTRUMENTAL1"
+   ]
+  },
+  {
+   "expression": "CASE_INSTRUMENTAL-y",
+   "tokens": [
+    "VARIABLE:CASE_INSTRUMENTAL-y"
+   ]
+  },
+  {
+   "expression": "(CASE_INSTRUMENTAL)",
+   "tokens": [
+    "GROUP_START:(",
+    "CASE_INSTRUMENTAL:CASE_INSTRUMENTAL",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CASE_INSTRUMENTALCASE_INSTRUMENTAL",
+   "tokens": [
+    "VARIABLE:CASE_INSTRUMENTALCASE_INSTRUMENTAL"
+   ]
+  },
+  {
+   "expression": "_CASE_INSTRUMENTAL",
+   "tokens": [
+    "VARIABLE:_CASE_INSTRUMENTAL"
+   ]
+  },
+  {
+   "expression": "case_instrumental",
+   "tokens": [
+    "VARIABLE:case_instrumental"
+   ]
+  },
+  {
+   "expression": "CASE_INSTRUMENTAL == CASE_INSTRUMENTAL",
+   "tokens": [
+    "CASE_INSTRUMENTAL:CASE_INSTRUMENTAL",
+    "EQUAL_TO:==",
+    "CASE_INSTRUMENTAL:CASE_INSTRUMENTAL"
+   ]
+  },
+  {
+   "expression": "0CASE_INSTRUMENTAL",
+   "tokens": [
+    "NUMBER:0",
+    "CASE_INSTRUMENTAL:CASE_INSTRUMENTAL"
+   ]
+  },
+  {
+   "expression": "CASE_INSTRUMENTAL.",
+   "error": "Unexpected code point U+002E at index 17 while evaluating expression 'CASE_INSTRUMENTAL.'."
+  },
+  {
+   "expression": "CASE_LOCATIVE",
+   "tokens": [
+    "CASE_LOCATIVE:CASE_LOCATIVE"
+   ]
+  },
+  {
+   "expression": "x == CASE_LOCATIVE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CASE_LOCATIVE:CASE_LOCATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_LOCATIVEX",
+   "tokens": [
+    "VARIABLE:CASE_LOCATIVEX"
+   ]
+  },
+  {
+   "expression": "myCASE_LOCATIVE",
+   "tokens": [
+    "VARIABLE:myCASE_LOCATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_LOCATIVE_",
+   "tokens": [
+    "VARIABLE:CASE_LOCATIVE_"
+   ]
+  },
+  {
+   "expression": "CASE_LOCATIVE1",
+   "tokens": [
+    "VARIABLE:CASE_LOCATIVE1"
+   ]
+  },
+  {
+   "expression": "CASE_LOCATIVE-y",
+   "tokens": [
+    "VARIABLE:CASE_LOCATIVE-y"
+   ]
+  },
+  {
+   "expression": "(CASE_LOCATIVE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CASE_LOCATIVE:CASE_LOCATIVE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CASE_LOCATIVECASE_LOCATIVE",
+   "tokens": [
+    "VARIABLE:CASE_LOCATIVECASE_LOCATIVE"
+   ]
+  },
+  {
+   "expression": "_CASE_LOCATIVE",
+   "tokens": [
+    "VARIABLE:_CASE_LOCATIVE"
+   ]
+  },
+  {
+   "expression": "case_locative",
+   "tokens": [
+    "VARIABLE:case_locative"
+   ]
+  },
+  {
+   "expression": "CASE_LOCATIVE == CASE_LOCATIVE",
+   "tokens": [
+    "CASE_LOCATIVE:CASE_LOCATIVE",
+    "EQUAL_TO:==",
+    "CASE_LOCATIVE:CASE_LOCATIVE"
+   ]
+  },
+  {
+   "expression": "0CASE_LOCATIVE",
+   "tokens": [
+    "NUMBER:0",
+    "CASE_LOCATIVE:CASE_LOCATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_LOCATIVE.",
+   "error": "Unexpected code point U+002E at index 13 while evaluating expression 'CASE_LOCATIVE.'."
+  },
+  {
+   "expression": "CASE_PREPOSITIONAL",
+   "tokens": [
+    "CASE_PREPOSITIONAL:CASE_PREPOSITIONAL"
+   ]
+  },
+  {
+   "expression": "x == CASE_PREPOSITIONAL",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CASE_PREPOSITIONAL:CASE_PREPOSITIONAL"
+   ]
+  },
+  {
+   "expression": "CASE_PREPOSITIONALX",
+   "tokens": [
+    "VARIABLE:CASE_PREPOSITIONALX"
+   ]
+  },
+  {
+   "expression": "myCASE_PREPOSITIONAL",
+   "tokens": [
+    "VARIABLE:myCASE_PREPOSITIONAL"
+   ]
+  },
+  {
+   "expression": "CASE_PREPOSITIONAL_",
+   "tokens": [
+    "VARIABLE:CASE_PREPOSITIONAL_"
+   ]
+  },
+  {
+   "expression": "CASE_PREPOSITIONAL1",
+   "tokens": [
+    "VARIABLE:CASE_PREPOSITIONAL1"
+   ]
+  },
+  {
+   "expression": "CASE_PREPOSITIONAL-y",
+   "tokens": [
+    "VARIABLE:CASE_PREPOSITIONAL-y"
+   ]
+  },
+  {
+   "expression": "(CASE_PREPOSITIONAL)",
+   "tokens": [
+    "GROUP_START:(",
+    "CASE_PREPOSITIONAL:CASE_PREPOSITIONAL",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CASE_PREPOSITIONALCASE_PREPOSITIONAL",
+   "tokens": [
+    "VARIABLE:CASE_PREPOSITIONALCASE_PREPOSITIONAL"
+   ]
+  },
+  {
+   "expression": "_CASE_PREPOSITIONAL",
+   "tokens": [
+    "VARIABLE:_CASE_PREPOSITIONAL"
+   ]
+  },
+  {
+   "expression": "case_prepositional",
+   "tokens": [
+    "VARIABLE:case_prepositional"
+   ]
+  },
+  {
+   "expression": "CASE_PREPOSITIONAL == CASE_PREPOSITIONAL",
+   "tokens": [
+    "CASE_PREPOSITIONAL:CASE_PREPOSITIONAL",
+    "EQUAL_TO:==",
+    "CASE_PREPOSITIONAL:CASE_PREPOSITIONAL"
+   ]
+  },
+  {
+   "expression": "0CASE_PREPOSITIONAL",
+   "tokens": [
+    "NUMBER:0",
+    "CASE_PREPOSITIONAL:CASE_PREPOSITIONAL"
+   ]
+  },
+  {
+   "expression": "CASE_PREPOSITIONAL.",
+   "error": "Unexpected code point U+002E at index 18 while evaluating expression 'CASE_PREPOSITIONAL.'."
+  },
+  {
+   "expression": "CASE_VOCATIVE",
+   "tokens": [
+    "CASE_VOCATIVE:CASE_VOCATIVE"
+   ]
+  },
+  {
+   "expression": "x == CASE_VOCATIVE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CASE_VOCATIVE:CASE_VOCATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_VOCATIVEX",
+   "tokens": [
+    "VARIABLE:CASE_VOCATIVEX"
+   ]
+  },
+  {
+   "expression": "myCASE_VOCATIVE",
+   "tokens": [
+    "VARIABLE:myCASE_VOCATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_VOCATIVE_",
+   "tokens": [
+    "VARIABLE:CASE_VOCATIVE_"
+   ]
+  },
+  {
+   "expression": "CASE_VOCATIVE1",
+   "tokens": [
+    "VARIABLE:CASE_VOCATIVE1"
+   ]
+  },
+  {
+   "expression": "CASE_VOCATIVE-y",
+   "tokens": [
+    "VARIABLE:CASE_VOCATIVE-y"
+   ]
+  },
+  {
+   "expression": "(CASE_VOCATIVE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CASE_VOCATIVE:CASE_VOCATIVE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CASE_VOCATIVECASE_VOCATIVE",
+   "tokens": [
+    "VARIABLE:CASE_VOCATIVECASE_VOCATIVE"
+   ]
+  },
+  {
+   "expression": "_CASE_VOCATIVE",
+   "tokens": [
+    "VARIABLE:_CASE_VOCATIVE"
+   ]
+  },
+  {
+   "expression": "case_vocative",
+   "tokens": [
+    "VARIABLE:case_vocative"
+   ]
+  },
+  {
+   "expression": "CASE_VOCATIVE == CASE_VOCATIVE",
+   "tokens": [
+    "CASE_VOCATIVE:CASE_VOCATIVE",
+    "EQUAL_TO:==",
+    "CASE_VOCATIVE:CASE_VOCATIVE"
+   ]
+  },
+  {
+   "expression": "0CASE_VOCATIVE",
+   "tokens": [
+    "NUMBER:0",
+    "CASE_VOCATIVE:CASE_VOCATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_VOCATIVE.",
+   "error": "Unexpected code point U+002E at index 13 while evaluating expression 'CASE_VOCATIVE.'."
+  },
+  {
+   "expression": "CASE_ABLATIVE",
+   "tokens": [
+    "CASE_ABLATIVE:CASE_ABLATIVE"
+   ]
+  },
+  {
+   "expression": "x == CASE_ABLATIVE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CASE_ABLATIVE:CASE_ABLATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_ABLATIVEX",
+   "tokens": [
+    "VARIABLE:CASE_ABLATIVEX"
+   ]
+  },
+  {
+   "expression": "myCASE_ABLATIVE",
+   "tokens": [
+    "VARIABLE:myCASE_ABLATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_ABLATIVE_",
+   "tokens": [
+    "VARIABLE:CASE_ABLATIVE_"
+   ]
+  },
+  {
+   "expression": "CASE_ABLATIVE1",
+   "tokens": [
+    "VARIABLE:CASE_ABLATIVE1"
+   ]
+  },
+  {
+   "expression": "CASE_ABLATIVE-y",
+   "tokens": [
+    "VARIABLE:CASE_ABLATIVE-y"
+   ]
+  },
+  {
+   "expression": "(CASE_ABLATIVE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CASE_ABLATIVE:CASE_ABLATIVE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CASE_ABLATIVECASE_ABLATIVE",
+   "tokens": [
+    "VARIABLE:CASE_ABLATIVECASE_ABLATIVE"
+   ]
+  },
+  {
+   "expression": "_CASE_ABLATIVE",
+   "tokens": [
+    "VARIABLE:_CASE_ABLATIVE"
+   ]
+  },
+  {
+   "expression": "case_ablative",
+   "tokens": [
+    "VARIABLE:case_ablative"
+   ]
+  },
+  {
+   "expression": "CASE_ABLATIVE == CASE_ABLATIVE",
+   "tokens": [
+    "CASE_ABLATIVE:CASE_ABLATIVE",
+    "EQUAL_TO:==",
+    "CASE_ABLATIVE:CASE_ABLATIVE"
+   ]
+  },
+  {
+   "expression": "0CASE_ABLATIVE",
+   "tokens": [
+    "NUMBER:0",
+    "CASE_ABLATIVE:CASE_ABLATIVE"
+   ]
+  },
+  {
+   "expression": "CASE_ABLATIVE.",
+   "error": "Unexpected code point U+002E at index 13 while evaluating expression 'CASE_ABLATIVE.'."
+  },
+  {
+   "expression": "DEFINITENESS_DEFINITE",
+   "tokens": [
+    "DEFINITENESS_DEFINITE:DEFINITENESS_DEFINITE"
+   ]
+  },
+  {
+   "expression": "x == DEFINITENESS_DEFINITE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "DEFINITENESS_DEFINITE:DEFINITENESS_DEFINITE"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_DEFINITEX",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_DEFINITEX"
+   ]
+  },
+  {
+   "expression": "myDEFINITENESS_DEFINITE",
+   "tokens": [
+    "VARIABLE:myDEFINITENESS_DEFINITE"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_DEFINITE_",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_DEFINITE_"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_DEFINITE1",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_DEFINITE1"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_DEFINITE-y",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_DEFINITE-y"
+   ]
+  },
+  {
+   "expression": "(DEFINITENESS_DEFINITE)",
+   "tokens": [
+    "GROUP_START:(",
+    "DEFINITENESS_DEFINITE:DEFINITENESS_DEFINITE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_DEFINITEDEFINITENESS_DEFINITE",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_DEFINITEDEFINITENESS_DEFINITE"
+   ]
+  },
+  {
+   "expression": "_DEFINITENESS_DEFINITE",
+   "tokens": [
+    "VARIABLE:_DEFINITENESS_DEFINITE"
+   ]
+  },
+  {
+   "expression": "definiteness_definite",
+   "tokens": [
+    "VARIABLE:definiteness_definite"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_DEFINITE == DEFINITENESS_DEFINITE",
+   "tokens": [
+    "DEFINITENESS_DEFINITE:DEFINITENESS_DEFINITE",
+    "EQUAL_TO:==",
+    "DEFINITENESS_DEFINITE:DEFINITENESS_DEFINITE"
+   ]
+  },
+  {
+   "expression": "0DEFINITENESS_DEFINITE",
+   "tokens": [
+    "NUMBER:0",
+    "DEFINITENESS_DEFINITE:DEFINITENESS_DEFINITE"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_DEFINITE.",
+   "error": "Unexpected code point U+002E at index 21 while evaluating expression 'DEFINITENESS_DEFINITE.'."
+  },
+  {
+   "expression": "DEFINITENESS_INDEFINITE",
+   "tokens": [
+    "DEFINITENESS_INDEFINITE:DEFINITENESS_INDEFINITE"
+   ]
+  },
+  {
+   "expression": "x == DEFINITENESS_INDEFINITE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "DEFINITENESS_INDEFINITE:DEFINITENESS_INDEFINITE"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_INDEFINITEX",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_INDEFINITEX"
+   ]
+  },
+  {
+   "expression": "myDEFINITENESS_INDEFINITE",
+   "tokens": [
+    "VARIABLE:myDEFINITENESS_INDEFINITE"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_INDEFINITE_",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_INDEFINITE_"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_INDEFINITE1",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_INDEFINITE1"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_INDEFINITE-y",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_INDEFINITE-y"
+   ]
+  },
+  {
+   "expression": "(DEFINITENESS_INDEFINITE)",
+   "tokens": [
+    "GROUP_START:(",
+    "DEFINITENESS_INDEFINITE:DEFINITENESS_INDEFINITE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_INDEFINITEDEFINITENESS_INDEFINITE",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_INDEFINITEDEFINITENESS_INDEFINITE"
+   ]
+  },
+  {
+   "expression": "_DEFINITENESS_INDEFINITE",
+   "tokens": [
+    "VARIABLE:_DEFINITENESS_INDEFINITE"
+   ]
+  },
+  {
+   "expression": "definiteness_indefinite",
+   "tokens": [
+    "VARIABLE:definiteness_indefinite"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_INDEFINITE == DEFINITENESS_INDEFINITE",
+   "tokens": [
+    "DEFINITENESS_INDEFINITE:DEFINITENESS_INDEFINITE",
+    "EQUAL_TO:==",
+    "DEFINITENESS_INDEFINITE:DEFINITENESS_INDEFINITE"
+   ]
+  },
+  {
+   "expression": "0DEFINITENESS_INDEFINITE",
+   "tokens": [
+    "NUMBER:0",
+    "DEFINITENESS_INDEFINITE:DEFINITENESS_INDEFINITE"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_INDEFINITE.",
+   "error": "Unexpected code point U+002E at index 23 while evaluating expression 'DEFINITENESS_INDEFINITE.'."
+  },
+  {
+   "expression": "DEFINITENESS_CONSTRUCT",
+   "tokens": [
+    "DEFINITENESS_CONSTRUCT:DEFINITENESS_CONSTRUCT"
+   ]
+  },
+  {
+   "expression": "x == DEFINITENESS_CONSTRUCT",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "DEFINITENESS_CONSTRUCT:DEFINITENESS_CONSTRUCT"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_CONSTRUCTX",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_CONSTRUCTX"
+   ]
+  },
+  {
+   "expression": "myDEFINITENESS_CONSTRUCT",
+   "tokens": [
+    "VARIABLE:myDEFINITENESS_CONSTRUCT"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_CONSTRUCT_",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_CONSTRUCT_"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_CONSTRUCT1",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_CONSTRUCT1"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_CONSTRUCT-y",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_CONSTRUCT-y"
+   ]
+  },
+  {
+   "expression": "(DEFINITENESS_CONSTRUCT)",
+   "tokens": [
+    "GROUP_START:(",
+    "DEFINITENESS_CONSTRUCT:DEFINITENESS_CONSTRUCT",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_CONSTRUCTDEFINITENESS_CONSTRUCT",
+   "tokens": [
+    "VARIABLE:DEFINITENESS_CONSTRUCTDEFINITENESS_CONSTRUCT"
+   ]
+  },
+  {
+   "expression": "_DEFINITENESS_CONSTRUCT",
+   "tokens": [
+    "VARIABLE:_DEFINITENESS_CONSTRUCT"
+   ]
+  },
+  {
+   "expression": "definiteness_construct",
+   "tokens": [
+    "VARIABLE:definiteness_construct"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_CONSTRUCT == DEFINITENESS_CONSTRUCT",
+   "tokens": [
+    "DEFINITENESS_CONSTRUCT:DEFINITENESS_CONSTRUCT",
+    "EQUAL_TO:==",
+    "DEFINITENESS_CONSTRUCT:DEFINITENESS_CONSTRUCT"
+   ]
+  },
+  {
+   "expression": "0DEFINITENESS_CONSTRUCT",
+   "tokens": [
+    "NUMBER:0",
+    "DEFINITENESS_CONSTRUCT:DEFINITENESS_CONSTRUCT"
+   ]
+  },
+  {
+   "expression": "DEFINITENESS_CONSTRUCT.",
+   "error": "Unexpected code point U+002E at index 22 while evaluating expression 'DEFINITENESS_CONSTRUCT.'."
+  },
+  {
+   "expression": "CLASSIFIER_GENERAL",
+   "tokens": [
+    "CLASSIFIER_GENERAL:CLASSIFIER_GENERAL"
+   ]
+  },
+  {
+   "expression": "x == CLASSIFIER_GENERAL",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CLASSIFIER_GENERAL:CLASSIFIER_GENERAL"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_GENERALX",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_GENERALX"
+   ]
+  },
+  {
+   "expression": "myCLASSIFIER_GENERAL",
+   "tokens": [
+    "VARIABLE:myCLASSIFIER_GENERAL"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_GENERAL_",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_GENERAL_"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_GENERAL1",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_GENERAL1"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_GENERAL-y",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_GENERAL-y"
+   ]
+  },
+  {
+   "expression": "(CLASSIFIER_GENERAL)",
+   "tokens": [
+    "GROUP_START:(",
+    "CLASSIFIER_GENERAL:CLASSIFIER_GENERAL",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_GENERALCLASSIFIER_GENERAL",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_GENERALCLASSIFIER_GENERAL"
+   ]
+  },
+  {
+   "expression": "_CLASSIFIER_GENERAL",
+   "tokens": [
+    "VARIABLE:_CLASSIFIER_GENERAL"
+   ]
+  },
+  {
+   "expression": "classifier_general",
+   "tokens": [
+    "VARIABLE:classifier_general"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_GENERAL == CLASSIFIER_GENERAL",
+   "tokens": [
+    "CLASSIFIER_GENERAL:CLASSIFIER_GENERAL",
+    "EQUAL_TO:==",
+    "CLASSIFIER_GENERAL:CLASSIFIER_GENERAL"
+   ]
+  },
+  {
+   "expression": "0CLASSIFIER_GENERAL",
+   "tokens": [
+    "NUMBER:0",
+    "CLASSIFIER_GENERAL:CLASSIFIER_GENERAL"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_GENERAL.",
+   "error": "Unexpected code point U+002E at index 18 while evaluating expression 'CLASSIFIER_GENERAL.'."
+  },
+  {
+   "expression": "CLASSIFIER_PERSON",
+   "tokens": [
+    "CLASSIFIER_PERSON:CLASSIFIER_PERSON"
+   ]
+  },
+  {
+   "expression": "x == CLASSIFIER_PERSON",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CLASSIFIER_PERSON:CLASSIFIER_PERSON"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_PERSONX",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_PERSONX"
+   ]
+  },
+  {
+   "expression": "myCLASSIFIER_PERSON",
+   "tokens": [
+    "VARIABLE:myCLASSIFIER_PERSON"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_PERSON_",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_PERSON_"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_PERSON1",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_PERSON1"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_PERSON-y",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_PERSON-y"
+   ]
+  },
+  {
+   "expression": "(CLASSIFIER_PERSON)",
+   "tokens": [
+    "GROUP_START:(",
+    "CLASSIFIER_PERSON:CLASSIFIER_PERSON",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_PERSONCLASSIFIER_PERSON",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_PERSONCLASSIFIER_PERSON"
+   ]
+  },
+  {
+   "expression": "_CLASSIFIER_PERSON",
+   "tokens": [
+    "VARIABLE:_CLASSIFIER_PERSON"
+   ]
+  },
+  {
+   "expression": "classifier_person",
+   "tokens": [
+    "VARIABLE:classifier_person"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_PERSON == CLASSIFIER_PERSON",
+   "tokens": [
+    "CLASSIFIER_PERSON:CLASSIFIER_PERSON",
+    "EQUAL_TO:==",
+    "CLASSIFIER_PERSON:CLASSIFIER_PERSON"
+   ]
+  },
+  {
+   "expression": "0CLASSIFIER_PERSON",
+   "tokens": [
+    "NUMBER:0",
+    "CLASSIFIER_PERSON:CLASSIFIER_PERSON"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_PERSON.",
+   "error": "Unexpected code point U+002E at index 17 while evaluating expression 'CLASSIFIER_PERSON.'."
+  },
+  {
+   "expression": "CLASSIFIER_ANIMAL",
+   "tokens": [
+    "CLASSIFIER_ANIMAL:CLASSIFIER_ANIMAL"
+   ]
+  },
+  {
+   "expression": "x == CLASSIFIER_ANIMAL",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CLASSIFIER_ANIMAL:CLASSIFIER_ANIMAL"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_ANIMALX",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_ANIMALX"
+   ]
+  },
+  {
+   "expression": "myCLASSIFIER_ANIMAL",
+   "tokens": [
+    "VARIABLE:myCLASSIFIER_ANIMAL"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_ANIMAL_",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_ANIMAL_"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_ANIMAL1",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_ANIMAL1"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_ANIMAL-y",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_ANIMAL-y"
+   ]
+  },
+  {
+   "expression": "(CLASSIFIER_ANIMAL)",
+   "tokens": [
+    "GROUP_START:(",
+    "CLASSIFIER_ANIMAL:CLASSIFIER_ANIMAL",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_ANIMALCLASSIFIER_ANIMAL",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_ANIMALCLASSIFIER_ANIMAL"
+   ]
+  },
+  {
+   "expression": "_CLASSIFIER_ANIMAL",
+   "tokens": [
+    "VARIABLE:_CLASSIFIER_ANIMAL"
+   ]
+  },
+  {
+   "expression": "classifier_animal",
+   "tokens": [
+    "VARIABLE:classifier_animal"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_ANIMAL == CLASSIFIER_ANIMAL",
+   "tokens": [
+    "CLASSIFIER_ANIMAL:CLASSIFIER_ANIMAL",
+    "EQUAL_TO:==",
+    "CLASSIFIER_ANIMAL:CLASSIFIER_ANIMAL"
+   ]
+  },
+  {
+   "expression": "0CLASSIFIER_ANIMAL",
+   "tokens": [
+    "NUMBER:0",
+    "CLASSIFIER_ANIMAL:CLASSIFIER_ANIMAL"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_ANIMAL.",
+   "error": "Unexpected code point U+002E at index 17 while evaluating expression 'CLASSIFIER_ANIMAL.'."
+  },
+  {
+   "expression": "CLASSIFIER_LONG_THIN",
+   "tokens": [
+    "CLASSIFIER_LONG_THIN:CLASSIFIER_LONG_THIN"
+   ]
+  },
+  {
+   "expression": "x == CLASSIFIER_LONG_THIN",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CLASSIFIER_LONG_THIN:CLASSIFIER_LONG_THIN"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_LONG_THINX",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_LONG_THINX"
+   ]
+  },
+  {
+   "expression": "myCLASSIFIER_LONG_THIN",
+   "tokens": [
+    "VARIABLE:myCLASSIFIER_LONG_THIN"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_LONG_THIN_",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_LONG_THIN_"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_LONG_THIN1",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_LONG_THIN1"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_LONG_THIN-y",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_LONG_THIN-y"
+   ]
+  },
+  {
+   "expression": "(CLASSIFIER_LONG_THIN)",
+   "tokens": [
+    "GROUP_START:(",
+    "CLASSIFIER_LONG_THIN:CLASSIFIER_LONG_THIN",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_LONG_THINCLASSIFIER_LONG_THIN",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_LONG_THINCLASSIFIER_LONG_THIN"
+   ]
+  },
+  {
+   "expression": "_CLASSIFIER_LONG_THIN",
+   "tokens": [
+    "VARIABLE:_CLASSIFIER_LONG_THIN"
+   ]
+  },
+  {
+   "expression": "classifier_long_thin",
+   "tokens": [
+    "VARIABLE:classifier_long_thin"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_LONG_THIN == CLASSIFIER_LONG_THIN",
+   "tokens": [
+    "CLASSIFIER_LONG_THIN:CLASSIFIER_LONG_THIN",
+    "EQUAL_TO:==",
+    "CLASSIFIER_LONG_THIN:CLASSIFIER_LONG_THIN"
+   ]
+  },
+  {
+   "expression": "0CLASSIFIER_LONG_THIN",
+   "tokens": [
+    "NUMBER:0",
+    "CLASSIFIER_LONG_THIN:CLASSIFIER_LONG_THIN"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_LONG_THIN.",
+   "error": "Unexpected code point U+002E at index 20 while evaluating expression 'CLASSIFIER_LONG_THIN.'."
+  },
+  {
+   "expression": "CLASSIFIER_FLAT",
+   "tokens": [
+    "CLASSIFIER_FLAT:CLASSIFIER_FLAT"
+   ]
+  },
+  {
+   "expression": "x == CLASSIFIER_FLAT",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CLASSIFIER_FLAT:CLASSIFIER_FLAT"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_FLATX",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_FLATX"
+   ]
+  },
+  {
+   "expression": "myCLASSIFIER_FLAT",
+   "tokens": [
+    "VARIABLE:myCLASSIFIER_FLAT"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_FLAT_",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_FLAT_"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_FLAT1",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_FLAT1"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_FLAT-y",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_FLAT-y"
+   ]
+  },
+  {
+   "expression": "(CLASSIFIER_FLAT)",
+   "tokens": [
+    "GROUP_START:(",
+    "CLASSIFIER_FLAT:CLASSIFIER_FLAT",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_FLATCLASSIFIER_FLAT",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_FLATCLASSIFIER_FLAT"
+   ]
+  },
+  {
+   "expression": "_CLASSIFIER_FLAT",
+   "tokens": [
+    "VARIABLE:_CLASSIFIER_FLAT"
+   ]
+  },
+  {
+   "expression": "classifier_flat",
+   "tokens": [
+    "VARIABLE:classifier_flat"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_FLAT == CLASSIFIER_FLAT",
+   "tokens": [
+    "CLASSIFIER_FLAT:CLASSIFIER_FLAT",
+    "EQUAL_TO:==",
+    "CLASSIFIER_FLAT:CLASSIFIER_FLAT"
+   ]
+  },
+  {
+   "expression": "0CLASSIFIER_FLAT",
+   "tokens": [
+    "NUMBER:0",
+    "CLASSIFIER_FLAT:CLASSIFIER_FLAT"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_FLAT.",
+   "error": "Unexpected code point U+002E at index 15 while evaluating expression 'CLASSIFIER_FLAT.'."
+  },
+  {
+   "expression": "CLASSIFIER_BOUND",
+   "tokens": [
+    "CLASSIFIER_BOUND:CLASSIFIER_BOUND"
+   ]
+  },
+  {
+   "expression": "x == CLASSIFIER_BOUND",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CLASSIFIER_BOUND:CLASSIFIER_BOUND"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_BOUNDX",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_BOUNDX"
+   ]
+  },
+  {
+   "expression": "myCLASSIFIER_BOUND",
+   "tokens": [
+    "VARIABLE:myCLASSIFIER_BOUND"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_BOUND_",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_BOUND_"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_BOUND1",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_BOUND1"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_BOUND-y",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_BOUND-y"
+   ]
+  },
+  {
+   "expression": "(CLASSIFIER_BOUND)",
+   "tokens": [
+    "GROUP_START:(",
+    "CLASSIFIER_BOUND:CLASSIFIER_BOUND",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_BOUNDCLASSIFIER_BOUND",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_BOUNDCLASSIFIER_BOUND"
+   ]
+  },
+  {
+   "expression": "_CLASSIFIER_BOUND",
+   "tokens": [
+    "VARIABLE:_CLASSIFIER_BOUND"
+   ]
+  },
+  {
+   "expression": "classifier_bound",
+   "tokens": [
+    "VARIABLE:classifier_bound"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_BOUND == CLASSIFIER_BOUND",
+   "tokens": [
+    "CLASSIFIER_BOUND:CLASSIFIER_BOUND",
+    "EQUAL_TO:==",
+    "CLASSIFIER_BOUND:CLASSIFIER_BOUND"
+   ]
+  },
+  {
+   "expression": "0CLASSIFIER_BOUND",
+   "tokens": [
+    "NUMBER:0",
+    "CLASSIFIER_BOUND:CLASSIFIER_BOUND"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_BOUND.",
+   "error": "Unexpected code point U+002E at index 16 while evaluating expression 'CLASSIFIER_BOUND.'."
+  },
+  {
+   "expression": "CLASSIFIER_MACHINE",
+   "tokens": [
+    "CLASSIFIER_MACHINE:CLASSIFIER_MACHINE"
+   ]
+  },
+  {
+   "expression": "x == CLASSIFIER_MACHINE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CLASSIFIER_MACHINE:CLASSIFIER_MACHINE"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_MACHINEX",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_MACHINEX"
+   ]
+  },
+  {
+   "expression": "myCLASSIFIER_MACHINE",
+   "tokens": [
+    "VARIABLE:myCLASSIFIER_MACHINE"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_MACHINE_",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_MACHINE_"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_MACHINE1",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_MACHINE1"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_MACHINE-y",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_MACHINE-y"
+   ]
+  },
+  {
+   "expression": "(CLASSIFIER_MACHINE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CLASSIFIER_MACHINE:CLASSIFIER_MACHINE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_MACHINECLASSIFIER_MACHINE",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_MACHINECLASSIFIER_MACHINE"
+   ]
+  },
+  {
+   "expression": "_CLASSIFIER_MACHINE",
+   "tokens": [
+    "VARIABLE:_CLASSIFIER_MACHINE"
+   ]
+  },
+  {
+   "expression": "classifier_machine",
+   "tokens": [
+    "VARIABLE:classifier_machine"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_MACHINE == CLASSIFIER_MACHINE",
+   "tokens": [
+    "CLASSIFIER_MACHINE:CLASSIFIER_MACHINE",
+    "EQUAL_TO:==",
+    "CLASSIFIER_MACHINE:CLASSIFIER_MACHINE"
+   ]
+  },
+  {
+   "expression": "0CLASSIFIER_MACHINE",
+   "tokens": [
+    "NUMBER:0",
+    "CLASSIFIER_MACHINE:CLASSIFIER_MACHINE"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_MACHINE.",
+   "error": "Unexpected code point U+002E at index 18 while evaluating expression 'CLASSIFIER_MACHINE.'."
+  },
+  {
+   "expression": "CLASSIFIER_VEHICLE",
+   "tokens": [
+    "CLASSIFIER_VEHICLE:CLASSIFIER_VEHICLE"
+   ]
+  },
+  {
+   "expression": "x == CLASSIFIER_VEHICLE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CLASSIFIER_VEHICLE:CLASSIFIER_VEHICLE"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_VEHICLEX",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_VEHICLEX"
+   ]
+  },
+  {
+   "expression": "myCLASSIFIER_VEHICLE",
+   "tokens": [
+    "VARIABLE:myCLASSIFIER_VEHICLE"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_VEHICLE_",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_VEHICLE_"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_VEHICLE1",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_VEHICLE1"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_VEHICLE-y",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_VEHICLE-y"
+   ]
+  },
+  {
+   "expression": "(CLASSIFIER_VEHICLE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CLASSIFIER_VEHICLE:CLASSIFIER_VEHICLE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_VEHICLECLASSIFIER_VEHICLE",
+   "tokens": [
+    "VARIABLE:CLASSIFIER_VEHICLECLASSIFIER_VEHICLE"
+   ]
+  },
+  {
+   "expression": "_CLASSIFIER_VEHICLE",
+   "tokens": [
+    "VARIABLE:_CLASSIFIER_VEHICLE"
+   ]
+  },
+  {
+   "expression": "classifier_vehicle",
+   "tokens": [
+    "VARIABLE:classifier_vehicle"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_VEHICLE == CLASSIFIER_VEHICLE",
+   "tokens": [
+    "CLASSIFIER_VEHICLE:CLASSIFIER_VEHICLE",
+    "EQUAL_TO:==",
+    "CLASSIFIER_VEHICLE:CLASSIFIER_VEHICLE"
+   ]
+  },
+  {
+   "expression": "0CLASSIFIER_VEHICLE",
+   "tokens": [
+    "NUMBER:0",
+    "CLASSIFIER_VEHICLE:CLASSIFIER_VEHICLE"
+   ]
+  },
+  {
+   "expression": "CLASSIFIER_VEHICLE.",
+   "error": "Unexpected code point U+002E at index 18 while evaluating expression 'CLASSIFIER_VEHICLE.'."
+  },
+  {
+   "expression": "FORMALITY_CASUAL",
+   "tokens": [
+    "FORMALITY_CASUAL:FORMALITY_CASUAL"
+   ]
+  },
+  {
+   "expression": "x == FORMALITY_CASUAL",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "FORMALITY_CASUAL:FORMALITY_CASUAL"
+   ]
+  },
+  {
+   "expression": "FORMALITY_CASUALX",
+   "tokens": [
+    "VARIABLE:FORMALITY_CASUALX"
+   ]
+  },
+  {
+   "expression": "myFORMALITY_CASUAL",
+   "tokens": [
+    "VARIABLE:myFORMALITY_CASUAL"
+   ]
+  },
+  {
+   "expression": "FORMALITY_CASUAL_",
+   "tokens": [
+    "VARIABLE:FORMALITY_CASUAL_"
+   ]
+  },
+  {
+   "expression": "FORMALITY_CASUAL1",
+   "tokens": [
+    "VARIABLE:FORMALITY_CASUAL1"
+   ]
+  },
+  {
+   "expression": "FORMALITY_CASUAL-y",
+   "tokens": [
+    "VARIABLE:FORMALITY_CASUAL-y"
+   ]
+  },
+  {
+   "expression": "(FORMALITY_CASUAL)",
+   "tokens": [
+    "GROUP_START:(",
+    "FORMALITY_CASUAL:FORMALITY_CASUAL",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "FORMALITY_CASUALFORMALITY_CASUAL",
+   "tokens": [
+    "VARIABLE:FORMALITY_CASUALFORMALITY_CASUAL"
+   ]
+  },
+  {
+   "expression": "_FORMALITY_CASUAL",
+   "tokens": [
+    "VARIABLE:_FORMALITY_CASUAL"
+   ]
+  },
+  {
+   "expression": "formality_casual",
+   "tokens": [
+    "VARIABLE:formality_casual"
+   ]
+  },
+  {
+   "expression": "FORMALITY_CASUAL == FORMALITY_CASUAL",
+   "tokens": [
+    "FORMALITY_CASUAL:FORMALITY_CASUAL",
+    "EQUAL_TO:==",
+    "FORMALITY_CASUAL:FORMALITY_CASUAL"
+   ]
+  },
+  {
+   "expression": "0FORMALITY_CASUAL",
+   "tokens": [
+    "NUMBER:0",
+    "FORMALITY_CASUAL:FORMALITY_CASUAL"
+   ]
+  },
+  {
+   "expression": "FORMALITY_CASUAL.",
+   "error": "Unexpected code point U+002E at index 16 while evaluating expression 'FORMALITY_CASUAL.'."
+  },
+  {
+   "expression": "FORMALITY_INFORMAL",
+   "tokens": [
+    "FORMALITY_INFORMAL:FORMALITY_INFORMAL"
+   ]
+  },
+  {
+   "expression": "x == FORMALITY_INFORMAL",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "FORMALITY_INFORMAL:FORMALITY_INFORMAL"
+   ]
+  },
+  {
+   "expression": "FORMALITY_INFORMALX",
+   "tokens": [
+    "VARIABLE:FORMALITY_INFORMALX"
+   ]
+  },
+  {
+   "expression": "myFORMALITY_INFORMAL",
+   "tokens": [
+    "VARIABLE:myFORMALITY_INFORMAL"
+   ]
+  },
+  {
+   "expression": "FORMALITY_INFORMAL_",
+   "tokens": [
+    "VARIABLE:FORMALITY_INFORMAL_"
+   ]
+  },
+  {
+   "expression": "FORMALITY_INFORMAL1",
+   "tokens": [
+    "VARIABLE:FORMALITY_INFORMAL1"
+   ]
+  },
+  {
+   "expression": "FORMALITY_INFORMAL-y",
+   "tokens": [
+    "VARIABLE:FORMALITY_INFORMAL-y"
+   ]
+  },
+  {
+   "expression": "(FORMALITY_INFORMAL)",
+   "tokens": [
+    "GROUP_START:(",
+    "FORMALITY_INFORMAL:FORMALITY_INFORMAL",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "FORMALITY_INFORMALFORMALITY_INFORMAL",
+   "tokens": [
+    "VARIABLE:FORMALITY_INFORMALFORMALITY_INFORMAL"
+   ]
+  },
+  {
+   "expression": "_FORMALITY_INFORMAL",
+   "tokens": [
+    "VARIABLE:_FORMALITY_INFORMAL"
+   ]
+  },
+  {
+   "expression": "formality_informal",
+   "tokens": [
+    "VARIABLE:formality_informal"
+   ]
+  },
+  {
+   "expression": "FORMALITY_INFORMAL == FORMALITY_INFORMAL",
+   "tokens": [
+    "FORMALITY_INFORMAL:FORMALITY_INFORMAL",
+    "EQUAL_TO:==",
+    "FORMALITY_INFORMAL:FORMALITY_INFORMAL"
+   ]
+  },
+  {
+   "expression": "0FORMALITY_INFORMAL",
+   "tokens": [
+    "NUMBER:0",
+    "FORMALITY_INFORMAL:FORMALITY_INFORMAL"
+   ]
+  },
+  {
+   "expression": "FORMALITY_INFORMAL.",
+   "error": "Unexpected code point U+002E at index 18 while evaluating expression 'FORMALITY_INFORMAL.'."
+  },
+  {
+   "expression": "FORMALITY_FORMAL",
+   "tokens": [
+    "FORMALITY_FORMAL:FORMALITY_FORMAL"
+   ]
+  },
+  {
+   "expression": "x == FORMALITY_FORMAL",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "FORMALITY_FORMAL:FORMALITY_FORMAL"
+   ]
+  },
+  {
+   "expression": "FORMALITY_FORMALX",
+   "tokens": [
+    "VARIABLE:FORMALITY_FORMALX"
+   ]
+  },
+  {
+   "expression": "myFORMALITY_FORMAL",
+   "tokens": [
+    "VARIABLE:myFORMALITY_FORMAL"
+   ]
+  },
+  {
+   "expression": "FORMALITY_FORMAL_",
+   "tokens": [
+    "VARIABLE:FORMALITY_FORMAL_"
+   ]
+  },
+  {
+   "expression": "FORMALITY_FORMAL1",
+   "tokens": [
+    "VARIABLE:FORMALITY_FORMAL1"
+   ]
+  },
+  {
+   "expression": "FORMALITY_FORMAL-y",
+   "tokens": [
+    "VARIABLE:FORMALITY_FORMAL-y"
+   ]
+  },
+  {
+   "expression": "(FORMALITY_FORMAL)",
+   "tokens": [
+    "GROUP_START:(",
+    "FORMALITY_FORMAL:FORMALITY_FORMAL",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "FORMALITY_FORMALFORMALITY_FORMAL",
+   "tokens": [
+    "VARIABLE:FORMALITY_FORMALFORMALITY_FORMAL"
+   ]
+  },
+  {
+   "expression": "_FORMALITY_FORMAL",
+   "tokens": [
+    "VARIABLE:_FORMALITY_FORMAL"
+   ]
+  },
+  {
+   "expression": "formality_formal",
+   "tokens": [
+    "VARIABLE:formality_formal"
+   ]
+  },
+  {
+   "expression": "FORMALITY_FORMAL == FORMALITY_FORMAL",
+   "tokens": [
+    "FORMALITY_FORMAL:FORMALITY_FORMAL",
+    "EQUAL_TO:==",
+    "FORMALITY_FORMAL:FORMALITY_FORMAL"
+   ]
+  },
+  {
+   "expression": "0FORMALITY_FORMAL",
+   "tokens": [
+    "NUMBER:0",
+    "FORMALITY_FORMAL:FORMALITY_FORMAL"
+   ]
+  },
+  {
+   "expression": "FORMALITY_FORMAL.",
+   "error": "Unexpected code point U+002E at index 16 while evaluating expression 'FORMALITY_FORMAL.'."
+  },
+  {
+   "expression": "FORMALITY_HUMBLE",
+   "tokens": [
+    "FORMALITY_HUMBLE:FORMALITY_HUMBLE"
+   ]
+  },
+  {
+   "expression": "x == FORMALITY_HUMBLE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "FORMALITY_HUMBLE:FORMALITY_HUMBLE"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HUMBLEX",
+   "tokens": [
+    "VARIABLE:FORMALITY_HUMBLEX"
+   ]
+  },
+  {
+   "expression": "myFORMALITY_HUMBLE",
+   "tokens": [
+    "VARIABLE:myFORMALITY_HUMBLE"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HUMBLE_",
+   "tokens": [
+    "VARIABLE:FORMALITY_HUMBLE_"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HUMBLE1",
+   "tokens": [
+    "VARIABLE:FORMALITY_HUMBLE1"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HUMBLE-y",
+   "tokens": [
+    "VARIABLE:FORMALITY_HUMBLE-y"
+   ]
+  },
+  {
+   "expression": "(FORMALITY_HUMBLE)",
+   "tokens": [
+    "GROUP_START:(",
+    "FORMALITY_HUMBLE:FORMALITY_HUMBLE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HUMBLEFORMALITY_HUMBLE",
+   "tokens": [
+    "VARIABLE:FORMALITY_HUMBLEFORMALITY_HUMBLE"
+   ]
+  },
+  {
+   "expression": "_FORMALITY_HUMBLE",
+   "tokens": [
+    "VARIABLE:_FORMALITY_HUMBLE"
+   ]
+  },
+  {
+   "expression": "formality_humble",
+   "tokens": [
+    "VARIABLE:formality_humble"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HUMBLE == FORMALITY_HUMBLE",
+   "tokens": [
+    "FORMALITY_HUMBLE:FORMALITY_HUMBLE",
+    "EQUAL_TO:==",
+    "FORMALITY_HUMBLE:FORMALITY_HUMBLE"
+   ]
+  },
+  {
+   "expression": "0FORMALITY_HUMBLE",
+   "tokens": [
+    "NUMBER:0",
+    "FORMALITY_HUMBLE:FORMALITY_HUMBLE"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HUMBLE.",
+   "error": "Unexpected code point U+002E at index 16 while evaluating expression 'FORMALITY_HUMBLE.'."
+  },
+  {
+   "expression": "FORMALITY_HONORIFIC",
+   "tokens": [
+    "FORMALITY_HONORIFIC:FORMALITY_HONORIFIC"
+   ]
+  },
+  {
+   "expression": "x == FORMALITY_HONORIFIC",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "FORMALITY_HONORIFIC:FORMALITY_HONORIFIC"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HONORIFICX",
+   "tokens": [
+    "VARIABLE:FORMALITY_HONORIFICX"
+   ]
+  },
+  {
+   "expression": "myFORMALITY_HONORIFIC",
+   "tokens": [
+    "VARIABLE:myFORMALITY_HONORIFIC"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HONORIFIC_",
+   "tokens": [
+    "VARIABLE:FORMALITY_HONORIFIC_"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HONORIFIC1",
+   "tokens": [
+    "VARIABLE:FORMALITY_HONORIFIC1"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HONORIFIC-y",
+   "tokens": [
+    "VARIABLE:FORMALITY_HONORIFIC-y"
+   ]
+  },
+  {
+   "expression": "(FORMALITY_HONORIFIC)",
+   "tokens": [
+    "GROUP_START:(",
+    "FORMALITY_HONORIFIC:FORMALITY_HONORIFIC",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HONORIFICFORMALITY_HONORIFIC",
+   "tokens": [
+    "VARIABLE:FORMALITY_HONORIFICFORMALITY_HONORIFIC"
+   ]
+  },
+  {
+   "expression": "_FORMALITY_HONORIFIC",
+   "tokens": [
+    "VARIABLE:_FORMALITY_HONORIFIC"
+   ]
+  },
+  {
+   "expression": "formality_honorific",
+   "tokens": [
+    "VARIABLE:formality_honorific"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HONORIFIC == FORMALITY_HONORIFIC",
+   "tokens": [
+    "FORMALITY_HONORIFIC:FORMALITY_HONORIFIC",
+    "EQUAL_TO:==",
+    "FORMALITY_HONORIFIC:FORMALITY_HONORIFIC"
+   ]
+  },
+  {
+   "expression": "0FORMALITY_HONORIFIC",
+   "tokens": [
+    "NUMBER:0",
+    "FORMALITY_HONORIFIC:FORMALITY_HONORIFIC"
+   ]
+  },
+  {
+   "expression": "FORMALITY_HONORIFIC.",
+   "error": "Unexpected code point U+002E at index 19 while evaluating expression 'FORMALITY_HONORIFIC.'."
+  },
+  {
+   "expression": "CLUSIVITY_INCLUSIVE",
+   "tokens": [
+    "CLUSIVITY_INCLUSIVE:CLUSIVITY_INCLUSIVE"
+   ]
+  },
+  {
+   "expression": "x == CLUSIVITY_INCLUSIVE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CLUSIVITY_INCLUSIVE:CLUSIVITY_INCLUSIVE"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_INCLUSIVEX",
+   "tokens": [
+    "VARIABLE:CLUSIVITY_INCLUSIVEX"
+   ]
+  },
+  {
+   "expression": "myCLUSIVITY_INCLUSIVE",
+   "tokens": [
+    "VARIABLE:myCLUSIVITY_INCLUSIVE"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_INCLUSIVE_",
+   "tokens": [
+    "VARIABLE:CLUSIVITY_INCLUSIVE_"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_INCLUSIVE1",
+   "tokens": [
+    "VARIABLE:CLUSIVITY_INCLUSIVE1"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_INCLUSIVE-y",
+   "tokens": [
+    "VARIABLE:CLUSIVITY_INCLUSIVE-y"
+   ]
+  },
+  {
+   "expression": "(CLUSIVITY_INCLUSIVE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CLUSIVITY_INCLUSIVE:CLUSIVITY_INCLUSIVE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_INCLUSIVECLUSIVITY_INCLUSIVE",
+   "tokens": [
+    "VARIABLE:CLUSIVITY_INCLUSIVECLUSIVITY_INCLUSIVE"
+   ]
+  },
+  {
+   "expression": "_CLUSIVITY_INCLUSIVE",
+   "tokens": [
+    "VARIABLE:_CLUSIVITY_INCLUSIVE"
+   ]
+  },
+  {
+   "expression": "clusivity_inclusive",
+   "tokens": [
+    "VARIABLE:clusivity_inclusive"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_INCLUSIVE == CLUSIVITY_INCLUSIVE",
+   "tokens": [
+    "CLUSIVITY_INCLUSIVE:CLUSIVITY_INCLUSIVE",
+    "EQUAL_TO:==",
+    "CLUSIVITY_INCLUSIVE:CLUSIVITY_INCLUSIVE"
+   ]
+  },
+  {
+   "expression": "0CLUSIVITY_INCLUSIVE",
+   "tokens": [
+    "NUMBER:0",
+    "CLUSIVITY_INCLUSIVE:CLUSIVITY_INCLUSIVE"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_INCLUSIVE.",
+   "error": "Unexpected code point U+002E at index 19 while evaluating expression 'CLUSIVITY_INCLUSIVE.'."
+  },
+  {
+   "expression": "CLUSIVITY_EXCLUSIVE",
+   "tokens": [
+    "CLUSIVITY_EXCLUSIVE:CLUSIVITY_EXCLUSIVE"
+   ]
+  },
+  {
+   "expression": "x == CLUSIVITY_EXCLUSIVE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "CLUSIVITY_EXCLUSIVE:CLUSIVITY_EXCLUSIVE"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_EXCLUSIVEX",
+   "tokens": [
+    "VARIABLE:CLUSIVITY_EXCLUSIVEX"
+   ]
+  },
+  {
+   "expression": "myCLUSIVITY_EXCLUSIVE",
+   "tokens": [
+    "VARIABLE:myCLUSIVITY_EXCLUSIVE"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_EXCLUSIVE_",
+   "tokens": [
+    "VARIABLE:CLUSIVITY_EXCLUSIVE_"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_EXCLUSIVE1",
+   "tokens": [
+    "VARIABLE:CLUSIVITY_EXCLUSIVE1"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_EXCLUSIVE-y",
+   "tokens": [
+    "VARIABLE:CLUSIVITY_EXCLUSIVE-y"
+   ]
+  },
+  {
+   "expression": "(CLUSIVITY_EXCLUSIVE)",
+   "tokens": [
+    "GROUP_START:(",
+    "CLUSIVITY_EXCLUSIVE:CLUSIVITY_EXCLUSIVE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_EXCLUSIVECLUSIVITY_EXCLUSIVE",
+   "tokens": [
+    "VARIABLE:CLUSIVITY_EXCLUSIVECLUSIVITY_EXCLUSIVE"
+   ]
+  },
+  {
+   "expression": "_CLUSIVITY_EXCLUSIVE",
+   "tokens": [
+    "VARIABLE:_CLUSIVITY_EXCLUSIVE"
+   ]
+  },
+  {
+   "expression": "clusivity_exclusive",
+   "tokens": [
+    "VARIABLE:clusivity_exclusive"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_EXCLUSIVE == CLUSIVITY_EXCLUSIVE",
+   "tokens": [
+    "CLUSIVITY_EXCLUSIVE:CLUSIVITY_EXCLUSIVE",
+    "EQUAL_TO:==",
+    "CLUSIVITY_EXCLUSIVE:CLUSIVITY_EXCLUSIVE"
+   ]
+  },
+  {
+   "expression": "0CLUSIVITY_EXCLUSIVE",
+   "tokens": [
+    "NUMBER:0",
+    "CLUSIVITY_EXCLUSIVE:CLUSIVITY_EXCLUSIVE"
+   ]
+  },
+  {
+   "expression": "CLUSIVITY_EXCLUSIVE.",
+   "error": "Unexpected code point U+002E at index 19 while evaluating expression 'CLUSIVITY_EXCLUSIVE.'."
+  },
+  {
+   "expression": "ANIMACY_ANIMATE",
+   "tokens": [
+    "ANIMACY_ANIMATE:ANIMACY_ANIMATE"
+   ]
+  },
+  {
+   "expression": "x == ANIMACY_ANIMATE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "ANIMACY_ANIMATE:ANIMACY_ANIMATE"
+   ]
+  },
+  {
+   "expression": "ANIMACY_ANIMATEX",
+   "tokens": [
+    "VARIABLE:ANIMACY_ANIMATEX"
+   ]
+  },
+  {
+   "expression": "myANIMACY_ANIMATE",
+   "tokens": [
+    "VARIABLE:myANIMACY_ANIMATE"
+   ]
+  },
+  {
+   "expression": "ANIMACY_ANIMATE_",
+   "tokens": [
+    "VARIABLE:ANIMACY_ANIMATE_"
+   ]
+  },
+  {
+   "expression": "ANIMACY_ANIMATE1",
+   "tokens": [
+    "VARIABLE:ANIMACY_ANIMATE1"
+   ]
+  },
+  {
+   "expression": "ANIMACY_ANIMATE-y",
+   "tokens": [
+    "VARIABLE:ANIMACY_ANIMATE-y"
+   ]
+  },
+  {
+   "expression": "(ANIMACY_ANIMATE)",
+   "tokens": [
+    "GROUP_START:(",
+    "ANIMACY_ANIMATE:ANIMACY_ANIMATE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "ANIMACY_ANIMATEANIMACY_ANIMATE",
+   "tokens": [
+    "VARIABLE:ANIMACY_ANIMATEANIMACY_ANIMATE"
+   ]
+  },
+  {
+   "expression": "_ANIMACY_ANIMATE",
+   "tokens": [
+    "VARIABLE:_ANIMACY_ANIMATE"
+   ]
+  },
+  {
+   "expression": "animacy_animate",
+   "tokens": [
+    "VARIABLE:animacy_animate"
+   ]
+  },
+  {
+   "expression": "ANIMACY_ANIMATE == ANIMACY_ANIMATE",
+   "tokens": [
+    "ANIMACY_ANIMATE:ANIMACY_ANIMATE",
+    "EQUAL_TO:==",
+    "ANIMACY_ANIMATE:ANIMACY_ANIMATE"
+   ]
+  },
+  {
+   "expression": "0ANIMACY_ANIMATE",
+   "tokens": [
+    "NUMBER:0",
+    "ANIMACY_ANIMATE:ANIMACY_ANIMATE"
+   ]
+  },
+  {
+   "expression": "ANIMACY_ANIMATE.",
+   "error": "Unexpected code point U+002E at index 15 while evaluating expression 'ANIMACY_ANIMATE.'."
+  },
+  {
+   "expression": "ANIMACY_INANIMATE",
+   "tokens": [
+    "ANIMACY_INANIMATE:ANIMACY_INANIMATE"
+   ]
+  },
+  {
+   "expression": "x == ANIMACY_INANIMATE",
+   "tokens": [
+    "VARIABLE:x",
+    "EQUAL_TO:==",
+    "ANIMACY_INANIMATE:ANIMACY_INANIMATE"
+   ]
+  },
+  {
+   "expression": "ANIMACY_INANIMATEX",
+   "tokens": [
+    "VARIABLE:ANIMACY_INANIMATEX"
+   ]
+  },
+  {
+   "expression": "myANIMACY_INANIMATE",
+   "tokens": [
+    "VARIABLE:myANIMACY_INANIMATE"
+   ]
+  },
+  {
+   "expression": "ANIMACY_INANIMATE_",
+   "tokens": [
+    "VARIABLE:ANIMACY_INANIMATE_"
+   ]
+  },
+  {
+   "expression": "ANIMACY_INANIMATE1",
+   "tokens": [
+    "VARIABLE:ANIMACY_INANIMATE1"
+   ]
+  },
+  {
+   "expression": "ANIMACY_INANIMATE-y",
+   "tokens": [
+    "VARIABLE:ANIMACY_INANIMATE-y"
+   ]
+  },
+  {
+   "expression": "(ANIMACY_INANIMATE)",
+   "tokens": [
+    "GROUP_START:(",
+    "ANIMACY_INANIMATE:ANIMACY_INANIMATE",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "ANIMACY_INANIMATEANIMACY_INANIMATE",
+   "tokens": [
+    "VARIABLE:ANIMACY_INANIMATEANIMACY_INANIMATE"
+   ]
+  },
+  {
+   "expression": "_ANIMACY_INANIMATE",
+   "tokens": [
+    "VARIABLE:_ANIMACY_INANIMATE"
+   ]
+  },
+  {
+   "expression": "animacy_inanimate",
+   "tokens": [
+    "VARIABLE:animacy_inanimate"
+   ]
+  },
+  {
+   "expression": "ANIMACY_INANIMATE == ANIMACY_INANIMATE",
+   "tokens": [
+    "ANIMACY_INANIMATE:ANIMACY_INANIMATE",
+    "EQUAL_TO:==",
+    "ANIMACY_INANIMATE:ANIMACY_INANIMATE"
+   ]
+  },
+  {
+   "expression": "0ANIMACY_INANIMATE",
+   "tokens": [
+    "NUMBER:0",
+    "ANIMACY_INANIMATE:ANIMACY_INANIMATE"
+   ]
+  },
+  {
+   "expression": "ANIMACY_INANIMATE.",
+   "error": "Unexpected code point U+002E at index 17 while evaluating expression 'ANIMACY_INANIMATE.'."
+  },
+  {
+   "expression": "a < b",
+   "tokens": [
+    "VARIABLE:a",
+    "LESS_THAN:<",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a<b",
+   "tokens": [
+    "VARIABLE:a",
+    "LESS_THAN:<",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "<",
+   "tokens": [
+    "LESS_THAN:<"
+   ]
+  },
+  {
+   "expression": "a <= b",
+   "tokens": [
+    "VARIABLE:a",
+    "LESS_THAN_OR_EQUAL_TO:<=",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a<=b",
+   "tokens": [
+    "VARIABLE:a",
+    "LESS_THAN_OR_EQUAL_TO:<=",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "<=",
+   "tokens": [
+    "LESS_THAN_OR_EQUAL_TO:<="
+   ]
+  },
+  {
+   "expression": "a > b",
+   "tokens": [
+    "VARIABLE:a",
+    "GREATER_THAN:>",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a>b",
+   "tokens": [
+    "VARIABLE:a",
+    "GREATER_THAN:>",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": ">",
+   "tokens": [
+    "GREATER_THAN:>"
+   ]
+  },
+  {
+   "expression": "a >= b",
+   "tokens": [
+    "VARIABLE:a",
+    "GREATER_THAN_OR_EQUAL_TO:>=",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a>=b",
+   "tokens": [
+    "VARIABLE:a",
+    "GREATER_THAN_OR_EQUAL_TO:>=",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": ">=",
+   "tokens": [
+    "GREATER_THAN_OR_EQUAL_TO:>="
+   ]
+  },
+  {
+   "expression": "a == b",
+   "tokens": [
+    "VARIABLE:a",
+    "EQUAL_TO:==",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a==b",
+   "tokens": [
+    "VARIABLE:a",
+    "EQUAL_TO:==",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "==",
+   "tokens": [
+    "EQUAL_TO:=="
+   ]
+  },
+  {
+   "expression": "a != b",
+   "tokens": [
+    "VARIABLE:a",
+    "NOT_EQUAL_TO:!=",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a!=b",
+   "tokens": [
+    "VARIABLE:a",
+    "NOT_EQUAL_TO:!=",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "!=",
+   "tokens": [
+    "NOT_EQUAL_TO:!="
+   ]
+  },
+  {
+   "expression": "a && b",
+   "tokens": [
+    "VARIABLE:a",
+    "AND:&&",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a&&b",
+   "tokens": [
+    "VARIABLE:a",
+    "AND:&&",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "&&",
+   "tokens": [
+    "AND:&&"
+   ]
+  },
+  {
+   "expression": "a || b",
+   "tokens": [
+    "VARIABLE:a",
+    "OR:||",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a||b",
+   "tokens": [
+    "VARIABLE:a",
+    "OR:||",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "||",
+   "tokens": [
+    "OR:||"
+   ]
+  },
+  {
+   "expression": "a ( b",
+   "tokens": [
+    "VARIABLE:a",
+    "GROUP_START:(",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a(b",
+   "tokens": [
+    "VARIABLE:a",
+    "GROUP_START:(",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "(",
+   "tokens": [
+    "GROUP_START:("
+   ]
+  },
+  {
+   "expression": "a ) b",
+   "tokens": [
+    "VARIABLE:a",
+    "GROUP_END:)",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a)b",
+   "tokens": [
+    "VARIABLE:a",
+    "GROUP_END:)",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": ")",
+   "tokens": [
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "a = b",
+   "error": "Unexpected code point U+003D at index 2 while evaluating expression 'a = b'. Did you mean '=='?"
+  },
+  {
+   "expression": "a=b",
+   "error": "Unexpected code point U+003D at index 1 while evaluating expression 'a=b'. Did you mean '=='?"
+  },
+  {
+   "expression": "=",
+   "error": "Unexpected code point U+003D at index 0 while evaluating expression '='. Did you mean '=='?"
+  },
+  {
+   "expression": "a ! b",
+   "error": "Unexpected code point U+0021 at index 2 while evaluating expression 'a ! b'."
+  },
+  {
+   "expression": "a!b",
+   "error": "Unexpected code point U+0021 at index 1 while evaluating expression 'a!b'."
+  },
+  {
+   "expression": "!",
+   "error": "Unexpected code point U+0021 at index 0 while evaluating expression '!'."
+  },
+  {
+   "expression": "a & b",
+   "error": "Unexpected code point U+0026 at index 2 while evaluating expression 'a & b'."
+  },
+  {
+   "expression": "a&b",
+   "error": "Unexpected code point U+0026 at index 1 while evaluating expression 'a&b'."
+  },
+  {
+   "expression": "&",
+   "error": "Unexpected code point U+0026 at index 0 while evaluating expression '&'."
+  },
+  {
+   "expression": "a | b",
+   "error": "Unexpected code point U+007C at index 2 while evaluating expression 'a | b'."
+  },
+  {
+   "expression": "a|b",
+   "error": "Unexpected code point U+007C at index 1 while evaluating expression 'a|b'."
+  },
+  {
+   "expression": "|",
+   "error": "Unexpected code point U+007C at index 0 while evaluating expression '|'."
+  },
+  {
+   "expression": "a <== b",
+   "error": "Unexpected code point U+003D at index 4 while evaluating expression 'a <== b'. Did you mean '=='?"
+  },
+  {
+   "expression": "a<==b",
+   "error": "Unexpected code point U+003D at index 3 while evaluating expression 'a<==b'. Did you mean '=='?"
+  },
+  {
+   "expression": "<==",
+   "error": "Unexpected code point U+003D at index 2 while evaluating expression '<=='. Did you mean '=='?"
+  },
+  {
+   "expression": "a >== b",
+   "error": "Unexpected code point U+003D at index 4 while evaluating expression 'a >== b'. Did you mean '=='?"
+  },
+  {
+   "expression": "a>==b",
+   "error": "Unexpected code point U+003D at index 3 while evaluating expression 'a>==b'. Did you mean '=='?"
+  },
+  {
+   "expression": ">==",
+   "error": "Unexpected code point U+003D at index 2 while evaluating expression '>=='. Did you mean '=='?"
+  },
+  {
+   "expression": "a === b",
+   "error": "Unexpected code point U+003D at index 4 while evaluating expression 'a === b'. Did you mean '=='?"
+  },
+  {
+   "expression": "a===b",
+   "error": "Unexpected code point U+003D at index 3 while evaluating expression 'a===b'. Did you mean '=='?"
+  },
+  {
+   "expression": "===",
+   "error": "Unexpected code point U+003D at index 2 while evaluating expression '==='. Did you mean '=='?"
+  },
+  {
+   "expression": "a !== b",
+   "error": "Unexpected code point U+003D at index 4 while evaluating expression 'a !== b'. Did you mean '=='?"
+  },
+  {
+   "expression": "a!==b",
+   "error": "Unexpected code point U+003D at index 3 while evaluating expression 'a!==b'. Did you mean '=='?"
+  },
+  {
+   "expression": "!==",
+   "error": "Unexpected code point U+003D at index 2 while evaluating expression '!=='. Did you mean '=='?"
+  },
+  {
+   "expression": "a <> b",
+   "tokens": [
+    "VARIABLE:a",
+    "LESS_THAN:<",
+    "GREATER_THAN:>",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a<>b",
+   "tokens": [
+    "VARIABLE:a",
+    "LESS_THAN:<",
+    "GREATER_THAN:>",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "<>",
+   "tokens": [
+    "LESS_THAN:<",
+    "GREATER_THAN:>"
+   ]
+  },
+  {
+   "expression": "a => b",
+   "error": "Unexpected code point U+003D at index 2 while evaluating expression 'a => b'. Did you mean '=='?"
+  },
+  {
+   "expression": "a=>b",
+   "error": "Unexpected code point U+003D at index 1 while evaluating expression 'a=>b'. Did you mean '=='?"
+  },
+  {
+   "expression": "=>",
+   "error": "Unexpected code point U+003D at index 0 while evaluating expression '=>'. Did you mean '=='?"
+  },
+  {
+   "expression": "a =< b",
+   "error": "Unexpected code point U+003D at index 2 while evaluating expression 'a =< b'. Did you mean '=='?"
+  },
+  {
+   "expression": "a=<b",
+   "error": "Unexpected code point U+003D at index 1 while evaluating expression 'a=<b'. Did you mean '=='?"
+  },
+  {
+   "expression": "=<",
+   "error": "Unexpected code point U+003D at index 0 while evaluating expression '=<'. Did you mean '=='?"
+  },
+  {
+   "expression": "a &&& b",
+   "error": "Unexpected code point U+0026 at index 4 while evaluating expression 'a &&& b'."
+  },
+  {
+   "expression": "a&&&b",
+   "error": "Unexpected code point U+0026 at index 3 while evaluating expression 'a&&&b'."
+  },
+  {
+   "expression": "&&&",
+   "error": "Unexpected code point U+0026 at index 2 while evaluating expression '&&&'."
+  },
+  {
+   "expression": "a ||| b",
+   "error": "Unexpected code point U+007C at index 4 while evaluating expression 'a ||| b'."
+  },
+  {
+   "expression": "a|||b",
+   "error": "Unexpected code point U+007C at index 3 while evaluating expression 'a|||b'."
+  },
+  {
+   "expression": "|||",
+   "error": "Unexpected code point U+007C at index 2 while evaluating expression '|||'."
+  },
+  {
+   "expression": "a << b",
+   "tokens": [
+    "VARIABLE:a",
+    "LESS_THAN:<",
+    "LESS_THAN:<",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a<<b",
+   "tokens": [
+    "VARIABLE:a",
+    "LESS_THAN:<",
+    "LESS_THAN:<",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "<<",
+   "tokens": [
+    "LESS_THAN:<",
+    "LESS_THAN:<"
+   ]
+  },
+  {
+   "expression": "a >> b",
+   "tokens": [
+    "VARIABLE:a",
+    "GREATER_THAN:>",
+    "GREATER_THAN:>",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a>>b",
+   "tokens": [
+    "VARIABLE:a",
+    "GREATER_THAN:>",
+    "GREATER_THAN:>",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": ">>",
+   "tokens": [
+    "GREATER_THAN:>",
+    "GREATER_THAN:>"
+   ]
+  },
+  {
+   "expression": "0",
+   "tokens": [
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "n == 0",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "0 == n",
+   "tokens": [
+    "NUMBER:0",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1",
+   "tokens": [
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "1 == n",
+   "tokens": [
+    "NUMBER:1",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "-1",
+   "tokens": [
+    "NUMBER:-1"
+   ]
+  },
+  {
+   "expression": "n == -1",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:-1"
+   ]
+  },
+  {
+   "expression": "-1 == n",
+   "tokens": [
+    "NUMBER:-1",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "+1",
+   "tokens": [
+    "NUMBER:+1"
+   ]
+  },
+  {
+   "expression": "n == +1",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:+1"
+   ]
+  },
+  {
+   "expression": "+1 == n",
+   "tokens": [
+    "NUMBER:+1",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1.",
+   "tokens": [
+    "NUMBER:1."
+   ]
+  },
+  {
+   "expression": "n == 1.",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1."
+   ]
+  },
+  {
+   "expression": "1. == n",
+   "tokens": [
+    "NUMBER:1.",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1.0",
+   "tokens": [
+    "NUMBER:1.0"
+   ]
+  },
+  {
+   "expression": "n == 1.0",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1.0"
+   ]
+  },
+  {
+   "expression": "1.0 == n",
+   "tokens": [
+    "NUMBER:1.0",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": ".5",
+   "tokens": [
+    "NUMBER:.5"
+   ]
+  },
+  {
+   "expression": "n == .5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:.5"
+   ]
+  },
+  {
+   "expression": ".5 == n",
+   "tokens": [
+    "NUMBER:.5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "-.5",
+   "tokens": [
+    "NUMBER:-.5"
+   ]
+  },
+  {
+   "expression": "n == -.5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:-.5"
+   ]
+  },
+  {
+   "expression": "-.5 == n",
+   "tokens": [
+    "NUMBER:-.5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "+.5",
+   "tokens": [
+    "NUMBER:+.5"
+   ]
+  },
+  {
+   "expression": "n == +.5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:+.5"
+   ]
+  },
+  {
+   "expression": "+.5 == n",
+   "tokens": [
+    "NUMBER:+.5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "0.0",
+   "tokens": [
+    "NUMBER:0.0"
+   ]
+  },
+  {
+   "expression": "n == 0.0",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:0.0"
+   ]
+  },
+  {
+   "expression": "0.0 == n",
+   "tokens": [
+    "NUMBER:0.0",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1e5",
+   "tokens": [
+    "NUMBER:1e5"
+   ]
+  },
+  {
+   "expression": "n == 1e5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1e5"
+   ]
+  },
+  {
+   "expression": "1e5 == n",
+   "tokens": [
+    "NUMBER:1e5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1E5",
+   "tokens": [
+    "NUMBER:1E5"
+   ]
+  },
+  {
+   "expression": "n == 1E5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1E5"
+   ]
+  },
+  {
+   "expression": "1E5 == n",
+   "tokens": [
+    "NUMBER:1E5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1e+5",
+   "tokens": [
+    "NUMBER:1e+5"
+   ]
+  },
+  {
+   "expression": "n == 1e+5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1e+5"
+   ]
+  },
+  {
+   "expression": "1e+5 == n",
+   "tokens": [
+    "NUMBER:1e+5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1e-5",
+   "tokens": [
+    "NUMBER:1e-5"
+   ]
+  },
+  {
+   "expression": "n == 1e-5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1e-5"
+   ]
+  },
+  {
+   "expression": "1e-5 == n",
+   "tokens": [
+    "NUMBER:1e-5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1.5e5",
+   "tokens": [
+    "NUMBER:1.5e5"
+   ]
+  },
+  {
+   "expression": "n == 1.5e5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1.5e5"
+   ]
+  },
+  {
+   "expression": "1.5e5 == n",
+   "tokens": [
+    "NUMBER:1.5e5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1.e5",
+   "tokens": [
+    "NUMBER:1.e5"
+   ]
+  },
+  {
+   "expression": "n == 1.e5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1.e5"
+   ]
+  },
+  {
+   "expression": "1.e5 == n",
+   "tokens": [
+    "NUMBER:1.e5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": ".5e5",
+   "tokens": [
+    "NUMBER:.5e5"
+   ]
+  },
+  {
+   "expression": "n == .5e5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:.5e5"
+   ]
+  },
+  {
+   "expression": ".5e5 == n",
+   "tokens": [
+    "NUMBER:.5e5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "00",
+   "tokens": [
+    "NUMBER:00"
+   ]
+  },
+  {
+   "expression": "n == 00",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:00"
+   ]
+  },
+  {
+   "expression": "00 == n",
+   "tokens": [
+    "NUMBER:00",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "007",
+   "tokens": [
+    "NUMBER:007"
+   ]
+  },
+  {
+   "expression": "n == 007",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:007"
+   ]
+  },
+  {
+   "expression": "007 == n",
+   "tokens": [
+    "NUMBER:007",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1e",
+   "tokens": [
+    "NUMBER:1",
+    "VARIABLE:e"
+   ]
+  },
+  {
+   "expression": "n == 1e",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "VARIABLE:e"
+   ]
+  },
+  {
+   "expression": "1e == n",
+   "tokens": [
+    "NUMBER:1",
+    "VARIABLE:e",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1e+",
+   "error": "Unexpected code point U+002B at index 2 while evaluating expression '1e+'."
+  },
+  {
+   "expression": "n == 1e+",
+   "error": "Unexpected code point U+002B at index 7 while evaluating expression 'n == 1e+'."
+  },
+  {
+   "expression": "1e+ == n",
+   "error": "Unexpected code point U+002B at index 2 while evaluating expression '1e+ == n'."
+  },
+  {
+   "expression": "1.2.3",
+   "tokens": [
+    "NUMBER:1.2",
+    "NUMBER:.3"
+   ]
+  },
+  {
+   "expression": "n == 1.2.3",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1.2",
+    "NUMBER:.3"
+   ]
+  },
+  {
+   "expression": "1.2.3 == n",
+   "tokens": [
+    "NUMBER:1.2",
+    "NUMBER:.3",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "--1",
+   "error": "Unexpected code point U+002D at index 0 while evaluating expression '--1'."
+  },
+  {
+   "expression": "n == --1",
+   "error": "Unexpected code point U+002D at index 5 while evaluating expression 'n == --1'."
+  },
+  {
+   "expression": "--1 == n",
+   "error": "Unexpected code point U+002D at index 0 while evaluating expression '--1 == n'."
+  },
+  {
+   "expression": "+-1",
+   "error": "Unexpected code point U+002B at index 0 while evaluating expression '+-1'."
+  },
+  {
+   "expression": "n == +-1",
+   "error": "Unexpected code point U+002B at index 5 while evaluating expression 'n == +-1'."
+  },
+  {
+   "expression": "+-1 == n",
+   "error": "Unexpected code point U+002B at index 0 while evaluating expression '+-1 == n'."
+  },
+  {
+   "expression": "1-1",
+   "tokens": [
+    "NUMBER:1",
+    "NUMBER:-1"
+   ]
+  },
+  {
+   "expression": "n == 1-1",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "NUMBER:-1"
+   ]
+  },
+  {
+   "expression": "1-1 == n",
+   "tokens": [
+    "NUMBER:1",
+    "NUMBER:-1",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "5-3",
+   "tokens": [
+    "NUMBER:5",
+    "NUMBER:-3"
+   ]
+  },
+  {
+   "expression": "n == 5-3",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:5",
+    "NUMBER:-3"
+   ]
+  },
+  {
+   "expression": "5-3 == n",
+   "tokens": [
+    "NUMBER:5",
+    "NUMBER:-3",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "5+3",
+   "tokens": [
+    "NUMBER:5",
+    "NUMBER:+3"
+   ]
+  },
+  {
+   "expression": "n == 5+3",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:5",
+    "NUMBER:+3"
+   ]
+  },
+  {
+   "expression": "5+3 == n",
+   "tokens": [
+    "NUMBER:5",
+    "NUMBER:+3",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1_000",
+   "tokens": [
+    "NUMBER:1",
+    "VARIABLE:_000"
+   ]
+  },
+  {
+   "expression": "n == 1_000",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "VARIABLE:_000"
+   ]
+  },
+  {
+   "expression": "1_000 == n",
+   "tokens": [
+    "NUMBER:1",
+    "VARIABLE:_000",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "0x10",
+   "tokens": [
+    "NUMBER:0",
+    "VARIABLE:x10"
+   ]
+  },
+  {
+   "expression": "n == 0x10",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:0",
+    "VARIABLE:x10"
+   ]
+  },
+  {
+   "expression": "0x10 == n",
+   "tokens": [
+    "NUMBER:0",
+    "VARIABLE:x10",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1n",
+   "tokens": [
+    "NUMBER:1",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "n == 1n",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1n == n",
+   "tokens": [
+    "NUMBER:1",
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "9007199254740993",
+   "tokens": [
+    "NUMBER:9007199254740993"
+   ]
+  },
+  {
+   "expression": "n == 9007199254740993",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:9007199254740993"
+   ]
+  },
+  {
+   "expression": "9007199254740993 == n",
+   "tokens": [
+    "NUMBER:9007199254740993",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "100000000000000000001",
+   "tokens": [
+    "NUMBER:100000000000000000001"
+   ]
+  },
+  {
+   "expression": "n == 100000000000000000001",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:100000000000000000001"
+   ]
+  },
+  {
+   "expression": "100000000000000000001 == n",
+   "tokens": [
+    "NUMBER:100000000000000000001",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "1.7976931348623157e309",
+   "tokens": [
+    "NUMBER:1.7976931348623157e309"
+   ]
+  },
+  {
+   "expression": "n == 1.7976931348623157e309",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1.7976931348623157e309"
+   ]
+  },
+  {
+   "expression": "1.7976931348623157e309 == n",
+   "tokens": [
+    "NUMBER:1.7976931348623157e309",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": ".",
+   "error": "Unexpected code point U+002E at index 0 while evaluating expression '.'."
+  },
+  {
+   "expression": "n == .",
+   "error": "Unexpected code point U+002E at index 5 while evaluating expression 'n == .'."
+  },
+  {
+   "expression": ". == n",
+   "error": "Unexpected code point U+002E at index 0 while evaluating expression '. == n'."
+  },
+  {
+   "expression": "..",
+   "error": "Unexpected code point U+002E at index 0 while evaluating expression '..'."
+  },
+  {
+   "expression": "n == ..",
+   "error": "Unexpected code point U+002E at index 5 while evaluating expression 'n == ..'."
+  },
+  {
+   "expression": ".. == n",
+   "error": "Unexpected code point U+002E at index 0 while evaluating expression '.. == n'."
+  },
+  {
+   "expression": "1..2",
+   "tokens": [
+    "NUMBER:1.",
+    "NUMBER:.2"
+   ]
+  },
+  {
+   "expression": "n == 1..2",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "NUMBER:1.",
+    "NUMBER:.2"
+   ]
+  },
+  {
+   "expression": "1..2 == n",
+   "tokens": [
+    "NUMBER:1.",
+    "NUMBER:.2",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "e5",
+   "tokens": [
+    "VARIABLE:e5"
+   ]
+  },
+  {
+   "expression": "n == e5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "VARIABLE:e5"
+   ]
+  },
+  {
+   "expression": "e5 == n",
+   "tokens": [
+    "VARIABLE:e5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "E5",
+   "tokens": [
+    "VARIABLE:E5"
+   ]
+  },
+  {
+   "expression": "n == E5",
+   "tokens": [
+    "VARIABLE:n",
+    "EQUAL_TO:==",
+    "VARIABLE:E5"
+   ]
+  },
+  {
+   "expression": "E5 == n",
+   "tokens": [
+    "VARIABLE:E5",
+    "EQUAL_TO:==",
+    "VARIABLE:n"
+   ]
+  },
+  {
+   "expression": "a",
+   "tokens": [
+    "VARIABLE:a"
+   ]
+  },
+  {
+   "expression": "a == 1",
+   "tokens": [
+    "VARIABLE:a",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "_",
+   "tokens": [
+    "VARIABLE:_"
+   ]
+  },
+  {
+   "expression": "_ == 1",
+   "tokens": [
+    "VARIABLE:_",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "_a",
+   "tokens": [
+    "VARIABLE:_a"
+   ]
+  },
+  {
+   "expression": "_a == 1",
+   "tokens": [
+    "VARIABLE:_a",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "a_",
+   "tokens": [
+    "VARIABLE:a_"
+   ]
+  },
+  {
+   "expression": "a_ == 1",
+   "tokens": [
+    "VARIABLE:a_",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "a-b",
+   "tokens": [
+    "VARIABLE:a-b"
+   ]
+  },
+  {
+   "expression": "a-b == 1",
+   "tokens": [
+    "VARIABLE:a-b",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "a--b",
+   "tokens": [
+    "VARIABLE:a--b"
+   ]
+  },
+  {
+   "expression": "a--b == 1",
+   "tokens": [
+    "VARIABLE:a--b",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "-a",
+   "error": "Unexpected code point U+002D at index 0 while evaluating expression '-a'."
+  },
+  {
+   "expression": "-a == 1",
+   "error": "Unexpected code point U+002D at index 0 while evaluating expression '-a == 1'."
+  },
+  {
+   "expression": "a1",
+   "tokens": [
+    "VARIABLE:a1"
+   ]
+  },
+  {
+   "expression": "a1 == 1",
+   "tokens": [
+    "VARIABLE:a1",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "1a",
+   "tokens": [
+    "NUMBER:1",
+    "VARIABLE:a"
+   ]
+  },
+  {
+   "expression": "1a == 1",
+   "tokens": [
+    "NUMBER:1",
+    "VARIABLE:a",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "naïve",
+   "tokens": [
+    "VARIABLE:naïve"
+   ]
+  },
+  {
+   "expression": "naïve == 1",
+   "tokens": [
+    "VARIABLE:naïve",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "naïve-count_2",
+   "tokens": [
+    "VARIABLE:naïve-count_2"
+   ]
+  },
+  {
+   "expression": "naïve-count_2 == 1",
+   "tokens": [
+    "VARIABLE:naïve-count_2",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "日本語",
+   "tokens": [
+    "VARIABLE:日本語"
+   ]
+  },
+  {
+   "expression": "日本語 == 1",
+   "tokens": [
+    "VARIABLE:日本語",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "ゼロ",
+   "tokens": [
+    "VARIABLE:ゼロ"
+   ]
+  },
+  {
+   "expression": "ゼロ == 1",
+   "tokens": [
+    "VARIABLE:ゼロ",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "x́",
+   "tokens": [
+    "VARIABLE:x́"
+   ]
+  },
+  {
+   "expression": "x́ == 1",
+   "tokens": [
+    "VARIABLE:x́",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "ａ",
+   "tokens": [
+    "VARIABLE:ａ"
+   ]
+  },
+  {
+   "expression": "ａ == 1",
+   "tokens": [
+    "VARIABLE:ａ",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "𝕏",
+   "tokens": [
+    "VARIABLE:𝕏"
+   ]
+  },
+  {
+   "expression": "𝕏 == 1",
+   "tokens": [
+    "VARIABLE:𝕏",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "count-",
+   "tokens": [
+    "VARIABLE:count-"
+   ]
+  },
+  {
+   "expression": "count- == 1",
+   "tokens": [
+    "VARIABLE:count-",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "-",
+   "error": "Unexpected code point U+002D at index 0 while evaluating expression '-'."
+  },
+  {
+   "expression": "- == 1",
+   "error": "Unexpected code point U+002D at index 0 while evaluating expression '- == 1'."
+  },
+  {
+   "expression": "__",
+   "tokens": [
+    "VARIABLE:__"
+   ]
+  },
+  {
+   "expression": "__ == 1",
+   "tokens": [
+    "VARIABLE:__",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "a_b-c",
+   "tokens": [
+    "VARIABLE:a_b-c"
+   ]
+  },
+  {
+   "expression": "a_b-c == 1",
+   "tokens": [
+    "VARIABLE:a_b-c",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "true",
+   "tokens": [
+    "VARIABLE:true"
+   ]
+  },
+  {
+   "expression": "true == 1",
+   "tokens": [
+    "VARIABLE:true",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "false",
+   "tokens": [
+    "VARIABLE:false"
+   ]
+  },
+  {
+   "expression": "false == 1",
+   "tokens": [
+    "VARIABLE:false",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "null",
+   "tokens": [
+    "VARIABLE:null"
+   ]
+  },
+  {
+   "expression": "null == 1",
+   "tokens": [
+    "VARIABLE:null",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "and",
+   "tokens": [
+    "VARIABLE:and"
+   ]
+  },
+  {
+   "expression": "and == 1",
+   "tokens": [
+    "VARIABLE:and",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "or",
+   "tokens": [
+    "VARIABLE:or"
+   ]
+  },
+  {
+   "expression": "or == 1",
+   "tokens": [
+    "VARIABLE:or",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "not",
+   "tokens": [
+    "VARIABLE:not"
+   ]
+  },
+  {
+   "expression": "not == 1",
+   "tokens": [
+    "VARIABLE:not",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": " ",
+   "tokens": []
+  },
+  {
+   "expression": "a b",
+   "tokens": [
+    "VARIABLE:a",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a\t==\tb",
+   "tokens": [
+    "VARIABLE:a",
+    "EQUAL_TO:==",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "\t",
+   "tokens": []
+  },
+  {
+   "expression": "a\tb",
+   "tokens": [
+    "VARIABLE:a",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a\r==\rb",
+   "tokens": [
+    "VARIABLE:a",
+    "EQUAL_TO:==",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "\r",
+   "tokens": []
+  },
+  {
+   "expression": "a\rb",
+   "tokens": [
+    "VARIABLE:a",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a\n==\nb",
+   "tokens": [
+    "VARIABLE:a",
+    "EQUAL_TO:==",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "\n",
+   "tokens": []
+  },
+  {
+   "expression": "a\nb",
+   "tokens": [
+    "VARIABLE:a",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a\f==\fb",
+   "tokens": [
+    "VARIABLE:a",
+    "EQUAL_TO:==",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "\f",
+   "tokens": []
+  },
+  {
+   "expression": "a\fb",
+   "tokens": [
+    "VARIABLE:a",
+    "VARIABLE:b"
+   ]
+  },
+  {
+   "expression": "a\u000b==\u000bb",
+   "error": "Unexpected code point U+000B at index 1 while evaluating expression 'a\u000b==\u000bb'."
+  },
+  {
+   "expression": "\u000b",
+   "error": "Unexpected code point U+000B at index 0 while evaluating expression '\u000b'."
+  },
+  {
+   "expression": "a\u000bb",
+   "error": "Unexpected code point U+000B at index 1 while evaluating expression 'a\u000bb'."
+  },
+  {
+   "expression": "a == b",
+   "error": "Unexpected code point U+00A0 at index 1 while evaluating expression 'a == b'."
+  },
+  {
+   "expression": " ",
+   "error": "Unexpected code point U+00A0 at index 0 while evaluating expression ' '."
+  },
+  {
+   "expression": "a b",
+   "error": "Unexpected code point U+00A0 at index 1 while evaluating expression 'a b'."
+  },
+  {
+   "expression": "a == b",
+   "error": "Unexpected code point U+2028 at index 1 while evaluating expression 'a == b'."
+  },
+  {
+   "expression": " ",
+   "error": "Unexpected code point U+2028 at index 0 while evaluating expression ' '."
+  },
+  {
+   "expression": "a b",
+   "error": "Unexpected code point U+2028 at index 1 while evaluating expression 'a b'."
+  },
+  {
+   "expression": "a == b",
+   "error": "Unexpected code point U+2029 at index 1 while evaluating expression 'a == b'."
+  },
+  {
+   "expression": " ",
+   "error": "Unexpected code point U+2029 at index 0 while evaluating expression ' '."
+  },
+  {
+   "expression": "a b",
+   "error": "Unexpected code point U+2029 at index 1 while evaluating expression 'a b'."
+  },
+  {
+   "expression": "a　==　b",
+   "error": "Unexpected code point U+3000 at index 1 while evaluating expression 'a　==　b'."
+  },
+  {
+   "expression": "　",
+   "error": "Unexpected code point U+3000 at index 0 while evaluating expression '　'."
+  },
+  {
+   "expression": "a　b",
+   "error": "Unexpected code point U+3000 at index 1 while evaluating expression 'a　b'."
+  },
+  {
+   "expression": "a​==​b",
+   "error": "Unexpected code point U+200B at index 1 while evaluating expression 'a​==​b'."
+  },
+  {
+   "expression": "​",
+   "error": "Unexpected code point U+200B at index 0 while evaluating expression '​'."
+  },
+  {
+   "expression": "a​b",
+   "error": "Unexpected code point U+200B at index 1 while evaluating expression 'a​b'."
+  },
+  {
+   "expression": "a==b",
+   "error": "Unexpected code point U+0085 at index 1 while evaluating expression 'a==b'."
+  },
+  {
+   "expression": "",
+   "error": "Unexpected code point U+0085 at index 0 while evaluating expression ''."
+  },
+  {
+   "expression": "ab",
+   "error": "Unexpected code point U+0085 at index 1 while evaluating expression 'ab'."
+  },
+  {
+   "expression": "a\u001c==\u001cb",
+   "error": "Unexpected code point U+001C at index 1 while evaluating expression 'a\u001c==\u001cb'."
+  },
+  {
+   "expression": "\u001c",
+   "error": "Unexpected code point U+001C at index 0 while evaluating expression '\u001c'."
+  },
+  {
+   "expression": "a\u001cb",
+   "error": "Unexpected code point U+001C at index 1 while evaluating expression 'a\u001cb'."
+  },
+  {
+   "expression": "   ",
+   "tokens": []
+  },
+  {
+   "expression": "a == b == c",
+   "tokens": [
+    "VARIABLE:a",
+    "EQUAL_TO:==",
+    "VARIABLE:b",
+    "EQUAL_TO:==",
+    "VARIABLE:c"
+   ]
+  },
+  {
+   "expression": "((a))",
+   "tokens": [
+    "GROUP_START:(",
+    "GROUP_START:(",
+    "VARIABLE:a",
+    "GROUP_END:)",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": "(((",
+   "tokens": [
+    "GROUP_START:(",
+    "GROUP_START:(",
+    "GROUP_START:("
+   ]
+  },
+  {
+   "expression": "))",
+   "tokens": [
+    "GROUP_END:)",
+    "GROUP_END:)"
+   ]
+  },
+  {
+   "expression": ")(",
+   "tokens": [
+    "GROUP_END:)",
+    "GROUP_START:("
+   ]
+  },
+  {
+   "expression": "a == 'x'",
+   "error": "Unexpected code point U+0027 at index 5 while evaluating expression 'a == 'x''."
+  },
+  {
+   "expression": "a == \"x\"",
+   "error": "Unexpected code point U+0022 at index 5 while evaluating expression 'a == \"x\"'."
+  },
+  {
+   "expression": "#",
+   "error": "Unexpected code point U+0023 at index 0 while evaluating expression '#'."
+  },
+  {
+   "expression": "@",
+   "error": "Unexpected code point U+0040 at index 0 while evaluating expression '@'."
+  },
+  {
+   "expression": "$",
+   "error": "Unexpected code point U+0024 at index 0 while evaluating expression '$'."
+  },
+  {
+   "expression": "%",
+   "error": "Unexpected code point U+0025 at index 0 while evaluating expression '%'."
+  },
+  {
+   "expression": "^",
+   "error": "Unexpected code point U+005E at index 0 while evaluating expression '^'."
+  },
+  {
+   "expression": "~",
+   "error": "Unexpected code point U+007E at index 0 while evaluating expression '~'."
+  },
+  {
+   "expression": "`",
+   "error": "Unexpected code point U+0060 at index 0 while evaluating expression '`'."
+  },
+  {
+   "expression": "[",
+   "error": "Unexpected code point U+005B at index 0 while evaluating expression '['."
+  },
+  {
+   "expression": "]",
+   "error": "Unexpected code point U+005D at index 0 while evaluating expression ']'."
+  },
+  {
+   "expression": "{",
+   "error": "Unexpected code point U+007B at index 0 while evaluating expression '{'."
+  },
+  {
+   "expression": "}",
+   "error": "Unexpected code point U+007D at index 0 while evaluating expression '}'."
+  },
+  {
+   "expression": ",",
+   "error": "Unexpected code point U+002C at index 0 while evaluating expression ','."
+  },
+  {
+   "expression": ";",
+   "error": "Unexpected code point U+003B at index 0 while evaluating expression ';'."
+  },
+  {
+   "expression": ":",
+   "error": "Unexpected code point U+003A at index 0 while evaluating expression ':'."
+  },
+  {
+   "expression": "?",
+   "error": "Unexpected code point U+003F at index 0 while evaluating expression '?'."
+  },
+  {
+   "expression": "a?b",
+   "error": "Unexpected code point U+003F at index 1 while evaluating expression 'a?b'."
+  },
+  {
+   "expression": "\\",
+   "error": "Unexpected code point U+005C at index 0 while evaluating expression '\\'."
+  },
+  {
+   "expression": "/",
+   "error": "Unexpected code point U+002F at index 0 while evaluating expression '/'."
+  },
+  {
+   "expression": "a/b",
+   "error": "Unexpected code point U+002F at index 1 while evaluating expression 'a/b'."
+  },
+  {
+   "expression": "a.b",
+   "error": "Unexpected code point U+002E at index 1 while evaluating expression 'a.b'."
+  },
+  {
+   "expression": "a,b",
+   "error": "Unexpected code point U+002C at index 1 while evaluating expression 'a,b'."
+  },
+  {
+   "expression": "a;b",
+   "error": "Unexpected code point U+003B at index 1 while evaluating expression 'a;b'."
+  },
+  {
+   "expression": "a:b",
+   "error": "Unexpected code point U+003A at index 1 while evaluating expression 'a:b'."
+  },
+  {
+   "expression": ".a",
+   "error": "Unexpected code point U+002E at index 0 while evaluating expression '.a'."
+  },
+  {
+   "expression": "a.",
+   "error": "Unexpected code point U+002E at index 1 while evaluating expression 'a.'."
+  },
+  {
+   "expression": "..a",
+   "error": "Unexpected code point U+002E at index 0 while evaluating expression '..a'."
+  },
+  {
+   "expression": "\u0000",
+   "error": "Unexpected code point U+0000 at index 0 while evaluating expression '\u0000'."
+  },
+  {
+   "expression": "a\u0000b",
+   "error": "Unexpected code point U+0000 at index 1 while evaluating expression 'a\u0000b'."
+  },
+  {
+   "expression": "😀",
+   "error": "Unexpected code point U+1F600 at index 0 while evaluating expression '😀'."
+  },
+  {
+   "expression": "a 😀",
+   "error": "Unexpected code point U+1F600 at index 2 while evaluating expression 'a 😀'."
+  },
+  {
+   "expression": "emoji😀",
+   "error": "Unexpected code point U+1F600 at index 5 while evaluating expression 'emoji😀'."
+  },
+  {
+   "expression": "a == 😀",
+   "error": "Unexpected code point U+1F600 at index 5 while evaluating expression 'a == 😀'."
+  },
+  {
+   "expression": "toString",
+   "tokens": [
+    "VARIABLE:toString"
+   ]
+  },
+  {
+   "expression": "valueOf",
+   "tokens": [
+    "VARIABLE:valueOf"
+   ]
+  },
+  {
+   "expression": "constructor",
+   "tokens": [
+    "VARIABLE:constructor"
+   ]
+  },
+  {
+   "expression": "hasOwnProperty",
+   "tokens": [
+    "VARIABLE:hasOwnProperty"
+   ]
+  },
+  {
+   "expression": "__proto__",
+   "tokens": [
+    "VARIABLE:__proto__"
+   ]
+  },
+  {
+   "expression": "__defineGetter__",
+   "tokens": [
+    "VARIABLE:__defineGetter__"
+   ]
+  },
+  {
+   "expression": "propertyIsEnumerable",
+   "tokens": [
+    "VARIABLE:propertyIsEnumerable"
+   ]
+  },
+  {
+   "expression": "isPrototypeOf",
+   "tokens": [
+    "VARIABLE:isPrototypeOf"
+   ]
+  },
+  {
+   "expression": "toLocaleString",
+   "tokens": [
+    "VARIABLE:toLocaleString"
+   ]
+  },
+  {
+   "expression": "__lookupSetter__",
+   "tokens": [
+    "VARIABLE:__lookupSetter__"
+   ]
+  },
+  {
+   "expression": "toString == 1",
+   "tokens": [
+    "VARIABLE:toString",
+    "EQUAL_TO:==",
+    "NUMBER:1"
+   ]
+  },
+  {
+   "expression": "constructor == GENDER_FEMININE",
+   "tokens": [
+    "VARIABLE:constructor",
+    "EQUAL_TO:==",
+    "GENDER_FEMININE:GENDER_FEMININE"
+   ]
+  },
+  {
+   "expression": "__proto__ != 0",
+   "tokens": [
+    "VARIABLE:__proto__",
+    "NOT_EQUAL_TO:!=",
+    "NUMBER:0"
+   ]
+  },
+  {
+   "expression": "1 == valueOf",
+   "tokens": [
+    "NUMBER:1",
+    "EQUAL_TO:==",
+    "VARIABLE:valueOf"
+   ]
+  },
+  {
+   "expression": "hasOwnProperty && constructor",
+   "tokens": [
+    "VARIABLE:hasOwnProperty",
+    "AND:&&",
+    "VARIABLE:constructor"
+   ]
+  },
+  {
+   "expression": "prototype",
+   "tokens": [
+    "VARIABLE:prototype"
+   ]
+  },
+  {
+   "expression": "name",
+   "tokens": [
+    "VARIABLE:name"
+   ]
+  },
+  {
+   "expression": "length",
+   "tokens": [
+    "VARIABLE:length"
+   ]
+  },
+  {
+   "expression": "call",
+   "tokens": [
+    "VARIABLE:call"
+   ]
+  },
+  {
+   "expression": "apply",
+   "tokens": [
+    "VARIABLE:apply"
+   ]
+  },
+  {
+   "expression": "bind",
+   "tokens": [
+    "VARIABLE:bind"
+   ]
+  }
+ ]
+}

@@ -34,7 +34,15 @@ const gc = /** @type {undefined | (() => void)} */ (globalThis.gc);
 const ITERATIONS = 9;
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 
-/** The fixed small raw-text catalog. Deliberately small: 0a measures the FLOOR, not a real app. */
+/**
+ * The fixed small catalog. Deliberately small: 0a measures the FLOOR, not a real app.
+ *
+ * Plan section 9.2 specifies TWO variants over this same content: the root with "a fixed small
+ * embedded RAW-TEXT catalog", and `lokalized/core` with "its fixed ALREADY-PARSED equivalent". Until
+ * M5a wired the bounded parser into `createStrings`, the raw-text form could not be constructed at
+ * all, so both variants were handed the identical object and differed only by entry point — the
+ * measurement did not match its own description. It does now.
+ */
 const CATALOG = {
   en: {
     "Greeting": "Hello, {{name}}",
@@ -126,13 +134,20 @@ async function measure(label, entry, construct, render) {
 }
 
 const rows = [
-  // Variant 1: the root, with the raw-text catalog parsed at construction.
+  // Variant 1: the root, parsing a raw-text catalog at construction — the whole point of this
+  // variant is that construction pays for parsing, so the catalog is serialized here.
   await measure("root + raw-text catalog", "src/index.js",
-    (mod) => mod.createStrings({ fallbackLocale: "en", locale: "en-AU", strings: CATALOG, tiebreakers: TIEBREAKERS }),
+    (mod) => mod.createStrings({
+      fallbackLocale: "en",
+      locale: "en-AU",
+      strings: Object.fromEntries(Object.entries(CATALOG).map(([tag, doc]) => [tag, JSON.stringify(doc)])),
+      tiebreakers: TIEBREAKERS,
+    }),
     (strings) => strings.get("I read {{bookCount}} books", { bookCount: 3 })),
 
-  // Variant 2: lokalized/core with the equivalent catalog. Same artifact, same derivative; the
-  // difference is the entry point's graph, which is what 0a is comparing.
+  // Variant 2: lokalized/core with the ALREADY-PARSED equivalent. Same content, same artifact; the
+  // differences 0a is comparing are the entry point's graph AND the parsing the caller has already
+  // paid for elsewhere.
   await measure("core + parsed equivalent", "src/core/index.js",
     (mod) => mod.createStrings({ fallbackLocale: "en", locale: "en-AU", strings: CATALOG, tiebreakers: TIEBREAKERS }),
     (strings) => strings.get("I read {{bookCount}} books", { bookCount: 3 })),

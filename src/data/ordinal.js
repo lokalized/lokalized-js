@@ -39,6 +39,7 @@ import {
 } from "../index.js";
 import { jdkLanguageTag } from "../internal/locale-jdk-tag.js";
 import {
+  PLURAL_DATA_RUNTIME,
   UnsupportedLocaleError,
   cardinalRuleLocaleTags,
   createRuleTable,
@@ -196,6 +197,57 @@ validateProvenance(PROVENANCE);
 export const ordinalData = freeze({
   $lokalized: /** @type {const} */ ("ordinal-data"),
   provenance: PROVENANCE,
+
+  // The capability `createStrings` needs, under a symbol that is not part of the published shape.
+  // Core cannot import this module — the root graph is ratcheted precisely so it cannot — so an
+  // ORDINALITY_* placeholder is answerable only by the classifier the CONSUMER hands over with the
+  // data. Names rather than tagged values: the renderer keys `translations` by name and must not
+  // acquire an edge to this module's constants either.
+  [PLURAL_DATA_RUNTIME]: freeze({
+    /**
+     * @param {unknown} value
+     * @param {string} locale
+     * @returns {string}
+     */
+    ordinalityNameFor: (value, locale) =>
+      ordinalityForNumber(/** @type {number | bigint | Readonly<{ $lokalized: string, value: string }>} */ (value), locale)
+        .name,
+
+    /**
+     * The same table, entered from plural OPERANDS instead of a caller value.
+     *
+     * The expression evaluator has already converted its operand by the time it needs an ordinal
+     * category (`position == ORDINALITY_TWO`), so re-deriving operands from a value would be both
+     * wasteful and lossy — a `pluralOperands` carrier's explicit visible places would be lost.
+     *
+     * @param {import("../internal/plural.js").Operands} operands
+     * @param {string} locale
+     * @returns {string} the bare CLDR category (`"two"`)
+     */
+    ordinalCategoryForOperands: (operands, locale) => {
+      const index = ordinalGroupIndexFor(locale);
+
+      if (index < 0) throw new UnsupportedLocaleError(jdkLanguageTag(locale));
+
+      return ORDINAL_TABLE.countFor(index, operands);
+    },
+
+    /**
+     * The third capability, and the one `parseStrings` needs: which ordinal forms a locale can
+     * produce, as strings-file names, in `Ordinality` declaration order.
+     *
+     * `LocalizedStringLoader.warnOnIncompleteOrdinalityTranslations` calls
+     * `Ordinality.supportedOrdinalitiesForLocale` directly because Java's loader has the whole
+     * library on its classpath. The JS parser is in the ROOT graph and this module deliberately is
+     * not, so the probe travels with the caller's `pluralData` exactly as the two classifiers above
+     * do. A parse without it reports no ordinality gaps rather than importing the table.
+     *
+     * @param {string} locale
+     * @returns {readonly string[]}
+     */
+    supportedOrdinalityNamesFor: (locale) =>
+      supportedOrdinalitiesForLocale(locale).map((ordinality) => ordinality.name),
+  }),
 });
 
 /** The undetermined group's index, resolved once. */

@@ -7,21 +7,21 @@
   "node": [
     {
       "label": "root + raw-text catalog",
-      "modules": 19,
-      "sourceBytes": 375500,
-      "importMs": 0.275,
-      "constructionMs": 0.0335,
-      "firstRenderMs": 0.3309,
-      "retainedBytes": -253568
+      "modules": 25,
+      "sourceBytes": 583724,
+      "importMs": 0.432,
+      "constructionMs": 0.1328,
+      "firstRenderMs": 0.3464,
+      "retainedBytes": 63264
     },
     {
       "label": "core + parsed equivalent",
-      "modules": 18,
-      "sourceBytes": 369075,
-      "importMs": 0.211,
-      "constructionMs": 0.0454,
-      "firstRenderMs": 0.1931,
-      "retainedBytes": 35680
+      "modules": 24,
+      "sourceBytes": 577299,
+      "importMs": 0.468,
+      "constructionMs": 0.2439,
+      "firstRenderMs": 0.2063,
+      "retainedBytes": 127896
     }
   ],
   "rebaselines": [
@@ -30,6 +30,107 @@
       "growth": [
         "root + raw-text catalog: source graph grew 361714 -> 375500 bytes",
         "core + parsed equivalent: source graph grew 356241 -> 369075 bytes"
+      ]
+    },
+    {
+      "reason": "M6: the expression language enters the root graph. src/internal/expression.js (the eager compiler and tree-walking evaluator) and src/internal/expression-tokenizer.js are new root modules, and src/internal/interpolate.js grew to evaluate whole-message and generated-fragment alternatives, select ORDINALITY_* and range-driven cardinality through injected optional-data classifiers, and contextualize generated-placeholder failures. Root modules 19 -> 21; source graph 375500 -> 471405 bytes. No generated data table was added: the ordinal and cardinal-range tables remain outside the root, asserted by test/pinned-data-only.test.js.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 375500 -> 472214 bytes",
+        "root + raw-text catalog: module count grew 19 -> 21",
+        "core + parsed equivalent: source graph grew 369075 -> 465789 bytes",
+        "core + parsed equivalent: module count grew 18 -> 20"
+      ]
+    },
+    {
+      "reason": "M6: the expression language enters the root graph. src/internal/expression.js (eager compiler plus tree-walking evaluator) and src/internal/expression-tokenizer.js are new root modules, and src/internal/interpolate.js grew to select whole-message and generated-fragment alternatives, resolve ORDINALITY_* and range-driven cardinality through injected optional-data classifiers, and contextualize generated-placeholder failures. Root modules 19 -> 21. No generated data table was added: the ordinal and cardinal-range tables stay outside the root, asserted by test/pinned-data-only.test.js.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 472214 -> 473318 bytes",
+        "core + parsed equivalent: source graph grew 465789 -> 466893 bytes"
+      ]
+    },
+    {
+      "reason": "M6 review: +2498 bytes of source in the root graph, all of it expression-language code. src/internal/expression.js gains validateLimit() so a configured expression limit above EXPRESSION_LIMIT_CEILINGS is rejected rather than silently ignored (the ceilings were exported but unenforced), and src/core/index.js now hands the optional ordinal classifier to each evaluate() call instead of installing it on a module-level global, which was a cross-instance leak. Module count is unchanged at 21/20 and no generated data table was added.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 473318 -> 475817 bytes",
+        "core + parsed equivalent: source graph grew 466893 -> 469392 bytes"
+      ]
+    },
+    {
+      "reason": "M6 adversarial review: two evaluator fixes grew the root graph by 2,498 bytes (src/internal/expression.js 53,333 -> 55,262, the rest in src/core/index.js and src/internal/expression-tokenizer.js). (1) effectiveLimits() now validates a caller-supplied limit the way TranslationRuntimeLimits.Builder.build() does - integer, positive (or non-negative for nesting depth), and at or under the exported hard ceiling - with Java's verbatim messages; previously EXPRESSION_LIMIT_CEILINGS was exported but enforced nowhere, so a configured limit above the ceiling was neither rejected nor clamped but silently honoured. (2) The ordinal-category classifier moved off a module-level registration onto a per-evaluation option, so a Strings built without pluralData.ordinal can no longer answer an ordinal question merely because some other instance in the process was built with it. No data table entered the root graph; test/pinned-data-only.test.js still asserts the ordinal and cardinal-range tables stay outside it.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 475817 -> 476361 bytes",
+        "core + parsed equivalent: source graph grew 469392 -> 469936 bytes"
+      ]
+    },
+    {
+      "reason": "M5a: the bounded duplicate-aware parser enters the root graph. src/internal/json-parse.js (strict UTF-8 decoding, a hand-written bounded JSON scanner, per-path duplicate detection, and limit enforcement before object materialization) plus parse-diagnostics.js and parse-warnings.js. JSON.parse cannot satisfy the M5a gate — it keeps the last duplicate silently, materializes before any limit can fire, and substitutes U+FFFD for invalid UTF-8 — so a real parser is the milestone's substance. Module count 21 -> 22.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 476361 -> 508616 bytes",
+        "root + raw-text catalog: module count grew 21 -> 22",
+        "core + parsed equivalent: source graph grew 469936 -> 502191 bytes",
+        "core + parsed equivalent: module count grew 20 -> 21"
+      ]
+    },
+    {
+      "reason": "M5a adversarial review: +5,432 bytes of comments and one behavioural fix in the root graph, from two concurrent review sessions sharing this tree. THIS session changed src/internal/json-parse.js only (+2,088 bytes, of which ~1,190 is mine): JsonReader now retains AT MOST ONE duplicate finding instead of every duplicate in the document. Only duplicates[0] was ever consumed — parseCatalogMembers stops at the first root member carrying a finding — while each retained finding materialised a fresh bounded JSON path of up to 4,096 UTF-16 units rebuilt from the whole container stack, so a 590 KB file holding 100,000 repetitions of one member name at depth 63 allocated 384 MB and took 172 ms; capped, the same file costs 4.7 MB and 7.5 ms and reports the identical diagnostic. That is an M5a bounded-work defect, not an optimisation, and test/json-parse.test.js now pins the cap alongside new both-sides boundary tests for the nesting, aggregate-byte and translation-node limits. The remaining growth (src/internal/catalog.js +3,344, src/internal/parse-warnings.js +615, src/parse/index.js -2,193) was made by a CO-RESIDENT M5a review session moving expression validation and incomplete-language-form warnings into the structural walk where Java runs them; it is included in this measurement because the tree is shared, and it is NOT covered by this session's review.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 508616 -> 514048 bytes",
+        "core + parsed equivalent: source graph grew 502191 -> 507623 bytes"
+      ]
+    },
+    {
+      "reason": "M5a adversarial review (diagnostics, gate integrity, public surface), companion to the entry above. No new module and no new data table: 22/21 modules, unchanged. The growth is comments plus one behavioural fix. THE FIX: expression validation and incomplete-language-form warnings now run INSIDE the structural walk, at the two points LocalizedStringLoader runs them (validateWholeMessageAlternativeExpression and validateFragmentAlternativeExpression inside parseLocalizedString; warnOnIncompleteLanguageFormTranslations inside the root member loop), instead of in two passes afterwards. Both are INJECTED into catalog.js as optional hooks (ParseContext.validateExpression / onRootParsed) rather than imported, so catalog.js stays independent of the expression language and createStrings keeps exactly the structural walk, the message wording and the graph it had. The placement is behavioural, not cosmetic: measured against unmodified lokalized-java 3.0.0 on the pinned JDK through LocalizedStringLoader.parse(InputStream, ...), the two-pass version disagreed on 9 of 32 differential inputs, including one where Java delivered a warning to the caller's handler that this port silently dropped because a later key failed. All 32 now agree. test/parse.test.js pins six of them and test/json-parse.test.js pins the 4096-character diagnostic-path bound; none of the seven is reachable from the corpus, whose parse fixtures carry exactly one defect each -- deleting the path bound outright still leaves all 1965 corpus cases green.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 514048 -> 514376 bytes",
+        "core + parsed equivalent: source graph grew 507623 -> 507951 bytes"
+      ]
+    },
+    {
+      "reason": "M5a wiring + 0a measurement correction. (1) createStrings now dispatches on section 3.2's CatalogInput: string and Uint8Array go through the bounded parser, an already-parsed object does not. That was 2 of the 4 declared input forms previously unimplemented, and it is what puts the parser in the root graph legitimately. (2) scenario-0a was passing the IDENTICAL object to both variants, so they differed only by entry point and the measurement did not match section 9.2's description of them. Variant 1 now serializes the catalog and pays for parsing at construction, as specified. The byte movement is the corrected measurement, not new code.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 514376 -> 515605 bytes",
+        "core + parsed equivalent: source graph grew 507951 -> 509180 bytes"
+      ]
+    },
+    {
+      "reason": "M5b: the catalog model, warnings and bidi surfaces enter the root graph. Three new root modules: src/internal/parse-warnings.js, which construction now needs because `createStrings` raises the incomplete cardinality/ordinality warnings for the catalogs it is handed directly (plan 3.2/4.4) instead of returning an empty array; and src/internal/bidi.js with its generated src/data/rtl.js RTL-script table, which the default RTL_LOCALES isolation mode cannot answer without. src/internal/catalog.js also grew by the programmatic `LocalizedStringInput[]` model walk (plan 3.6: depth ceiling, identity cycles, and the greatest-validated-depth DAG memo), which is the fourth CatalogInput form and had no implementation at all. None of it is optional data: the ordinal and cardinal-range tables remain outside the root graph, which is what the module count is really guarding.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 515605 -> 572659 bytes",
+        "root + raw-text catalog: module count grew 22 -> 25",
+        "core + parsed equivalent: source graph grew 509180 -> 566234 bytes",
+        "core + parsed equivalent: module count grew 21 -> 24"
+      ]
+    },
+    {
+      "reason": "M5b (continued): +403 bytes of commentary in src/internal/catalog.js explaining why an explicitly-undefined member on a programmatic node counts as absent where the file door has no such case. Same milestone and same modules as the preceding entry; no new module enters the graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 572659 -> 574331 bytes",
+        "core + parsed equivalent: source graph grew 566234 -> 567906 bytes"
+      ]
+    },
+    {
+      "reason": "M5b review: +443 bytes in src/internal/interpolate.js for javaSimpleNameOf, which fills the trailing getClass().getSimpleName() slot of the 'must be a Phonetic or CharSequence but was X' diagnostic from the tagged value's own axis (Gender, Cardinality, Phonetic) instead of the vaguer \"a tagged 'language-form' value\". Two more recorded Java cause messages now reproduce exactly (94 -> 96 of 126). Same 25 modules as the preceding entry; no new module enters the graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 574331 -> 574774 bytes",
+        "core + parsed equivalent: source graph grew 567906 -> 568349 bytes"
+      ]
+    },
+    {
+      "reason": "M5b (continued): +443 bytes in src/internal/interpolate.js, with no new module in the graph (25/24, unchanged). The bidi work that this session added -- src/internal/bidi.js and its generated src/data/rtl.js table -- was already accounted for two entries earlier; this delta arrived in interpolate.js between that re-record and this one, from M5b work landing in parallel in the same file (the phonetic-axis selection path), so it is recorded as milestone substance rather than attributed line by line, which the writer of this entry could not do honestly. The invariant the byte count is a proxy for is asserted directly and did not move: test/pinned-data-only.test.js still names the exact set of generated tables the root may reach, and neither optional plural module is reachable.",
+      "growth": []
+    },
+    {
+      "reason": "M5b close (bidi isolation, interpolation escapes, renderName, plus the concurrent M5b areas): src/internal/bidi.js and its pinned src/data/rtl.js enter the root graph out of necessity, not choice -- the library default is rtl-locales, so the 37 right-to-left scripts are consulted on lookups nobody configured. src/internal/interpolate.js grew the lenient scanner shared by the returned failure key, the IsolatedValue marker mirroring BidiUtils.BoundedIsolatedValue, and the renderName table built from the single generated LANGUAGE_FORM_NAMES list. Root modules 22 -> 25. test/pinned-data-only.test.js names data/rtl.js explicitly so a future table cannot slip in under a re-recorded byte ceiling.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 574774 -> 582855 bytes",
+        "core + parsed equivalent: source graph grew 568349 -> 576430 bytes"
+      ]
+    },
+    {
+      "reason": "M5b review: createStrings accepts plan 3.2's ReadonlyMap CatalogMap (a Map was silently read as zero catalogs), plus the concurrent bidi/interpolation and tiebreaker-validation work in the same milestone",
+      "growth": [
+        "root + raw-text catalog: source graph grew 582855 -> 583724 bytes",
+        "core + parsed equivalent: source graph grew 576430 -> 577299 bytes"
       ]
     }
   ]

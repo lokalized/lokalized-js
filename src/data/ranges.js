@@ -50,6 +50,7 @@ import {
 } from "../index.js";
 import { jdkLanguageTag } from "../internal/locale-jdk-tag.js";
 import {
+  PLURAL_DATA_RUNTIME,
   UnsupportedLocaleError,
   cardinalRuleLocaleTags,
   createRuleTable,
@@ -321,7 +322,35 @@ const RANGE_TABLE = createRuleTable(RANGE_GROUPS.map((group) => ({ locales: grou
 export const cardinalRangeData = freeze({
   $lokalized: /** @type {const} */ ("cardinal-range-data"),
   provenance: PROVENANCE,
+
+  // See `PLURAL_DATA_RUNTIME`: the range classifier travels on the carrier because the root graph
+  // must not reach this module's table. Endpoints and result are language-form NAMES so the
+  // renderer, which keys `translations` by name, needs no edge to the constants either.
+  [PLURAL_DATA_RUNTIME]: freeze({
+    /**
+     * @param {string} startName
+     * @param {string} endName
+     * @param {string} locale
+     * @returns {string}
+     */
+    rangeCardinalityNameFor: (startName, endName, locale) =>
+      cardinalityForRange(cardinalityNamed(startName), cardinalityNamed(endName), locale).name,
+  }),
 });
+
+/**
+ * The root's frozen `CARDINALITY_*` constant with this name.
+ *
+ * @param {string} name
+ * @returns {CardinalityValue}
+ */
+function cardinalityNamed(name) {
+  const index = INDEX_BY_FORM_NAME.get(name);
+
+  if (index === undefined) throw new RangeError(`Unknown cardinality '${name}'`);
+
+  return valueAt(index);
+}
 
 /* -------------------------------------------------------------------------- */
 /* Public classifier                                                          */

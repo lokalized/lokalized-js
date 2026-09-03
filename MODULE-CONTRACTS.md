@@ -94,27 +94,150 @@ loaded them all. That is a strong self-test available immediately.
 
 ---
 
+## `src/internal/expression.js` (+ `src/internal/expression-tokenizer.js`)
+
+```js
+export function compile(expression, options)                   // -> CompiledExpression (throws)
+export function evaluate(compiled, values, locale, options)    // -> boolean (throws)
+export const EXPRESSION_LIMITS, EXPRESSION_LIMIT_CEILINGS
+// options for evaluate: {
+//   phoneticResolver?(term, locale),                  // raw-string phonetic input
+//   ordinalCategoryResolver?(operands, locale),       // `lokalized/data/ordinal`
+//   maximumPhoneticInputCharacters?,
+// }
+```
+
+**Compilation is EAGER and the split is the contract.** `compile` does everything that does not
+depend on caller values — lexing, numeric-literal validation, the shunting-yard conversion, the
+static operand typing that rejects a chained comparison, and all three limits — and `createStrings`
+runs it over every alternative in every catalog at construction. A later `evaluate` parses nothing.
+This is behaviour, not speed: a malformed or over-limit expression must fail construction of the
+whole catalog, not the one lookup that happens to reach it.
+
+**Limits are checked in Java's order, because the order decides which error an author sees:**
+characters BEFORE tokenization, then token count, then nesting depth (running unclosed groups, not
+total groups). A configured limit above its hard ceiling is REJECTED, never clamped and never
+ignored — clamping and ignoring are indistinguishable from the caller's side until an expression
+that should have been refused is accepted.
+
+**Both optional services arrive PER EVALUATION.** There is no module-level registration seam for
+either the phonetic resolver or the ordinal classifier, deliberately: two `Strings` instances in one
+process are independent configurations, and a global would let one built with `pluralData.ordinal`
+make a second one, built without it, silently able to classify a number.
+
+**A raw string is ALWAYS text**, on every axis including phonetic — it is a resolver TERM, never the
+constant it spells. `"GENDER_FEMININE"` from a caller reaches the phonetic branch and its resolver
+requirement; `"PHONETIC_VOWEL"` is handed to the resolver rather than short-circuited to the
+constant. Recognition of a tagged value is structural (`$lokalized` + `axis`/`name`), so values
+survive JSON, workers, `structuredClone`, and RSC boundaries.
+
+**Numeric comparison is exact**, through `plural.js`'s decimal path and never binary64. No `eval`,
+no `new Function`; `test/expression.test.js` asserts the absence of both across both files.
+
+**Verify against** the `expressions.*` family, and against the conformance runner's
+`causeMessageMatchedIds` ratchet, which pins the Java diagnostic text the result projection does not
+compare.
+
+---
+
 ## `src/internal/interpolate.js`
 
 ```js
 /**
- * Render one definition. Throws on a missing language-form branch, an unresolvable placeholder, or a
- * failed alternative — the caller turns that into a resolution failure.
+ * Render one definition, or return null when no alternative matched and the selected node has no
+ * translation of its own (Java's `Optional.empty()`, which the caller reports as
+ * `no-matching-alternative` and the default fallback policy WALKS PAST).
+ * Throws on a missing language-form branch, an unresolvable placeholder, or a failed expression —
+ * the caller turns that into a resolution failure, which the default policy does halt on.
  * `evaluationLocale` is the SUPPLYING locale, never the requested one.
  */
-export function render(definition, placeholders, context)  // context: { key, evaluationLocale } -> string
+export function render(definition, placeholders, context)  // -> string | null
+// context: {
+//   key, evaluationLocale,
+//   evaluateExpression?(alternativeNode, rawValues),      // the eagerly compiled expression
+//   ordinalityNameFor?(value, locale),                    // `lokalized/data/ordinal`
+//   rangeCardinalityNameFor?(startName, endName, locale), // `lokalized/data/ranges`
+//   isolateValues?,                                       // already decided; see `bidi.js`
+// }
+
+/**
+ * Interpolate a RETURNED FAILURE KEY with the caller's values, leniently, and total by contract:
+ * any conversion, isolation or limit failure returns the original raw key.
+ */
+export function interpolateFailureKey(key, placeholders, isolateValues)  // -> string
 ```
 
-Two jobs. First, **language-form selection**: a placeholder whose `translations` map is keyed by
-`CARDINALITY_*` selects on the cardinal category of the referenced input value, computed under
-`evaluationLocale`; one keyed by `GENDER_*` and the other nominal axes selects on an exact tagged
-value. Second, **substitution**: `{{name}}` is replaced by a resolved placeholder or a caller value.
+Three jobs. First, **branch selection**: whole-message and generated-fragment `alternatives` are
+first-match and terminal — once a condition matches, only that branch may resolve and an unmatched
+nested subtree does not fall through to a later sibling. Placeholder bindings accumulate BY NAME
+across the selected path (a branch keeps ancestor definitions for names it does not mention) while a
+name the branch DOES redefine is swapped whole, never merged form-by-form. Second, **language-form
+selection** on all ten axes: `CARDINALITY_*` and `ORDINALITY_*` on the classification of the
+referenced value under `evaluationLocale`, the nominal axes on an exact tagged value, and a `range`
+on the cardinalities of its two endpoints. Third, **substitution**: `{{name}}` is replaced by a
+resolved placeholder or a caller value.
 
-M2 scope: cardinality and the nominal axes by exact tagged value. Escapes and the expression language
-in `alternatives` are M5b/M6 — leave alternatives unevaluated and say so, rather than half-implementing.
+Three services arrive through the CONTEXT rather than by import, and for one reason: this module is
+in the root graph, which `test/pinned-data-only.test.js` and `npm run scenario:0a` ratchet.
+`evaluateExpression` keeps the evaluator's edges out; the two classifiers keep the OPTIONAL
+`lokalized/data/ordinal` and `lokalized/data/ranges` tables out of the root entirely. `createStrings`
+detects catalog use of either eagerly and refuses construction when the caller did not supply it.
+
+A SELECTOR (an alternative's expression, a `value`, a `range`) reads RAW CALLER INPUT; a template
+reference `{{name}}` reads the GENERATED value. Resolution is lazy — only placeholders the rendered
+text names are generated — so a cycle in an unreached branch is not a cycle, and cycle detection is a
+resolution STACK rather than a visited set.
+
+A FOURTH service arrives through the context for a different reason: `phoneticResolver` is not a
+table this module must not import, it is CALLER CODE. The phonetic axis is the only one whose
+selection calls back into the application, and it is handed the EVALUATION locale — the donor
+catalog's, never the request's. Resolution stays lazy and is deduplicated by placeholder NAME, so
+one placeholder named twice in a template resolves once and two placeholders reading one source
+resolve twice. `createStrings` always supplies a resolver, defaulting to a throwing one, so "none
+configured" is a resolution failure of the current candidate at the moment a raw term reaches the
+axis — never a construction error, and never a silently substituted category.
+
+Out of scope here: the output/expansion character budgets.
 
 **Verify against** `evaluation-locale.*` cases, whose translations name the category selected, and
 which fail loudly if the requested locale is used instead of the supplying one.
+
+---
+
+## `src/internal/bidi.js` (+ `src/data/rtl.js`)
+
+```js
+export const DEFAULT_BIDI_ISOLATION            // "rtl-locales" -- the LIBRARY default, not opt-in
+export function validateBidiIsolation(mode, where)      // -> "none" | "rtl-locales" | "all"
+export function localeUsesRightToLeftScript(tag)        // -> boolean
+export function shouldApplyBidiIsolation(mode, locale)  // -> boolean
+export function isolate(value)                          // -> string, FSI ... PDI
+```
+
+Port of `BidiUtils` plus `DefaultStrings.shouldApplyBidiIsolation`. Four rules, each of which a
+plausible implementation gets wrong in a different direction:
+
+1. **The mode keys off the LOCALE, never the value's direction.** `en` plus an Arabic name is not
+   isolated under the default; `he` plus a Latin name is.
+2. **The locale is the EVALUATION locale for a translation** — the catalog that supplied the entry —
+   **and the REQUESTED locale for a returned failure key**, which by definition had no donor. The
+   same request can therefore resolve un-isolated and return an isolated key.
+3. **Isolation wraps the caller's VALUE, not the message**, and translation-owned generated text is
+   inserted bare even when the same render isolated a caller value beside it.
+4. **`isolate` repairs structure while copying**: an already-isolated value is returned untouched,
+   but only when one balanced run covers the whole value; an unmatched pop is dropped; an unclosed
+   initiator is balanced. The empty string gets no marks.
+
+The mode is settable on the instance and per call, and a per-call value REPLACES the instance one in
+both directions rather than narrowing it. `src/data/rtl.js` (37 pinned CLDR scripts) is in the root
+graph by necessity: the default mode consults it on lookups nobody configured.
+
+Out of scope here: the bounded `maximumOutputCharacters` contract Java's `BidiUtils` also carries.
+Half of it — a budget that fires only for isolated values — would be worse than none, so it lands
+with the runtime-limit work that owns `maximumInterpolatedOutputCharacters`.
+
+**Verify against** `npm run diff:interpolate`, which runs the real `BidiUtils` and the real lenient
+`StringInterpolator` on the pinned JDK, and the `bidi-isolation.*` corpus family.
 
 ---
 

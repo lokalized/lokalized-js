@@ -9,23 +9,39 @@
  * Bounded means the limits are enforced while parsing, not afterwards: JSON container depth,
  * translation-node count, and alternative nesting depth.
  *
- * Out of M2 scope, by instruction: duplicate JSON member rejection and line/column diagnostics
- * (`lokalized/parse`, M5a), and expression syntax validation for `alternatives` (M6). Alternatives
- * are parsed into the model and left unevaluated.
+ * Expression validation and incomplete-language-form warnings are INJECTED rather than imported
+ * (`ParseContext.validateExpression` / `onRootParsed`), and they run where Java runs them: inside
+ * this walk. A caller that supplies neither gets the structural parse alone, which is what
+ * `createStrings` still does — it compiles every expression in its own later pass
+ * (`compileDefinitionExpressions`, `DefaultStrings.compileExpressions`'s order) and surfaces the
+ * evaluator's message unwrapped, and it emits no warnings at all. Keeping the hooks optional is what
+ * lets `lokalized/parse` be loader-faithful without changing what `createStrings` reports.
  */
 
 import { isValidIdentifier, placeholderNamesIn } from "./interpolate.js";
+import {
+  boundedDiagnosticValue,
+  boundedJsonPath,
+  normalizeCatalogText,
+  parseJsonDocument,
+  readCharacters,
+  readStrictUtf8,
+  validateJsonNestingDepth as validateTextNestingDepth,
+} from "./json-parse.js";
 
-/** `LocalizedStringLoadingOptions.DEFAULT_MAXIMUM_JSON_NESTING_DEPTH`. */
+/** The `LocalizedStringLoadingOptions` defaults, and the two ceilings on the options themselves. */
+const DEFAULT_MAXIMUM_INPUT_BYTES = 8 * 1024 * 1024;
+const DEFAULT_MAXIMUM_READER_CHARACTERS = 8 * 1024 * 1024;
 const DEFAULT_MAXIMUM_JSON_NESTING_DEPTH = 64;
-/** `LocalizedStringLoadingOptions.DEFAULT_MAXIMUM_TRANSLATION_NODES`. */
+const DEFAULT_MAXIMUM_TOTAL_INPUT_BYTES = 32 * 1024 * 1024;
+const DEFAULT_MAXIMUM_LOCALIZED_STRINGS_FILES = 256;
 const DEFAULT_MAXIMUM_TRANSLATION_NODES = 100_000;
-/** `LocalizedStringLoadingOptions.MAXIMUM_JSON_NESTING_DEPTH` — the ceiling on the option itself. */
+const DEFAULT_MAXIMUM_WARNINGS = 1_000;
 const MAXIMUM_JSON_NESTING_DEPTH = 128;
+/** `Integer.MAX_VALUE - 1`, the ceiling Java's builder puts on `maximumInputBytes`. */
+const MAXIMUM_INPUT_BYTES = 2_147_483_646;
 /** `LocalizedStringValidator.MAXIMUM_ALTERNATIVE_DEPTH`. */
 const MAXIMUM_ALTERNATIVE_DEPTH = 128;
-/** `LocalizedStringLoader.MAXIMUM_JSON_DIAGNOSTIC_PATH_CHARACTERS`. */
-const MAXIMUM_JSON_DIAGNOSTIC_PATH_CHARACTERS = 4096;
 
 /**
  * @typedef {"cardinality" | "ordinality" | "gender" | "grammatical-case" | "definiteness"
@@ -84,8 +100,13 @@ const MAXIMUM_JSON_DIAGNOSTIC_PATH_CHARACTERS = 4096;
 
 /**
  * @typedef {object} ParseLimits
+ * @property {number} [maximumInputBytes] per-resource, byte input only
+ * @property {number} [maximumReaderCharacters] per-resource, text input only
  * @property {number} [maximumJsonNestingDepth]
- * @property {number} [maximumTranslationNodes]
+ * @property {number} [maximumTotalInputBytes] aggregate, across a load
+ * @property {number} [maximumLocalizedStringsFiles] aggregate, across a load
+ * @property {number} [maximumTranslationNodes] aggregate, across a load
+ * @property {number} [maximumWarnings] aggregate, across a load
  */
 
 /**
@@ -93,6 +114,16 @@ const MAXIMUM_JSON_DIAGNOSTIC_PATH_CHARACTERS = 4096;
  * @property {string} [locale] the locale this catalog is being parsed for
  * @property {string} [source] identifies the catalog in diagnostics
  * @property {ParseLimits} [limits]
+ * @property {(expression: string) => void} [validateExpression] compile every alternative's
+ *   expression WHERE JAVA COMPILES IT, inside the structural walk. Supplied by `lokalized/parse`;
+ *   omitted by `createStrings`, which compiles in a pass of its own afterwards.
+ * @property {(key: string, definition: Definition) => void} [onRootParsed] run for each root member
+ *   the instant it is parsed, before the next member is read — Java's slot for
+ *   `warnOnIncompleteLanguageFormTranslations`.
+ */
+
+/**
+ * @typedef {ParseContext & { session?: LoadingSession }} ParseSourceContext
  */
 
 /**
@@ -177,41 +208,6 @@ const RESERVED_LANGUAGE_FORM_NAMES = AXIS_BY_LANGUAGE_FORM_NAME;
 const VALID_LANGUAGE_FORM_NAMES = [...AXIS_BY_LANGUAGE_FORM_NAME.keys()].join(", ");
 
 /**
- * `LocalizedStringLoader.appendBoundedPathPart`.
- *
- * @param {string} path
- * @param {string} part
- * @returns {string}
- */
-function appendBoundedPathPart(path, part) {
-  const remaining = MAXIMUM_JSON_DIAGNOSTIC_PATH_CHARACTERS - path.length;
-
-  if (remaining <= 0) return path;
-  if (part.length <= remaining) return path + part;
-
-  return `${path}${remaining > 1 ? part.slice(0, remaining - 1) : ""}…`;
-}
-
-/**
- * `LocalizedStringLoader.boundedJsonPath` — the declaration path of a nested alternative, capped at
- * 4096 UTF-16 units with a trailing ellipsis, exactly as Java caps it.
- *
- * @param {string} parentPath
- * @param {string} prefix
- * @param {string} component
- * @param {string} suffix
- * @returns {string}
- */
-function boundedJsonPath(parentPath, prefix, component, suffix) {
-  if (parentPath.length >= MAXIMUM_JSON_DIAGNOSTIC_PATH_CHARACTERS) return parentPath;
-
-  let path = appendBoundedPathPart("", parentPath);
-  path = appendBoundedPathPart(path, prefix);
-  path = appendBoundedPathPart(path, component);
-  return appendBoundedPathPart(path, suffix);
-}
-
-/**
  * `LocalizedStringLoader.descriptionAtDeclarationPath`.
  *
  * At the root the declaration path IS the key, so the description stands alone; inside an
@@ -279,30 +275,140 @@ function validateNestingDepth(root, maximum, source) {
   }
 }
 
-/** Tracks the translation-node budget across one catalog. */
+/**
+ * `LocalizedStringLoadingOptions.Builder`'s validation, which Java performs when the options are
+ * BUILT — before a byte is read. A limit outside its range is refused, never clamped and never
+ * ignored: clamping and ignoring are indistinguishable from the caller's side until a resource that
+ * should have been refused is accepted.
+ *
+ * These are `IllegalArgumentException` in Java. The JS contract splits that across `TypeError` (the
+ * wrong kind of value) and `RangeError` (the right kind, out of range); every one of them is a
+ * range, so `RangeError` it is.
+ *
+ * @param {ParseLimits} [limits]
+ * @returns {Required<ParseLimits>}
+ */
+export function resolveLimits(limits) {
+  const resolved = {
+    maximumInputBytes: limits?.maximumInputBytes ?? DEFAULT_MAXIMUM_INPUT_BYTES,
+    maximumReaderCharacters: limits?.maximumReaderCharacters ?? DEFAULT_MAXIMUM_READER_CHARACTERS,
+    maximumJsonNestingDepth: limits?.maximumJsonNestingDepth ?? DEFAULT_MAXIMUM_JSON_NESTING_DEPTH,
+    maximumTotalInputBytes: limits?.maximumTotalInputBytes ?? DEFAULT_MAXIMUM_TOTAL_INPUT_BYTES,
+    maximumLocalizedStringsFiles:
+      limits?.maximumLocalizedStringsFiles ?? DEFAULT_MAXIMUM_LOCALIZED_STRINGS_FILES,
+    maximumTranslationNodes: limits?.maximumTranslationNodes ?? DEFAULT_MAXIMUM_TRANSLATION_NODES,
+    maximumWarnings: limits?.maximumWarnings ?? DEFAULT_MAXIMUM_WARNINGS,
+  };
+
+  if (!Number.isInteger(resolved.maximumInputBytes) || resolved.maximumInputBytes <= 0 ||
+    resolved.maximumInputBytes > MAXIMUM_INPUT_BYTES)
+    throw new RangeError("maximumInputBytes must be between 1 and Integer.MAX_VALUE - 1");
+
+  if (!Number.isInteger(resolved.maximumReaderCharacters) || resolved.maximumReaderCharacters <= 0)
+    throw new RangeError("maximumReaderCharacters must be positive");
+
+  if (!Number.isInteger(resolved.maximumJsonNestingDepth) || resolved.maximumJsonNestingDepth <= 0 ||
+    resolved.maximumJsonNestingDepth > MAXIMUM_JSON_NESTING_DEPTH)
+    throw new RangeError(`maximumJsonNestingDepth must be between 1 and ${MAXIMUM_JSON_NESTING_DEPTH}`);
+
+  if (!Number.isInteger(resolved.maximumTotalInputBytes) || resolved.maximumTotalInputBytes <= 0)
+    throw new RangeError("maximumTotalInputBytes must be positive");
+
+  if (!Number.isInteger(resolved.maximumLocalizedStringsFiles) ||
+    resolved.maximumLocalizedStringsFiles <= 0)
+    throw new RangeError("maximumLocalizedStringsFiles must be positive");
+
+  if (!Number.isInteger(resolved.maximumTranslationNodes) || resolved.maximumTranslationNodes < 0)
+    throw new RangeError("maximumTranslationNodes must be nonnegative");
+
+  if (!Number.isInteger(resolved.maximumWarnings) || resolved.maximumWarnings < 0)
+    throw new RangeError("maximumWarnings must be nonnegative");
+
+  return resolved;
+}
+
+/**
+ * `LocalizedStringLoader.LoadingSession` — the budgets that span a whole load rather than one
+ * resource, so a directory of files cannot pay each limit over again.
+ *
+ * Every one of these REJECTS BEFORE THE OVER-LIMIT ITEM IS RETAINED: the counter is compared before
+ * it is incremented, and `warn` refuses the warning instead of delivering it, which is why a load
+ * whose warning budget is zero fails on the first warning rather than emitting it and failing later.
+ */
+export class LoadingSession {
+  /** @param {ParseLimits} [limits] */
+  constructor(limits) {
+    this.limits = resolveLimits(limits);
+    this.inputBytes = 0;
+    this.localizedStringsFiles = 0;
+    this.translationNodes = 0;
+    this.warnings = 0;
+  }
+
+  /** @param {string} source @returns {void} */
+  beginFile(source) {
+    if (this.localizedStringsFiles >= this.limits.maximumLocalizedStringsFiles)
+      throw new Error(
+        `${source}: localized strings load exceeds the aggregate localized strings file limit of ` +
+          `${this.limits.maximumLocalizedStringsFiles}`,
+      );
+
+    ++this.localizedStringsFiles;
+  }
+
+  /** @param {number} count @param {string} source @returns {void} */
+  addInputBytes(count, source) {
+    if (count < 0 || this.inputBytes > this.limits.maximumTotalInputBytes - count)
+      throw new Error(
+        `${source}: localized strings load exceeds the aggregate maximum of ` +
+          `${this.limits.maximumTotalInputBytes} input bytes`,
+      );
+
+    this.inputBytes += count;
+  }
+
+  /** @param {number} count @param {string} source @returns {void} */
+  addTranslationNodes(count, source) {
+    if (count < 0 || this.translationNodes > this.limits.maximumTranslationNodes - count)
+      throw new Error(
+        `${source}: localized strings load exceeds the aggregate maximum of ` +
+          `${this.limits.maximumTranslationNodes} translation nodes`,
+      );
+
+    this.translationNodes += count;
+  }
+
+  /**
+   * @param {{ source: string }} warning
+   * @param {(warning: any) => void} [onWarning]
+   * @returns {void}
+   */
+  warn(warning, onWarning) {
+    if (this.warnings >= this.limits.maximumWarnings)
+      throw new Error(
+        `${warning.source}: localized strings load exceeds the aggregate maximum of ` +
+          `${this.limits.maximumWarnings} warnings`,
+      );
+
+    ++this.warnings;
+    if (onWarning) onWarning(warning);
+  }
+}
+
+/** One resource's view of the session's translation-node budget. */
 class NodeBudget {
   /**
-   * @param {number} maximum
+   * @param {LoadingSession} session
    * @param {string} source
    */
-  constructor(maximum, source) {
-    if (!Number.isInteger(maximum) || maximum < 0)
-      throw new Error("maximumTranslationNodes must be nonnegative");
-
-    this.maximum = maximum;
+  constructor(session, source) {
+    this.session = session;
     this.source = source;
-    this.used = 0;
   }
 
   /** @param {number} count */
   add(count) {
-    if (this.used > this.maximum - count)
-      throw new Error(
-        `${this.source}: localized strings load exceeds the aggregate maximum of ` +
-          `${this.maximum} translation nodes`,
-      );
-
-    this.used += count;
+    this.session.addTranslationNodes(count, this.source);
   }
 }
 
@@ -311,18 +417,50 @@ class ParseSession {
   /**
    * @param {string} source
    * @param {NodeBudget} budget
+   * @param {((expression: string) => void) | null} [validateExpression] the expression compiler, when
+   *   the caller wants validation to happen HERE. Injected rather than imported so `catalog.js`
+   *   stays independent of the expression language: `lokalized/parse` supplies it because the loader
+   *   wording and the loader's ordering are its contract; `createStrings` does not, and compiles in
+   *   its own pass afterwards.
    */
-  constructor(source, budget) {
+  constructor(source, budget, validateExpression) {
     this.source = source;
     this.budget = budget;
+    this.validateExpression = validateExpression ?? null;
   }
 
   /**
    * @param {string} message
+   * @param {unknown} [cause]
    * @returns {Error}
    */
-  error(message) {
-    return new Error(`${this.source}: ${message}`);
+  error(message, cause) {
+    return new Error(
+      `${this.source}: ${message}`,
+      cause === undefined ? undefined : { cause },
+    );
+  }
+
+  /**
+   * `LocalizedStringLoader.validateWholeMessageAlternativeExpression` and
+   * `validateFragmentAlternativeExpression`, which differ only in their wording.
+   *
+   * Called from INSIDE the structural walk, at the exact points Java calls them, because the order
+   * is observable: a file whose first alternative carries a bad expression and whose second carries
+   * a structural error reports the expression, and validating afterwards would report the structure.
+   *
+   * @param {string} expression
+   * @param {(reason: string) => string} describe
+   * @returns {void}
+   */
+  checkExpression(expression, describe) {
+    if (this.validateExpression === null) return;
+
+    try {
+      this.validateExpression(expression);
+    } catch (cause) {
+      throw this.error(describe(cause instanceof Error ? cause.message : String(cause)), cause);
+    }
   }
 }
 
@@ -664,6 +802,12 @@ function parseExpressionTranslation(session, rootKey, placeholderKey, declaratio
           `Placeholder is '${placeholderKey}' in root key '${rootKey}'`,
       );
 
+    session.checkExpression(
+      expression,
+      (reason) =>
+        `unable to parse fragment alternative ${index} expression '${expression}' for ` +
+        `placeholder '${placeholderKey}' in root key '${rootKey}': ${reason}`,
+    );
     validatePlaceholderReferences(
       session,
       rootKey,
@@ -853,6 +997,14 @@ function parseNode(session, rootKey, key, declarationPath, value, alternativeDep
         );
 
       const expression = /** @type {string} */ (members[0]);
+
+      session.checkExpression(
+        expression,
+        (reason) =>
+          `unable to parse whole-message alternative expression '${expression}' for root key ` +
+          `'${rootKey}': ${reason}`,
+      );
+
       alternatives.push({
         expression,
         definition: parseNode(
@@ -884,40 +1036,587 @@ function parseNode(session, rootKey, key, declarationPath, value, alternativeDep
 }
 
 /**
- * Bounded parse of one raw catalog object into the internal model.
+ * `LocalizedStringLoader.parseLocalizedStrings`'s member loop — the ONE place a catalog's root
+ * members become definitions, shared by the decoded-object and raw-source entry points.
+ *
+ * The interleaving here is Java's and it is observable. For each root member IN DOCUMENT ORDER:
+ * the root key's own uniqueness is checked, then every duplicate member anywhere BELOW that key,
+ * then the member is structurally parsed, then `onRootParsed` runs for it. So a structural error
+ * under an earlier key beats a duplicate under a later one, a duplicate under a key beats that key's
+ * own structural error, and a warning raised by an earlier key is DELIVERED before a later key's
+ * failure is raised — which is why the warning budget can be what a file fails on even though a
+ * later key is also malformed.
+ *
+ * @param {ParseSession} session
+ * @param {[string, unknown][]} members root members in order, duplicates included
+ * @param {import("./json-parse.js").DuplicateMember[]} duplicates in document order
+ * @param {((key: string, definition: Definition) => void) | null} [onRootParsed]
+ *   `warnOnIncompleteLanguageFormTranslations`'s slot in Java's member loop
+ * @returns {Map<string, Definition>}
+ */
+function parseCatalogMembers(session, members, duplicates, onRootParsed) {
+  session.budget.add(members.length);
+
+  /** @type {Map<string, Definition>} */
+  const definitions = new Map();
+  // At most one finding arrives, and one is all this loop could ever use: any later duplicate lies
+  // under a member the loop never reaches, because it stops at the first failure. `json-parse.js`
+  // relies on that to keep duplicate detection O(1) in retained state rather than O(duplicates).
+  const duplicate = duplicates[0];
+
+  for (let index = 0; index < members.length; index++) {
+    const [key, value] = /** @type {[string, unknown]} */ (members[index]);
+
+    if (definitions.has(key))
+      throw session.error(`duplicate localized string key '${key}' encountered`);
+
+    if (duplicate && duplicate.rootIndex === index)
+      // The bounded path is attached as a STRUCTURED FIELD as well as interpolated into the message,
+      // because `lokalized/parse` publishes `StringsParseError.path` (plan 3.4) and a consumer
+      // should not have to re-parse English to learn where the duplicate was.
+      throw Object.assign(
+        session.error(
+          `duplicate JSON object member '${boundedDiagnosticValue(duplicate.name)}' encountered at ` +
+            `${duplicate.path}`,
+        ),
+        { path: duplicate.path },
+      );
+
+    const definition = parseNode(session, key, key, key, value, 0);
+
+    definitions.set(key, definition);
+    if (onRootParsed) onRootParsed(key, definition);
+  }
+
+  return definitions;
+}
+
+/**
+ * Bounded parse of one already-decoded catalog object into the internal model.
+ *
+ * A decoded object cannot carry duplicates, byte length, or source locations — plan 4.1: it is not
+ * a raw strings-file input. `parseCatalogSource` is the entry point that owns those guarantees.
+ *
+ * The load's `session` is threaded through when there is one, and that is not an optimisation. Plan
+ * 3.2 requires the model/file/node/warning limits to apply "across all raw and already-parsed
+ * catalogs": a session created here instead would give every decoded catalog its own private budget,
+ * so a construction whose catalogs jointly blow the node limit would be accepted, and a caller's
+ * `loadingLimits` would silently govern only the catalogs that happened to arrive as text.
  *
  * @param {unknown} raw the decoded catalog object: key -> string or entry object
- * @param {ParseContext} [context]
+ * @param {ParseSourceContext} [context]
  * @returns {Map<string, Definition>}
  */
 export function parseCatalog(raw, context) {
   const source = context?.source ?? "catalog";
-  const limits = context?.limits ?? {};
-  const maximumJsonNestingDepth =
-    limits.maximumJsonNestingDepth ?? DEFAULT_MAXIMUM_JSON_NESTING_DEPTH;
-  const maximumTranslationNodes =
-    limits.maximumTranslationNodes ?? DEFAULT_MAXIMUM_TRANSLATION_NODES;
+  const session = context?.session ?? new LoadingSession(context?.limits);
 
-  if (
-    !Number.isInteger(maximumJsonNestingDepth) ||
-    maximumJsonNestingDepth <= 0 ||
-    maximumJsonNestingDepth > MAXIMUM_JSON_NESTING_DEPTH
-  )
-    throw new Error(`maximumJsonNestingDepth must be between 1 and ${MAXIMUM_JSON_NESTING_DEPTH}`);
+  session.beginFile(source);
 
   if (!isObject(raw))
     throw new Error(`${source}: a localized strings file must be comprised of a single JSON object`);
 
-  validateNestingDepth(raw, maximumJsonNestingDepth, source);
+  validateNestingDepth(raw, session.limits.maximumJsonNestingDepth, source);
 
-  const session = new ParseSession(source, new NodeBudget(maximumTranslationNodes, source));
   const keys = Object.keys(raw);
-  session.budget.add(keys.length);
+
+  return parseCatalogMembers(
+    new ParseSession(source, new NodeBudget(session, source), context?.validateExpression),
+    keys.map((key) => /** @type {[string, unknown]} */ ([key, raw[key]])),
+    [],
+    context?.onRootParsed,
+  );
+}
+
+/**
+ * Bounded parse of one RAW localized strings resource — bytes or text — into the internal model.
+ *
+ * `LocalizedStringLoader.parse(InputStream|Reader, ...)`, in Java's order, because the order decides
+ * which limit a hostile resource trips:
+ *
+ *   1. the loading options are validated before anything is read;
+ *   2. the file-count budget admits the resource;
+ *   3. byte input is bounded per-resource AND against the load's aggregate while it is counted,
+ *      before any string exists; text input is bounded by character count the same way;
+ *   4. bytes are decoded as FATAL UTF-8 — malformed, truncated and overlong sequences fail here
+ *      rather than becoming U+FFFD;
+ *   5. at most one leading BOM is removed, and only then is the resource tested for blankness;
+ *   6. JSON nesting depth is counted over the raw characters, before the document is parsed;
+ *   7. the document is parsed by the bounded reader, which rejects lone surrogates and records
+ *      duplicate members with their JSON paths;
+ *   8. the root must be an object, and its member count is charged to the node budget;
+ *   9. only now is the catalog model materialized, member by member — and per member, in Java's
+ *      order: duplicates, structure and expressions together, then `onRootParsed`.
+ *
+ * @param {Uint8Array | string} input
+ * @param {ParseSourceContext} [context]
+ * @returns {Map<string, Definition>}
+ */
+export function parseCatalogSource(input, context) {
+  const source = context?.source ?? "<input>";
+  const session = context?.session ?? new LoadingSession(context?.limits);
+
+  session.beginFile(source);
+
+  const decoded =
+    typeof input === "string"
+      ? readCharacters(input, source, session.limits.maximumReaderCharacters)
+      : readStrictUtf8(
+          input,
+          source,
+          session.limits.maximumInputBytes,
+          (count, forSource) => session.addInputBytes(count, forSource),
+        );
+
+  const text = normalizeCatalogText(decoded, source);
+
+  validateTextNestingDepth(text, source, session.limits.maximumJsonNestingDepth);
+
+  const { members, duplicates } = parseJsonDocument(text, source);
+
+  if (members === null)
+    throw new Error(`${source}: a localized strings file must be comprised of a single JSON object`);
+
+  return parseCatalogMembers(
+    new ParseSession(source, new NodeBudget(session, source), context?.validateExpression),
+    members,
+    duplicates,
+    context?.onRootParsed,
+  );
+}
+
+// -------------------------------------------------------------------------------------------------
+// Programmatic construction — plan sections 3.2 and 3.6.
+//
+// The fourth `CatalogInput` form is `readonly LocalizedStringInput[]`: an application's own data,
+// never a file. `LocalizedStringValidator` (the Java class of the same job) exists because Java
+// accepts programmatically built `LocalizedString` graphs too, and its contract is that "programmatically
+// constructed and file-backed localized strings fail at construction time in the same places".
+//
+// So this does NOT re-implement validation. It walks the input graph and hands each LEAF — a
+// translation template, a placeholder definition, an alternative's expression — to the very functions
+// the file path uses, so one authoring mistake produces one diagnostic no matter which door it came
+// through. What it owns alone is the part a file cannot express: a JSON document is a tree, while an
+// input graph is an arbitrary object graph that can share subtrees and can point at itself.
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * @typedef {object} LocalizedStringNodeInput
+ * @property {string} [translation]
+ * @property {string} [commentary]
+ * @property {unknown} [placeholders]
+ * @property {unknown} [alternatives]
+ */
+
+/**
+ * @typedef {ParseContext & { session?: LoadingSession }} ModelParseContext
+ */
+
+/** The members a programmatic node may carry, mirroring the strings-file object's members. */
+const MODEL_NODE_MEMBERS = ["translation", "commentary", "placeholders", "alternatives"];
+
+/**
+ * One programmatic placeholder definition, rewritten into the shape the file parser validates.
+ *
+ * The two shapes differ only in framing: the input form carries an explicit `kind` discriminator
+ * because a JavaScript object literal has no schema to disambiguate it, while the file form infers
+ * the mode from which members are present. Everything past this function is shared, which is the
+ * point — `parsePlaceholderDefinition` owns mixed axes, reserved names, range-is-cardinality-only,
+ * template references and fragment-expression compilation, and it must own them for both doors.
+ *
+ * Rewritten onto NULL-PROTOTYPE objects (plan 4.3): a language-form name, an expression, or a
+ * placeholder name is caller data, and `{ [expression]: translation }` on an ordinary object literal
+ * would let `__proto__` reach an inherited setter instead of landing as an own member.
+ *
+ * @param {ParseSession} session
+ * @param {string} rootKey
+ * @param {string} key the node's own key: the root key, or this alternative's expression
+ * @param {string} placeholderKey
+ * @param {unknown} input
+ * @returns {Record<string, unknown>}
+ */
+function modelPlaceholderShape(session, rootKey, key, placeholderKey, input) {
+  // The NODE key, not the root key, exactly as `parseNode` reports it. Inside a whole-message
+  // alternative the two differ — the node key is the alternative's expression — and this function's
+  // whole premise is that one authoring mistake reads the same through either door.
+  if (!isObject(input))
+    throw session.error(`the placeholder value must be an object. Key is '${key}'`);
+
+  const kind = input["kind"];
+
+  if (kind !== "language-form" && kind !== "expression")
+    throw session.error(
+      `placeholder '${placeholderKey}' for root key '${rootKey}' must declare kind ` +
+        `'language-form' or 'expression'; received ${JSON.stringify(kind) ?? String(kind)}`,
+    );
+
+  validateNoUnexpectedObjectMembers(
+    session,
+    rootKey,
+    input,
+    `placeholder '${placeholderKey}'`,
+    kind === "language-form"
+      ? ["kind", "value", "range", "translations"]
+      : ["kind", "translation", "alternatives"],
+  );
+
+  /** @type {Record<string, unknown>} */
+  const shape = Object.create(null);
+
+  if (kind === "language-form") {
+    // `has`, not `!== undefined`: an explicitly present `value: undefined` is a different authoring
+    // mistake from an absent one, and only the file parser's own diagnostics should name it.
+    if (has(input, "value")) shape["value"] = input["value"];
+    if (has(input, "range")) {
+      const range = input["range"];
+      shape["range"] = isObject(range) ? { ...range } : range;
+    }
+
+    if (!has(input, "translations"))
+      throw session.error(`placeholder translations are required. Key is '${rootKey}'`);
+
+    const translations = input["translations"];
+
+    if (!isObject(translations))
+      throw session.error(
+        `the placeholder translations value must be an object. Key is '${rootKey}'`,
+      );
+
+    /** @type {Record<string, unknown>} */
+    const copied = Object.create(null);
+    for (const form of Object.keys(translations)) copied[form] = translations[form];
+    shape["translations"] = copied;
+
+    return shape;
+  }
+
+  if (has(input, "translation")) shape["translation"] = input["translation"];
+
+  if (has(input, "alternatives")) {
+    const alternatives = input["alternatives"];
+
+    if (!Array.isArray(alternatives))
+      throw session.error(
+        `fragment alternatives must be an array for placeholder '${placeholderKey}' in root key ` +
+          `'${rootKey}'`,
+      );
+
+    shape["alternatives"] = alternatives.map((alternative, index) => {
+      if (!isObject(alternative))
+        throw session.error(
+          `fragment alternative ${index} must be an object for placeholder '${placeholderKey}' in ` +
+            `root key '${rootKey}'`,
+        );
+
+      validateNoUnexpectedObjectMembers(
+        session,
+        rootKey,
+        alternative,
+        `fragment alternative ${index} for placeholder '${placeholderKey}'`,
+        ["expression", "translation"],
+      );
+
+      const expression = alternative["expression"];
+
+      if (typeof expression !== "string")
+        throw session.error(
+          `fragment alternative ${index} must carry a string expression for placeholder ` +
+            `'${placeholderKey}' in root key '${rootKey}'`,
+        );
+
+      /** @type {Record<string, unknown>} */
+      const pair = Object.create(null);
+      pair[expression] = alternative["translation"];
+      return pair;
+    });
+  }
+
+  return shape;
+}
+
+/**
+ * One programmatic node — a root string, or a whole-message alternative — as a `Definition`.
+ *
+ * The DAG discipline here is Java's `LocalizedStringValidator.validate`, and each half of it exists
+ * for a failure the other cannot catch:
+ *
+ *   - `active` is the set on the current path, so a node that reaches itself is a cycle. Without it
+ *     this recursion does not terminate, and the depth ceiling would report a bogus "too deep".
+ *   - `validatedDepth` memoizes the DEEPEST placement at which a node has already been proved to
+ *     fit. A shared subtree reached again at the same depth or shallower is proved; reached DEEPER
+ *     it is revalidated, because the depth ceiling is measured from the root and a subtree that fit
+ *     at depth 3 may not fit at depth 126. Caching "seen" without the depth would miss that; not
+ *     caching at all makes a shared diamond exponential.
+ *
+ * The memo also returns the SAME `Definition` object for a shared input node, so the model is a DAG
+ * wherever the input was one rather than an expansion of it. Callers that walk definitions must
+ * therefore guard their own recursion by node identity.
+ *
+ * @param {ParseSession} session
+ * @param {string} rootKey
+ * @param {string} key the root key, or this alternative's expression
+ * @param {string} declarationPath
+ * @param {unknown} input
+ * @param {number} depth
+ * @param {Map<object, number>} validatedDepth
+ * @param {Set<object>} active
+ * @param {Map<object, Definition>} built
+ * @returns {Definition}
+ */
+function definitionFromInput(session, rootKey, key, declarationPath, input, depth, validatedDepth, active, built) {
+  if (depth > MAXIMUM_ALTERNATIVE_DEPTH)
+    throw session.error(
+      `alternative nesting exceeds the maximum depth of ${MAXIMUM_ALTERNATIVE_DEPTH} for key ` +
+        `'${rootKey}'`,
+    );
+
+  if (!isObject(input))
+    throw session.error(
+      `either a translation string or object value is required for key '${key}'`,
+    );
+
+  const node = /** @type {object} */ (input);
+
+  if (active.has(node))
+    throw session.error(`alternative graph contains an identity cycle for key '${rootKey}'`);
+
+  const proved = validatedDepth.get(node);
+  const cached = built.get(node);
+  if (proved !== undefined && cached !== undefined && proved >= depth) return cached;
+
+  active.add(node);
+
+  try {
+    const definition = buildDefinitionFromInput(
+      session, rootKey, key, declarationPath, input, depth, validatedDepth, active, built);
+
+    validatedDepth.set(node, depth);
+    built.set(node, definition);
+    return definition;
+  } finally {
+    active.delete(node);
+  }
+}
+
+/**
+ * The body of `definitionFromInput`, split out so the cycle bookkeeping above stays readable.
+ *
+ * Member ORDER matches `parseNode`: unexpected members, translation, commentary, placeholders,
+ * alternatives, then the "translation or alternative required" rule and the translation's own
+ * placeholder references last. A catalog with two mistakes must name the same one either way it was
+ * supplied.
+ *
+ * @param {ParseSession} session
+ * @param {string} rootKey
+ * @param {string} key
+ * @param {string} declarationPath
+ * @param {Record<string, unknown>} input
+ * @param {number} depth
+ * @param {Map<object, number>} validatedDepth
+ * @param {Set<object>} active
+ * @param {Map<object, Definition>} built
+ * @returns {Definition}
+ */
+function buildDefinitionFromInput(session, rootKey, key, declarationPath, input, depth, validatedDepth, active, built) {
+  // `key` and `expression` are the node's own identity, carried on the record rather than in a
+  // wrapper, so they are expected members here where the file form has no equivalent.
+  validateNoUnexpectedObjectMembers(session, key, input, "localized string", [
+    ...MODEL_NODE_MEMBERS,
+    depth === 0 ? "key" : "expression",
+  ]);
+
+  // An explicitly `undefined` member counts as ABSENT here, where the file door has no such case to
+  // consider: JSON cannot express `undefined`, but `{ translation: maybe }` and an optional-property
+  // spread are ordinary JavaScript, and rejecting them would make the shape harder to build from
+  // real data than from a literal. `null` is still an error, because it is a value the author wrote.
+  /** @type {string | null} */
+  let translation = null;
+
+  if (has(input, "translation") && input["translation"] !== undefined) {
+    if (typeof input["translation"] !== "string")
+      throw session.error(`translation must be a string for key '${key}'`);
+
+    translation = input["translation"];
+  }
+
+  /** @type {string | null} */
+  let commentary = null;
+
+  if (has(input, "commentary") && input["commentary"] !== undefined) {
+    if (typeof input["commentary"] !== "string")
+      throw session.error(`commentary must be a string for key '${key}'`);
+
+    commentary = input["commentary"];
+  }
+
+  /** @type {Map<string, PlaceholderDefinition>} */
+  const placeholders = new Map();
+
+  if (has(input, "placeholders") && input["placeholders"] !== undefined) {
+    const supplied = input["placeholders"];
+    // A `Map` is the shape plan 4.3 recommends whenever placeholder names come from a generated or
+    // untrusted source, so it is accepted here rather than only tolerated at lookup time.
+    const entries =
+      supplied instanceof Map
+        ? [...supplied.entries()]
+        : isObject(supplied)
+          ? Object.keys(supplied).map((name) => /** @type {[string, unknown]} */ ([name, supplied[name]]))
+          : null;
+
+    if (entries === null)
+      throw session.error(`the placeholders value must be an object. Key is '${key}'`);
+
+    for (const [placeholderKey, value] of entries) {
+      session.budget.add(1);
+
+      if (typeof placeholderKey !== "string")
+        throw session.error(`placeholder names must be strings. Key is '${key}'`);
+
+      ensureValidPlaceholderName(session, key, placeholderKey, "placeholder");
+
+      if (placeholders.has(placeholderKey))
+        throw session.error(
+          `duplicate placeholder '${placeholderKey}' encountered for key '${key}'`,
+        );
+
+      placeholders.set(
+        placeholderKey,
+        parsePlaceholderDefinition(
+          session,
+          rootKey,
+          placeholderKey,
+          declarationPath,
+          modelPlaceholderShape(session, rootKey, key, placeholderKey, value),
+        ),
+      );
+    }
+  }
+
+  /** @type {Alternative[]} */
+  const alternatives = [];
+
+  if (has(input, "alternatives") && input["alternatives"] !== undefined) {
+    const supplied = input["alternatives"];
+
+    if (!Array.isArray(supplied))
+      throw session.error(`alternatives must be an array. Key is '${key}'`);
+
+    if (supplied.length === 0)
+      throw session.error(`alternatives must contain at least one expression. Key is '${key}'`);
+
+    for (const element of supplied) {
+      session.budget.add(1);
+
+      if (element === null || element === undefined)
+        throw session.error(`alternative values cannot be null. Key is '${key}'`);
+
+      if (!isObject(element))
+        throw session.error(`alternative value must be an object. Key is '${key}'`);
+
+      const expression = element["expression"];
+
+      if (typeof expression !== "string")
+        throw session.error(
+          `each alternative must carry its predicate as a string 'expression'. Key is '${key}'`,
+        );
+
+      session.checkExpression(
+        expression,
+        (reason) =>
+          `unable to parse whole-message alternative expression '${expression}' for root key ` +
+          `'${rootKey}': ${reason}`,
+      );
+
+      alternatives.push({
+        expression,
+        definition: definitionFromInput(
+          session,
+          rootKey,
+          expression,
+          boundedJsonPath(declarationPath, " -> alternative[", expression, "]"),
+          element,
+          depth + 1,
+          validatedDepth,
+          active,
+          built,
+        ),
+      });
+    }
+  }
+
+  if (translation === null && alternatives.length === 0)
+    throw session.error(
+      `either a translation or at least one alternative expression is required for key '${key}'`,
+    );
+
+  if (translation !== null)
+    validatePlaceholderReferences(
+      session,
+      rootKey,
+      translation,
+      descriptionAtDeclarationPath("translation", rootKey, declarationPath),
+    );
+
+  return { translation, commentary, placeholders, alternatives };
+}
+
+/**
+ * Validate a programmatic catalog — `readonly LocalizedStringInput[]` — into the internal model.
+ *
+ * Charged to the same `LoadingSession` as every other catalog form. Plan 4.1 is explicit that
+ * programmatic values "receive model/schema validation and node limits, not source-level
+ * guarantees": there is no text to bound and no duplicate JSON member to find, but the translation
+ * NODE budget is a model limit and applies here exactly as it does to a parsed file.
+ *
+ * @param {readonly unknown[]} inputs
+ * @param {ModelParseContext} [context]
+ * @returns {Map<string, Definition>}
+ */
+export function parseModelCatalog(inputs, context) {
+  const source = context?.source ?? "catalog";
+  const session = context?.session ?? new LoadingSession(context?.limits);
+
+  session.beginFile(source);
+
+  if (!Array.isArray(inputs))
+    throw new Error(`${source}: a programmatic localized strings catalog must be an array`);
+
+  const parseSession = new ParseSession(
+    source,
+    new NodeBudget(session, source),
+    context?.validateExpression,
+  );
+
+  parseSession.budget.add(inputs.length);
 
   /** @type {Map<string, Definition>} */
   const definitions = new Map();
+  // Shared across the WHOLE catalog, not per root key: two root keys may legitimately share one
+  // alternative subtree, and re-proving it for the second key is the exponential case this memo
+  // exists to avoid. `active` is per key because a path is per key.
+  /** @type {Map<object, number>} */
+  const validatedDepth = new Map();
+  /** @type {Map<object, Definition>} */
+  const built = new Map();
 
-  for (const key of keys) definitions.set(key, parseNode(session, key, key, key, raw[key], 0));
+  for (const input of inputs) {
+    if (!isObject(input))
+      throw parseSession.error("each programmatic localized string must be an object");
+
+    const key = input["key"];
+
+    if (typeof key !== "string")
+      throw parseSession.error("each programmatic localized string must carry a string 'key'");
+
+    if (definitions.has(key))
+      throw parseSession.error(`duplicate localized string key '${key}' encountered`);
+
+    const definition = definitionFromInput(
+      parseSession, key, key, key, input, 0, validatedDepth, new Set(), built);
+
+    definitions.set(key, definition);
+    if (context?.onRootParsed) context.onRootParsed(key, definition);
+  }
 
   return definitions;
 }

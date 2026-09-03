@@ -332,7 +332,12 @@ export const IANA_RANGE_EQUIVALENTS = new Map([
  * @property {WeightedLanguageRange[]} requestedLanguageRanges
  */
 
-/** @typedef {Map<string, string[]> | Record<string, string[]> | null | undefined} Tiebreakers */
+/**
+ * Plan 3.2's `TiebreakerMap`, in either accepted shape and read-only in both. The arrays are
+ * `readonly` because `createStrings` hands this a frozen snapshot: see `safeTiebreakers` there.
+ *
+ * @typedef {ReadonlyMap<string, readonly string[]> | Readonly<Record<string, readonly string[]>> | null | undefined} Tiebreakers
+ */
 
 const CATEGORY_WILDCARD = 0;
 const CATEGORY_PRIMARY_LANGUAGE = 1;
@@ -862,7 +867,26 @@ function resolveTiebreakers(tiebreakers, sortedSupported) {
 
 	for (const [languageCode, locales] of entries) {
 		const normalized = primaryLanguage(languageCode);
-		resolved.set(normalized.length === 0 ? lower(languageCode) : normalized, [...locales]);
+		// The TAGS are normalized too, not just the language-code key. They are compared against
+		// `sortedSupported`, which holds already-normalized tags, so a caller who writes `en-gb`
+		// rather than `en-GB` previously got a tiebreaker that passed construction validation and
+		// then never matched anything — resolution silently fell through to a different order and
+		// returned a different catalog's translation. Java has no such gap: it stores
+		// `Locale.forLanguageTag(...)` values, so the comparison is normalized on both sides.
+		//
+		// Lenient on purpose: a tag too malformed to normalize is kept verbatim so it simply fails to
+		// match, which is what it did before. Rejecting it belongs to construction-time validation,
+		// not to the matcher.
+		resolved.set(
+			normalized.length === 0 ? lower(languageCode) : normalized,
+			locales.map((tag) => {
+				try {
+					return normalizeTag(tag);
+				} catch {
+					return tag;
+				}
+			}),
+		);
 	}
 
 	/** @type {Map<string, string[]>} */
