@@ -8,20 +8,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 25,
-      "sourceBytes": 584213,
-      "importMs": 0.35,
-      "constructionMs": 0.085,
-      "firstRenderMs": 0.3433,
-      "retainedBytes": 63264
+      "sourceBytes": 599551,
+      "importMs": 0.256,
+      "constructionMs": 0.0953,
+      "firstRenderMs": 0.3146,
+      "retainedBytes": 63272
     },
     {
       "label": "core + parsed equivalent",
       "modules": 24,
-      "sourceBytes": 577788,
-      "importMs": 0.339,
-      "constructionMs": 0.2362,
-      "firstRenderMs": 0.211,
-      "retainedBytes": 128864
+      "sourceBytes": 593126,
+      "importMs": 0.327,
+      "constructionMs": 0.2368,
+      "firstRenderMs": 0.1813,
+      "retainedBytes": 145000
     }
   ],
   "rebaselines": [
@@ -138,6 +138,13 @@
       "growth": [
         "root + raw-text catalog: source graph grew 583724 -> 584213 bytes",
         "core + parsed equivalent: source graph grew 577299 -> 577788 bytes"
+      ]
+    },
+    {
+      "reason": "M7 A0-A2 (resolved fallback locale, the matchFor locale arm, raw-range single-member ingress): +15,338 bytes in BOTH graphs, 25/24 modules unchanged. Root and core grew by the identical delta, which is the load-bearing measurement: it decomposes exactly as src/core/index.js +7,193 (DefaultStrings:446-470 fallback resolution plus the :303-314 and :465 construction refusals) and src/internal/locale.js +8,145 (splitting the kernel so matchForRange takes the caller's RAW lowercased range, since Java builds member statics from the raw range for matchFor(List) and only matchFor(Locale) normalizes). The other 38,992 bytes this slice added -- src/negotiate/index.js +15,676 and the new pinned src/data/iana-range-equivalents.js +23,316 -- are DELIBERATELY ABSENT from both totals, and the equal delta across the two variants is the evidence: lokalized/negotiate and its IANA table are unreachable from src/index.js, which is the property the module-count ratchet exists to protect. Conformance 1,200 -> 1,384 passed, 0 FAILED.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 584213 -> 599551 bytes",
+        "core + parsed equivalent: source graph grew 577788 -> 593126 bytes"
       ]
     }
   ]

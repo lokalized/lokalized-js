@@ -96,7 +96,11 @@ test("the root graph carries no optional plural data", () => {
     }
   }
 
-  for (const forbidden of ["ordinal-rules.js", "cardinal-ranges.js", "data/ordinal.js", "data/ranges.js"])
+  // `data/iana-range-equivalents.js` joins the list at M7 A2: the 802-class IANA closure belongs to
+  // `lokalized/negotiate` by plan 3.1, and the root graph carries only the reduced slice inlined in
+  // `src/internal/locale.js`. Naming it here is what keeps it out — the byte ratchet would not.
+  for (const forbidden of ["ordinal-rules.js", "cardinal-ranges.js", "data/ordinal.js", "data/ranges.js",
+    "data/iana-range-equivalents.js"])
     assert.ok(
       ![...reached].some((file) => file.endsWith(forbidden)),
       `${forbidden} must not be reachable from the root entry point`,

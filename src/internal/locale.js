@@ -390,10 +390,15 @@ function isEligibleForExclusion(value) {
  * BMP-only tags CLDR uses. Sorting supported locales by this order is observable through
  * `consideredLocales` and through every "first candidate wins" tie-break.
  *
+ * EXPORTED because `createStrings` sorts the same list for the same reason — Java's
+ * `Comparator.comparing(Locale::toLanguageTag)` at `DefaultStrings.java:304-314`. It had a private
+ * copy; a second spelling of one Java comparator is a divergence waiting to happen in a place the
+ * corpus cannot see, because a reordering only changes an answer when two catalogs tie.
+ *
  * @param {string} first
  * @param {string} second
  */
-function compareTags(first, second) {
+export function compareTags(first, second) {
 	return first < second ? -1 : first > second ? 1 : 0;
 }
 
@@ -586,27 +591,47 @@ function extlangEquivalentLanguageRangeFor(range) {
 }
 
 /**
+ * `DefaultStrings#addParsedLanguageRangeIdentities`, whose body is `LanguageRange.parse(range)` — so
+ * this is the JDK's IANA equivalence expansion, not a CLDR alias lookup.
+ *
+ * The DEFAULT resolver is the reduced inline table read by exact lookup, which is all the locale
+ * ingress can ever need: the ranges `matchFor` builds are normalized locale tags, so the entries
+ * dropped from the table are unreachable from it. `lokalized/negotiate` supplies the full pinned
+ * closure instead, because a RAW RFC 4647 range is not a normalized tag and reaches entries this
+ * table does not carry. Two corpus cases prove that is not hypothetical: `no-bok-no` expands through
+ * `no-bok -> nb` and `sgn-be-fr-x-a` through `sgn-be-fr -> sfb`, and neither key survives the
+ * reduction.
+ *
+ * @typedef {(range: string) => readonly string[] | null} RangeEquivalentResolver
+ */
+
+/** @type {RangeEquivalentResolver} */
+const REDUCED_RANGE_EQUIVALENTS = (range) => IANA_RANGE_EQUIVALENTS.get(lower(range)) ?? null;
+
+/**
  * @param {string} range
  * @param {Set<string>} identities
+ * @param {RangeEquivalentResolver} rangeEquivalents
  */
-function addParsedLanguageRangeIdentities(range, identities) {
-	for (const equivalent of IANA_RANGE_EQUIVALENTS.get(lower(range)) ?? [range]) identities.add(lower(equivalent));
+function addParsedLanguageRangeIdentities(range, identities, rangeEquivalents) {
+	for (const equivalent of rangeEquivalents(range) ?? [range]) identities.add(lower(equivalent));
 }
 
 /**
  * @param {string} range
+ * @param {RangeEquivalentResolver} rangeEquivalents
  * @returns {Set<string>}
  */
-function languageRangeIdentitiesFor(range) {
+function languageRangeIdentitiesFor(range, rangeEquivalents) {
 	/** @type {Set<string>} */
 	const identities = new Set([lower(range)]);
-	addParsedLanguageRangeIdentities(range, identities);
+	addParsedLanguageRangeIdentities(range, identities, rangeEquivalents);
 
 	const extlangEquivalentRange = extlangEquivalentLanguageRangeFor(range);
 
 	if (extlangEquivalentRange !== null) {
 		identities.add(lower(extlangEquivalentRange));
-		addParsedLanguageRangeIdentities(extlangEquivalentRange, identities);
+		addParsedLanguageRangeIdentities(extlangEquivalentRange, identities, rangeEquivalents);
 	}
 
 	return identities;
@@ -695,15 +720,16 @@ function semanticLanguageRangeForDerivedMatching(range, knownTag, containsWildca
 /**
  * @param {string} range
  * @param {number} weight
+ * @param {RangeEquivalentResolver} rangeEquivalents
  * @returns {MemberStatics}
  */
-function memberStaticsFor(range, weight) {
+function memberStaticsFor(range, weight, rangeEquivalents) {
 	const containsWildcard = range.includes("*");
 	const structuralRange = normalizedExtendedLanguageRange(range);
 	const privateUse = isPrivateUseLanguageTag(range);
 	const undetermined = hasUndeterminedLanguage(range);
 	const knownTag = isKnownLanguageTag(range);
-	const identities = languageRangeIdentitiesFor(range);
+	const identities = languageRangeIdentitiesFor(range, rangeEquivalents);
 	const semanticRange = semanticLanguageRangeForDerivedMatching(range, knownTag, containsWildcard, identities);
 
 	/** @type {MemberStatics} */
@@ -774,10 +800,18 @@ function supportedLocaleStaticsFor(languageTag) {
 }
 
 /**
+ * `DefaultStrings#normalizedLanguageCode` (DefaultStrings.java:2669).
+ *
+ * The empty string falls through to `lower(languageCode)`, which is Java's: `Locale.forLanguageTag("")`
+ * is `Locale.ROOT`, whose normalized language is absent, so `orElse` hands back what it was given.
+ *
+ * EXPORTED because `createStrings`'s fallback resolution needs the identical function — Java calls
+ * this same method at `DefaultStrings.java:446-470` — and had a private copy of it.
+ *
  * @param {string} languageCode
  * @returns {string}
  */
-function normalizedLanguageCode(languageCode) {
+export function normalizedLanguageCode(languageCode) {
 	const normalized = primaryLanguage(languageCode);
 	return lower(normalized.length === 0 ? languageCode : normalized);
 }
@@ -852,11 +886,18 @@ function compatibleLikelyScripts(requestedLanguageScript, availableLanguageScrip
  * Normalizes a caller-supplied tiebreaker map and derives the identity entries Java's constructor
  * adds for every language code with exactly one loaded locale.
  *
+ * EXPORTED because `createStrings` walks the SAME map to resolve its configured fallback locale to
+ * a loaded catalog (`DefaultStrings.java:446-470` reads the map `:395-444` builds). It had a private
+ * copy, and a divergence between the two would resolve the fallback to a catalog that per-lookup
+ * resolution never consults — a defect invisible to the corpus, which spells every tiebreaker
+ * canonically. `sortedSupported` need not in fact be sorted: the order is read only by the identity
+ * synthesis below, which fires only for a language code carried by exactly one loaded locale.
+ *
  * @param {Tiebreakers} tiebreakers
- * @param {string[]} sortedSupported
+ * @param {string[] | readonly string[]} sortedSupported
  * @returns {Map<string, string[]>}
  */
-function resolveTiebreakers(tiebreakers, sortedSupported) {
+export function resolveTiebreakers(tiebreakers, sortedSupported) {
 	/** @type {Map<string, string[]>} */
 	const resolved = new Map();
 
@@ -941,6 +982,30 @@ function preferredLocaleForRange(range, candidates, fallbackLocale, tiebreakers)
 	if (candidates.includes(fallbackLocale)) return fallbackLocale;
 
 	return candidates[0] ?? null;
+}
+
+/**
+ * `DefaultStrings:1955`. A bare or leading wildcard expresses no language preference of its own, so
+ * the CONFIGURED fallback speaks for the caller: the fallback locale itself when it survived, then —
+ * when it was excluded — the fallback LANGUAGE's configured tiebreakers, before any unrelated
+ * language. Deliberately not `preferredLocaleForRange`, which consults the RANGE's own language and
+ * would consult `*`.
+ *
+ * @param {string[]} availableLocales already restricted to the winning quality
+ * @param {string} fallbackLocale
+ * @param {Map<string, string[]>} tiebreakers
+ * @returns {string}
+ */
+function preferredLocaleForWildcard(availableLocales, fallbackLocale, tiebreakers) {
+	if (availableLocales.length === 0) throw new RangeError("At least one available locale is required");
+	if (availableLocales.includes(fallbackLocale)) return fallbackLocale;
+
+	const fallbackLanguage = primaryLanguage(fallbackLocale);
+	const tiebreakerMatch = fallbackLanguage.length === 0
+		? null
+		: lookupMatchByTiebreakers(fallbackLanguage, availableLocales, tiebreakers);
+
+	return tiebreakerMatch ?? availableLocales[0] ?? "";
 }
 
 /**
@@ -1109,6 +1174,14 @@ function languageRangeMatchTypeFor(locale, member, fallbackLocale, tiebreakers) 
  * Java's strict single-locale match kernel. Reports the same state as an unmatched result rather
  * than manufacturing a configured-fallback match.
  *
+ * THE LOCALE INGRESS, and the only one that normalizes. `LocaleMatcher.java:63-65` builds its single
+ * range from `locale.toLanguageTag()`, so the range Java matches on is the NORMALIZED tag lowercased
+ * — `sgn-nsl` arrives here as `nsl`, and `languageRange` reports `nsl` because that is genuinely what
+ * Java asked for. A caller-supplied RFC 4647 range is a different thing entirely and must keep its
+ * raw spelling; that ingress is `matchForRange`, and routing it through this function silently
+ * rewrites the caller's range, which changes the reported diagnostic AND (through `memberStaticsFor`)
+ * the selected locale.
+ *
  * @param {string} requested requested locale tag
  * @param {Iterable<string>} supported loaded locale tags
  * @param {string} fallbackLocale resolved fallback locale tag
@@ -1116,13 +1189,34 @@ function languageRangeMatchTypeFor(locale, member, fallbackLocale, tiebreakers) 
  * @returns {LocaleMatch}
  */
 export function matchFor(requested, supported, fallbackLocale, tiebreakers) {
-	const requestedTag = normalizeTag(requested);
-	const range = lower(requestedTag);
+	return matchForRange(lower(normalizeTag(requested)), 1, supported, fallbackLocale, tiebreakers);
+}
+
+/**
+ * The same kernel over a RAW RFC 4647 language range: the range is taken exactly as the caller
+ * spelled it (lowercased, as `Locale.LanguageRange`'s own constructor does) and is never normalized
+ * into a locale tag. `memberStaticsFor` is already raw-correct, so this is the whole difference
+ * between the two ingresses.
+ *
+ * It is the single-member reduction of `DefaultStrings#matchFor(List)`: one member means no group
+ * election, no cell matrix, and no governor comparison, since a locale that has any relationship at
+ * all is governed by the only range there is. The N-member solver is M7 A3.
+ *
+ * @param {string} range a validated, lowercased RFC 4647 extended language range
+ * @param {number} weight the member's quality weight
+ * @param {Iterable<string>} supported loaded locale tags
+ * @param {string} fallbackLocale resolved fallback locale tag
+ * @param {Tiebreakers} [tiebreakers] language code -> ordered loaded tags
+ * @param {RangeEquivalentResolver} [rangeEquivalents] the IANA equivalence expansion to use; the
+ *   reduced inline table when omitted, which a raw range can outgrow — see the resolver's own note
+ * @returns {LocaleMatch}
+ */
+export function matchForRange(range, weight, supported, fallbackLocale, tiebreakers, rangeEquivalents) {
 	const sortedSupported = sortedSupportedTags(supported);
 	const resolvedTiebreakers = resolveTiebreakers(tiebreakers, sortedSupported);
 
 	/** @type {WeightedLanguageRange[]} */
-	const requestedLanguageRanges = [{ range, weight: 1 }];
+	const requestedLanguageRanges = [{ range, weight }];
 
 	/** @returns {LocaleMatch} */
 	const noMatch = () => ({
@@ -1136,7 +1230,7 @@ export function matchFor(requested, supported, fallbackLocale, tiebreakers) {
 		requestedLanguageRanges,
 	});
 
-	const member = memberStaticsFor(range, 1);
+	const member = memberStaticsFor(range, weight, rangeEquivalents ?? REDUCED_RANGE_EQUIVALENTS);
 	const localeStatics = sortedSupported.map((tag) => supportedLocaleStaticsFor(tag));
 	const cells = localeStatics.map((statics) => languageRangeSpecificityFor(statics, member));
 
@@ -1186,7 +1280,13 @@ export function matchFor(requested, supported, fallbackLocale, tiebreakers) {
 		survivors.push(locale);
 	}
 
-	if (survivors.length === 0) return noMatch();
+	// `DefaultStrings:1780` answers no-match when the highest effective weight is nonpositive, and
+	// `:1762` drops any locale whose governing range is. Reduced to one member the two collapse into
+	// this: a nonpositive range selects nothing, however strongly a locale is related to it. That is
+	// why the `weight <= 0` guard in the sweep above cannot stand alone — it deliberately KEEPS the
+	// exclusion-eligible cells, which is how a negative range excludes a locale for a later member,
+	// and with no later member to serve them they must not be served here.
+	if (survivors.length === 0 || weight <= 0) return noMatch();
 
 	/**
 	 * @param {string} locale
@@ -1198,15 +1298,24 @@ export function matchFor(requested, supported, fallbackLocale, tiebreakers) {
 		isMatch: true,
 		fallbackLocale,
 		consideredLocales: sortedSupported,
-		effectiveWeight: 1,
+		effectiveWeight: weight,
 		languageRange: range,
 		requestedLanguageRanges,
 	});
 
-	// Java's cascade opens with a bare-wildcard branch. A single requested locale has already been
-	// through `normalizeTag`, so its range can never contain `*`; the wildcard and extended-range
-	// branches belong to the language-range negotiator, not to this kernel. `extended-range` can
-	// still be REPORTED here, because a wildcard-free range can match structurally.
+	// Java's cascade opens with the bare-wildcard branch (`DefaultStrings:1815`). `matchFor(Locale)`
+	// can never reach it — a normalized tag contains no `*` — but a caller-supplied range can.
+	//
+	// KEPT FOR STRUCTURAL FIDELITY, AND MEASURED TO BE INDISTINGUISHABLE HERE. Deleting it changes
+	// no corpus answer and no answer this reduction can produce at all: `*` is not undetermined and
+	// not private-use, so it falls through to the `containsWildcard` block below, whose structural
+	// filter keeps every survivor and whose `primary === "*"` arm calls the same helper with the same
+	// list. Java's ordering matters once N members can interleave; with one member the two coincide.
+	// Recorded rather than trimmed because a later slice restores the interleaving — and recorded
+	// plainly rather than justified, because a branch nothing discriminates must not be described as
+	// though something does. `test/negotiate.test.js` pins the answer; the ARM is not what it pins.
+	if (range === "*") return localeMatch(preferredLocaleForWildcard(survivors, fallbackLocale, resolvedTiebreakers));
+
 	if (member.undetermined && !member.privateUse) return noMatch();
 
 	// An actual exact localized strings source must win over a canonically equivalent tag.
@@ -1216,6 +1325,25 @@ export function matchFor(requested, supported, fallbackLocale, tiebreakers) {
 	for (const locale of survivors)
 		for (const identity of member.identities)
 			if (!equalsIgnoreCase(identity, range) && equalsIgnoreCase(locale, identity)) return localeMatch(locale);
+
+	// Noninitial wildcards have RFC 4647 STRUCTURAL semantics only (`DefaultStrings:1836-1852`). An
+	// extended range with no structural candidate must not be broadened through canonical, CLDR,
+	// likely-subtag or primary-language matching — including a private-use range such as `x-*`, which
+	// is why this sits ABOVE the private-use exit rather than below it. Probed independently of
+	// quality, exactly as Java probes it.
+	if (member.containsWildcard) {
+		const filteredCandidates = structurallyFilteredLocales(range, survivors);
+
+		if (filteredCandidates.length === 0) return noMatch();
+
+		const primary = normalizedLanguageCode(javaSplit(range)[0] ?? "");
+		const preferred = primary === "*"
+			? preferredLocaleForWildcard(filteredCandidates, fallbackLocale, resolvedTiebreakers)
+			: preferredLocaleForRange(range, filteredCandidates, fallbackLocale, resolvedTiebreakers)
+				?? filteredCandidates[0] ?? "";
+
+		return localeMatch(preferred);
+	}
 
 	// Private-use tags have no language semantics to broaden: they select an exact source or nothing.
 	if (member.privateUse) return noMatch();

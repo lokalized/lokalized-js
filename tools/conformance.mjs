@@ -34,9 +34,9 @@
  *
  *   node tools/conformance.mjs [--verbose] [--family <prefix>] [--json <path>] [--write]
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const specDir = process.env.LOKALIZED_SPEC_DIR ? resolve(process.env.LOKALIZED_SPEC_DIR) : resolve(root, "../lokalized-spec");
@@ -252,28 +252,51 @@ class NoCounterpart extends Error {}
 const noCounterpart = (why) => { throw new NoCounterpart(why); };
 
 // --- the implementation under test ------------------------------------------------------------
-// Imported lazily and defensively: during M2 most of this does not exist yet, and a missing export
-// must register as `unsupported`, never as a crash that hides the cases that DO work.
-let core = null;
-let rootApi = null;
-try { core = await import("../src/core/index.js"); } catch { /* unsupported */ }
-try { rootApi = await import("../src/index.js"); } catch { /* unsupported */ }
+/**
+ * Import a subpath that may not exist yet — ABSENT and BROKEN kept apart.
+ *
+ * Every one of these modules is imported by name rather than through the root, and during M2 most
+ * of them did not exist at all; a subpath the port has not written must register as `unsupported`,
+ * never as a crash that hides the cases that DO work. That was written as `try { … } catch { }`,
+ * which also swallows a module that EXISTS and THREW — a syntax error, or a failure inside a data
+ * module it imports. The whole family of cases the subpath serves would then report a brand-new
+ * `unsupported` bucket instead of FAILED, which is the milestone's forbidden shape: a real defect
+ * converted into attributed non-work, caught today only by the passing-set ratchet one layer away
+ * from the count everyone reads. `src/negotiate/index.js` alone carries 50 passing cases and pulls
+ * in an 802-class generated table, so the swallow had teeth.
+ *
+ * Existence is decided on the FILE, before the import runs, so nothing about the failure has to be
+ * pattern-matched out of an error message. A module that is there and throws propagates, and the
+ * runner dies with that error rather than reporting anything.
+ *
+ * @param {string} relativePath
+ * @returns {Promise<Record<string, unknown> | null>}
+ */
+async function optionalSubpath(relativePath) {
+  if (!existsSync(join(root, relativePath))) return null;
+  return await import(pathToFileURL(join(root, relativePath)).href);
+}
 
-// The optional cardinal-range subpath. Imported separately and never from the root, because the
-// whole point of `lokalized/data/ranges` is that the root graph does not reach its table.
-let rangeApi = null;
-try { rangeApi = await import("../src/data/ranges.js"); } catch { /* unsupported */ }
+const core = await optionalSubpath("src/core/index.js");
+const rootApi = await optionalSubpath("src/index.js");
 
-// The optional ordinal subpath, imported the same way and for the same reason: `lokalized/data/
-// ordinal` is not reachable from the root, so the runner must ask for it by name or the corpus's
-// ordinal operations stay unsupported forever.
-let ordinalApi = null;
-try { ordinalApi = await import("../src/data/ordinal.js"); } catch { /* unsupported */ }
+// The optional cardinal-range subpath, never reached from the root, because the whole point of
+// `lokalized/data/ranges` is that the root graph does not reach its table.
+const rangeApi = await optionalSubpath("src/data/ranges.js");
+
+// The optional ordinal subpath, for the same reason: `lokalized/data/ordinal` is not reachable from
+// the root, so the runner must ask for it by name or the corpus's ordinal operations stay
+// unsupported forever.
+const ordinalApi = await optionalSubpath("src/data/ordinal.js");
 
 // `lokalized/parse`. Its entry point takes raw text or bytes, so the `parse` cases below hand it a
 // file rather than a decoded object — that is the whole point of the operation.
-let parseApi = null;
-try { parseApi = await import("../src/parse/index.js"); } catch { /* unsupported */ }
+const parseApi = await optionalSubpath("src/parse/index.js");
+
+// `lokalized/negotiate`, also outside the root graph by design, and the only door to
+// `matchFor(List)`: a runner that only imported `src/index.js` could never reach the RFC 4647 range
+// ingress at all.
+const negotiateApi = await optionalSubpath("src/negotiate/index.js");
 
 /**
  * Phonetic-resolver invocations observed during the case currently executing.
@@ -631,12 +654,30 @@ function projectResult(result, expected) {
     attemptedLocales: [...result.attemptedLocales],
     isFallback: result.isFallback,
     failureReason: result.failureReason ?? null,
-    // The corpus records the full match object; compare only the fields both sides define, and only
-    // when the recorded side has one, so a skeleton is not failed for diagnostics it does not yet emit.
-    localeMatchResult: expected.localeMatchResult === null ? null : match && {
+    // The corpus records EIGHT match fields and the port's `matchFor` produces all eight, so all
+    // eight are compared — symmetrically, the same key list on both sides of `jcs`. The narrowed
+    // `{matchType, locale}` projection this replaces left six diagnostics unchecked, and one of them
+    // was `fallbackLocale`: the port echoed the configured spelling where Java records the RESOLVED
+    // loaded catalog, and no comparison could see it. Widening a projection is only honest when both
+    // sides widen together; a field added here alone, or an `?? expected.x` default, would restore
+    // green without restoring correctness.
+    // The `expected.localeMatchResult === null ? null : …` gate this replaces forced the ACTUAL side
+    // to null whenever Java recorded no match, so a port emitting a match where Java records none
+    // compared equal and PASSED. It fires on zero corpus rows — no `getResult` case in the 2,298
+    // records a null `localeMatchResult`, so removing it changes no outcome — but it is exactly the
+    // shape the anti-weakening rule names, and A0 had just widened it from guarding two fields to
+    // guarding eight. The actual side is now written from the actual value alone; a null against an
+    // object is a `jcs` mismatch and fails, which is the point.
+    localeMatchResult: match ? {
       matchType: match.matchType,
       locale: match.locale ?? null,
-    },
+      isMatch: match.isMatch,
+      fallbackLocale: match.fallbackLocale,
+      consideredLocales: match.consideredLocales,
+      effectiveWeight: match.effectiveWeight,
+      languageRange: match.languageRange,
+      requestedLanguageRanges: match.requestedLanguageRanges,
+    } : null,
   };
 }
 
@@ -653,6 +694,12 @@ function expectedResultProjection(expected) {
     localeMatchResult: expected.localeMatchResult === null ? null : {
       matchType: adaptEnum(expected.localeMatchResult.matchType),
       locale: expected.localeMatchResult.locale,
+      isMatch: expected.localeMatchResult.isMatch,
+      fallbackLocale: expected.localeMatchResult.fallbackLocale,
+      consideredLocales: expected.localeMatchResult.consideredLocales,
+      effectiveWeight: expected.localeMatchResult.effectiveWeight,
+      languageRange: expected.localeMatchResult.languageRange,
+      requestedLanguageRanges: expected.localeMatchResult.requestedLanguageRanges,
     },
   };
 }
@@ -926,13 +973,192 @@ function runCase(testCase, fixture) {
       return jcs(actual) === jcs(wanted) ? { ok: true } : { ok: false, actual, wanted };
     }
 
+    case "matchFor": {
+      // Channel one of the two the corpus records: what the MATCHER selects, observed on its own
+      // rather than through a translation. `Strings#matchFor` has two overloads and the corpus
+      // exercises both under this one operation name — 137 cases hand it a `Locale`, 164 hand it a
+      // `List<LanguageRange>`. Both are routed here now; of the list cases, the 50 that carry
+      // exactly one member run, and the 114 multi-member ones do not.
+      //
+      // In JAVA these are one solver, not two: `matchFor(Locale)` is the DEFAULT interface method at
+      // `LocaleMatcher.java:63-65`, which wraps `locale.toLanguageTag()` in a single `LanguageRange`
+      // and delegates to `matchFor(List)`. The port has only the single-member reduction of that
+      // solver so far, which is why the member COUNT is what this arm routes on; the N-member
+      // sections it still lacks are M7's A3. Saying Java has two matchers would be false, and would
+      // read as licence to keep two code paths once the whole list overload lands.
+      //
+      // The ONE ingress difference is real and belongs at the top of the solver, not below it: the
+      // locale overload builds its range from `toLanguageTag()`, so it matches on a NORMALIZED tag,
+      // while the list overload keeps the caller's raw spelling lowercased. Everything under
+      // `matchForRange` is shared.
+      //
+      // ROUTING ON THE INPUT SHAPE, decided before anything executes — not a catch around a call
+      // that ran. The MULTI-MEMBER language-range overload is still not run, and that guard is the
+      // only `unsupported` on the answering path: it is the same call the default arm below makes,
+      // on the same operation, producing the same reason string, so those cases report exactly what
+      // they reported before this arm existed. (Two others exist and neither can absorb a matcher
+      // defect: `matchForCase`'s module-availability check, which decides on the subpath's
+      // existence before any range is matched, and the recorded-throw branch's undeclared-Java-type
+      // check, which fires on the CORPUS's vocabulary rather than on anything the port did.)
+      //
+      // A `try { … } catch { unsupported(…) }` around the answering call would convert a real
+      // matcher defect into attributed non-work and look identical in the headline count, which is
+      // why there is nothing to catch there: a throw from the port travels out of this arm and is
+      // recorded as FAILED by the runner's own handler. In particular the fourteen ranges that are
+      // legal RFC 4647 but not well-formed locales (`de-*`, `x-foo-*`, `zh-guoyu-tw`, …) must MATCH
+      // here; if a future edit made them report a reason instead, this arm would be lying.
+      const ranges = input.languageRanges;
+      const singleMember = Array.isArray(ranges) && ranges.length === 1;
+
+      if (input.locale === undefined && !singleMember) operationNotImplemented(operation);
+
+      // EIGHT `matchFor` cases record `expected.thrown` and carry NO `expected.match`: the two
+      // 33-member limit rows and the six malformed headers. All eight are header strings or
+      // over-length lists, so the guard above routes every one of them away today and this branch
+      // is unreached — which is precisely why it is written now, next to the comparison it mirrors,
+      // rather than left to the slice that opens those routes and will be busy with the parser.
+      // Without it, `const recorded = expected.match` is `undefined` and `recorded.matchType` dies
+      // as a TypeError where an error-identity comparison belongs.
+      //
+      // The `try` is around ONE call and its catch feeds a COMPARISON, not an attribution: a wrong
+      // error, or no error at all, is `{ ok: false }`. `unsupported` travels through untouched, on
+      // the `cardinalityForNumber` arm's precedent, because it is the runner's own control flow and
+      // not a result from the port.
+      //
+      // THE MESSAGE IS COMPARED, NOT ONLY THE ERROR KIND, and that is the whole value of the branch.
+      // `ERROR_NAME` maps `IllegalArgumentException` to `TypeError | RangeError` deliberately
+      // loosely, which is right where the corpus records a category of failure — and far too loose
+      // here, where seven of the eight record the PARSER's own verbatim output (`range=notaheader!`,
+      // `range=\tfr`, `weight="abc" for language range "fr"`). Measured: routing the eight into this
+      // arm against today's port, a kind-only comparison reports all eight as PASSES — seven of them
+      // because a header STRING is iterable, so `[..."not a header!"]` refuses its first character
+      // as a non-object and throws a `RangeError` that has nothing to do with the header grammar.
+      // That is the `zh-123` shape exactly: a check confirming something it never exercised. With
+      // the message compared, seven fail and only `.explicit-thirty-three-ranges-rejected` — a real
+      // 33-member array, refused by a rule the port already implements — passes, which is the true
+      // state of the port before A4.
+      //
+      // If A4 finds a wording it must diverge from, that is a recorded decision and a visible edit
+      // here, not a comparison quietly narrowed back to the kind.
+      if (expected.thrown) {
+        const javaType = expected.thrown.type;
+        if (!(javaType in ERROR_NAME)) unsupported(`no JS counterpart declared for ${javaType}`);
+        const wantedNames = ERROR_NAME[javaType];
+        const wanted = { name: wantedNames.join(" or "), message: expected.thrown.message };
+        try {
+          matchForCase(fixture, input, ranges);
+          return { ok: false, actual: { name: "no exception", message: null }, wanted };
+        } catch (error) {
+          if (error instanceof Unsupported) throw error;
+          const name = error instanceof Error ? error.name : String(error);
+          const actual = { name, message: messageOf(error) };
+          return wantedNames.includes(name) && actual.message === wanted.message
+            ? { ok: true }
+            : { ok: false, actual, wanted };
+        }
+      }
+
+      // The same call the recorded-throw branch above makes, on the same two ingresses. See
+      // `matchForCase` for why the locale and range doors are separate and why `stringsFor`'s
+      // fixture gating is what keeps the cases this arm does not unlock honest.
+      const match = matchForCase(fixture, input, ranges);
+
+      // All EIGHT recorded fields, the same key list on both sides. Nothing is defaulted from the
+      // expected side and nothing is gated on the recorded side having a value: every `matchFor`
+      // case that is not a recorded throw carries `expected.match`, and the throws were taken by
+      // the branch above, so there is no null branch to hide behind. A narrower
+      // projection here would report passes for a matcher that got `languageRange`,
+      // `effectiveWeight` or `consideredLocales` wrong — the fields A0 widened `getResult` to
+      // compare, for exactly that reason.
+      const actual = {
+        matchType: match.matchType,
+        locale: match.locale,
+        isMatch: match.isMatch,
+        fallbackLocale: match.fallbackLocale,
+        consideredLocales: match.consideredLocales,
+        effectiveWeight: match.effectiveWeight,
+        languageRange: match.languageRange,
+        requestedLanguageRanges: match.requestedLanguageRanges,
+      };
+      const recorded = expected.match;
+      const wanted = {
+        matchType: adaptEnum(recorded.matchType),
+        locale: recorded.locale,
+        isMatch: recorded.isMatch,
+        fallbackLocale: recorded.fallbackLocale,
+        consideredLocales: recorded.consideredLocales,
+        effectiveWeight: recorded.effectiveWeight,
+        languageRange: recorded.languageRange,
+        requestedLanguageRanges: recorded.requestedLanguageRanges,
+      };
+      return jcs(actual) === jcs(wanted) ? { ok: true } : { ok: false, actual, wanted };
+    }
+
     default: {
       const jvmOnly = NO_JS_COUNTERPART[operation];
       if (jvmOnly) noCounterpart(`operation '${operation}' has no JS counterpart: ${jvmOnly.why}`);
-      const owner = OWNER_MILESTONE[operation];
-      unsupported(`operation '${operation}' is not implemented${owner ? ` (${owner})` : ""}`);
+      operationNotImplemented(operation);
     }
   }
+}
+
+/**
+ * Execute one `matchFor` case, on whichever of the two ingresses its input names.
+ *
+ * Factored out so the recorded-throw comparison and the recorded-match comparison run the SAME
+ * call. Two copies would let a future edit make the throwing path reach a different entry point
+ * than the one under test — the failure mode where a check confirms something it never exercised.
+ *
+ * `getDirectLocaleContext(locale)` is the counterpart plan v7 section 3.3 names for
+ * `Strings#matchFor(Locale)`: it "validates and normalizes the input, preserves it as
+ * `lookupLocale`, and returns the frozen strict single-locale match from this exact `Strings`
+ * instance's applicable configuration", invoking no callback and touching no catalog. It is the
+ * SAME kernel `getResult` computes its diagnostic from, so this arm cannot pass a case the
+ * translation path would get wrong.
+ *
+ * The RANGE ingress is a different entry point on purpose, and routing it through the locale one is
+ * the defect A2 repairs: `getDirectLocaleContext` normalizes, which rewrites `sgn-nsl` to `nsl`
+ * (EXACT where Java records CANONICAL), turns `zh-min-nan` into `nan` (selecting `nan-CN` where
+ * Java answers `nan-MY`), and rejects a legal `de-*` outright. The two share one kernel below
+ * `matchForRange`; they must not share the ingress.
+ *
+ * `stringsFor` does the fixture gating, unchanged and unweakened, which is what keeps the cases
+ * this slice does not unlock honest: the one whose fixture installs an ambient match supplier and
+ * the two whose catalogs are raw bytes report the capability that actually blocks them instead of
+ * the operation name, and both of those reason strings already existed.
+ */
+function matchForCase(fixture, input, ranges) {
+  const strings = stringsFor(fixture);
+
+  if (input.locale !== undefined) return strings.getDirectLocaleContext(input.locale).localeMatch;
+
+  // The same MODULE-AVAILABILITY guard `parseStrings`, `cardinalityForRange` and the ordinal probes
+  // already carry, and the only `unsupported(` on this path. It fires when the subpath does not
+  // exist, before any range is matched — never on a range that ran. `optionalSubpath` distinguishes
+  // a subpath that is absent from one that threw on import, so a broken `negotiate` cannot arrive
+  // here disguised as an unimplemented one.
+  if (!negotiateApi?.createLocaleNegotiator) unsupported("createLocaleNegotiator is not implemented");
+
+  // The instance's OWN applicable configuration, read back through the public accessor rather than
+  // rebuilt from the fixture: its `fallbackLocale` is the one `createStrings` resolved to a loaded
+  // catalog, so the negotiator matches against exactly what the `Strings` would.
+  const negotiator = negotiateApi.createLocaleNegotiator(strings.getLocaleConfiguration());
+  return negotiator.matchForLanguageRanges(ranges);
+}
+
+/**
+ * The one place the "operation is not implemented" reason string is spelled.
+ *
+ * Extracted so the `matchFor` arm's language-range guard and the default arm cannot drift apart:
+ * a reason string that differed by a word between the two would split one bucket into two in the
+ * report and read as a new capability appearing.
+ *
+ * @param {string} operation
+ * @returns {never}
+ */
+function operationNotImplemented(operation) {
+  const owner = OWNER_MILESTONE[operation];
+  unsupported(`operation '${operation}' is not implemented${owner ? ` (${owner})` : ""}`);
 }
 
 /**

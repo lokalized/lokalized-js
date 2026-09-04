@@ -82,6 +82,7 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     ["data/ordinal", "ordinalityForOperands", "number/operand ordinal classifiers and support probes"],
     ["data/ordinal", "supportedOrdinalitiesForLocale", "number/operand ordinal classifiers and support probes"],
     ["data/ordinal", "getSupportedOrdinalityLocaleTags", "number/operand ordinal classifiers and support probes"],
+    ["negotiate", "createLocaleNegotiator", "range parser/factory/option helpers"],
   ]);
 
   /** @param {string} owner @returns {Set<string>} */

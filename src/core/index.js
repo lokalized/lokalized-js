@@ -31,8 +31,17 @@ import {
   evaluate as evaluateCompiledExpression,
 } from "../internal/expression.js";
 import { interpolateFailureKey, render } from "../internal/interpolate.js";
-import { equivalentTags } from "../internal/locale-cldr.js";
-import { candidateChain, matchFor, normalizeTag, primaryLanguage } from "../internal/locale.js";
+import { canonicalLanguageTag, equivalentTags } from "../internal/locale-cldr.js";
+import { javaSplit } from "../internal/locale-jdk-tag.js";
+import {
+  candidateChain,
+  compareTags,
+  matchFor,
+  normalizedLanguageCode,
+  normalizeTag,
+  primaryLanguage,
+  resolveTiebreakers,
+} from "../internal/locale.js";
 import { incompleteLanguageFormReporter } from "../internal/parse-warnings.js";
 import { PLURAL_DATA_RUNTIME } from "../internal/plural.js";
 
@@ -150,7 +159,14 @@ class ResolutionFailure extends Error {
  * @param {CreateStringsOptions} options
  */
 export function createStrings(options) {
-  const fallbackLocale = normalizeTag(options.fallbackLocale);
+  // The tag the CALLER wrote, normalized but not yet resolved against the loaded catalogs. Java
+  // keeps the same two values apart: the constructor parameter, and `this.fallbackLocale`, which is
+  // the loaded catalog the parameter names (`DefaultStrings.java:446-470`). Only the second is a
+  // catalog anything can be served from, and only the first is what the ambient locale defaults to.
+  const configuredFallbackLocale = normalizeTag(options.fallbackLocale);
+  // Deliberately the CONFIGURED spelling, not the resolved one. The corpus pins this:
+  // `locale-identity.deprecated-fallback.instance-locale-uses-loaded-spelling` configures `hy-810`,
+  // resolves the fallback to the loaded `hy-AM`, and still records `lookupLocale: "hy-810"`.
   const ambientLocale = normalizeTag(options.locale ?? options.fallbackLocale);
 
   // A callback of the wrong SHAPE is a configuration mistake and is refused here; a callback that
@@ -211,10 +227,38 @@ export function createStrings(options) {
   const supported = [...catalogs.keys()];
   const tiebreakers = safeTiebreakers(options.tiebreakers);
 
+  // `DefaultStrings.java:304-314`, and it runs BEFORE the tiebreaker rules below, exactly as Java
+  // orders the two. Sorted by tag because the walk below and Java's diagnostic both read this list
+  // in `Locale#toLanguageTag` order.
+  const equivalentFallbackLocales = supported
+    .filter((tag) => equivalentTags(tag, configuredFallbackLocale))
+    .sort(compareTags);
+
+  // The first of the two construction refusals A0 adds. A fallback naming no loaded catalog is not
+  // a fallback: every lookup that reaches the end of its chain would then be served by whichever
+  // catalog happened to be there, or by nothing at all, and the configuration mistake would show up
+  // only as translations quietly coming from the wrong locale.
+  if (equivalentFallbackLocales.length === 0)
+    throw new RangeError(
+      `Specified fallback locale is '${configuredFallbackLocale}' but no matching localized ` +
+        `strings locale was found. Known locales: ${javaList([...supported].sort(compareTags))}`,
+    );
+
   // Refused at CONSTRUCTION, before the first lookup can hide the ambiguity behind an arbitrary
   // winner. `DefaultStrings` runs this check (DefaultStrings.java:395-430) and the port did not, so
   // `{ strings: { en, "en-US" } }` with no tiebreakers built an instance Java refuses outright.
   validateTiebreakers(supported, tiebreakers);
+
+  // `DefaultStrings.java:446-470`. THE CALLER'S SPELLING IS NOT A CATALOG NAME, and until this
+  // landed the port simply passed the normalized configured tag on to the kernel — whose `matchFor`
+  // doc comment has always said `@param fallbackLocale resolved fallback locale tag`. The kernel was
+  // right; only its caller was wrong. Nothing here touches `src/internal/locale.js`.
+  const fallbackLocale = resolveFallbackLocale(
+    configuredFallbackLocale,
+    supported,
+    equivalentFallbackLocales,
+    tiebreakers,
+  );
 
   // Eager, construction-time: what the catalogs actually ask for, and whether the caller supplied
   // it. Plan section 3.7 is explicit that missing optional data is a construction failure "not a
@@ -421,6 +465,30 @@ export function createStrings(options) {
 }
 
 /**
+ * The per-call options object naming one explicit locale:
+ * `strings.get(key, undefined, forLocale("fr-CA"))`.
+ *
+ * Plan section 3.3 declares it and section 3.5 gives it its entire behavior in one word: `forLocale`
+ * "performs syntactic normalization IMMEDIATELY". A caller who writes the object by hand —
+ * `{ locale: "fr-ca" }` — is equally valid and normalizes inside `getResult` instead, so the only
+ * thing this function buys is WHERE a malformed tag is reported: at the site that spelled it, rather
+ * than at whichever unrelated lookup later consumed it. That difference is the reason it exists, and
+ * it is the thing `test/for-locale.test.js` discriminates — nothing in the corpus can, because the
+ * oracle has no counterpart operation for it and every recorded ingress spells its tag well-formed.
+ *
+ * It deliberately knows nothing about any catalog. The instance-dependent match and coverage
+ * validation stays where section 3.5 puts it, at consumption by a `Strings`, so one options object
+ * stays reusable across instances that load different locales.
+ *
+ * @param {string} locale
+ * @returns {Readonly<{ locale: string }>}
+ * @throws {RangeError} if the tag is not a well-formed IETF BCP 47 locale
+ */
+export function forLocale(locale) {
+  return freeze({ locale: normalizeTag(locale) });
+}
+
+/**
  * Pull the ordinal support probe off a `lokalized/data/ordinal` carrier, if one was supplied.
  *
  * Without it, ordinality gaps simply go unreported — the same trade `lokalized/parse` makes, and for
@@ -576,6 +644,60 @@ function validateTiebreakers(supported, tiebreakers) {
         `locale[s]: ${javaList([...loaded].sort())}`,
     );
   }
+}
+
+// `compareTags`, `normalizedLanguageCode` and the tiebreaker-map finalizer used to live here as
+// private copies of three helpers the locale kernel already had. They are now imported from
+// `../internal/locale.js`, which is the only honest arrangement: each is ONE function in Java
+// (`Comparator.comparing(Locale::toLanguageTag)`, `DefaultStrings#normalizedLanguageCode:2669`, and
+// `finalizedTiebreakerLocalesByLanguageCode:395-444`), read here at construction and there at every
+// lookup. A divergence in any of the three resolves the fallback to a catalog that per-lookup
+// resolution never consults, and the corpus cannot see it: every tiebreaker in it is spelled
+// canonically, so the two spellings agree on every recorded input while disagreeing in general.
+
+/**
+ * Java's fallback-locale resolution, `DefaultStrings.java:446-470`, in Java's order: the configured
+ * tag when a catalog is loaded under exactly that spelling; else the ONE canonically equivalent
+ * loaded catalog; else the fallback's language code walked through the tiebreaker list, taking the
+ * first entry that is itself equivalent to the fallback; else the instance is refused.
+ *
+ * Two details carry the rule, each with a corpus fixture behind it.
+ *
+ * The language code is Java's `normalizedLanguageCode(canonicalLanguageTag(tag).split("-")[0])`, not
+ * `tag.split("-")[0]`: `dedup-and-candidates-equivalent-fallback-am-first` configures `arm-SU`
+ * against a tiebreaker map keyed `hy`, so a raw first subtag looks up `arm`, finds nothing, and
+ * falls through to whichever equivalent catalog happens to come first.
+ *
+ * And the walk SKIPS a tiebreaker not equivalent to the fallback rather than taking the head of the
+ * list: `owed-ds-fallback-tiebreaker-walk` loads `sr-Cyrl`, `sh` and `hbs` and leads its `sr` list
+ * with `sr-Cyrl`, which is not equivalent to the configured `sr-Latn`. Taking the first entry
+ * unconditionally serves every fallback translation from the Cyrillic catalog.
+ *
+ * @param {string} configured the normalized tag the caller configured
+ * @param {readonly string[]} supported the loaded catalogs' normalized tags
+ * @param {readonly string[]} equivalentFallbackLocales loaded catalogs equivalent to `configured`,
+ *   tag-sorted, non-empty by the refusal in `createStrings`
+ * @param {Readonly<Record<string, readonly string[]>> | null} tiebreakers
+ * @returns {string}
+ */
+function resolveFallbackLocale(configured, supported, equivalentFallbackLocales, tiebreakers) {
+  if (supported.includes(configured)) return configured;
+  if (equivalentFallbackLocales.length === 1) return /** @type {string} */ (equivalentFallbackLocales[0]);
+
+  const languageCode = normalizedLanguageCode(javaSplit(canonicalLanguageTag(configured))[0] ?? "");
+  const ordered = resolveTiebreakers(tiebreakers, supported).get(languageCode);
+
+  if (ordered !== undefined)
+    for (const tiebreaker of ordered)
+      if (equivalentFallbackLocales.includes(tiebreaker)) return tiebreaker;
+
+  // Java's message names `tiebreakerLocalesByLanguageCode`, its constructor parameter; only that
+  // half is reworded to the option a JavaScript caller has, on the rule `validateTiebreakers`
+  // follows. The diagnosis — which locales collided — is Java's.
+  throw new RangeError(
+    `Fallback locale '${configured}' is canonically equivalent to multiple loaded locales ` +
+      `${javaList(equivalentFallbackLocales)}; configure createStrings({ tiebreakers }) to choose one`,
+  );
 }
 
 /** The frozen, null-prototype empty record `getLocaleConfiguration()` reports when none were set. */
