@@ -5,8 +5,8 @@
  * The behavioral corpus records what unmodified lokalized-java 3.0.0 actually does. Two of its
  * channels belong to this module and both are driven here in full:
  *
- *   - every `matchFor` case whose input is a single locale (123 of the 216; the other 93 supply an
- *     `Accept-Language` header and belong to the language-range negotiator);
+ *   - every `matchFor` case whose input is a single locale (the rest supply an `Accept-Language`
+ *     header and belong to the language-range negotiator);
  *   - the `attemptedLocales` of every `getResult` case that reports a result, which is exactly what
  *     `candidateChain` must produce as a prefix.
  */
@@ -275,20 +275,82 @@ describe("matchFor against the corpus", () => {
 		testCase.operation === "matchFor" && typeof testCase.input.locale === "string");
 
 	// Every `getResult` case also records the full LocaleMatchResult the run negotiated, so the
-	// diagnostic channel is gated on 1,089 recorded results rather than on the 123 cases whose
-	// operation happens to be named `matchFor`. The two cases that supply BOTH a locale and language
-	// ranges are excluded: Java's ingress lets per-call ranges displace a per-call locale, so their
-	// recorded result belongs to the header channel, not to this kernel.
+	// diagnostic channel is gated on every recorded result rather than only on the cases whose
+	// operation happens to be named `matchFor`. Cases that supply language ranges are excluded:
+	// Java's ingress lets per-call ranges displace a per-call locale, so their recorded result belongs
+	// to the header channel, not to this kernel.
 	/** @type {any[]} */
 	const derivedCases = corpus.cases.filter((/** @type {any} */ testCase) =>
 		testCase.operation === "getResult" && typeof testCase.input.locale === "string" &&
 		testCase.input.languageRanges === undefined && testCase.expected?.result?.localeMatchResult);
 
 	it("covers every single-locale matchFor case in the corpus", () => {
+		// This used to pin exact counts, which corpus GROWTH — the one change that is unambiguously good
+		// news — breaks while saying nothing about correctness. What the pin actually guards is that no
+		// recorded case escapes every channel unnoticed, so assert the partitions themselves and keep
+		// floors against a filter that silently stops matching.
+		//
+		// The floors sit at the CURRENT corpus counts, not at the counts standing before the last growth.
+		// A floor left behind at a stale value is slack a narrowed filter can hide in: 966 against the
+		// 1,056 results now recorded would let ninety cases fall out of the strongest gate in this file
+		// without a word. Raise them when the corpus grows; they only ever forbid shrinkage.
+		/** @type {any[]} */
 		const all = corpus.cases.filter((/** @type {any} */ testCase) => testCase.operation === "matchFor");
-		assert.equal(all.length, 216);
-		assert.equal(cases.length, 123);
-		assert.equal(derivedCases.length, 966);
+		// Defined POSITIVELY — by what the case supplies, not as the negation of the other half — so the
+		// partition equality below can actually fail. Defined by negation it is a tautology that gates
+		// nothing. Ranges arrive either as a raw `Accept-Language` header string or as a parsed list;
+		// both are the negotiator's business, so test for presence, not for `Array.isArray`.
+		/** @type {any[]} */
+		const headerCases = all.filter((/** @type {any} */ testCase) => testCase.input.languageRanges !== undefined);
+
+		assert.equal(cases.length + headerCases.length, all.length,
+			"every matchFor case belongs to this kernel or to the language-range negotiator, and to exactly one");
+
+		// The equality above catches a case in neither channel or in both; this names it. Both are real
+		// hazards: a case supplying neither is driven by nothing, and one supplying both would be driven
+		// here as a single-locale match even though Java's ingress lets per-call ranges displace a
+		// per-call locale (TranslationOptions.Builder#languageRanges nulls the locale outright).
+		for (const testCase of all) {
+			const suppliesLocale = typeof testCase.input.locale === "string";
+			const suppliesRanges = testCase.input.languageRanges !== undefined;
+			assert.ok(suppliesLocale !== suppliesRanges, `${testCase.id} supplies ` +
+				(suppliesLocale ? "both a locale and language ranges, so two channels claim it"
+					: "neither a locale nor language ranges, so no channel drives it"));
+		}
+
+		for (const testCase of cases)
+			assert.ok(testCase.expected?.match, `${testCase.id} records no match result to gate against`);
+
+		// The `getResult` cases carrying a LocaleMatchResult split three ways, and each way is either
+		// driven below or excluded for a stated reason.
+		/** @type {any[]} */
+		const resultCases = corpus.cases.filter((/** @type {any} */ testCase) =>
+			testCase.operation === "getResult" && testCase.expected?.result?.localeMatchResult);
+		// Ranges present (with or without a locale): the header channel negotiated this result.
+		const rangeDriven = resultCases.filter((/** @type {any} */ testCase) =>
+			testCase.input.languageRanges !== undefined);
+		// Neither present: the locale came from the instance's ambient configuration, a locale supplier,
+		// or a localeMatchSupplier whose result Java preserves rather than re-deriving, so the call's own
+		// input cannot reconstruct what this kernel was handed.
+		const ambient = resultCases.filter((/** @type {any} */ testCase) =>
+			testCase.input.languageRanges === undefined && typeof testCase.input.locale !== "string");
+
+		assert.equal(derivedCases.length + rangeDriven.length + ambient.length, resultCases.length,
+			"every recorded LocaleMatchResult is driven here, header-negotiated, or ambient-sourced");
+		// That equality is exhaustive by construction, so it cannot fail on its own — these two can. The
+		// excused bucket is excused because the CALL omitted a locale; assert that rather than assume it,
+		// and hold the driven share so future growth cannot drain into the excused bucket unremarked
+		// (1,056 of 1,220 today). The old exact count made any such drift fail loudly; a bare floor does
+		// not, and this is what replaces that half of its teeth.
+		for (const testCase of ambient)
+			assert.ok(!("locale" in testCase.input),
+				`${testCase.id} is excused as ambient but its input carries a locale key`);
+		assert.ok(derivedCases.length / resultCases.length >= 0.85,
+			`only ${derivedCases.length} of ${resultCases.length} recorded LocaleMatchResults are driven by this gate`);
+
+		assert.ok(all.length >= 263, `matchFor cases fell to ${all.length}`);
+		assert.ok(cases.length >= 137, `single-locale matchFor cases fell to ${cases.length}`);
+		assert.ok(derivedCases.length >= 1056, `single-locale getResult cases fell to ${derivedCases.length}`);
 	});
 
 	it("reports consideredLocales as the deduplicated, tag-sorted supported set", () => {
@@ -341,7 +403,17 @@ describe("candidateChain against the corpus", () => {
 		testCase.operation === "getResult" && Array.isArray(testCase.expected?.result?.attemptedLocales));
 
 	it("covers every getResult case that reports a resolution walk", () => {
-		assert.equal(cases.length, 1104);
+		// A floor rather than an equality: this set only grows with the corpus, and the floor is kept at
+		// the current count so it forbids every shrinkage rather than only a large one. The property
+		// worth pinning is that a recorded walk and a recorded LocaleMatchResult always travel together —
+		// a case reporting one without the other means a channel is being skipped somewhere.
+		/** @type {any[]} */
+		const withMatchResult = corpus.cases.filter((/** @type {any} */ testCase) =>
+			testCase.operation === "getResult" && testCase.expected?.result?.localeMatchResult);
+
+		assert.deepEqual(cases.map((testCase) => testCase.id).sort(),
+			withMatchResult.map((/** @type {any} */ testCase) => testCase.id).sort());
+		assert.ok(cases.length >= 1220, `resolution-walk cases fell to ${cases.length}`);
 	});
 
 	it("reproduces every attemptedLocales prefix", () => {
@@ -374,18 +446,24 @@ describe("candidateChain against the corpus", () => {
 		assert.deepEqual(failures, []);
 	});
 
-	it("is not the selection channel: 221 translated cases supply from a locale matchFor did not select", () => {
+	it("is not the selection channel: translated cases routinely supply from a locale matchFor did not select", () => {
 		// A quantified guard against anyone collapsing the two channels. The SUPPLYING locale — the one
 		// interpolation and plural selection must evaluate under — is the last candidateChain entry
-		// actually visited, and it disagrees with matchFor's selection in 28% of translated cases.
+		// actually visited, and it disagrees with matchFor's selection in better than a quarter of
+		// translated cases (222 of 853). Floors at the current counts plus a ratio, not exact counts:
+		// collapsing the channels would drive divergence toward zero, which is what the ratio catches,
+		// while corpus growth only moves the totals up. The ratio sits at a fifth rather than at today's
+		// quarter so that growth weighted toward agreeing cases does not raise a false alarm.
 		const translated = corpus.cases.filter((/** @type {any} */ testCase) =>
 			testCase.operation === "getResult" && testCase.expected?.result?.localeMatchResult &&
 			testCase.expected.result.status === "TRANSLATED");
 		const diverging = translated.filter((/** @type {any} */ testCase) =>
 			testCase.expected.result.resolvedLocale !== testCase.expected.result.localeMatchResult.locale);
 
-		assert.equal(translated.length, 788);
-		assert.equal(diverging.length, 221);
+		assert.ok(translated.length >= 853, `translated cases fell to ${translated.length}`);
+		assert.ok(diverging.length >= 222, `diverging cases fell to ${diverging.length}`);
+		assert.ok(diverging.length / translated.length > 0.2,
+			`selection and resolution diverge in only ${diverging.length}/${translated.length} translated cases`);
 	});
 
 	it("separates selection from resolution where the corpus says they diverge", () => {

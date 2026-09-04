@@ -96,6 +96,31 @@ function operandsForCorpusValue(value, visibleDecimalPlaces) {
   }
 }
 
+/**
+ * Java exception type -> the JS error names the port is permitted to raise for it. The same mapping
+ * `ERROR_NAME` in `tools/conformance.mjs` applies, restated here so `npm test` alone compares the
+ * error KIND and not just its message.
+ *
+ * A Java type this map has never seen FAILS rather than passing vacuously: a corpus case that starts
+ * recording an unfamiliar exception must stop the suite, not slip through an absent entry.
+ */
+const JAVA_ERROR_NAMES = new Map([
+  ["com.lokalized.UnsupportedLocaleException", ["UnsupportedLocaleError"]],
+  ["java.lang.IllegalArgumentException", ["TypeError", "RangeError"]],
+  ["java.lang.ArithmeticException", ["RangeError"]],
+]);
+
+/**
+ * @param {Error} error the error the port raised
+ * @param {string} javaType the Java exception type the corpus recorded
+ * @param {string} id the case id, for the failure message
+ */
+function assertMatchesRecordedKind(error, javaType, id) {
+  const permitted = JAVA_ERROR_NAMES.get(javaType);
+  assert.ok(permitted, `${id}: no JS counterpart recorded for ${javaType}`);
+  assert.ok(permitted.includes(error.name), `${id}: ${error.name} is not one of ${permitted.join(", ")}`);
+}
+
 test("behavioral vectors: cardinalityForNumber and cardinalityForOperands", { skip: vectorsSkip }, () => {
   const corpus = readJson(vectorsPath);
   /** @type {any[]} */
@@ -104,16 +129,20 @@ test("behavioral vectors: cardinalityForNumber and cardinalityForOperands", { sk
       testCase.operation === "cardinalityForNumber" || testCase.operation === "cardinalityForOperands",
   );
 
-  assert.equal(
-    cases.filter((testCase) => testCase.operation === "cardinalityForNumber").length,
-    49,
-    "expected 49 cardinalityForNumber cases",
-  );
-  assert.equal(
-    cases.filter((testCase) => testCase.operation === "cardinalityForOperands").length,
-    15,
-    "expected 15 cardinalityForOperands cases",
-  );
+  // FLOORS, not exact counts. What these guard is that the two filters reached the corpus rather
+  // than silently zero -- a typo in an operation name would otherwise leave this whole gate running
+  // over an empty list and still reporting green. The exact form fails on corpus GROWTH, which is
+  // the one reason that is unambiguously good news, while saying nothing about correctness: M3b's
+  // owed cases took cardinalityForNumber 49 -> 58 and cardinalityForOperands 15 -> 16, and every one
+  // of the additions passes below.
+  //
+  // Each floor is set at the corpus's CURRENT size, not at the pre-growth one. A floor's whole job
+  // is to catch a silent SHRINK, and 49 would have let nine of the cases below disappear without a
+  // word. Raise these when the corpus grows again; they are meant to move.
+  const numberCases = cases.filter((testCase) => testCase.operation === "cardinalityForNumber").length;
+  const operandCases = cases.filter((testCase) => testCase.operation === "cardinalityForOperands").length;
+  assert.ok(numberCases >= 58, `expected at least 58 cardinalityForNumber cases, saw ${numberCases}`);
+  assert.ok(operandCases >= 16, `expected at least 16 cardinalityForOperands cases, saw ${operandCases}`);
 
   for (const testCase of cases) {
     const { locale, value, visibleDecimalPlaces } = testCase.input;
@@ -124,6 +153,10 @@ test("behavioral vectors: cardinalityForNumber and cardinalityForOperands", { sk
         (/** @type {unknown} */ error) => {
           assert.ok(error instanceof Error, `${testCase.id}: expected an Error`);
           assert.equal(error.message, testCase.expected.thrown.message, testCase.id);
+          // The KIND as well as the message. A matching message on the wrong error class is still a
+          // port defect -- callers branch on the class -- and `UnsupportedLocaleError` in particular
+          // would be indistinguishable from a bare `Error` if only the text were compared.
+          assertMatchesRecordedKind(error, testCase.expected.thrown.type, testCase.id);
           return true;
         },
         testCase.id,

@@ -491,11 +491,46 @@ test("the behavioral corpus's recorded cardinalityForRange cases pass", { skip }
   // including `pt-flattening.range.pt-pt-inherits-pt-one-to-one`, whose note says a port that keyed
   // ranges by exact locale "would throw here".
   const cases = corpus.cases.filter((/** @type {any} */ c) => c.operation === "cardinalityForRange");
-  assert.ok(cases.length >= 3, `expected the corpus to carry range cases, found ${cases.length}`);
+  // A FLOOR pinned at the corpus's CURRENT size: growth is fine, a silent shrink is not. M3b took
+  // cardinalityForRange 3 -> 12, and at 3 nine of those could disappear without failing anything.
+  assert.ok(cases.length >= 12, `expected the corpus to carry at least 12 range cases, found ${cases.length}`);
 
   for (const testCase of cases) {
-    const actual = cardinalityForRange(testCase.input.start, testCase.input.end, testCase.input.locale);
+    const { start, end, locale } = testCase.input;
+
+    // A case may record a THROW rather than a classification. M3b added
+    // `owed.m3b.cldr.range-for-rules-less-locale-throws` -- `zxx`, a tag with no cardinal rule
+    // bundle at all -- which is the FIRST of the three behaviours this file's header names ("an
+    // unsupported locale throws") to be pinned by the Java oracle rather than by hand. This branch
+    // is not a relaxation: `assert.throws` fails if the call returns, so a recorded throw still has
+    // to be a throw, with a message byte-identical to Java's.
+    if (testCase.expected.thrown !== undefined) {
+      assert.throws(
+        () => cardinalityForRange(start, end, locale),
+        (/** @type {any} */ error) => {
+          assert.ok(error instanceof Error, `${testCase.id}: expected an Error`);
+          assert.equal(error.message, testCase.expected.thrown.message, `${testCase.id}: message`);
+          assert.equal(error.name, "UnsupportedLocaleError", `${testCase.id}: error kind`);
+          assert.equal(
+            testCase.expected.thrown.type,
+            "com.lokalized.UnsupportedLocaleException",
+            `${testCase.id}: this gate only knows the UnsupportedLocaleException counterpart`,
+          );
+          return true;
+        },
+        testCase.id,
+      );
+      counts.corpus += 1;
+      continue;
+    }
+
+    // All three fields, not just `name`: the corpus records `axis` and `renderName` too, and they are
+    // what separates a cardinal form from an ordinal one wearing the same category. Comparing `name`
+    // alone would accept a port that answered on the wrong axis.
+    const actual = cardinalityForRange(start, end, locale);
     assert.equal(actual?.name, testCase.expected.classification.name, testCase.id);
+    assert.equal(actual?.axis, testCase.expected.classification.axis, `${testCase.id}: axis`);
+    assert.equal(actual?.renderName, testCase.expected.classification.renderName, `${testCase.id}: renderName`);
     counts.corpus += 1;
   }
 });
@@ -778,14 +813,34 @@ test("the gate ran the assertions it claims", { skip }, () => {
   assert.equal(counts.missingRow, 792, "all 36 ordered pairs for one locale per group");
   assert.equal(counts.noGroup, 4752, "all 36 ordered pairs for every cardinal locale with no group");
   assert.equal(counts.alias, 37, "mo pinned against ro");
-  assert.equal(counts.corpus, 3, "recorded lokalized-java cardinalityForRange cases");
+  // A FLOOR, not an exact count: `counts.corpus` is driven by the behavioral corpus, which GROWS --
+  // M3b's owed cases took cardinalityForRange 3 -> 12. Worse, the exact `3` had stopped meaning
+  // anything: the loop above was aborting on the new `zxx` throw case, which happens to be the
+  // fourth, so this assertion was reading a count produced by a FAILING test and calling it correct.
+  // The floor guards what matters -- that the loop reached the corpus at all rather than zero cases.
+  assert.ok(counts.corpus >= 12, `recorded lokalized-java cardinalityForRange cases: ${counts.corpus} < 12`);
   assert.equal(counts.parity, 480, "locale acceptance swept against the root classifier");
   assert.equal(counts.exact, 24, "endpoints composed from the exact classifier");
   assert.equal(counts.config, 17, "construction-time validation, forced to fail");
   assert.equal(counts.edge, 125, "endpoint and locale-ladder assertions");
 
+  // The total is EXACT, expressed relative to the tallies asserted above. What the old fixed 6,671
+  // caught was a tally key nothing accounts for -- a new counter added to `counts` and then never
+  // checked. A floor loses exactly that: any unaccounted key only pushes the total UP and passes.
+  // Written this way it survives corpus growth (the one term that moves is `counts.corpus`, which
+  // has its own floor above) while still failing the moment a key appears that no line above names.
+  const accounted =
+    counts.gate +
+    counts.missingRow +
+    counts.noGroup +
+    counts.alias +
+    counts.corpus +
+    counts.parity +
+    counts.exact +
+    counts.config +
+    counts.edge;
   const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
-  assert.equal(total, 6671, "total cardinalityForRange assertions executed");
+  assert.equal(total, accounted, "every tally key must be one the assertions above name; an unaccounted key lands here");
 
   Reflect.defineProperty(Intl, "PluralRules", { value: hostPluralRules, writable: true, configurable: true });
   Reflect.defineProperty(Intl, "NumberFormat", { value: hostNumberFormat, writable: true, configurable: true });

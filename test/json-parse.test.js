@@ -43,47 +43,62 @@ const encoder = new TextEncoder();
 const bytes = (text) => encoder.encode(text);
 
 /**
- * `parse` cases whose Java outcome needs a capability ABOVE this layer.
+ * Java's own wording for a failure raised by the expression compiler, from
+ * `LocalizedStringLoader.java:2341` (whole-message) and `:2540` (fragment).
+ */
+const EXPRESSION_COMPILATION =
+  /: unable to parse (?:whole-message alternative|fragment alternative \d+) expression /;
+
+/**
+ * Java's own wording for a load refused because a WARNING busted the budget, from
+ * `LocalizedStringLoader.java:2940`. The budget lives at this layer and is tested below; only a
+ * component that actually emits a warning can trip it.
+ */
+const WARNING_EMISSION = /: localized strings load exceeds the aggregate maximum of \d+ warnings$/;
+
+/**
+ * `parse` cases whose Java outcome needs a capability ABOVE this layer — DERIVED, never listed.
  *
  * This file drives `parseCatalogSource` DIRECTLY, so it sees the bounded reader and the structural
- * validator and nothing else. Both capabilities named below live in `src/parse/index.js`, which
- * composes this layer with the expression compiler and the warning reporter — the conformance
- * runner exercises that composition and all 118 `parse` cases pass through it. Neither exclusion is
- * a JSON-layer difference, and neither can hide one: every other parse case is compared here,
- * message for message, and the count is pinned.
+ * validator and nothing else. Both capabilities named here live in `src/parse/index.js`, which
+ * composes this layer with the expression compiler and the warning reporter — the conformance runner
+ * exercises that composition and every `parse` case reproduces Java through it. Neither exclusion is
+ * a JSON-layer difference, and neither can hide one: every other parse case is compared below,
+ * message for message, and the count carries a floor.
  *
- * @type {Map<string, string>}
+ * Two properties keep this honest, and both were absent from the hand-written list this replaced:
+ *
+ *   1. The decision is read off JAVA'S RECORDED FAILURE MESSAGE, so it is a statement about what the
+ *      case needs, not about what this port happens to do. A case cannot excuse itself by failing.
+ *   2. Every excluded case is still RUN, and an exclusion that this layer has started reproducing
+ *      exactly is a test FAILURE, not a silent pass. The list this replaced had rotted exactly that
+ *      way: ten of its twelve `warning emission` entries name cases whose Java outcome is a
+ *      SUCCESSFUL parse plus warnings, whose key set — all this sweep compares — this layer
+ *      reproduces, so they were being excused from a check they already passed.
+ *
+ * @param {any} testCase
+ * @returns {string | null} the missing capability, or null if this layer must reproduce Java
  */
-const ABOVE_THIS_LAYER = new Map([
+function aboveThisLayer(testCase) {
+  const expected = testCase.expected?.parse;
+
+  if (!expected?.failed) return null;
+
+  const message = String(expected.failureMessage ?? "");
+
   // Java validates alternative expressions inside `parseLocalizedString`. In this port compilation
   // belongs to `src/internal/expression.js` and is driven by `parseStrings`/`createStrings`, so a
   // catalog whose only defect is an unparseable expression is structurally valid at this layer.
-  ["malformed-structure.alternatives.unparseable-expression-rejected", "expression compilation"],
-  ["malformed-structure.expression.chained-comparison-rejected", "expression compilation"],
-  ["malformed-structure.expression.dangling-operator-rejected", "expression compilation"],
-  ["malformed-structure.expression.empty-expression-rejected", "expression compilation"],
-  ["malformed-structure.expression.operand-only-rejected", "expression compilation"],
-  ["malformed-structure.expression.unbalanced-closing-parenthesis-rejected", "expression compilation"],
-  ["malformed-structure.expression.unbalanced-parentheses-rejected", "expression compilation"],
-  ["malformed-structure.expression.unknown-operator-rejected", "expression compilation"],
-  ["malformed-structure.fragment.unparseable-expression-rejected", "expression compilation"],
+  if (EXPRESSION_COMPILATION.test(message)) return "expression compilation";
+
   // Incomplete-language-form warnings are emitted by `warnOnIncompleteLanguageFormTranslations`
   // after each key is validated, which needs the locale's CLDR form set — data this layer is not
-  // allowed to reach. The BUDGET that bounds them is here, and is tested below; the warnings are
-  // reported by `src/parse/index.js`.
-  ["loading-limits.warnings.zero-applies-to-single-resource-parse", "warning emission"],
-  ["locale-identity.plural-rules.parse-under-ru-su-warns", "warning emission"],
-  ["warnings.cardinality.ar-missing-forms", "warning emission"],
-  ["warnings.cardinality.he-missing-forms", "warning emission"],
-  ["warnings.cardinality.lv-missing-forms", "warning emission"],
-  ["warnings.cardinality.ru-missing-forms", "warning emission"],
-  ["warnings.limit.zero-fails-parse-too", "warning emission"],
-  ["warnings.order.parse-matches-directory-traversal-order", "warning emission"],
-  ["warnings.ordinality.cy-missing-four-forms", "warning emission"],
-  ["warnings.ordinality.hi-missing-three-forms", "warning emission"],
-  ["warnings.ordinality.it-missing-many", "warning emission"],
-  ["warnings.supportedset.ja-two-only-warns-other", "warning emission"],
-]);
+  // allowed to reach. The BUDGET that bounds them is here, and is tested below; the warnings that
+  // charge it are reported by `src/parse/index.js`.
+  if (WARNING_EMISSION.test(message)) return "warning emission";
+
+  return null;
+}
 
 /**
  * The resource a `parse` case names, as the bytes Java's `parse(InputStream, ...)` was handed.
@@ -126,67 +141,152 @@ function limitsFor(fixture) {
 }
 
 describe("the raw-source parser against every corpus parse case", () => {
+  /**
+   * Replay one `parse` case at this layer.
+   *
+   * @param {any} testCase
+   * @returns {string | null} how it disagreed with Java, or null if it reproduced Java exactly
+   */
+  const disagreement = (testCase) => {
+    const fixture = corpus.fixtures[testCase.fixture];
+    const expected = testCase.expected.parse;
+
+    /** @type {Map<string, unknown> | null} */
+    let definitions = null;
+    /** @type {unknown} */
+    let thrown = null;
+
+    try {
+      definitions = parseCatalogSource(resourceBytes(fixture, testCase.input.file), {
+        locale: testCase.input.locale,
+        source: testCase.input.source,
+        limits: limitsFor(fixture),
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    if (expected.failed) {
+      if (thrown === null) return `${testCase.id}: accepted, expected a rejection`;
+
+      const actual = thrown instanceof Error ? thrown.message : String(thrown);
+
+      return actual === expected.failureMessage
+        ? null
+        : `${testCase.id}:\n    got  ${JSON.stringify(actual)}\n    want ` +
+            `${JSON.stringify(expected.failureMessage)}`;
+    }
+
+    if (thrown !== null)
+      return `${testCase.id}: rejected (${thrown instanceof Error ? thrown.message : thrown})`;
+
+    const actualKeys = [...(definitions ?? new Map()).keys()].sort();
+    const expectedKeys = [...expected.keys].sort();
+
+    return actualKeys.join("\0") === expectedKeys.join("\0")
+      ? null
+      : `${testCase.id}: parsed key set\n    got  ${JSON.stringify(actualKeys)}\n    want ` +
+          `${JSON.stringify(expectedKeys)}`;
+  };
+
+  /**
+   * Replay one case at this layer and report only whether THIS layer rejected it.
+   *
+   * Used on the excluded cases, where Java's message is unreachable here by construction but the
+   * exclusion's own premise — "structurally valid, defective only above" — is checkable.
+   *
+   * @param {any} testCase
+   * @returns {string | null} the rejection message, or null if this layer accepted the catalog
+   */
+  const rejectionAtThisLayer = (testCase) => {
+    const fixture = corpus.fixtures[testCase.fixture];
+
+    try {
+      parseCatalogSource(resourceBytes(fixture, testCase.input.file), {
+        locale: testCase.input.locale,
+        source: testCase.input.source,
+        limits: limitsFor(fixture),
+      });
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+
+    return null;
+  };
+
   it("reproduces Java's outcome, message for message", () => {
     /** @type {string[]} */
     const differences = [];
+    /** @type {string[]} */
+    const staleExclusions = [];
+    /** @type {Map<string, number>} */
+    const excluded = new Map();
     let compared = 0;
 
     for (const testCase of corpus.cases) {
       if (testCase.operation !== "parse") continue;
-      if (ABOVE_THIS_LAYER.has(testCase.id)) continue;
 
-      const fixture = corpus.fixtures[testCase.fixture];
-      const expected = testCase.expected.parse;
-      ++compared;
+      const capability = aboveThisLayer(testCase);
 
-      /** @type {Map<string, unknown> | null} */
-      let definitions = null;
-      /** @type {unknown} */
-      let thrown = null;
+      if (capability !== null) {
+        excluded.set(capability, (excluded.get(capability) ?? 0) + 1);
 
-      try {
-        definitions = parseCatalogSource(resourceBytes(fixture, testCase.input.file), {
-          locale: testCase.input.locale,
-          source: testCase.input.source,
-          limits: limitsFor(fixture),
-        });
-      } catch (error) {
-        thrown = error;
-      }
-
-      if (expected.failed) {
-        if (thrown === null) {
-          differences.push(`${testCase.id}: accepted, expected a rejection`);
+        // Self-policing, in BOTH directions.
+        //
+        // Outgrown: an exclusion this layer now reproduces exactly is a failure, not a free pass.
+        if (disagreement(testCase) === null) {
+          staleExclusions.push(
+            `${testCase.id}: excused as needing ${capability}, but this layer now reproduces Java ` +
+              `exactly — the exclusion has outlived its reason and must be narrowed or deleted`,
+          );
           continue;
         }
 
-        const actual = thrown instanceof Error ? thrown.message : String(thrown);
+        // Still earned, for the RIGHT reason. Both exclusions rest on the same claim: the catalog's
+        // only defect is above this layer, so this layer must find it STRUCTURALLY VALID. Without
+        // this, an exclusion would also swallow a JSON-layer regression that rejected the catalog
+        // for some unrelated wrong reason — it disagrees with Java either way, so the check above
+        // stays quiet, and the case is excused for a reason that is no longer true.
+        const rejection = rejectionAtThisLayer(testCase);
 
-        if (actual !== expected.failureMessage)
-          differences.push(
-            `${testCase.id}:\n    got  ${JSON.stringify(actual)}\n    want ` +
-              `${JSON.stringify(expected.failureMessage)}`,
+        if (rejection !== null)
+          staleExclusions.push(
+            `${testCase.id}: excused as needing ${capability}, which claims this layer finds the ` +
+              `catalog structurally valid — but this layer REJECTED it: ${rejection}`,
           );
 
         continue;
       }
 
-      if (thrown !== null) {
-        differences.push(
-          `${testCase.id}: rejected (${thrown instanceof Error ? thrown.message : thrown})`,
-        );
-        continue;
-      }
+      ++compared;
 
-      assert.deepEqual(
-        [...(definitions ?? new Map()).keys()].sort(),
-        [...expected.keys].sort(),
-        `${testCase.id}: parsed key set`,
-      );
+      const difference = disagreement(testCase);
+
+      if (difference !== null) differences.push(difference);
     }
 
     assert.deepEqual(differences, [], "parse cases disagreeing with Java");
-    assert.equal(compared, 97, "the corpus pins 118 parse cases, 21 of them above this layer");
+    assert.deepEqual(staleExclusions, [], "exclusions this layer has outgrown");
+
+    // Both capabilities must still be REACHED. A regex that silently stopped matching would push
+    // its cases into `differences` and fail loudly, but one that matched a capability out of
+    // existence would not, and the exclusion would then be dead code pretending to document a gap.
+    for (const capability of ["expression compilation", "warning emission"])
+      assert.ok(
+        (excluded.get(capability) ?? 0) > 0,
+        `no parse case exercises '${capability}' any more — retire the exclusion rather than keep it`,
+      );
+
+    // A FLOOR, not an exact count — an exact one fails on corpus GROWTH, the one reason that is
+    // unambiguously good news, while saying nothing about correctness. Set AT what the corpus
+    // compares today rather than comfortably under it: growth can only raise this number, so the
+    // only way to fall below is for a case that is compared today to stop being compared — which
+    // is exactly the silent loss worth failing on. It was 97 (the pre-growth exact count) while 116
+    // cases actually compared, leaving room for nineteen to slip out of the sweep unnoticed.
+    assert.ok(
+      compared >= 116,
+      `expected at least 116 comparable parse cases, saw ${compared} — cases left the sweep`,
+    );
   });
 
   it("agrees with the decoded-object entry point on every fixture catalog in the corpus", () => {

@@ -177,8 +177,13 @@ export function createStrings(options) {
   // resolver's shape is: `DefaultStrings` stores `DEFAULT_BIDI_ISOLATION` when handed null
   // (DefaultStrings.java:477), so an unrecognized spelling would otherwise be indistinguishable
   // from the default and isolation would quietly vanish from every RTL render.
+  // `== null` catches BOTH undefined and an explicit null, deliberately. Java's option setters are
+  // `@Nullable` and its getters return an `Optional` that is empty for null, so `.orElse(instance)`
+  // makes an explicitly-null option identical to an omitted one (`DefaultStrings.java:683-685`).
+  // Rejecting null instead — which this did — turns `{ bidiIsolation: someMaybeValue }` into a crash
+  // for callers whose value is legitimately absent, which is a very ordinary JavaScript shape.
   const instanceBidiIsolation =
-    options.bidiIsolation === undefined
+    options.bidiIsolation == null
       ? DEFAULT_BIDI_ISOLATION
       : validateBidiIsolation(options.bidiIsolation, "createStrings({ bidiIsolation })");
 
@@ -298,7 +303,7 @@ export function createStrings(options) {
     // over an instance `"none"` isolates, and per-call `"none"` over an instance `"all"` does not.
     // `TranslationOptions.getBidiIsolation().orElse(getBidiIsolation())` (DefaultStrings.java:683).
     const bidiIsolation =
-      callOptions?.bidiIsolation === undefined
+      callOptions?.bidiIsolation == null
         ? instanceBidiIsolation
         : validateBidiIsolation(callOptions.bidiIsolation, "get({ bidiIsolation })");
 

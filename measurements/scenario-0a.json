@@ -8,20 +8,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 25,
-      "sourceBytes": 583724,
-      "importMs": 0.432,
-      "constructionMs": 0.1328,
-      "firstRenderMs": 0.3464,
+      "sourceBytes": 584213,
+      "importMs": 0.35,
+      "constructionMs": 0.085,
+      "firstRenderMs": 0.3433,
       "retainedBytes": 63264
     },
     {
       "label": "core + parsed equivalent",
       "modules": 24,
-      "sourceBytes": 577299,
-      "importMs": 0.468,
-      "constructionMs": 0.2439,
-      "firstRenderMs": 0.2063,
-      "retainedBytes": 127896
+      "sourceBytes": 577788,
+      "importMs": 0.339,
+      "constructionMs": 0.2362,
+      "firstRenderMs": 0.211,
+      "retainedBytes": 128864
     }
   ],
   "rebaselines": [
@@ -131,6 +131,13 @@
       "growth": [
         "root + raw-text catalog: source graph grew 582855 -> 583724 bytes",
         "core + parsed equivalent: source graph grew 576430 -> 577299 bytes"
+      ]
+    },
+    {
+      "reason": "M3b close: +489 bytes in the root graph, all of it src/core/index.js, from the null-as-absent option fix — Java's setters are @Nullable and its getters return an Optional that is empty for null, so `options.bidiIsolation == null` must treat an explicit null identically to an omitted option (DefaultStrings.java:683-685). No new module (25/24, unchanged). Recorded jointly with the second staged fix of the same slice, src/parse/index.js +950 bytes (load-time expression validation now compiles against EXPRESSION_LIMIT_CEILINGS rather than the defaults, which had made the port stricter than Java on 6 corpus cases). That 950 is deliberately ABSENT from both graph totals, which moved by 489 and not 1439: src/parse/index.js is the lokalized/parse entry point and is not reachable from src/index.js. The equal delta across both variants is the evidence that the optional entry point stayed out of the root graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 583724 -> 584213 bytes",
+        "core + parsed equivalent: source graph grew 577299 -> 577788 bytes"
       ]
     }
   ]

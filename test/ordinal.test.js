@@ -20,8 +20,8 @@
  * sets recorded in the behavioral corpus — which is the corpus's sharpest evidence that the ordinal
  * table is not the cardinal one wearing a different name.
  *
- * All 15 ordinal cases the behavioral corpus recorded from a running lokalized-java also run here,
- * value by value. They are the only oracle in the repo for what happens at 2^53 and past
+ * Every ordinal case the behavioral corpus recorded from a running lokalized-java also runs here,
+ * value by value -- 17 of them at the time of writing, including the ones that recorded a THROW. They are the only oracle in the repo for what happens at 2^53 and past
  * `Long.MAX_VALUE`, and for the fact that a Java `long` and a Java `double` holding the same digits
  * are two different questions — the samples above cannot reach any of that, because CLDR's ordinal
  * samples are 111 bare integers and (as asserted below, from the shipped rules) never could be.
@@ -161,7 +161,11 @@ test("the same 2,645 assertions hold through the explicit-operand entry point", 
     }
   }
 
-  assert.equal(counts.operandPath, 2645);
+  // EXACT, and it must stay exact. This loop is driven by the pinned CLDR 48.2 vectors, not by the
+  // behavioral corpus: `ordinalGroups()` above already pins 25 groups, 108 locales and 841 samples
+  // exactly, so this number cannot move without one of those moving first. A floor here would buy
+  // nothing and would hide a filter that quietly stopped visiting a rule group.
+  assert.equal(counts.operandPath, 2645, "the ordinal gate is 2,645 assertions; anything less is not the gate");
 });
 
 test("the same 2,645 assertions hold for a native number, through the Double.toString port", { skip }, () => {
@@ -235,15 +239,49 @@ function corpusValue(value) {
   }
 }
 
+/**
+ * Java exception type -> the JS error name the port raises for it. The same mapping
+ * `tools/conformance.mjs` applies; restated here so `npm test` alone compares the error KIND and not
+ * just its message.
+ */
+const JAVA_ERROR_NAMES = new Map([
+  ["com.lokalized.UnsupportedLocaleException", ["UnsupportedLocaleError"]],
+  ["java.lang.IllegalArgumentException", ["TypeError", "RangeError"]],
+  ["java.lang.ArithmeticException", ["RangeError"]],
+]);
+
+/**
+ * Asserts that `error` is the JS counterpart of the Java exception a corpus case recorded.
+ *
+ * An unmapped Java type FAILS rather than passing vacuously: a corpus case that starts recording an
+ * exception this file has never seen must stop the suite, not slip through an absent map entry.
+ *
+ * @param {any} error the error the port raised
+ * @param {any} thrown the case's `expected.thrown` block
+ * @param {string} id the case id, for the failure message
+ */
+function assertMatchesRecordedThrow(error, thrown, id) {
+  assert.ok(error instanceof Error, `${id}: expected an Error`);
+  assert.equal(error.message, thrown.message, `${id}: message`);
+  const permitted = JAVA_ERROR_NAMES.get(thrown.type);
+  assert.ok(permitted, `${id}: no JS counterpart recorded for ${thrown.type}`);
+  assert.ok(permitted.includes(error.name), `${id}: ${error.name} is not one of ${permitted.join(", ")}`);
+}
+
 test("every ordinal case the behavioral corpus recorded from Java passes", { skip }, () => {
   // The conformance vectors are CLDR's own samples; THIS is lokalized-java's recorded behaviour at
   // the three ordinal entry points, and it reaches places the samples cannot: 2^53 and its
   // neighbours by three different carrier types, values past Long.MAX_VALUE, the compact exponent on
   // the ordinal operand path, `pt-PT` falling through to `pt` on an axis where the pt-PT rule bundle
-  // does not exist, and a locale with no ordinalities at all. `npm run conformance` drives these
+  // does not exist, a locale with no ordinalities at all, a cardinal-only locale (`ckb`) answering
+  // from the root ordinals, and `zxx` -- which has no rule bundle on either axis and throws. `npm run conformance` drives these
   // too; they are restated here so `npm test` alone cannot go green on a port that fails them.
   const recorded = corpus.cases.filter((/** @type {any} */ c) => /^(ordinality|supportedOrdinalities)/.test(c.operation));
-  assert.equal(recorded.length, 15, "the corpus records 15 ordinal operation cases; all of them must run");
+  // A FLOOR, not an exact count: the exact form fails on corpus GROWTH, which is the one reason that
+  // is unambiguously good news, while saying nothing about correctness. It is pinned at the corpus's
+  // CURRENT size rather than the pre-M3b 15, because a floor's whole job is to catch a silent SHRINK
+  // and 15 would let two of the cases below vanish unnoticed. Raise it when the corpus grows again.
+  assert.ok(recorded.length >= 17, `expected at least 17 ordinal operation cases, saw ${recorded.length}`);
 
   for (const testCase of recorded) {
     const { operation, input, expected } = testCase;
@@ -256,6 +294,27 @@ test("every ordinal case the behavioral corpus recorded from Java passes", { ski
       );
     } else {
       const classify = operation === "ordinalityForOperands" ? ordinalityForOperands : ordinalityForNumber;
+
+      // A case may record a THROW rather than a classification -- M3b added
+      // `owed.m3b.cldr.ordinality-for-rules-less-locale-throws`, which is `zxx` (CLDR's "no
+      // linguistic content"), a tag with no rule bundle on either axis. This branch is not a
+      // relaxation: it is the same oracle comparison, on the outcome Java actually recorded. A
+      // recorded throw must be met by a throw whose message is byte-identical to Java's, and a
+      // recorded classification must still not throw -- the `assert.throws` below fails if the call
+      // returns.
+      if (expected.thrown !== undefined) {
+        assert.throws(
+          () => classify(/** @type {any} */ (corpusValue(input.value)), input.locale),
+          (/** @type {any} */ error) => {
+            assertMatchesRecordedThrow(error, expected.thrown, testCase.id);
+            return true;
+          },
+          testCase.id,
+        );
+        counts.corpus++;
+        continue;
+      }
+
       const classified = classify(/** @type {any} */ (corpusValue(input.value)), input.locale);
       assert.equal(classified.name, expected.classification.name, testCase.id);
       assert.equal(classified.axis, expected.classification.axis, testCase.id);
@@ -270,7 +329,10 @@ test("the ordinal category sets the behavioral corpus recorded", { skip }, () =>
   // parses one identical catalog under many locales and records, in each warning's message, the
   // ordinal forms Java said the locale supports. Those lists are the oracle here.
   const cases = corpus.cases.filter((/** @type {any} */ c) => c.fixture === "warnings-ordinality-matrix");
-  assert.equal(cases.length, 6, "the ordinality matrix fixture should carry six recorded locales");
+  // A FLOOR for the same reason as everywhere else in this file: the fixture is corpus data and may
+  // gain locales. Zero would mean the fixture was renamed out from under this test, which is the
+  // failure worth catching.
+  assert.ok(cases.length >= 6, `the ordinality matrix fixture should carry at least six recorded locales, saw ${cases.length}`);
 
   for (const testCase of cases) {
     const expected = testCase.expected.parse ?? testCase.expected.load;
@@ -645,12 +707,23 @@ test("the root graph never reaches the ordinal table", () => {
 });
 
 test("the gate ran the number of assertions it claims", { skip }, () => {
-  assert.deepEqual(counts, {
+  // The five keys below are pinned to fixed inputs -- the CLDR 48.2 conformance vectors and this
+  // file's own hand-written edges -- so an exact count is right for them: any movement is a real
+  // change in what ran.
+  const { corpus, ...pinned } = counts;
+  assert.deepEqual(pinned, {
     decimalPath: 2645,
     operandPath: 2645,
     numberPath: 2645,
-    corpus: 21,
     fallback: 812,
     edge: 45,
   });
+
+  // `corpus` is the exception, and it is a FLOOR. It counts assertions driven by the behavioral
+  // corpus, which GROWS: M3b's owed cases took it 21 -> 23. The exact form fails on exactly the one
+  // kind of change that is unambiguously good news, while saying nothing about correctness. What
+  // the floor guards is what the exact count really guarded -- that the corpus-driven loops reached
+  // the corpus rather than silently zero. Pinned at the current 23, not the pre-growth 21, so that a
+  // shrink is caught too; raise it the next time the corpus grows.
+  assert.ok(corpus >= 23, `corpus-driven assertions ${corpus} < 23`);
 });

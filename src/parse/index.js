@@ -21,7 +21,22 @@
  */
 
 import { LoadingSession, parseCatalogSource, parseModelCatalog } from "../internal/catalog.js";
-import { compile as compileExpression } from "../internal/expression.js";
+import { EXPRESSION_LIMIT_CEILINGS, compile as compileExpression } from "../internal/expression.js";
+
+/**
+ * Load-time expression validation, against the HARD CEILINGS rather than the runtime defaults.
+ *
+ * Java's loaders build their evaluator with `TranslationRuntimeLimits.hardCeilings()` —
+ * `LocalizedStringLoader.java:115` and `LocalizedStringValidator.java:50` — deliberately, because at
+ * load time an application's runtime policy is not yet available: the catalog is being parsed, and
+ * whatever limits the eventual `Strings` instance will carry are not known. Validating against the
+ * DEFAULTS instead makes the parser strictly stricter than Java, so a catalog Java accepts is
+ * refused. `compile()` falls back to the defaults when handed no limits, which is right for runtime
+ * and wrong here, so the ceilings are passed explicitly.
+ *
+ * @param {string} expression
+ */
+const validateExpressionAtLoad = (expression) => compileExpression(expression, { limits: EXPRESSION_LIMIT_CEILINGS });
 import { normalizeTag } from "../internal/locale.js";
 import { StringsParseError, rethrowAsParseError } from "../internal/parse-diagnostics.js";
 import { incompleteLanguageFormReporter } from "../internal/parse-warnings.js";
@@ -222,7 +237,7 @@ export function parseStrings(input, options) {
       source,
       locale,
       session,
-      validateExpression: compileExpression,
+      validateExpression: validateExpressionAtLoad,
       onRootParsed: reportIncompleteLanguageForms,
     });
   } catch (error) {
@@ -301,7 +316,7 @@ export function defineCatalog(inputs) {
   try {
     definitions = parseModelCatalog(inputs, {
       source: DEFINE_SOURCE,
-      validateExpression: compileExpression,
+      validateExpression: validateExpressionAtLoad,
     });
   } catch (error) {
     rethrowAsParseError(error, DEFINE_SOURCE);

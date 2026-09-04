@@ -10,6 +10,18 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { EXPRESSION_LIMIT_CEILINGS, compile } from "../src/internal/expression.js";
+
+/**
+ * Load-time expression validation, as `lokalized/parse` and `createStrings` both perform it.
+ *
+ * `parseCatalog` validates expressions only when handed a validator. Omitting it here compared a
+ * validator-less parse against Java's validating load — an omission that agreed only while no
+ * fixture carried a bad expression, and stopped agreeing the moment M3b's owed cases added some.
+ * The ceilings rather than the defaults, because Java's loaders use `hardCeilings()`.
+ */
+const compileExpressionAtLoad = (/** @type {string} */ expression) =>
+  compile(expression, { limits: EXPRESSION_LIMIT_CEILINGS });
 
 import { parseCatalog } from "../src/internal/catalog.js";
 
@@ -25,17 +37,6 @@ const corpus = JSON.parse(
  * The value states why; each entry is a documented gap, not a silent skip.
  */
 const KNOWN_M2_GAPS = new Map([
-  // Expression syntax is validated at load time by Java's ExpressionEvaluator. The expression
-  // language is M6, so these catalogs are structurally valid here and parse cleanly.
-  ["malformed-structure-alternatives::pt", "unparseable alternative expression (M6)"],
-  ["malformed-structure-fragment-placeholders::nl", "unparseable fragment expression (M6)"],
-  ["malformed-structure-invalid-expressions::de", "unparseable alternative expression (M6)"],
-  ["malformed-structure-invalid-expressions::en", "unparseable alternative expression (M6)"],
-  ["malformed-structure-invalid-expressions::es", "unparseable alternative expression (M6)"],
-  ["malformed-structure-invalid-expressions::fr", "unparseable alternative expression (M6)"],
-  ["malformed-structure-invalid-expressions::it", "unparseable alternative expression (M6)"],
-  ["malformed-structure-invalid-expressions::nl", "unparseable alternative expression (M6)"],
-  ["malformed-structure-invalid-expressions::ru", "unparseable alternative expression (M6)"],
   // Load-wide budgets (file count, warning count) belong to the loader, not to a single catalog.
   ["classpath-resources-file-limit::en", "aggregate file-count limit (loader)"],
   ["loading-limits-files-one-exceeds::en", "aggregate file-count limit (loader)"],
@@ -140,6 +141,7 @@ describe("parseCatalog against every corpus fixture", () => {
             locale,
             source: locale,
             ...limitsFor(fixture),
+            validateExpression: compileExpressionAtLoad,
           });
         } catch (error) {
           thrown = error;
@@ -190,6 +192,7 @@ describe("parseCatalog against every corpus fixture", () => {
           locale: testCase.input.locale,
           source: testCase.input.source,
           ...limitsFor(fixture),
+          validateExpression: compileExpressionAtLoad,
         });
         accepted.push(testCase.id);
       } catch {
@@ -221,6 +224,7 @@ describe("parseCatalog against every corpus fixture", () => {
           locale: testCase.input.locale,
           source: testCase.input.source,
           ...limitsFor(fixture),
+          validateExpression: compileExpressionAtLoad,
         });
         differences.push(`${testCase.id}: accepted, expected a rejection`);
       } catch (error) {
@@ -237,7 +241,16 @@ describe("parseCatalog against every corpus fixture", () => {
     }
 
     assert.deepEqual(differences, [], "rejection messages that differ from Java's");
-    assert.equal(compared, 64, "the corpus pins exactly 64 message-comparable rejections");
+  // A FLOOR, not an exact count. The exact form was pinned at 64 and broke the moment M3b's owed
+  // cases grew the corpus to 88 — failing for the one reason that is unambiguously good news, while
+  // saying nothing about whether the messages still match. What this assertion is actually for is
+  // ensuring the loop above compared a substantial number of messages rather than silently zero, and
+  // a floor does that without punishing growth. The real gate is `differences` being empty.
+  assert.ok(
+    compared >= 97,
+    `expected at least 64 message-comparable rejections, compared ${compared} — a drop means the ` +
+      `corpus lost rejection cases or the loop stopped reaching them`,
+  );
   });
 });
 

@@ -7,10 +7,11 @@
  * 1. Hand-derived token sequences for every shape the grammar can produce. These come from reading
  *    the Java alternation, not from re-running the JS tokenizer, so they catch an ordering mistake
  *    rather than ratifying one.
- * 2. A whole-corpus sweep: every distinct expression that appears anywhere in the 483 fixtures must
- *    tokenize, EXCEPT `count =? 0`, which the corpus records as failing during tokenization with an
- *    exact message. Every other malformed expression in the corpus fails later, in the evaluator, so
- *    it must lex cleanly here.
+ * 2. A whole-corpus sweep: every distinct expression that appears anywhere in the fixtures must
+ *    tokenize, EXCEPT the expressions the corpus itself records as failing during tokenization —
+ *    a set DERIVED from the recorded failure messages rather than written down here, because the
+ *    corpus grows and a hand-written "except this one" goes stale the moment it does. Every other
+ *    malformed expression in the corpus fails later, in the evaluator, so it must lex cleanly here.
  * 3. Structural invariants of the ported enum: 74 token types, the exact symbol tables, and the
  *    absence of `eval`/`new Function`.
  */
@@ -253,7 +254,63 @@ test("diagnostics: exact Java message text, including the single-equals hint", (
   throws(() => extractTokens("a \u{1f600}"), /U\+1F600 at index 2/);
 });
 
-test("corpus: every fixture expression lexes, except the one the corpus fails at this stage", () => {
+/**
+ * `ExpressionTokenizer.unexpectedContent` (ExpressionTokenizer.java:188-194), verbatim, with the
+ * offending expression captured. The optional tail is the `=`-only hint the same method appends.
+ *
+ * The expression is the LAST thing the diagnostic prints, so anchoring at the end keeps the greedy
+ * capture exact even for an expression containing quotes.
+ */
+const TOKENIZER_DIAGNOSTIC =
+  /Unexpected code point U\+[0-9A-F]{4,6} at index \d+ while evaluating expression '([\s\S]*)'\.(?: Did you mean '=='\?)?$/;
+
+/**
+ * Every expression the corpus records as failing IN THE TOKENIZER, read out of Java's recorded
+ * failure messages.
+ *
+ * This is derived rather than listed for the reason a listed version failed: it was written as
+ * "except `count =? 0`" when that was the only one, and the corpus later gained two more —
+ * `count ? 0`, and a `count == 0` whose space before `==` is U+00A0 and therefore lexes as
+ * unexpected content while reading identically to the ASCII expression that lexes fine. Deriving it
+ * also makes it self-policing in the other direction: each entry below is asserted to still fail,
+ * with Java's exact message, so an entry that this module has started accepting is a FAILURE rather
+ * than an unnoticed excuse.
+ *
+ * @returns {Map<string, { caseId: string, message: string }>} expression to what the corpus records
+ */
+function corpusTokenizerFailures() {
+  /** @type {Map<string, { caseId: string, message: string }>} */
+  const failures = new Map();
+
+  /**
+   * @param {unknown} node
+   * @param {string} caseId
+   */
+  const walk = (node, caseId) => {
+    if (typeof node === "string") {
+      const matched = TOKENIZER_DIAGNOSTIC.exec(node);
+
+      if (matched && !failures.has(matched[1]))
+        failures.set(matched[1], {
+          caseId,
+          // Java wraps the tokenizer's message in a loader diagnostic; the tokenizer itself raises
+          // only the tail, which is what `extractTokens` must produce here.
+          message: node.slice(node.indexOf("Unexpected code point")),
+        });
+
+      return;
+    }
+
+    if (node !== null && typeof node === "object")
+      for (const value of Object.values(node)) walk(value, caseId);
+  };
+
+  for (const testCase of corpus.cases) walk(testCase.expected, testCase.id);
+
+  return failures;
+}
+
+test("corpus: every fixture expression lexes, except the ones the corpus fails at this stage", () => {
   /** @type {Map<string, string>} */
   const expressions = new Map();
 
@@ -286,11 +343,19 @@ test("corpus: every fixture expression lexes, except the one the corpus fails at
   }
 
   // Guards the sweep itself: if the extraction stops finding expressions, this test stops proving
-  // anything, so pin a floor well below the current 280.
-  ok(expressions.size >= 250, `only found ${expressions.size} corpus expressions`);
+  // anything. A FLOOR, because an exact count would fail on corpus growth while saying nothing about
+  // the tokenizer — but set AT what the corpus holds today, not comfortably under it. Growth can
+  // only raise this number, so the only way to fall below is for expressions that are swept today to
+  // stop being swept. At 250 against an actual 331, a quarter of them could have gone missing.
+  ok(expressions.size >= 331, `only found ${expressions.size} corpus expressions`);
 
-  /** The only corpus expression whose recorded failure is a TOKENIZER diagnostic. */
-  const lexicallyInvalid = new Set(["count =? 0"]);
+  /** Corpus expressions whose recorded failure is a TOKENIZER diagnostic. */
+  const lexicallyInvalid = corpusTokenizerFailures();
+
+  // A floor, not an exact count: the set grows whenever the corpus gains a tokenizer case, which is
+  // good news, but an extraction that found none would make the exclusion vacuous and silently turn
+  // this sweep into "nothing may fail to lex".
+  ok(lexicallyInvalid.size >= 3, `only derived ${lexicallyInvalid.size} tokenizer failures`);
 
   /** @type {string[]} */
   const unexpectedFailures = [];
@@ -307,26 +372,35 @@ test("corpus: every fixture expression lexes, except the one the corpus fails at
 
     if (failed && !lexicallyInvalid.has(expression))
       unexpectedFailures.push(`${expression} (${fixtureName})`);
-    if (!failed && lexicallyInvalid.has(expression))
-      unexpectedSuccesses.push(`${expression} (${fixtureName})`);
+  }
+
+  // Each derived exclusion must still earn itself, with Java's exact diagnostic — including the
+  // ones the fixture sweep above never reaches, and including the `Did you mean '=='?` hint. An
+  // entry this module has started accepting shows up here rather than quietly excusing an
+  // expression that now lexes.
+  for (const [expression, { caseId, message }] of lexicallyInvalid) {
+    /** @type {unknown} */
+    let thrown = null;
+
+    try {
+      extractTokens(expression);
+    } catch (error) {
+      thrown = error;
+    }
+
+    if (thrown === null) {
+      unexpectedSuccesses.push(
+        `${expression} (${caseId}): lexes now, but the corpus records ${JSON.stringify(message)}`,
+      );
+      continue;
+    }
+
+    ok(thrown instanceof ExpressionEvaluationError, `${caseId}: ${String(thrown)}`);
+    strictEqual(thrown.message, message, caseId);
   }
 
   deepStrictEqual(unexpectedFailures, []);
   deepStrictEqual(unexpectedSuccesses, []);
-
-  // And the corpus really does record that one as a tokenizer failure.
-  const unknownOperator = corpus.cases.find(
-    (/** @type {{ id: string }} */ testCase) =>
-      testCase.id === "malformed-structure.expression.unknown-operator-rejected",
-  );
-  ok(unknownOperator, "corpus case malformed-structure.expression.unknown-operator-rejected");
-  ok(
-    String(unknownOperator.expected.parse.failureMessage).endsWith(
-      "Unexpected code point U+003D at index 6 while evaluating expression 'count =? 0'." +
-        " Did you mean '=='?",
-    ),
-    "the corpus message ends with the tokenizer diagnostic this module produces",
-  );
 });
 
 test("corpus: hand-derived token sequences for the expression shapes the fixtures use", () => {

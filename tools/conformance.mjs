@@ -167,6 +167,44 @@ const OWNER_MILESTONE = {
   parse: "M5a",
   load: "M8",
   matchFor: "M7",
+  // Plan v7 section 3.5 puts bestMatchForAcceptLanguage on LocaleNegotiator with Java's fail-soft
+  // contract, returning a LocaleTag -- so the oracle's emitted tag IS the JS return value and this
+  // switch needs one new arm, not an adaptation layer. Naming the owner here is the difference
+  // between 21 cases reporting a reason and 21 reporting a bare "not implemented".
+  acceptLanguage: "M7",
+  // `define` is NOT the acceptLanguage shape, and the difference is worth stating because it changes
+  // what "not implemented" means here. Half of the observation already ships: the operation builds a
+  // LocalizedString programmatically, and `defineLocalizedString` is an allowlisted `lokalized/parse`
+  // export that M5b delivered. What has no direct analogue is the other half — Java reaches
+  // LocalizedString#equals by asking a constructed Strings whether its catalog CONTAINS the built
+  // value, and plan section 3.6 says outright that v1 adds no catalog-inspection surface, so there is
+  // no `contains` to call. The behavior is still portable: the same proposition is reachable through
+  // `parseStrings` plus a structural comparison of the defined string against the parsed entry with
+  // that key, which is the comparison `mergeParsedStringsFiles` already performs internally. That
+  // runner is what these 22 required IDs are owed, and it is deliberately not written here: Java's
+  // refusals come from LocalizedString's two raw-constructor checks while the JS ones come from the
+  // shared model walk, so wiring them up means deciding an adaptation rule, and inventing one inside
+  // this file is exactly how a real exactness defect was once absorbed. M5b is named as the owner
+  // because programmatic construction and the catalog model are its scope; M5b is closed, so these
+  // are new required IDs against a closed milestone rather than work it left unfinished.
+  define: "M5b",
+  // `construct` observes DefaultStrings' CONSTRUCTION-TIME validation: eight rows, one control that
+  // constructs plus seven deliberately degenerate builder configurations -- catalog omitted, catalog
+  // null, a null locale key, two supported tags that normalize to the same tag, a null catalog value,
+  // a null entry, and no locale source at all. The JS analogue is `createStrings`, which SHIPS, so what
+  // is missing is not the feature but a runner able to hand it a degenerate record; that makes this the
+  // `define` situation rather than the `matchFor` one.
+  //
+  // NAMING THE OWNER IS A JUDGEMENT, and it is recorded as one. Three of the seven refusals (null locale
+  // key, colliding normalized tags, absent locale source) are locale-source and supported-tag semantics
+  // that plan v7 gives the resolution core; the other four are the catalog map's shape. lokalized's
+  // CLAUDE.md records `construct` as specifying "resolution-core behavior M7 is built against", and that
+  // is the basis for M7 here. This entry was ADDED during the acceptLanguage/define repair, where an
+  // adversarial review found these eight reporting a reason and NO owner -- the one thing the
+  // unsupported list is not allowed to do. It annotates the reason text only; it is not an attribution
+  // rule and changes no case's outcome. If M7's scope turns out to exclude construction-time record
+  // validation, MOVE it rather than dropping it.
+  construct: "M7",
 };
 
 /**
@@ -763,6 +801,26 @@ function runCase(testCase, fixture) {
       if (!rangeApi?.cardinalityForRange) unsupported("cardinalityForRange is not implemented");
       // The corpus's endpoints are bare `{$lokalized, axis, name}` records with no `renderName`,
       // which is exactly the structural shape the classifier must accept.
+
+      // A recorded THROW is a legitimate expectation here, as it is for cardinalityForNumber. This
+      // branch had no thrown handling, so `owed.m3b.cldr.range-for-rules-less-locale-throws` could
+      // not pass whatever the port did: it always ran the classifier and reported "no exception"
+      // against an exception. That is a runner gap presenting as a port defect, which is the more
+      // expensive direction to be wrong in — it sends someone hunting a bug that is not there.
+      if (expected.thrown) {
+        const javaType = expected.thrown.type;
+        if (!(javaType in ERROR_NAME)) unsupported(`no JS counterpart declared for ${javaType}`);
+        const wantedNames = ERROR_NAME[javaType];
+        try {
+          rangeApi.cardinalityForRange(input.start, input.end, input.locale);
+          return { ok: false, actual: "no exception", wanted: wantedNames.join(" or ") };
+        } catch (error) {
+          if (error instanceof Unsupported) throw error;
+          const actual = error instanceof Error ? error.name : String(error);
+          return wantedNames.includes(actual) ? { ok: true } : { ok: false, actual, wanted: wantedNames.join(" or ") };
+        }
+      }
+
       const value = rangeApi.cardinalityForRange(input.start, input.end, input.locale);
       const actual = { name: value?.name ?? null };
       const wanted = { name: expected.classification.name };
