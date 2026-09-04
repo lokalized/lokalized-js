@@ -3,10 +3,11 @@
 /**
  * `lokalized/negotiate` — the RAW RFC 4647 range ingress.
  *
- * The corpus gates most of what is here: 50 recorded `matchFor(List)` cases run through
- * `createLocaleNegotiator` in `tools/conformance.mjs`, and every one of them compares all eight
- * recorded match fields. This file is for the properties those 50 CANNOT see, verified by ablation
- * rather than assumed — each was measured by deleting the code and re-running the corpus:
+ * The corpus gates most of what is here: 74 recorded `matchFor(List)` cases run through
+ * `createLocaleNegotiator` in `tools/conformance.mjs` (50 single-member since A2, plus A3's 24
+ * multi-member arrays), and every one of them compares all eight recorded match fields. This file is
+ * for the properties those 74 CANNOT see, verified by ablation rather than assumed — each was
+ * measured by deleting the code and re-running the corpus:
  *
  *   - the grammar validator's accepting side (no recorded case is ill-formed, so a validator that
  *     rejected everything ill-formed AND a few legal ranges besides would still score 50/50 — it
@@ -14,8 +15,12 @@
  *     it wrongly rejected happen to be recorded);
  *   - `weight`, which every one of the 50 spells `1`: hardcoding `effectiveWeight: 1` changes
  *     nothing in the corpus;
- *   - the 32-member cap and the explicit multi-member refusal;
- *   - the two ingresses staying apart, which is the whole subject of the slice.
+ *   - the 32-member cap, and the empty list being ANSWERED rather than refused;
+ *   - the two ingresses staying apart, which was the whole subject of A2;
+ *   - the two N-member solver rules ablation shows the corpus is blind to: the anchor-owning half of
+ *     `restrictedHeuristicRangeIndices`, and `selectionIndexByLocale`'s own-position arm. Both were
+ *     ablated (corpus unchanged at 1,411 passed / 0 FAILED) and then measured against unmodified
+ *     lokalized-java 3.0.0 on the pinned Corretto 21, so what they assert is a Java RUN.
  *
  * Each check below is a PAIR wherever a pair exists: a half that must fail beside a control that
  * must pass. A probe with no passing control confirms checks it never reached.
@@ -180,37 +185,172 @@ describe("the pinned IANA closure, which the root graph's reduced table does not
   });
 });
 
-describe("what this slice deliberately does not implement", () => {
+describe("the N-member solver's contract at this door", () => {
   const negotiator = negotiatorFor({ fallbackLocale: "en", locale: "en", strings: catalog(["en", "fr"]) });
 
-  it("refuses a multi-member request explicitly rather than answering from the first member", () => {
-    // A silent single-member answer here would look right on every input where the first member wins
-    // and be wrong on every input where it does not — the failure mode M7 A3 exists to remove.
-    //
-    // The ERROR KIND is asserted, not only the wording. Java refuses the neighbouring 33-member
-    // request with `IllegalArgumentException`, which the conformance runner's `ERROR_NAME` admits
-    // as `TypeError` or `RangeError`; a bare `Error` escaping through the public
-    // `bestMatchForLanguageRanges` would be a kind no Java run emits, and nothing else in this
-    // module throws one.
-    assert.throws(
-      () => negotiator.matchForLanguageRanges([{ range: "fr", weight: 1 }, { range: "en", weight: 0.5 }]),
-      { name: "RangeError", message: /multi-member language-range solver is not implemented yet; received 2 ranges/ },
-    );
-    assert.throws(
-      () => negotiator.matchForLanguageRanges([]),
-      { name: "RangeError", message: /received 0 ranges/ },
-    );
+  it("answers a multi-member request instead of refusing it", () => {
+    // Until M7 A3 this door threw `The multi-member language-range solver is not implemented yet`.
+    // The assertion is kept, inverted, so a regression that reinstated the refusal fails here rather
+    // than only in the corpus: `matchForRanges` now serves the whole list.
+    const match = negotiator.matchForLanguageRanges([{ range: "fr", weight: 0.5 }, { range: "en", weight: 1 }]);
+    assert.equal(match.locale, "en");
+    assert.equal(match.effectiveWeight, 1);
+    assert.equal(match.languageRange, "en");
 
-    // The control: one member is answered, not refused.
-    assert.equal(negotiator.matchForLanguageRanges([{ range: "fr", weight: 1 }]).locale, "fr");
+    // Weight order, not list order — the stable weight-descending sort is what decides.
+    const reversed = negotiator.matchForLanguageRanges([{ range: "en", weight: 0.5 }, { range: "fr", weight: 1 }]);
+    assert.equal(reversed.locale, "fr");
+    assert.equal(reversed.languageRange, "fr");
+  });
+
+  it("answers the EMPTY list as a no-match rather than refusing it", () => {
+    // `DefaultStrings:1557` short-circuits before it looks at a locale, which is why the result
+    // still reports every supported locale. Corpus row
+    // `browser-chooser.shape.empty-range-list-yields-no-match`.
+    const match = negotiator.matchForLanguageRanges([]);
+    assert.equal(match.matchType, "none");
+    assert.equal(match.locale, null);
+    assert.equal(match.effectiveWeight, null);
+    assert.deepEqual(match.requestedLanguageRanges, []);
+    assert.deepEqual(match.consideredLocales, ["en", "fr"]);
   });
 
   it("caps a public request at 32 members with Java's own message", () => {
-    // Reported BEFORE the not-implemented refusal, because it is a real contract rather than a gap:
-    // `browser-chooser.limit.explicit-thirty-three-ranges-rejected` records this exact message.
+    // Reported BEFORE anything is matched: `browser-chooser.limit.explicit-thirty-three-ranges-rejected`
+    // records this exact message, and as of A3 that row runs through this cap rather than being
+    // routed away by the runner.
     const ranges = Array.from({ length: 33 }, (_, index) => ({ range: `qa${String.fromCharCode(97 + index % 26)}`, weight: 0.5 }));
     assert.throws(() => negotiator.matchForLanguageRanges(ranges),
       { name: "RangeError", message: "At most 32 language ranges are supported, but received 33" });
+
+    // The control that must PASS: 32 exactly is accepted whole, never truncated.
+    assert.equal(negotiator.matchForLanguageRanges(ranges.slice(0, 32)).matchType, "none");
+  });
+});
+
+describe("EXTENDED_RANGE is re-derived per selected locale, never mapped from the governor", () => {
+  // `DefaultStrings#localeMatch:1942` states it outright: the public match type is NOT the governor's
+  // internal category. `en-latn` matches `en-Latn-US` through the DIRECT_STRUCTURAL cell — the same
+  // category a wildcard range produces — and must still report LIKELY_SUBTAG, because
+  // `languageRangeMatchTypeFor` re-derives from the range's own shape. A solver that mapped
+  // DIRECT_STRUCTURAL to `extended-range` would pass every wildcard case and get this one wrong.
+  //
+  // Both halves measured on unmodified lokalized-java 3.0.0 on the pinned Corretto 21:
+  // LIKELY_SUBTAG / en-Latn-US and EXTENDED_RANGE / en-Latn-US respectively.
+  const negotiator = negotiatorFor({
+    fallbackLocale: "fr",
+    locale: "fr",
+    strings: catalog(["en-Latn-US", "fr"]),
+  });
+
+  it("reports the derived nature of a WILDCARD-FREE structural match", () => {
+    const match = negotiator.matchForLanguageRanges([{ range: "en-latn", weight: 1 }]);
+    assert.equal(match.matchType, "likely-subtag");
+    assert.equal(match.locale, "en-Latn-US");
+
+    // Unchanged when a second, lower-weight member is present: the type follows the SELECTED
+    // locale's governor, not the serving position.
+    const withSecond = negotiator.matchForLanguageRanges(
+      [{ range: "en-latn", weight: 1 }, { range: "fr", weight: 0.5 }]);
+    assert.equal(withSecond.matchType, "likely-subtag");
+    assert.equal(withSecond.locale, "en-Latn-US");
+  });
+
+  it("still reports EXTENDED_RANGE where the range actually carries a wildcard — the control", () => {
+    const match = negotiator.matchForLanguageRanges([{ range: "en-*-us", weight: 1 }]);
+    assert.equal(match.matchType, "extended-range");
+    assert.equal(match.locale, "en-Latn-US");
+  });
+});
+
+describe("the two solver rules the corpus cannot check", () => {
+  // BOTH of these were ABLATED and both left the corpus at 1,411 passed / 0 FAILED, which is why
+  // they are pinned here instead. Neither answer below is an argument from the Java source: each was
+  // then run against unmodified lokalized-java 3.0.0 on the pinned Corretto 21 (a `Strings` built
+  // over the same catalogs, calling the same `matchFor(List<LanguageRange>)`), and the Java run is
+  // what these assertions record. Each pair carries a control expected to pass, because an input
+  // rejected by an earlier guard would confirm a rule it never reached.
+
+  it("a range that OWNS AN ANCHOR does not also spill into a sibling locale", () => {
+    // `restrictedHeuristicRangeIndices` (`DefaultStrings:1687`) holds anchor-OWNING representatives
+    // as well as specific-heuristic ones. `cmn` owns an anchor on `zh` — `zh` is one of its IANA
+    // identities, so the cell is CANONICAL — and it is ALSO likely-subtag related to `cmn-Hans`.
+    // Restricted, it governs only what it claimed, `cmn-Hans` is left ungoverned, and the answer is
+    // the exact `zh` at the group's own member.
+    //
+    // Implemented as nothing but `recognizedDepth > 1` — which is all the single-member reduction
+    // ever needed, since one member has no sibling to spill into — `cmn` is unrestricted, its
+    // LIKELY_SUBTAG cell claims `cmn-Hans`, and the answer becomes `likely-subtag`/`cmn-Hans`.
+    // MEASURED on the pinned JDK: Java answers EXACT / zh / 1.0 / range=zh.
+    const negotiator = negotiatorFor({
+      fallbackLocale: "en",
+      locale: "en",
+      strings: catalog(["cmn-Hans", "en", "zh"]),
+      tiebreakers: { zh: ["zh", "cmn-Hans"] },
+    });
+
+    const match = negotiator.matchForLanguageRanges([{ range: "cmn", weight: 1 }, { range: "zh", weight: 1 }]);
+    assert.equal(match.matchType, "exact");
+    assert.equal(match.locale, "zh");
+    assert.equal(match.languageRange, "zh");
+
+    // The two controls that must PASS, each measured on the same JDK run. They are what proves the
+    // pair above is about the anchor-owning restriction and not about the fixture: with one member
+    // there is nothing to restrict, and both single-member answers are unchanged by the ablation.
+    const cmnAlone = negotiator.matchForLanguageRanges([{ range: "cmn", weight: 1 }]);
+    assert.equal(cmnAlone.matchType, "canonical");
+    assert.equal(cmnAlone.locale, "zh");
+
+    const zhAlone = negotiator.matchForLanguageRanges([{ range: "zh", weight: 1 }]);
+    assert.equal(zhAlone.matchType, "exact");
+    assert.equal(zhAlone.locale, "zh");
+  });
+
+  it("a SYNTACTIC non-semantic governor selects at its own member position", () => {
+    // `selectionIndexByLocale` (`DefaultStrings:1772`). `sgn-no` and `nsl` are one IANA group whose
+    // representative is `sgn-no`; CLDR maps `sgn-NO` to `nsi`, so the group's SEMANTIC member stays
+    // the representative and `nsl` is not it. `nsl` nevertheless governs the `nsl` catalog through
+    // an EXACT — a SYNTACTIC — cell, so it selects at its OWN index (1), not the group's (0). The
+    // two survivors therefore sit in different buckets and the earlier bucket, the representative's,
+    // is served first: `sgn-no` reaches `nsi-Latn-DE` by likely subtag.
+    //
+    // Collapse the arm to `representativeIndex` — the shape a reader who saw only the "select at the
+    // group's first-member position" half would write — and both survivors bucket at 0, where
+    // `sgn-no`'s identity loop finds the exact `nsl` first and the answer becomes `exact`/`nsl`.
+    // MEASURED on the pinned JDK: Java answers LIKELY_SUBTAG / nsi-Latn-DE / 1.0 / range=sgn-no.
+    const negotiator = negotiatorFor({
+      fallbackLocale: "en",
+      locale: "en",
+      strings: catalog(["en", "nsi-Latn-DE", "nsl"]),
+    });
+
+    const match = negotiator.matchForLanguageRanges([{ range: "sgn-no", weight: 1 }, { range: "nsl", weight: 1 }]);
+    assert.equal(match.matchType, "likely-subtag");
+    assert.equal(match.locale, "nsi-Latn-DE");
+    assert.equal(match.languageRange, "sgn-no");
+
+    // A second witness on unrelated data, so the rule is not pinned to one alias table: `no-bok` and
+    // `nb` are one group whose semantic range is `nb`, and `nb` governs the `nb` catalog exactly.
+    // Java: CLDR_FALLBACK / no / 1.0 / range=no-bok; collapsed, `exact`/`nb`.
+    const norwegian = negotiatorFor({
+      fallbackLocale: "nb",
+      locale: "nb",
+      strings: catalog(["en", "nb", "no"]),
+    });
+
+    const second = norwegian.matchForLanguageRanges([{ range: "no-bok", weight: 1 }, { range: "nb", weight: 1 }]);
+    assert.equal(second.matchType, "cldr-fallback");
+    assert.equal(second.locale, "no");
+    assert.equal(second.languageRange, "no-bok");
+
+    // The controls that must PASS. Each single-member request answers identically under both arms —
+    // with one member the governor IS the representative — so a build that collapsed the arm still
+    // passes these, which is exactly what makes them controls rather than more of the same check.
+    assert.equal(negotiator.matchForLanguageRanges([{ range: "nsl", weight: 1 }]).matchType, "exact");
+    assert.equal(negotiator.matchForLanguageRanges([{ range: "nsl", weight: 1 }]).locale, "nsl");
+    assert.equal(norwegian.matchForLanguageRanges([{ range: "nb", weight: 1 }]).matchType, "exact");
+    assert.equal(norwegian.matchForLanguageRanges([{ range: "no-bok", weight: 1 }]).matchType, "canonical");
+    assert.equal(norwegian.matchForLanguageRanges([{ range: "no-bok", weight: 1 }]).locale, "nb");
   });
 });
 

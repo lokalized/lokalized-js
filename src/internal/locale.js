@@ -386,6 +386,36 @@ function isEligibleForExclusion(value) {
 }
 
 /**
+ * `LanguageRangeSpecificity#isSyntactic` (`DefaultStrings.java:3137`). EXACT and DIRECT_STRUCTURAL
+ * are the two relationships a member establishes from the tag's own spelling; every other category
+ * is derived from CLDR data and is therefore the semantic member's alone.
+ *
+ * @param {Specificity} value
+ */
+function isSyntactic(value) {
+	return value.category === CATEGORY_EXACT || value.category === CATEGORY_DIRECT_STRUCTURAL;
+}
+
+/**
+ * `LanguageRangeSpecificity#compareTo` (`DefaultStrings.java:3145`), whole. Category first, so an
+ * arbitrarily long range can never spill into a stronger category; then structural depth ASCENDING,
+ * so the deeper (more constrained) range is the more specific; then fallback distance REVERSED, so
+ * a NEARER CLDR fallback is the more specific.
+ *
+ * The single-member reduction never needed this: with one member there is no second cell to compare.
+ *
+ * @param {Specificity} first
+ * @param {Specificity} second
+ * @returns {number} positive when `first` is more specific than `second`
+ */
+function compareSpecificity(first, second) {
+	if (first.category !== second.category) return first.category < second.category ? -1 : 1;
+	if (first.structuralDepth !== second.structuralDepth) return first.structuralDepth < second.structuralDepth ? -1 : 1;
+	if (first.fallbackDistance === second.fallbackDistance) return 0;
+	return second.fallbackDistance < first.fallbackDistance ? -1 : 1;
+}
+
+/**
  * Java's `String#compareTo`, which JavaScript's relational operators already reproduce for the
  * BMP-only tags CLDR uses. Sorting supported locales by this order is observable through
  * `consideredLocales` and through every "first candidate wins" tie-break.
@@ -701,6 +731,7 @@ function semanticLanguageRangeForDerivedMatching(range, knownTag, containsWildca
  * @property {Set<string>} identities
  * @property {boolean} knownTag
  * @property {string} semanticRange
+ * @property {string} canonicalIdentity
  * @property {string} structuralRange
  * @property {string[]} rangeSubtags
  * @property {number} structuralDepth
@@ -739,6 +770,7 @@ function memberStaticsFor(range, weight, rangeEquivalents) {
 		identities,
 		knownTag,
 		semanticRange,
+		canonicalIdentity: canonicalLanguageRangeIdentity(semanticRange),
 		structuralRange,
 		rangeSubtags: javaSplit(range),
 		structuralDepth: structuralConstraintCountFor(structuralRange),
@@ -1193,14 +1225,16 @@ export function matchFor(requested, supported, fallbackLocale, tiebreakers) {
 }
 
 /**
- * The same kernel over a RAW RFC 4647 language range: the range is taken exactly as the caller
- * spelled it (lowercased, as `Locale.LanguageRange`'s own constructor does) and is never normalized
- * into a locale tag. `memberStaticsFor` is already raw-correct, so this is the whole difference
- * between the two ingresses.
+ * The single-member door into the solver below: one raw RFC 4647 language range, taken exactly as
+ * the caller spelled it (lowercased, as `Locale.LanguageRange`'s own constructor does) and never
+ * normalized into a locale tag. `memberStaticsFor` is already raw-correct, so the ingress is the
+ * whole difference between this and `matchFor`.
  *
- * It is the single-member reduction of `DefaultStrings#matchFor(List)`: one member means no group
- * election, no cell matrix, and no governor comparison, since a locale that has any relationship at
- * all is governed by the only range there is. The N-member solver is M7 A3.
+ * It is a WRAPPER now, not a reduction. Until M7 A3 this function carried its own collapsed copy of
+ * the solver (no group election, no cell matrix, no governor comparison, and every Java `continue`
+ * in the serving cascade spelled as `return noMatch()` because there was never a next member). Two
+ * code paths through one Java algorithm is the divergence this repo has already been bitten by, so
+ * the copy is gone and one member is simply a list of length one.
  *
  * @param {string} range a validated, lowercased RFC 4647 extended language range
  * @param {number} weight the member's quality weight
@@ -1212,11 +1246,56 @@ export function matchFor(requested, supported, fallbackLocale, tiebreakers) {
  * @returns {LocaleMatch}
  */
 export function matchForRange(range, weight, supported, fallbackLocale, tiebreakers, rangeEquivalents) {
+	return matchForRanges([{ range, weight }], supported, fallbackLocale, tiebreakers, rangeEquivalents);
+}
+
+/**
+ * `DefaultStrings#matchFor(List<LanguageRange>)` (`DefaultStrings.java:1544-1930`), whole — the
+ * N-member solver, sections C through H.
+ *
+ * The phases, in Java's order, each a pure pass over the one cell matrix:
+ *
+ * 1. **Weight-descending stable sort** (`:1560`). Request order survives inside a weight tier and is
+ *    observable: `m3b-negotiation.equal-anchors-equal-weight-request-order` and its `-reversed`
+ *    twin differ in nothing else and answer with a different `languageRange`.
+ * 2. **Group election** (`:1577`). Ranges that are IANA-equivalent (a shared identity) or
+ *    CLDR-equivalent (an equal canonical identity) join the FIRST representative directly equivalent
+ *    to them, never through a nonrepresentative alias — the JDK maps `nsl` to `sgn-NO` while CLDR
+ *    maps `sgn-NO` to `nsi`, so a transitive union would collapse two distinct preferences. A
+ *    lower-weight member of a group is INACTIVE and classifies nothing.
+ * 3. **Semantic-member election** (`:1606`). One member per group supplies every derived
+ *    (non-syntactic) relationship, and it is elected ONCE: `:1621`'s
+ *    `semanticMemberIndicesByRepresentative[representativeIndex] == representativeIndex` conjunct is
+ *    what stops a repeated `nsl` from re-electing, which the `owed.m3b.electionguard.*` trio pins.
+ * 4. **The cell matrix** (`:1631`), with the non-syntactic discard: a derived relationship is kept
+ *    only for the semantic member, while EXACT and DIRECT_STRUCTURAL stay interchangeable across the
+ *    whole group because they are read off the spelling rather than out of CLDR.
+ * 5. **Anchor reservation and the heuristic passes** (`:1655`, `:2251`). Each locale is reserved for
+ *    its strongest anchor; then every remaining SPECIFIC heuristic range claims at most one
+ *    unreserved locale, LIKELY_SUBTAG passes first and PRIMARY_LANGUAGE second — CATEGORY-MAJOR, not
+ *    range-major. `owed-ds.heuristic-depth-outranks-weight` versus `.heuristic-depth-agrees-with-weight`
+ *    is the pair that catches a range-major loop: same ranges, swapped weights, different answer.
+ * 6. **The governor sweep** (`:1723`). A locale's effective quality comes from its MOST SPECIFIC
+ *    matching range, so `en;q=1,en-US;q=0` excludes en-US without excluding en-GB.
+ * 7. **Survivor bucketing and the serving cascade** (`:1784`). Maximum-weight survivors are served in
+ *    member order, each only at the position `selectionIndexByLocale` recorded for it.
+ *
+ * @param {Iterable<{ range: string, weight: number }>} languageRanges the caller's list, in the
+ *   caller's own order; every range already lowercased and grammar-checked by its ingress
+ * @param {Iterable<string>} supported loaded locale tags
+ * @param {string} fallbackLocale resolved fallback locale tag
+ * @param {Tiebreakers} [tiebreakers] language code -> ordered loaded tags
+ * @param {RangeEquivalentResolver} [rangeEquivalents] the IANA equivalence expansion to use; the
+ *   reduced inline table when omitted, which a raw range can outgrow — see the resolver's own note
+ * @returns {LocaleMatch}
+ */
+export function matchForRanges(languageRanges, supported, fallbackLocale, tiebreakers, rangeEquivalents) {
 	const sortedSupported = sortedSupportedTags(supported);
 	const resolvedTiebreakers = resolveTiebreakers(tiebreakers, sortedSupported);
 
 	/** @type {WeightedLanguageRange[]} */
-	const requestedLanguageRanges = [{ range, weight }];
+	const requestedLanguageRanges =
+		[...languageRanges].map(({ range, weight }) => ({ range, weight }));
 
 	/** @returns {LocaleMatch} */
 	const noMatch = () => ({
@@ -1230,167 +1309,483 @@ export function matchForRange(range, weight, supported, fallbackLocale, tiebreak
 		requestedLanguageRanges,
 	});
 
-	const member = memberStaticsFor(range, weight, rangeEquivalents ?? REDUCED_RANGE_EQUIVALENTS);
+	// `DefaultStrings:1557`. The empty list short-circuits BEFORE any locale is looked at, which is
+	// why it still reports every supported locale in `consideredLocales`.
+	if (requestedLanguageRanges.length === 0) return noMatch();
+
+	const resolver = rangeEquivalents ?? REDUCED_RANGE_EQUIVALENTS;
+
+	// `Comparator.comparingDouble(LanguageRange::getWeight).reversed()` over `List#sort`, which is a
+	// STABLE sort in Java exactly as it is in JavaScript. The stability is load-bearing: within one
+	// weight tier the caller's order decides, and two corpus cases differ in nothing else.
+	//
+	// KNOWN, DELIBERATE, and left alone: this comparator uses `<`/`>` where every other Double.compare
+	// site in the solver uses `Object.is` (the active-member scan below, the heuristic ordering, the
+	// survivor bucketing). It differs from Java on ONE input, `-0` beside `0`: `comparingDouble` is
+	// `Double.compare`, which orders `-0.0` before `0.0` and therefore AFTER it once reversed, while
+	// `-0 < 0` and `-0 > 0` are both false here, so the pair keeps request order. Both weights are
+	// nonpositive, so neither member can govern; the residual question is only whether their relative
+	// order can steer the zero-weight EXCLUSION machinery, which no corpus row and no probe answers.
+	// A future reader should settle that against the pinned JDK before "fixing" the inconsistency in
+	// either direction — changing it silently would be an unmeasured behavior change.
+	const sortedRanges = [...requestedLanguageRanges]
+		.sort((first, second) => (first.weight < second.weight ? 1 : first.weight > second.weight ? -1 : 0));
+
+	const memberCount = sortedRanges.length;
+	const members = sortedRanges.map((member) => memberStaticsFor(member.range, member.weight, resolver));
 	const localeStatics = sortedSupported.map((tag) => supportedLocaleStaticsFor(tag));
-	const cells = localeStatics.map((statics) => languageRangeSpecificityFor(statics, member));
+	const localeCount = sortedSupported.length;
 
-	// Anchor reservation. A range that owns an anchor must not also spill into a sibling locale
-	// related only by likely-subtag or primary-language inference.
-	const localeReserved = cells.map((cell) => cell !== null && isAnchor(cell));
-	const rangeOwnsAnchor = localeReserved.some((reserved) => reserved);
-	const specificHeuristicRange = member.recognizedDepth > 1;
-	const restricted = rangeOwnsAnchor || specificHeuristicRange;
+	/** @param {number} index */
+	const supportedTagAt = (index) => sortedSupported[index] ?? "";
+	/** @param {number} index */
+	const memberAt = (index) => /** @type {MemberStatics} */ (members[index]);
 
-	/** @type {string | null} */
-	let preferredHeuristicLocale = null;
+	// -------------------------------------------------------------------------------------------
+	// Group / representative election (`DefaultStrings:1577`)
+	// -------------------------------------------------------------------------------------------
 
-	if (specificHeuristicRange && !rangeOwnsAnchor) {
-		for (const category of [CATEGORY_LIKELY_SUBTAG, CATEGORY_PRIMARY_LANGUAGE]) {
-			/** @type {string[]} */
-			const candidates = [];
+	/** @type {number[]} */
+	const representativeIndices = new Array(memberCount).fill(0);
+	/** @type {boolean[]} */
+	const activeMembers = new Array(memberCount).fill(false);
 
-			for (let index = 0; index < sortedSupported.length; ++index) {
-				const cell = cells[index];
-				if (!localeReserved[index] && cell != null && cell.category === category)
-					candidates.push(sortedSupported[index] ?? "");
-			}
+	for (let memberIndex = 0; memberIndex < memberCount; ++memberIndex) {
+		representativeIndices[memberIndex] = memberIndex;
+		const member = memberAt(memberIndex);
 
-			const preferred = category === CATEGORY_LIKELY_SUBTAG
-				? lookupMatchByLikelySubtag(member.semanticRange, candidates, fallbackLocale, resolvedTiebreakers)
-				: preferredLocaleForRange(member.semanticRange, candidates, fallbackLocale, resolvedTiebreakers);
+		for (let representativeIndex = 0; representativeIndex < memberIndex; ++representativeIndex) {
+			if (representativeIndices[representativeIndex] !== representativeIndex) continue;
 
-			if (preferred !== null) {
-				preferredHeuristicLocale = preferred;
+			const representative = memberAt(representativeIndex);
+			let jdkEquivalent = false;
+
+			for (const identity of member.identities)
+				if (representative.identities.has(identity)) {
+					jdkEquivalent = true;
+					break;
+				}
+
+			if (jdkEquivalent || representative.canonicalIdentity === member.canonicalIdentity) {
+				representativeIndices[memberIndex] = representativeIndex;
 				break;
 			}
 		}
+
+		// `Double.compare(a, b) == 0`, which `Object.is` reproduces exactly — including the -0.0 and
+		// NaN edges `===` gets wrong — where `==` would not.
+		activeMembers[memberIndex] =
+			Object.is(member.weight, memberAt(representativeIndices[memberIndex] ?? memberIndex).weight);
 	}
 
-	// Governor sweep, reduced to one member: a locale survives when it has a relationship at all and
-	// a restricted heuristic range has not claimed a different locale.
-	/** @type {string[]} */
-	const survivors = [];
+	// -------------------------------------------------------------------------------------------
+	// Semantic-member election (`DefaultStrings:1606`)
+	// -------------------------------------------------------------------------------------------
 
-	for (let index = 0; index < sortedSupported.length; ++index) {
-		const cell = cells[index];
-		if (cell == null) continue;
-		const locale = sortedSupported[index] ?? "";
-		if (isHeuristic(cell) && restricted && locale !== preferredHeuristicLocale) continue;
-		if (member.weight <= 0 && !isEligibleForExclusion(cell)) continue;
-		survivors.push(locale);
+	/** @type {number[]} */
+	const semanticMemberIndicesByRepresentative = members.map((_member, index) => index);
+
+	for (let memberIndex = 0; memberIndex < memberCount; ++memberIndex) {
+		if (!activeMembers[memberIndex]) continue;
+
+		const representativeIndex = representativeIndices[memberIndex] ?? memberIndex;
+		const representative = memberAt(representativeIndex);
+
+		// A recognized representative already expresses the caller's semantic preference.
+		if (representative.knownTag) continue;
+
+		if (!equalsIgnoreCase(representative.range, representative.semanticRange) &&
+			semanticMemberIndicesByRepresentative[representativeIndex] === representativeIndex &&
+			equalsIgnoreCase(memberAt(memberIndex).range, representative.semanticRange))
+			semanticMemberIndicesByRepresentative[representativeIndex] = memberIndex;
 	}
 
-	// `DefaultStrings:1780` answers no-match when the highest effective weight is nonpositive, and
-	// `:1762` drops any locale whose governing range is. Reduced to one member the two collapse into
-	// this: a nonpositive range selects nothing, however strongly a locale is related to it. That is
-	// why the `weight <= 0` guard in the sweep above cannot stand alone — it deliberately KEEPS the
-	// exclusion-eligible cells, which is how a negative range excludes a locale for a later member,
-	// and with no later member to serve them they must not be served here.
-	if (survivors.length === 0 || weight <= 0) return noMatch();
+	/** @param {number} memberIndex the semantic member of this member's group */
+	const semanticMemberFor = (memberIndex) =>
+		semanticMemberIndicesByRepresentative[representativeIndices[memberIndex] ?? memberIndex] ?? memberIndex;
+
+	// -------------------------------------------------------------------------------------------
+	// The cell matrix, with the non-syntactic discard (`DefaultStrings:1631`)
+	// -------------------------------------------------------------------------------------------
+
+	/** @type {(Specificity | null)[][]} */
+	const cells = [];
+
+	for (let localeIndex = 0; localeIndex < localeCount; ++localeIndex) {
+		/** @type {(Specificity | null)[]} */
+		const row = new Array(memberCount).fill(null);
+		const statics = /** @type {SupportedLocaleStatics} */ (localeStatics[localeIndex]);
+
+		for (let memberIndex = 0; memberIndex < memberCount; ++memberIndex) {
+			if (!activeMembers[memberIndex]) continue;
+
+			const cell = languageRangeSpecificityFor(statics, memberAt(memberIndex));
+
+			// Derived CLDR/canonical relationships come from ONE member of the group; the JDK's IANA
+			// alias table can conflict with CLDR, and an extlang form such as `ar-ary` could otherwise
+			// infer `ar-EG`. Syntactic relationships stay interchangeable across the group.
+			if (cell !== null && !isSyntactic(cell) && memberIndex !== semanticMemberFor(memberIndex)) continue;
+
+			row[memberIndex] = cell;
+		}
+
+		cells.push(row);
+	}
 
 	/**
+	 * @param {number} localeIndex
+	 * @param {number} memberIndex
+	 * @returns {Specificity | null}
+	 */
+	const cellAt = (localeIndex, memberIndex) => (cells[localeIndex] ?? [])[memberIndex] ?? null;
+
+	// -------------------------------------------------------------------------------------------
+	// Anchor reservation (`DefaultStrings:1655`)
+	// -------------------------------------------------------------------------------------------
+
+	/** @type {Set<number>} */
+	const restrictedHeuristicRangeIndices = new Set();
+	/** @type {Map<number, string>} */
+	const preferredLocalesBySpecificHeuristicRangeIndex = new Map();
+	/** @type {boolean[]} */
+	const localeReservedByAnchorOrSpecificHeuristic = new Array(localeCount).fill(false);
+	/** @type {boolean[]} */
+	const rangeOwnsAnchor = new Array(memberCount).fill(false);
+
+	for (let localeIndex = 0; localeIndex < localeCount; ++localeIndex) {
+		/** @type {Specificity | null} */
+		let bestAnchorSpecificity = null;
+		let bestAnchorRangeIndex = -1;
+		let bestAnchorWeight = -1;
+
+		for (let memberIndex = 0; memberIndex < memberCount; ++memberIndex) {
+			const cell = cellAt(localeIndex, memberIndex);
+
+			if (cell === null || !isAnchor(cell)) continue;
+			if (memberAt(memberIndex).weight <= 0 && !isEligibleForExclusion(cell)) continue;
+
+			const comparison = bestAnchorSpecificity === null ? 1 : compareSpecificity(cell, bestAnchorSpecificity);
+
+			if (comparison > 0 || (comparison === 0 && memberAt(memberIndex).weight > bestAnchorWeight)) {
+				bestAnchorSpecificity = cell;
+				bestAnchorRangeIndex = memberIndex;
+				bestAnchorWeight = memberAt(memberIndex).weight;
+			}
+		}
+
+		if (bestAnchorRangeIndex >= 0) {
+			localeReservedByAnchorOrSpecificHeuristic[localeIndex] = true;
+			const representativeIndex = representativeIndices[bestAnchorRangeIndex] ?? bestAnchorRangeIndex;
+			rangeOwnsAnchor[representativeIndex] = true;
+
+			// THE HALF THE CORPUS CANNOT SEE. `restrictedHeuristicRangeIndices` holds anchor-OWNING
+			// representatives as well as specific-heuristic ones, and this is the entry that makes a
+			// range which owns an anchor stop spilling into a sibling locale it is related to only by
+			// likely-subtag or primary-language inference. Implementing `restricted` as nothing but
+			// `recognizedDepth > 1` (the shape the single-member reduction could get away with, since
+			// one member has no sibling to lose) drops this rule and FAILS SILENTLY — it changes the
+			// answer only when nothing stronger claims the sibling. `test/negotiate.test.js`
+			// pins it on an input measured to differ between the two.
+			restrictedHeuristicRangeIndices.add(representativeIndex);
+		}
+	}
+
+	/** @type {number[]} */
+	const assignableSpecificHeuristicRangeIndices = [];
+
+	for (let memberIndex = 0; memberIndex < memberCount; ++memberIndex) {
+		if (representativeIndices[memberIndex] !== memberIndex) continue;
+		if (memberAt(memberIndex).weight <= 0 ||
+			memberAt(semanticMemberIndicesByRepresentative[memberIndex] ?? memberIndex).recognizedDepth <= 1)
+			continue;
+
+		restrictedHeuristicRangeIndices.add(memberIndex);
+		if (!rangeOwnsAnchor[memberIndex]) assignableSpecificHeuristicRangeIndices.push(memberIndex);
+	}
+
+	// -------------------------------------------------------------------------------------------
+	// The heuristic passes (`DefaultStrings:2251`), CATEGORY-MAJOR
+	// -------------------------------------------------------------------------------------------
+
+	/**
+	 * `assignPreferredSpecificHeuristicLocales`. Claims at most one unreserved locale for each
+	 * specific heuristic range of THIS category, so that likely-subtag relationships outrank
+	 * primary-language ones across the whole request rather than range by range. Lower-priority
+	 * ranges therefore see the locales stronger ones released.
+	 *
+	 * @param {number} category
+	 */
+	const assignPreferredSpecificHeuristicLocales = (category) => {
+		const orderedRangeIndices = [...assignableSpecificHeuristicRangeIndices].sort((first, second) => {
+			const firstMember = memberAt(semanticMemberIndicesByRepresentative[first] ?? first);
+			const secondMember = memberAt(semanticMemberIndicesByRepresentative[second] ?? second);
+			const firstDepth = category === CATEGORY_LIKELY_SUBTAG ? firstMember.recognizedDepth : firstMember.semanticDepth;
+			const secondDepth = category === CATEGORY_LIKELY_SUBTAG ? secondMember.recognizedDepth : secondMember.semanticDepth;
+
+			if (firstDepth !== secondDepth) return secondDepth - firstDepth;
+			if (!Object.is(firstMember.weight, secondMember.weight))
+				return secondMember.weight < firstMember.weight ? -1 : 1;
+
+			return first - second;
+		});
+
+		for (const languageRangeIndex of orderedRangeIndices) {
+			if (preferredLocalesBySpecificHeuristicRangeIndex.has(languageRangeIndex)) continue;
+
+			const heuristicMemberIndex = semanticMemberIndicesByRepresentative[languageRangeIndex] ?? languageRangeIndex;
+			/** @type {string[]} */
+			const candidates = [];
+
+			for (let localeIndex = 0; localeIndex < localeCount; ++localeIndex) {
+				const cell = cellAt(localeIndex, heuristicMemberIndex);
+
+				if (!localeReservedByAnchorOrSpecificHeuristic[localeIndex] && cell !== null && cell.category === category)
+					candidates.push(supportedTagAt(localeIndex));
+			}
+
+			const semanticRange = memberAt(heuristicMemberIndex).semanticRange;
+			const preferredLocale = category === CATEGORY_LIKELY_SUBTAG
+				? lookupMatchByLikelySubtag(semanticRange, candidates, fallbackLocale, resolvedTiebreakers)
+				: preferredLocaleForRange(semanticRange, candidates, fallbackLocale, resolvedTiebreakers);
+
+			if (preferredLocale === null) continue;
+
+			preferredLocalesBySpecificHeuristicRangeIndex.set(languageRangeIndex, preferredLocale);
+			localeReservedByAnchorOrSpecificHeuristic[sortedSupported.indexOf(preferredLocale)] = true;
+		}
+	};
+
+	assignPreferredSpecificHeuristicLocales(CATEGORY_LIKELY_SUBTAG);
+	assignPreferredSpecificHeuristicLocales(CATEGORY_PRIMARY_LANGUAGE);
+
+	// -------------------------------------------------------------------------------------------
+	// The governor sweep (`DefaultStrings:1723`)
+	// -------------------------------------------------------------------------------------------
+
+	/** @type {number[]} */
+	const governorMemberIndexByLocale = new Array(localeCount).fill(-1);
+	/** @type {number[]} */
+	const selectionIndexByLocale = new Array(localeCount).fill(0);
+	/** @type {number[]} */
+	const governorWeightByLocale = new Array(localeCount).fill(0);
+	let highestEffectiveWeight = 0;
+
+	for (let localeIndex = 0; localeIndex < localeCount; ++localeIndex) {
+		const availableLocale = supportedTagAt(localeIndex);
+		/** @type {Specificity | null} */
+		let bestSpecificity = null;
+		let bestMemberIndex = -1;
+		let effectiveWeight = -1;
+
+		for (let memberIndex = 0; memberIndex < memberCount; ++memberIndex) {
+			const cell = cellAt(localeIndex, memberIndex);
+
+			if (cell === null) continue;
+
+			const representativeIndex = representativeIndices[memberIndex] ?? memberIndex;
+
+			// A restricted heuristic range governs its CLAIMED locale and nothing else, which keeps a
+			// broad, high-quality range from selecting a locale a more specific, lower-quality range
+			// deliberately downgraded. An anchor-owning representative has no claimed locale at all —
+			// it is never `assignable` — so this skips every heuristic cell it has.
+			if (isHeuristic(cell) && restrictedHeuristicRangeIndices.has(representativeIndex) &&
+				preferredLocalesBySpecificHeuristicRangeIndex.get(representativeIndex) !== availableLocale)
+				continue;
+
+			// A negative range excludes syntactic and canonical matches, not locales merely related
+			// through the CLDR parent/likely-subtag heuristics.
+			if (memberAt(memberIndex).weight <= 0 && !isEligibleForExclusion(cell)) continue;
+
+			const comparison = bestSpecificity === null ? 1 : compareSpecificity(cell, bestSpecificity);
+
+			if (comparison > 0 || (comparison === 0 && memberAt(memberIndex).weight > effectiveWeight)) {
+				bestSpecificity = cell;
+				bestMemberIndex = memberIndex;
+				effectiveWeight = memberAt(memberIndex).weight;
+			}
+		}
+
+		// A locale whose governing range is nonpositive is excluded outright; no later phase restores it.
+		if (bestMemberIndex < 0 || effectiveWeight <= 0) continue;
+
+		const representativeIndex = representativeIndices[bestMemberIndex] ?? bestMemberIndex;
+		const semanticMember = bestMemberIndex === semanticMemberIndicesByRepresentative[representativeIndex];
+
+		governorMemberIndexByLocale[localeIndex] = bestMemberIndex;
+		governorWeightByLocale[localeIndex] = effectiveWeight;
+
+		// Syntactic ALIAS matches select at the member's own position; semantic and derived matches
+		// select at the group's first-member position, so an interleaved equal-weight range cannot
+		// outrank the group. The `!isSyntactic` disjunct is Java's and is kept verbatim even though the
+		// cell matrix above makes it unreachable — a non-syntactic cell only ever survives FOR the
+		// semantic member, so the first disjunct has already fired. It is dispositioned `excluded` in
+		// the coverage record for exactly that reason, and `test/negotiate.test.js` pins the arm
+		// that IS reachable: a syntactic non-semantic governor selecting at its own index.
+		selectionIndexByLocale[localeIndex] = semanticMember ||
+			!isSyntactic(/** @type {Specificity} */ (bestSpecificity))
+			? representativeIndex
+			: bestMemberIndex;
+
+		highestEffectiveWeight = Math.max(highestEffectiveWeight, effectiveWeight);
+	}
+
+	if (highestEffectiveWeight <= 0) return noMatch();
+
+	// -------------------------------------------------------------------------------------------
+	// Survivor bucketing and the serving cascade (`DefaultStrings:1784`)
+	// -------------------------------------------------------------------------------------------
+
+	/** @type {(string[] | null)[]} */
+	const survivorsBySelectionIndex = new Array(memberCount).fill(null);
+
+	for (let localeIndex = 0; localeIndex < localeCount; ++localeIndex) {
+		if ((governorMemberIndexByLocale[localeIndex] ?? -1) < 0 ||
+			!Object.is(governorWeightByLocale[localeIndex], highestEffectiveWeight))
+			continue;
+
+		const selectionIndex = selectionIndexByLocale[localeIndex] ?? 0;
+		const survivors = survivorsBySelectionIndex[selectionIndex] ?? [];
+
+		survivors.push(supportedTagAt(localeIndex));
+		survivorsBySelectionIndex[selectionIndex] = survivors;
+	}
+
+	/**
+	 * `DefaultStrings#localeMatch` (`:1930`). The public match type is re-derived once, FOR THE
+	 * SELECTED LOCALE ONLY, from that locale's GOVERNOR — never mapped out of the governor's internal
+	 * category, which is why a structural relationship on a wildcard-free range reports its CLDR or
+	 * likely-subtag nature and never `extended-range`.
+	 *
 	 * @param {string} locale
 	 * @returns {LocaleMatch}
 	 */
-	const localeMatch = (locale) => ({
-		matchType: languageRangeMatchTypeFor(locale, member, fallbackLocale, resolvedTiebreakers),
-		locale,
-		isMatch: true,
-		fallbackLocale,
-		consideredLocales: sortedSupported,
-		effectiveWeight: weight,
-		languageRange: range,
-		requestedLanguageRanges,
-	});
+	const localeMatch = (locale) => {
+		const localeIndex = sortedSupported.indexOf(locale);
+		const governor = memberAt(governorMemberIndexByLocale[localeIndex] ?? 0);
 
-	// Java's cascade opens with the bare-wildcard branch (`DefaultStrings:1815`). `matchFor(Locale)`
-	// can never reach it — a normalized tag contains no `*` — but a caller-supplied range can.
-	//
-	// KEPT FOR STRUCTURAL FIDELITY, AND MEASURED TO BE INDISTINGUISHABLE HERE. Deleting it changes
-	// no corpus answer and no answer this reduction can produce at all: `*` is not undetermined and
-	// not private-use, so it falls through to the `containsWildcard` block below, whose structural
-	// filter keeps every survivor and whose `primary === "*"` arm calls the same helper with the same
-	// list. Java's ordering matters once N members can interleave; with one member the two coincide.
-	// Recorded rather than trimmed because a later slice restores the interleaving — and recorded
-	// plainly rather than justified, because a branch nothing discriminates must not be described as
-	// though something does. `test/negotiate.test.js` pins the answer; the ARM is not what it pins.
-	if (range === "*") return localeMatch(preferredLocaleForWildcard(survivors, fallbackLocale, resolvedTiebreakers));
+		return {
+			matchType: languageRangeMatchTypeFor(locale, governor, fallbackLocale, resolvedTiebreakers),
+			locale,
+			isMatch: true,
+			fallbackLocale,
+			consideredLocales: sortedSupported,
+			effectiveWeight: governorWeightByLocale[localeIndex] ?? 0,
+			languageRange: governor.range,
+			requestedLanguageRanges,
+		};
+	};
 
-	if (member.undetermined && !member.privateUse) return noMatch();
+	for (let memberIndex = 0; memberIndex < memberCount; ++memberIndex) {
+		const languageRangeLocales = survivorsBySelectionIndex[memberIndex];
 
-	// An actual exact localized strings source must win over a canonically equivalent tag.
-	for (const locale of survivors)
-		if (equalsIgnoreCase(locale, range)) return localeMatch(locale);
+		if (languageRangeLocales == null) continue;
 
-	for (const locale of survivors)
-		for (const identity of member.identities)
-			if (!equalsIgnoreCase(identity, range) && equalsIgnoreCase(locale, identity)) return localeMatch(locale);
+		const member = memberAt(memberIndex);
+		const range = member.range;
 
-	// Noninitial wildcards have RFC 4647 STRUCTURAL semantics only (`DefaultStrings:1836-1852`). An
-	// extended range with no structural candidate must not be broadened through canonical, CLDR,
-	// likely-subtag or primary-language matching — including a private-use range such as `x-*`, which
-	// is why this sits ABOVE the private-use exit rather than below it. Probed independently of
-	// quality, exactly as Java probes it.
-	if (member.containsWildcard) {
-		const filteredCandidates = structurallyFilteredLocales(range, survivors);
+		if (member.weight <= 0) continue;
 
-		if (filteredCandidates.length === 0) return noMatch();
+		if (range === "*")
+			return localeMatch(preferredLocaleForWildcard(languageRangeLocales, fallbackLocale, resolvedTiebreakers));
 
-		const primary = normalizedLanguageCode(javaSplit(range)[0] ?? "");
-		const preferred = primary === "*"
-			? preferredLocaleForWildcard(filteredCandidates, fallbackLocale, resolvedTiebreakers)
-			: preferredLocaleForRange(range, filteredCandidates, fallbackLocale, resolvedTiebreakers)
-				?? filteredCandidates[0] ?? "";
+		if (member.undetermined && !member.privateUse) continue;
 
-		return localeMatch(preferred);
+		// An actual exact localized strings source must win over a canonically equivalent tag.
+		let served = null;
+
+		for (const locale of languageRangeLocales)
+			if (equalsIgnoreCase(locale, range)) {
+				served = locale;
+				break;
+			}
+
+		if (served !== null) return localeMatch(served);
+
+		// A Java 9 parser may omit an IANA alias a newer runtime materializes as a later exact member.
+		for (const locale of languageRangeLocales) {
+			for (const identity of member.identities)
+				if (!equalsIgnoreCase(identity, range) && equalsIgnoreCase(locale, identity)) {
+					served = locale;
+					break;
+				}
+
+			if (served !== null) break;
+		}
+
+		if (served !== null) return localeMatch(served);
+
+		// Noninitial wildcards have RFC 4647 STRUCTURAL semantics only (`DefaultStrings:1836-1852`). An
+		// extended range with no structural candidate must not be broadened through canonical, CLDR,
+		// likely-subtag or primary-language matching — including a private-use range such as `x-*`,
+		// which is why this sits ABOVE the private-use exit rather than below it. Probed independently
+		// of quality, exactly as Java probes it.
+		if (member.containsWildcard) {
+			const filteredCandidates = structurallyFilteredLocales(range, languageRangeLocales);
+
+			if (filteredCandidates.length === 0) continue;
+
+			const wildcardPrimary = normalizedLanguageCode(javaSplit(range)[0] ?? "");
+			const preferred = wildcardPrimary === "*"
+				? preferredLocaleForWildcard(filteredCandidates, fallbackLocale, resolvedTiebreakers)
+				: preferredLocaleForRange(range, filteredCandidates, fallbackLocale, resolvedTiebreakers)
+					?? filteredCandidates[0] ?? "";
+
+			return localeMatch(preferred);
+		}
+
+		// Private-use tags have no language semantics to broaden: they select an exact source or yield
+		// to a later member.
+		if (member.privateUse) continue;
+
+		const canonicalRange = member.canonicalRange ?? "";
+		const canonicalMatches = languageRangeLocales.filter((locale) =>
+			equalsIgnoreCase(canonicalLanguageTag(locale), canonicalRange));
+		const canonicalMatch =
+			preferredLocaleForRange(canonicalRange, canonicalMatches, fallbackLocale, resolvedTiebreakers);
+
+		if (canonicalMatch !== null) return localeMatch(canonicalMatch);
+
+		const lookupMatch = lookupMatchByFallbackCandidates(
+			member.semanticRange, languageRangeLocales, fallbackLocale, resolvedTiebreakers);
+
+		if (lookupMatch !== null) return localeMatch(lookupMatch);
+
+		const likelySubtagMatch = lookupMatchByLikelySubtag(
+			member.semanticRange, languageRangeLocales, fallbackLocale, resolvedTiebreakers);
+
+		if (likelySubtagMatch !== null) return localeMatch(likelySubtagMatch);
+
+		// Primary-tag candidates (for example `pt` or `pt-XX`).
+		const primary = member.requestedPrimary ?? "";
+		let candidates = languageRangeLocales.filter((locale) => {
+			const normalizedLanguage = primaryLanguage(locale);
+			if (normalizedLanguage.length === 0 || !equalsIgnoreCase(normalizedLanguage, primary)) return false;
+			return compatibleLikelyScripts(
+				languageScriptForLikelySubtag(member.semanticRange), languageScriptForLikelySubtag(locale));
+		});
+
+		if (candidates.length === 0) continue; // try the next language range
+
+		const filteredCandidates = structurallyFilteredLocales(range, candidates);
+
+		if (filteredCandidates.length > 0) {
+			// Java compares the tag against `Locale#getLanguage()`, not against its normalized language,
+			// so a bare `he` counts as "specific" (its stored language is the superseded `iw`).
+			const hasSpecificMatch =
+				filteredCandidates.some((locale) => !equalsIgnoreCase(locale, jdkLanguageSubtag(locale)));
+			if (hasSpecificMatch) candidates = filteredCandidates;
+		}
+
+		if (candidates.length === 1) return localeMatch(candidates[0] ?? "");
+
+		const tiebreakerMatch = lookupMatchByTiebreakers(primary, candidates, resolvedTiebreakers);
+
+		if (tiebreakerMatch !== null) return localeMatch(tiebreakerMatch);
+
+		return localeMatch(candidates[0] ?? "");
 	}
 
-	// Private-use tags have no language semantics to broaden: they select an exact source or nothing.
-	if (member.privateUse) return noMatch();
-
-	const canonicalRange = member.canonicalRange ?? "";
-	const canonicalMatches = survivors.filter((locale) =>
-		equalsIgnoreCase(canonicalLanguageTag(locale), canonicalRange));
-	const canonicalMatch = preferredLocaleForRange(canonicalRange, canonicalMatches, fallbackLocale, resolvedTiebreakers);
-
-	if (canonicalMatch !== null) return localeMatch(canonicalMatch);
-
-	const lookupMatch =
-		lookupMatchByFallbackCandidates(member.semanticRange, survivors, fallbackLocale, resolvedTiebreakers);
-
-	if (lookupMatch !== null) return localeMatch(lookupMatch);
-
-	const likelySubtagMatch =
-		lookupMatchByLikelySubtag(member.semanticRange, survivors, fallbackLocale, resolvedTiebreakers);
-
-	if (likelySubtagMatch !== null) return localeMatch(likelySubtagMatch);
-
-	const primary = member.requestedPrimary ?? "";
-	let candidates = survivors.filter((locale) => {
-		const normalizedLanguage = primaryLanguage(locale);
-		if (normalizedLanguage.length === 0 || !equalsIgnoreCase(normalizedLanguage, primary)) return false;
-		return compatibleLikelyScripts(
-			languageScriptForLikelySubtag(member.semanticRange), languageScriptForLikelySubtag(locale));
-	});
-
-	if (candidates.length === 0) return noMatch();
-
-	const filteredCandidates = structurallyFilteredLocales(range, candidates);
-
-	if (filteredCandidates.length > 0) {
-		// Java compares the tag against `Locale#getLanguage()`, not against its normalized language, so
-		// a bare `he` counts as "specific" (its stored language is the superseded `iw`).
-		const hasSpecificMatch = filteredCandidates.some((locale) => !equalsIgnoreCase(locale, jdkLanguageSubtag(locale)));
-		if (hasSpecificMatch) candidates = filteredCandidates;
-	}
-
-	if (candidates.length === 1) return localeMatch(candidates[0] ?? "");
-
-	const tiebreakerMatch = lookupMatchByTiebreakers(primary, candidates, resolvedTiebreakers);
-
-	if (tiebreakerMatch !== null) return localeMatch(tiebreakerMatch);
-
-	return localeMatch(candidates[0] ?? "");
+	return noMatch();
 }
 
 // ---------------------------------------------------------------------------------------------

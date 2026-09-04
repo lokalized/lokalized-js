@@ -74,6 +74,14 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
   // explicitly, against the OWNER that declares the category. Adding an export still costs a
   // reviewed line, and now it also costs naming the owner it belongs to.
   const CATEGORIZED = /** @type {[string, string, string][]} */ ([
+    // Plan 3.5 declares all three by name — `const RETURN_KEY`, `const THROW_EXCEPTION`,
+    // `function returnString(translation)` — under core's "failure policy/observer/handler types
+    // and helpers" category. They are the caller-facing half of `onFailure`: a handler must be able
+    // to say "throw" as well as "return the key", and the plan's own note that responses are
+    // discriminated STRUCTURALLY is why they are helpers rather than tokens the library recognizes.
+    ["core", "RETURN_KEY", "failure policy/observer/handler types and helpers"],
+    ["core", "THROW_EXCEPTION", "failure policy/observer/handler types and helpers"],
+    ["core", "returnString", "failure policy/observer/handler types and helpers"],
     ["core", "cardinalityForNumber", "cardinal classifiers/support probes"],
     ["core", "cardinalityForOperands", "cardinal classifiers/support probes"],
     ["core", "supportedCardinalitiesForLocale", "cardinal classifiers/support probes"],

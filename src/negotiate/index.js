@@ -14,15 +14,18 @@
  * to `nsl`, which reports `EXACT`/`nsl` where Java reports `CANONICAL`/`nsl`; and `zh-min-nan`
  * normalizes to `nan`, which — through `memberStaticsFor`'s semantic range — selects `nan-CN` where
  * Java selects `nan-MY`. The ANSWER changes, not just the diagnostic. So the raw ingress is its own
- * entry point (`matchForRange`), and this module is its public door.
+ * entry point (`matchForRanges`, and `matchForRange` beneath it for a single member), and this module
+ * is its public door. `matchFor` is the NORMALIZING locale overload and is not that door.
  *
- * Only the SINGLE-MEMBER reduction is wired up so far. The N-member solver (group election, the
- * cell matrix, the governor sweep, the serving cascade) is M7 A3, and until it lands a multi-member
- * request is refused explicitly rather than answered approximately.
+ * The whole N-member solver is wired up as of M7 A3 — group election, the semantic-member election,
+ * the cell matrix, anchor reservation, the category-major heuristic passes, the governor sweep and
+ * the serving cascade all live in `matchForRanges`. What remains outside it is the HEADER parser
+ * (`Locale.LanguageRange.parse`), which is A4; a caller reaching this module hands it an explicit
+ * list, and the 32-member cap below is the only shape rule left here.
  */
 
 import { decode as decodeRangeEquivalents } from "../data/iana-range-equivalents.js";
-import { matchFor, matchForRange, normalizeTag } from "../internal/locale.js";
+import { matchFor, matchForRanges, normalizeTag } from "../internal/locale.js";
 
 /**
  * The pinned IANA range-equivalence closure, 802 classes, probed out of the JDK oracle itself
@@ -249,7 +252,7 @@ export function createLocaleNegotiator(configuration) {
 	const { fallbackLocale, supportedLocales, tiebreakers } = applicableConfiguration(configuration);
 
 	/**
-	 * The single-member reduction of `DefaultStrings#matchFor(List)`.
+	 * `DefaultStrings#matchFor(List<LanguageRange>)`, over any number of members.
 	 *
 	 * @param {Iterable<unknown>} ranges
 	 * @returns {import("../internal/locale.js").LocaleMatch}
@@ -265,31 +268,12 @@ export function createLocaleNegotiator(configuration) {
 				`At most ${MAXIMUM_LANGUAGE_RANGES} language ranges are supported, but received ${members.length}`,
 			);
 
-		// EXPLICIT, and not a silent approximation. Group election, the cell matrix, the governor
-		// sweep and the serving cascade are M7 A3; without them a two-member request cannot be
-		// answered, and answering it from the first member would be wrong in a way that looks right.
-		//
-		// THE EMPTY LIST IS A DELIBERATE A3 DEFERRAL, not an oversight, and it is the one refusal
-		// here that a correct implementation would answer: `browser-chooser.shape.empty-range-list-
-		// yields-no-match` records NONE with `requestedLanguageRanges: []`, which zero survivors
-		// gives under any reading of `DefaultStrings:1780`. It is refused anyway because the shape
-		// of that answer — which `consideredLocales` it reports, and on whose sweep — is a property
-		// of the sections A3 owns, and fabricating it here would be a hand-built result no Java run
-		// has been read for. It costs exactly one attributed case, and A3's denominator is 24 with
-		// it or 23 without.
-		//
-		// A `RangeError` rather than a bare `Error`, matching every other refusal in this module and
-		// the `IllegalArgumentException` the corpus records for the neighbouring 33-member case:
-		// `ERROR_NAME` maps that to `TypeError | RangeError`, so a bare `Error` reaching a caller
-		// through the public `bestMatchForLanguageRanges` would be an error kind no Java run emits.
-		if (members.length !== 1)
-			throw new RangeError(
-				`The multi-member language-range solver is not implemented yet; received ${members.length} ranges`,
-			);
-
-		const member = /** @type {WeightedLanguageRange} */ (members[0]);
-		return matchForRange(member.range, member.weight, supportedLocales, fallbackLocale, tiebreakers,
-			pinnedRangeEquivalents);
+		// THE EMPTY LIST IS AN ANSWER, not a refusal, and it stops being an A3 deferral here:
+		// `DefaultStrings:1557` short-circuits an empty list to `noLocaleMatch` BEFORE it looks at a
+		// single locale, which is why `browser-chooser.shape.empty-range-list-yields-no-match` records
+		// NONE while still reporting every supported locale in `consideredLocales`. The solver owns that
+		// short-circuit; this door does not second-guess it.
+		return matchForRanges(members, supportedLocales, fallbackLocale, tiebreakers, pinnedRangeEquivalents);
 	};
 
 	return Object.freeze({

@@ -29,6 +29,13 @@
 
 import { isolate } from "./bidi.js";
 import { LANGUAGE_FORM_NAMES } from "./catalog.js";
+// The ERROR CLASS only, from the tokenizer that declares it — not the evaluator, whose edges stay
+// out of here by the rule above. `expression-tokenizer.js` is already in both measured graphs
+// (`expression.js` re-exports this class and `core/index.js` imports the evaluator), so this edge
+// adds no module: `npm run scenario:0a` reports 25 root / 24 core before and after.
+// `contextualizePlaceholderFailure` needs it to reproduce `DefaultStrings.java:1270-1281`, which
+// preserves the failing exception's TYPE rather than flattening every cause into one class.
+import { ExpressionEvaluationError } from "./expression-tokenizer.js";
 import { cardinalCategoryFor, operandsFromDecimalText, operandsFromNumber } from "./plural.js";
 
 const PLACEHOLDER_START = "{{";
@@ -782,13 +789,22 @@ function resolveExpressionTranslation(definition, values, context) {
     try {
       matched = evaluateAlternative(alternative, values, context);
     } catch (cause) {
-      // Java re-throws the same category with the expression named, so a fragment failure carries
-      // exactly two wrappers: this one, then the generated-placeholder boundary.
-      throw new Error(
+      // Java re-throws THE SAME CATEGORY with the expression named (`DefaultStrings.java:1226-1238`
+      // catches `ExpressionEvaluationException`, `IllegalArgumentException` and
+      // `IllegalStateException` separately and rebuilds each as its own class), so a fragment failure
+      // carries exactly two wrappers: this one, then the generated-placeholder boundary — and BOTH
+      // keep the type. This comment said so while the code threw a bare `Error` at both sites, which
+      // is how `callback-interaction.expression-fragment.evaluation-failure-preserves-library-
+      // exception-type` and four neighbours came to record `ExpressionEvaluationException` against a
+      // port that reported an anonymous one. Only the first arm has a JS counterpart today — see
+      // `contextualizePlaceholderFailure` for why the other two do not.
+      const message =
         `Unable to evaluate generated-fragment expression '${alternative.expression}': ` +
-          `${cause instanceof Error ? cause.message : String(cause)}`,
-        { cause },
-      );
+        `${cause instanceof Error ? cause.message : String(cause)}`;
+
+      throw cause instanceof ExpressionEvaluationError
+        ? new ExpressionEvaluationError(message, { cause })
+        : new Error(message, { cause });
     }
 
     if (matched)
@@ -831,6 +847,24 @@ function evaluateAlternative(alternative, values, context) {
  * at, and (once one exists) what was selected. Message text is diagnostic rather than normative; the
  * CAUSE CHAIN is the part that is contracted, so the original error is always preserved as `cause`.
  *
+ * THE CONTEXTUALIZED ERROR KEEPS THE FAILING EXCEPTION'S TYPE. Java's ladder
+ * (`DefaultStrings.java:1270-1281`) rebuilds the contextualized exception as the same class for
+ * `ExpressionEvaluationException`, `IllegalArgumentException` and `IllegalStateException`, and this
+ * used to flatten all of them into a bare `Error`. That was invisible until B1 joined the `failures`
+ * channel to the comparison, and it turned five rows red the moment it was read — among them
+ * `callback-interaction.expression-fragment.evaluation-failure-preserves-library-exception-type`,
+ * whose name is the clause. A handler asking "was this my expression, or the library?" got the same
+ * answer for both.
+ *
+ * ONLY THE FIRST OF JAVA'S FOUR ARMS IS PORTED, and the other three are recorded rather than
+ * pretended. `IllegalArgumentException` (a placeholder whose value was never supplied) and
+ * `IllegalStateException` (a language-form translation missing the selected member) both map onto
+ * plan 3.5's `ResolutionError` with its `RESOLUTION_INVALID_ARGUMENT`/`RESOLUTION_INVALID_STATE`
+ * codes, which has not landed (plan open question 4); until it does they are the same bare `Error`
+ * here, which also makes them indistinguishable from Java's FOURTH arm — an unrecognized
+ * application error, which Java returns VERBATIM rather than contextualizing. Implementing that arm
+ * on top of an undifferentiated `Error` would strip the context off the library's own failures.
+ *
  * @param {string} key
  * @param {string} placeholderName
  * @param {PlaceholderBinding} binding
@@ -843,12 +877,13 @@ function contextualizePlaceholderFailure(key, placeholderName, binding, selectio
     binding.definition.kind === "expression" ? "ExpressionTranslation" : "LanguageFormTranslation";
   const causeMessage = cause instanceof Error ? cause.message : String(cause);
   const selectionContext = selectionDescription === null ? "" : `; selected ${selectionDescription}`;
-
-  return new Error(
+  const message =
     `Unable to resolve generated placeholder '${placeholderName}' (${kind}) for key '${key}'; ` +
-      `definition declared at ${binding.declaringPath}${selectionContext}: ${causeMessage}`,
-    { cause },
-  );
+    `definition declared at ${binding.declaringPath}${selectionContext}: ${causeMessage}`;
+
+  return cause instanceof ExpressionEvaluationError
+    ? new ExpressionEvaluationError(message, { cause })
+    : new Error(message, { cause });
 }
 
 /**

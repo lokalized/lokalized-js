@@ -34,6 +34,7 @@
  *
  *   node tools/conformance.mjs [--verbose] [--family <prefix>] [--json <path>] [--write]
  */
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -326,6 +327,176 @@ const RESOLVER_THREW = {
 };
 
 /**
+ * Java exception type -> the JS error NAME the port raises for the same resolution failure.
+ *
+ * Used only for the `causeType` field of the `failures` and `policyCalls` channels, which is the
+ * cause a candidate's render actually threw. Declared explicitly, and an unlisted type reports the
+ * case unsupported rather than comparing equal — the `RESOLVER_THREW` discipline.
+ *
+ * ONE ENTRY IS A DELIBERATE COLLAPSE AND IT COSTS REAL DISCRIMINATION. Java raises
+ * `IllegalStateException` for a language-form translation that lacks the required member ("Missing
+ * Gender translation for NEUTER") and `IllegalArgumentException` for a placeholder whose context
+ * value was never supplied ("Missing value for placeholder 'absentCount'"). The port raises the SAME
+ * bare `Error` for both — measured, not assumed, on `custom-policy-four-candidate-chain` — because
+ * plan 3.5's `ResolutionError` with its `RESOLUTION_INVALID_STATE` / `RESOLUTION_INVALID_ARGUMENT`
+ * codes has not landed (plan open question 4). So seven cases whose recorded channels carry BOTH
+ * Java types compare equal on a distinction the port cannot make:
+ * `custom-policy.cause.three-consecutive-calls-carry-three-distinct-types`,
+ * `custom-policy.cause.truncated-walk-still-reports-the-first-cause`, and the five
+ * `callback-interaction.first-cause.*`. They still discriminate order, count and the third type
+ * (`ExpressionEvaluationError`), which is why the field is compared rather than dropped — dropping
+ * it would lose those too — but the collapse is recorded here so the day the error hierarchy lands
+ * this table splits and those seven start proving what they were written to prove.
+ */
+const CAUSE_NAME = {
+  "com.lokalized.ExpressionEvaluationException": "ExpressionEvaluationError",
+  "java.lang.IllegalStateException": "Error",
+  "java.lang.IllegalArgumentException": "Error",
+};
+
+/** The JS error name of whatever a candidate threw, in the shape `CAUSE_NAME` maps Java onto. */
+const causeNameOf = (cause) =>
+  cause === null || cause === undefined ? null : cause instanceof Error ? cause.name : String(cause);
+
+/**
+ * Failures handed to the failure handler during the case currently executing, as the RAW frozen
+ * `TranslationFailure` objects.
+ *
+ * Raw rather than projected, because one recorded field is a REFERENCE comparison the projection
+ * cannot make later from a copy: `matchObjectIdenticalToResult` asks whether the handler saw the
+ * same match object the result carries, and plan 8.3 requires "identical match-object identity
+ * through result, failure ... and thrown-failure paths".
+ *
+ * @type {any[]}
+ */
+const failureCalls = [];
+
+/**
+ * Fallback-policy consultations observed during the case currently executing.
+ *
+ * The ABSENCE of an entry is the observable in the truncation clauses: Java breaks on
+ * `candidateIndex + 1 >= fallbackCandidates.size()` BEFORE consulting, so a four-candidate walk that
+ * fails everywhere records three calls, and `custom-policy.finalcandidate.no-call-though-the-last-
+ * locale-is-listed` lists all four locales in its policy so the missing fourth cannot be read as a
+ * coincidence.
+ *
+ * @type {{ reason: string, locale: string, causeType: string | null, decision: unknown }[]}
+ */
+const policyCalls = [];
+
+/**
+ * Wrap a failure handler so every invocation is recorded. `VectorOracle.recording`, mirrored.
+ *
+ * BEFORE the delegate, deliberately, and the order is load-bearing in the opposite direction from
+ * `recordingPolicy` below: a `throw-in-handler` behavior must still leave the failure it was called
+ * for in the channel, which is what four throw-in-handler rows record.
+ */
+const recordingHandler = (delegate) => (failure) => {
+  failureCalls.push(failure);
+  return delegate(failure);
+};
+
+/**
+ * Wrap a fallback policy so every consultation is recorded. `VectorOracle.recordingPolicy`.
+ *
+ * AFTER the delegate returns, deliberately: a `throw-in-policy` behavior records NOTHING, and that
+ * absence is the evidence in the four throw-in-policy cases. Recording first would manufacture a
+ * consultation the corpus says is unobservable.
+ */
+const recordingPolicy = (delegate) => (reason, locale, cause) => {
+  const decision = delegate(reason, locale, cause);
+  policyCalls.push({ reason, locale, causeType: causeNameOf(cause), decision });
+  return decision;
+};
+
+/**
+ * A named failure-handler behavior, ported from `VectorOracle.handlerFrom` rather than reinvented.
+ *
+ * `null`/absent yields the LIBRARY DEFAULT wrapped in the recorder, exactly as the oracle does, so
+ * the observation channel exists for every case without a fixture opting in and without changing
+ * what any case does. `throw-in-handler` raises a plain `Error`: the oracle raises
+ * `IllegalStateException`, and every case that observes it carries `expected.thrown`, which is B2's
+ * gate — so the kind is not compared here and is not claimed to be.
+ */
+function failureHandlerFor(spec) {
+  if (spec === null || spec === undefined) return recordingHandler(() => core.RETURN_KEY);
+
+  switch (spec.behavior) {
+    case "return-key":
+      return recordingHandler(() => core.RETURN_KEY);
+    case "throw":
+      return recordingHandler(() => core.THROW_EXCEPTION);
+    case "return-string": {
+      const text = spec.text;
+      if (typeof text !== "string") unsupported("a return-string failure handler needs its text");
+      return recordingHandler(() => core.returnString(text));
+    }
+    case "throw-in-handler": {
+      const message = spec.message ?? "handler failed deliberately";
+      return recordingHandler(() => { throw new Error(message); });
+    }
+    default:
+      unsupported(`unknown failure handler behavior: ${spec.behavior}`);
+  }
+}
+
+/**
+ * The three built-ins of `DefaultTranslationFallbackPolicy` (TranslationFallbackPolicy.java), as
+ * functions this runner can wrap in a recorder.
+ *
+ * A KNOWN HOLE, stated rather than hidden. The port accepts these three by NAME — the option is
+ * typed `BuiltinFallbackPolicy | FallbackPolicy` — and a policy handed to it as a string cannot be
+ * wrapped, because there is only one policy slot and the recorder has to occupy it. So every corpus
+ * case that names a built-in exercises THIS table and not the port's, exactly as `VectorOracle`
+ * wraps Java's built-in singletons rather than the library resolving them itself. The equivalence
+ * that closes the hole is asserted by ablation in `test/fallback-policy.test.js`, which drives the
+ * same lookups through the string form and the function form and requires identical results; delete
+ * the port's table and that test goes red while the corpus stays green.
+ */
+const BUILTIN_FALLBACK_POLICIES = {
+  "missing-or-no-match": (reason) => reason !== "resolution-failure",
+  "any-failure": () => true,
+  never: () => false,
+};
+
+/**
+ * A named fallback-policy behavior, ported from `VectorOracle.policyFrom` / `customPolicyFrom`.
+ *
+ * `null`/absent yields `missing-or-no-match` wrapped in the recorder — the library default
+ * (`DefaultStrings.java:473`), installed unconditionally so the channel exists for every case
+ * without a fixture opting in, which is what `VectorOracle` does at its line 297.
+ */
+function fallbackPolicyFor(spec) {
+  if (spec === null || spec === undefined)
+    return recordingPolicy(BUILTIN_FALLBACK_POLICIES["missing-or-no-match"]);
+
+  if (typeof spec === "string") {
+    if (!Object.hasOwn(BUILTIN_FALLBACK_POLICIES, spec))
+      unsupported(`unknown fallback policy: ${spec}`);
+    return recordingPolicy(BUILTIN_FALLBACK_POLICIES[spec]);
+  }
+
+  switch (spec.behavior) {
+    case "continue-for-locales": {
+      const tags = new Set(spec.locales);
+      return recordingPolicy((_reason, locale) => tags.has(locale));
+    }
+    case "continue-for-reasons": {
+      // The corpus spells reasons as Java enum members; `adaptEnum` is the one place that mapping
+      // lives, so an unlisted member fails loudly here instead of silently never matching.
+      const reasons = new Set(spec.reasons.map(adaptEnum));
+      return recordingPolicy((reason) => reasons.has(reason));
+    }
+    case "throw-in-policy": {
+      const message = spec.message ?? "fallback policy failed deliberately";
+      return recordingPolicy(() => { throw new Error(message); });
+    }
+    default:
+      unsupported(`unknown custom fallback policy behavior: ${spec.behavior}`);
+  }
+}
+
+/**
  * A named phonetic-resolver behavior, wrapped so its invocations are recorded.
  *
  * The six behaviors are ported from `VectorOracle.delegateResolverFrom` rather than reinvented, and
@@ -416,8 +587,6 @@ function stringsFor(fixture) {
   // out to produce Java's exact answer under the fixed v1 limits, because the fixture raised a
   // ceiling the value never approached or lowered one it still fit under. Those are passes, not
   // remaining work. The 24 that genuinely differ are attributed after the fact in `classifyFailure`.
-  if (fixture.translationFailureHandler) unsupported("failure handlers are not implemented");
-  if (fixture.translationFallbackPolicy) unsupported("fallback policies are not implemented");
   if (Object.keys(fixture.rawFiles ?? {}).length || Object.keys(fixture.rawFilesBase64 ?? {}).length)
     unsupported("raw/byte fixtures require the bounded parser's failure paths");
 
@@ -454,6 +623,16 @@ function stringsFor(fixture) {
     // explicit-RTL_LOCALES fixture because DefaultStrings.java:477 stores the default when handed
     // null. The runner should exercise the same defaulting the library documents.
     ...(fixture.bidiIsolation ? { bidiIsolation: adaptEnum(fixture.bidiIsolation) } : {}),
+    // ALWAYS installed, wrapping the library default when the fixture names none — the rule
+    // `VectorOracle` follows at its lines 291-298, and the reason is the same on both sides: the
+    // failure and policy channels are recorded observables on every case, not opt-in extras, so a
+    // runner that only installed them when a fixture asked would leave 251 policy-recording and 298
+    // failure-recording cases unable to be compared at all. Pure delegation, so behavior-neutral:
+    // the delegates are `RETURN_KEY` and `missing-or-no-match`, which is what an unconfigured
+    // `createStrings` would have used anyway. The cost is that the port's OWN defaulting is never
+    // exercised here; `test/fallback-policy.test.js` covers it.
+    onFailure: failureHandlerFor(fixture.translationFailureHandler),
+    fallbackPolicy: fallbackPolicyFor(fixture.translationFallbackPolicy),
   });
 }
 
@@ -642,9 +821,49 @@ const placeholdersFor = (input) =>
     ? undefined
     : Object.fromEntries(Object.entries(input.placeholders).map(([k, v]) => [k, placeholderValue(v)]));
 
-/** Project a JS TranslationResult into the corpus's recorded Java shape. */
-function projectResult(result, expected) {
-  const match = result.localeMatch ?? null;
+/**
+ * The eight recorded match fields, from the ACTUAL side.
+ *
+ * Extracted so the result's `localeMatchResult` and the failure channel's cannot drift apart. In
+ * Java they are the SAME object on every row that carries both — `matchObjectIdenticalToResult` is
+ * recorded `true` on all 370 — so two independently maintained field lists would be two chances to
+ * add a field to one and forget it on the other.
+ *
+ * The `match ? … : null` shape is A0's repair and is deliberate: the actual side is written from
+ * the actual value alone, so a port emitting a match where Java records none is a `jcs` mismatch
+ * rather than a pass.
+ */
+const projectMatch = (match) => match ? {
+  matchType: match.matchType,
+  locale: match.locale ?? null,
+  isMatch: match.isMatch,
+  fallbackLocale: match.fallbackLocale,
+  consideredLocales: match.consideredLocales,
+  effectiveWeight: match.effectiveWeight,
+  languageRange: match.languageRange,
+  requestedLanguageRanges: match.requestedLanguageRanges,
+} : null;
+
+/** The same eight fields from the WANTED side. `undefined` throws here, deliberately: the corpus
+ *  always carries the key, and a silent `== null` would turn a missing field into a passing null. */
+const expectedMatchProjection = (match) => match === null ? null : {
+  matchType: adaptEnum(match.matchType),
+  locale: match.locale,
+  isMatch: match.isMatch,
+  fallbackLocale: match.fallbackLocale,
+  consideredLocales: match.consideredLocales,
+  effectiveWeight: match.effectiveWeight,
+  languageRange: match.languageRange,
+  requestedLanguageRanges: match.requestedLanguageRanges,
+};
+
+/** Project a JS TranslationResult into the corpus's recorded Java shape.
+ *
+ *  Takes ONLY the actual result. It used to take `expected` as well, unused since `projectMatch` was
+ *  extracted, and an unused `expected` in scope on the actual side is precisely what makes a
+ *  `?? expected.x` default writable — the one edit this projection's own comment forbids. Removed so
+ *  it cannot be written by accident. */
+function projectResult(result) {
   return {
     key: result.key,
     translation: result.translation,
@@ -661,23 +880,7 @@ function projectResult(result, expected) {
     // loaded catalog, and no comparison could see it. Widening a projection is only honest when both
     // sides widen together; a field added here alone, or an `?? expected.x` default, would restore
     // green without restoring correctness.
-    // The `expected.localeMatchResult === null ? null : …` gate this replaces forced the ACTUAL side
-    // to null whenever Java recorded no match, so a port emitting a match where Java records none
-    // compared equal and PASSED. It fires on zero corpus rows — no `getResult` case in the 2,298
-    // records a null `localeMatchResult`, so removing it changes no outcome — but it is exactly the
-    // shape the anti-weakening rule names, and A0 had just widened it from guarding two fields to
-    // guarding eight. The actual side is now written from the actual value alone; a null against an
-    // object is a `jcs` mismatch and fails, which is the point.
-    localeMatchResult: match ? {
-      matchType: match.matchType,
-      locale: match.locale ?? null,
-      isMatch: match.isMatch,
-      fallbackLocale: match.fallbackLocale,
-      consideredLocales: match.consideredLocales,
-      effectiveWeight: match.effectiveWeight,
-      languageRange: match.languageRange,
-      requestedLanguageRanges: match.requestedLanguageRanges,
-    } : null,
+    localeMatchResult: projectMatch(result.localeMatch ?? null),
   };
 }
 
@@ -691,18 +894,104 @@ function expectedResultProjection(expected) {
     attemptedLocales: expected.attemptedLocales,
     isFallback: expected.isFallback,
     failureReason: adaptEnum(expected.failureReason),
-    localeMatchResult: expected.localeMatchResult === null ? null : {
-      matchType: adaptEnum(expected.localeMatchResult.matchType),
-      locale: expected.localeMatchResult.locale,
-      isMatch: expected.localeMatchResult.isMatch,
-      fallbackLocale: expected.localeMatchResult.fallbackLocale,
-      consideredLocales: expected.localeMatchResult.consideredLocales,
-      effectiveWeight: expected.localeMatchResult.effectiveWeight,
-      languageRange: expected.localeMatchResult.languageRange,
-      requestedLanguageRanges: expected.localeMatchResult.requestedLanguageRanges,
-    },
+    localeMatchResult: expectedMatchProjection(expected.localeMatchResult),
   };
 }
+
+/** A recorded Java cause class name, as the JS error name this port raises. @see CAUSE_NAME */
+function adaptCauseType(causeType) {
+  if (causeType === null || causeType === undefined) return null;
+  if (!(causeType in CAUSE_NAME))
+    unsupported(`no JS counterpart declared for a resolution cause of type ${causeType}`);
+  return CAUSE_NAME[causeType];
+}
+
+/**
+ * What the failure handler was handed, projected. `VectorOracle.describeObservedFailures`.
+ *
+ * `causeMessage` is the ONE recorded field this projection omits, and it is ratcheted rather than
+ * gated because message wording is a declared JS-idiomatic decision in 35 places: gating on it here
+ * would turn the ratchet into a gate by the side door and paint 35 known, reviewed divergences red.
+ *
+ * MEASURED, correcting an earlier version of this comment that argued the omission could narrow
+ * nothing because the string is always the one `expected.result.failureCause.message` already
+ * carries. Only 244 rows record BOTH — those 244 do agree byte for byte, zero disagreements — while
+ * 227 further rows record a failure `causeMessage` with NO result-level counterpart at all (73
+ * `get`, which has no result object, and 154 `getResult`), 42 of them non-null. The earlier "370"
+ * was the count of `matchObjectIdenticalToResult === true` rows, cited correctly two paragraphs
+ * below and wrongly here; the two statistics had been conflated. Those 42 messages were therefore
+ * verified by nothing. They are now banked through `failureCauseMessages`, on exactly the same terms
+ * as the result-level one.
+ *
+ * `matchObjectIdenticalToResult` is TRI-STATE and the null arm means "not comparable", not "not
+ * identical": a `get` case produces no result object, so there is nothing to compare the handler's
+ * match against. Reporting `false` there would invent a divergence.
+ *
+ * @param {unknown} resultMatch the result's own match object, or null when there is no result
+ */
+function projectFailures(resultMatch) {
+  return failureCalls.map((failure) => ({
+    key: failure.key,
+    reason: failure.reason,
+    lookupLocale: failure.lookupLocale,
+    attemptedLocales: [...failure.attemptedLocales],
+    message: failure.message,
+    // Java sorts through a `TreeSet` over the placeholder keys; JS `Array#sort` is the same UTF-16
+    // code-unit order. Sorted on BOTH sides by the oracle and by this line, never on one.
+    placeholderNames: Object.keys(failure.placeholders).sort(),
+    causeType: causeNameOf(failure.cause),
+    localeMatchResult: projectMatch(failure.localeMatch ?? null),
+    matchObjectIdenticalToResult: resultMatch === null ? null : failure.localeMatch === resultMatch,
+  }));
+}
+
+/**
+ * The recorded Java failures, in the same shape.
+ *
+ * `?? []` is symmetric rather than a default that hides a difference: `VectorOracle` adds the key
+ * only when the list is non-empty, so an absent key and an empty list are the same state on the
+ * Java side — while the actual side is always the real recorded list, so a port that fires the
+ * handler where Java never did compares non-empty against `[]` and FAILS.
+ */
+function expectedFailures(expected) {
+  return (expected.failures ?? []).map((failure) => ({
+    key: failure.key,
+    reason: adaptEnum(failure.reason),
+    lookupLocale: failure.lookupLocale,
+    attemptedLocales: failure.attemptedLocales,
+    message: failure.message,
+    placeholderNames: failure.placeholderNames,
+    causeType: adaptCauseType(failure.causeType),
+    localeMatchResult: expectedMatchProjection(failure.localeMatchResult),
+    matchObjectIdenticalToResult: failure.matchObjectIdenticalToResult,
+  }));
+}
+
+/**
+ * The wanted/actual cause-message pairs the FAILURE channel records, for the diagnostic ratchet.
+ *
+ * Built index-wise against `failureCalls`, which is sound only where the projection above already
+ * compared equal — and that is the only place it is read (`outcome.ok`). Rows whose recorded
+ * `causeMessage` is null carry no diagnostic to ratchet and are dropped, mirroring the result-level
+ * channel's `failureCause == null` arm, so this widens the ratchet's denominator by the rows that
+ * actually record a message and by nothing else. Reported and ratcheted, never gated: see
+ * `causeMessageMatchedIds`.
+ */
+function failureCauseMessages(expected) {
+  return (expected.failures ?? [])
+    .map((failure, i) => ({ wanted: failure.causeMessage, actual: messageOf(failureCalls[i]?.cause ?? null) }))
+    .filter((pair) => pair.wanted != null);
+}
+
+/** The policy consultations this case made, and the ones Java recorded. Same `?? []` rule. */
+const projectPolicyCalls = () => policyCalls.map((call) => ({ ...call }));
+const expectedPolicyCalls = (expected) =>
+  (expected.policyCalls ?? []).map((call) => ({
+    reason: adaptEnum(call.reason),
+    locale: call.locale,
+    causeType: adaptCauseType(call.causeType),
+    decision: call.decision,
+  }));
 
 /**
  * The per-call `TranslationOptions` a case names, in the shape `get`/`getResult` accept.
@@ -711,16 +1000,36 @@ function expectedResultProjection(expected) {
  * is: an option this runner does not recognize must reach `classifyFailure` and be reported, never
  * be quietly dropped so the case passes on the default. Every key handled here is one the port
  * implements; everything else stays unlisted and is attributed.
+ *
+ * The table maps the CORPUS key to the port's option name, because the two callback options are
+ * spelled differently on the two sides — Java's `translationFallbackPolicy` / `translationFailure
+ * Handler` against plan 3.3's `fallbackPolicy` / `onFailure`. `IMPLEMENTED_CALL_OPTIONS` stays the
+ * corpus keys, since that is what `classifyFailure` scans.
+ *
+ * An explicit JSON `null` is passed THROUGH rather than skipped, and that is the point of the
+ * `owed-null-options` family: Java's builder leaves the instance value in place for a null setter
+ * (`optionsFrom` applies neither), and the port reaches the same state through its `== null` rule.
+ * Passing null exercises that rule; skipping the key would leave it unexercised.
  */
-const CALL_OPTION_ADAPTERS = { bidiIsolation: adaptEnum };
+const CALL_OPTION_ADAPTERS = {
+  bidiIsolation: { option: "bidiIsolation", adapt: adaptEnum },
+  translationFallbackPolicy: {
+    option: "fallbackPolicy",
+    adapt: (spec) => (spec === null ? null : fallbackPolicyFor(spec)),
+  },
+  translationFailureHandler: {
+    option: "onFailure",
+    adapt: (spec) => (spec === null ? null : failureHandlerFor(spec)),
+  },
+};
 const IMPLEMENTED_CALL_OPTIONS = new Set(Object.keys(CALL_OPTION_ADAPTERS));
 
 function callOptionsFor(input) {
   const options = {};
   if (input.locale) options.locale = input.locale;
 
-  for (const [name, adapt] of Object.entries(CALL_OPTION_ADAPTERS))
-    if (input[name] !== undefined) options[name] = adapt(input[name]);
+  for (const [name, { option, adapt }] of Object.entries(CALL_OPTION_ADAPTERS))
+    if (input[name] !== undefined) options[option] = adapt(input[name]);
 
   return Object.keys(options).length ? options : undefined;
 }
@@ -732,6 +1041,8 @@ function runCase(testCase, fixture) {
   // Per case, exactly as the oracle clears its own channels per case. A fresh `Strings` is built for
   // every case, so nothing survives here except what this case's lookup did.
   resolverCalls.length = 0;
+  failureCalls.length = 0;
+  policyCalls.length = 0;
 
   switch (operation) {
     case "getResult": {
@@ -742,8 +1053,25 @@ function runCase(testCase, fixture) {
       // phonetic corpus renders a string a wrong implementation would also render — a memoizing one,
       // or one handing the resolver the REQUESTED locale — so comparing the translation alone would
       // report those as passes.
-      const actual = { ...projectResult(result, expected.result), resolverCalls: [...resolverCalls] };
-      const wanted = { ...expectedResultProjection(expected.result), resolverCalls: expectedResolverCalls(expected) };
+      //
+      // `failures` and `policyCalls` join it on the same terms and for the same reason. 426 already
+      // passing rows carried both channels and the runner had never read either, so the truncation
+      // clauses — statements about consultations that did NOT happen — were being verified by
+      // nothing at all. Both sides are built the same way: the actual list is always what this run
+      // recorded, the wanted list is always the corpus's (empty when the key is absent), so a port
+      // that consults once too often or fires the handler twice fails on the count alone.
+      const actual = {
+        ...projectResult(result),
+        resolverCalls: [...resolverCalls],
+        failures: projectFailures(result.localeMatch ?? null),
+        policyCalls: projectPolicyCalls(),
+      };
+      const wanted = {
+        ...expectedResultProjection(expected.result),
+        resolverCalls: expectedResolverCalls(expected),
+        failures: expectedFailures(expected),
+        policyCalls: expectedPolicyCalls(expected),
+      };
 
       // The recorded Java DIAGNOSTIC, carried out separately from the projection above. It is
       // deliberately not part of pass/fail: message wording is a JS-idiomatic decision in several
@@ -752,12 +1080,14 @@ function runCase(testCase, fixture) {
       // It is ratcheted instead — see `causeMessageMatchedIds` — so a message that matches Java
       // today can never silently stop matching, which is the property the M6 gate's "errors match
       // Java cases" clause actually needs.
-      const causeMessage =
-        expected.result.failureCause == null
-          ? undefined
-          : { wanted: expected.result.failureCause.message, actual: messageOf(result.cause) };
+      const causeMessages = [
+        ...(expected.result.failureCause == null
+          ? []
+          : [{ wanted: expected.result.failureCause.message, actual: messageOf(result.cause) }]),
+        ...failureCauseMessages(expected),
+      ];
 
-      return jcs(actual) === jcs(wanted) ? { ok: true, causeMessage } : { ok: false, actual, wanted, causeMessage };
+      return jcs(actual) === jcs(wanted) ? { ok: true, causeMessages } : { ok: false, actual, wanted, causeMessages };
     }
 
     case "get": {
@@ -776,15 +1106,36 @@ function runCase(testCase, fixture) {
       // cannot yet be checked, not channels that are inconvenient. As it happens no corpus `get`
       // case records resolver calls alone, so nothing moved on this line by itself — which is the
       // point: the gate is about what is verified, not about what it lets through.
-      const observed = ["failures", "policyCalls", "supplierCalls", "thrown"].filter((k) => k in expected);
-      if (observed.length) unsupported("get cases recording failure/policy/supplier calls or a thrown error need the callback contracts");
+      //
+      // `failures` and `policyCalls` leave it HERE, in the same hunk that adds their comparison two
+      // lines below — the precedent `resolverCalls` set, and the only terms on which a channel may
+      // leave this gate. `supplierCalls` (B3) and `thrown` (B2) stay, because nothing compares them.
+      // The message names the channels the list actually holds. It read "failure/policy/supplier
+      // calls or a thrown error" for one slice after `failures` and `policyCalls` left the list, so
+      // 46 cases carried a reason-table label naming two channels that ARE compared.
+      const observed = ["supplierCalls", "thrown"].filter((k) => k in expected);
+      if (observed.length) unsupported("get cases recording supplier calls or a thrown error need the callback contracts");
       const strings = stringsFor(fixture);
       const actual = {
         translation: strings.get(input.key, placeholdersFor(input), callOptionsFor(input)),
         resolverCalls: [...resolverCalls],
+        // No result object exists on this path, so `matchObjectIdenticalToResult` is NOT COMPARABLE
+        // and is recorded null on both sides — which is what the oracle does by passing null to
+        // `describeObservedFailures`, and why that field is tri-state rather than boolean.
+        failures: projectFailures(null),
+        policyCalls: projectPolicyCalls(),
       };
-      const wanted = { translation: expected.translation, resolverCalls: expectedResolverCalls(expected) };
-      return jcs(actual) === jcs(wanted) ? { ok: true } : { ok: false, actual, wanted };
+      const wanted = {
+        translation: expected.translation,
+        resolverCalls: expectedResolverCalls(expected),
+        failures: expectedFailures(expected),
+        policyCalls: expectedPolicyCalls(expected),
+      };
+      // `get` produces no result object, so the only cause message it can record is the failure
+      // channel's — 73 of the 227 rows the ratchet used to miss entirely.
+      return jcs(actual) === jcs(wanted)
+        ? { ok: true, causeMessages: failureCauseMessages(expected) }
+        : { ok: false, actual, wanted };
     }
 
     case "cardinalityForNumber":
@@ -977,15 +1328,16 @@ function runCase(testCase, fixture) {
       // Channel one of the two the corpus records: what the MATCHER selects, observed on its own
       // rather than through a translation. `Strings#matchFor` has two overloads and the corpus
       // exercises both under this one operation name — 137 cases hand it a `Locale`, 164 hand it a
-      // `List<LanguageRange>`. Both are routed here now; of the list cases, the 50 that carry
-      // exactly one member run, and the 114 multi-member ones do not.
+      // `List<LanguageRange>`. Both are routed here now; of the list cases, the 74 that arrive as an
+      // EXPLICIT ARRAY run, and the 90 spelled as an Accept-Language HEADER do not.
       //
       // In JAVA these are one solver, not two: `matchFor(Locale)` is the DEFAULT interface method at
       // `LocaleMatcher.java:63-65`, which wraps `locale.toLanguageTag()` in a single `LanguageRange`
-      // and delegates to `matchFor(List)`. The port has only the single-member reduction of that
-      // solver so far, which is why the member COUNT is what this arm routes on; the N-member
-      // sections it still lacks are M7's A3. Saying Java has two matchers would be false, and would
-      // read as licence to keep two code paths once the whole list overload lands.
+      // and delegates to `matchFor(List)`. As of M7 A3 the port has that one solver too — the member
+      // COUNT is no longer what this arm routes on, because it no longer decides anything. What is
+      // left to route on is the INPUT SHAPE: an array is a list of `LanguageRange`s the caller
+      // already built, a string is a header only `Locale.LanguageRange.parse` can turn into one, and
+      // that parser is M7's A4.
       //
       // The ONE ingress difference is real and belongs at the top of the solver, not below it: the
       // locale overload builds its range from `toLanguageTag()`, so it matches on a NORMALIZED tag,
@@ -993,13 +1345,17 @@ function runCase(testCase, fixture) {
       // `matchForRange` is shared.
       //
       // ROUTING ON THE INPUT SHAPE, decided before anything executes — not a catch around a call
-      // that ran. The MULTI-MEMBER language-range overload is still not run, and that guard is the
-      // only `unsupported` on the answering path: it is the same call the default arm below makes,
-      // on the same operation, producing the same reason string, so those cases report exactly what
-      // they reported before this arm existed. (Two others exist and neither can absorb a matcher
-      // defect: `matchForCase`'s module-availability check, which decides on the subpath's
-      // existence before any range is matched, and the recorded-throw branch's undeclared-Java-type
-      // check, which fires on the CORPUS's vocabulary rather than on anything the port did.)
+      // that ran. A HEADER STRING is still not parsed, and that guard is the only `unsupported` on
+      // the answering path: it is the same call the default arm below makes, on the same operation,
+      // producing the same reason string, so those cases report exactly what they reported before
+      // this arm existed. (Two others exist and neither can absorb a matcher defect:
+      // `matchForCase`'s module-availability check, which decides on the subpath's existence before
+      // any range is matched, and the recorded-throw branch's undeclared-Java-type check, which
+      // fires on the CORPUS's vocabulary rather than on anything the port did.)
+      //
+      // A0 wrote the guard as `!singleMember`, which ALSO routed away the 24 explicit multi-member
+      // arrays. A3 implements those, so the count drops out of the condition entirely; a guard that
+      // still counted members would now be refusing work the port does.
       //
       // A `try { … } catch { unsupported(…) }` around the answering call would convert a real
       // matcher defect into attributed non-work and look identical in the headline count, which is
@@ -1008,15 +1364,14 @@ function runCase(testCase, fixture) {
       // legal RFC 4647 but not well-formed locales (`de-*`, `x-foo-*`, `zh-guoyu-tw`, …) must MATCH
       // here; if a future edit made them report a reason instead, this arm would be lying.
       const ranges = input.languageRanges;
-      const singleMember = Array.isArray(ranges) && ranges.length === 1;
 
-      if (input.locale === undefined && !singleMember) operationNotImplemented(operation);
+      if (input.locale === undefined && !Array.isArray(ranges)) operationNotImplemented(operation);
 
       // EIGHT `matchFor` cases record `expected.thrown` and carry NO `expected.match`: the two
-      // 33-member limit rows and the six malformed headers. All eight are header strings or
-      // over-length lists, so the guard above routes every one of them away today and this branch
-      // is unreached — which is precisely why it is written now, next to the comparison it mirrors,
-      // rather than left to the slice that opens those routes and will be busy with the parser.
+      // 33-member limit rows and the six malformed headers. Seven are header strings and are still
+      // routed away by the guard above; the eighth,
+      // `browser-chooser.limit.explicit-thirty-three-ranges-rejected`, is a real 33-entry ARRAY and
+      // reaches this branch as of A3, where the port's own 32-member cap answers it.
       // Without it, `const recorded = expected.match` is `undefined` and `recorded.matchType` dies
       // as a TypeError where an error-identity comparison belongs.
       //
@@ -1201,10 +1556,20 @@ function classifyFailure(testCase, fixture, actual, wanted) {
   //    would have relabelled every future per-call isolation defect as "not implemented", inside a
   //    function whose contract says it cannot. `IMPLEMENTED_CALL_OPTIONS` is the single list, shared
   //    with `callOptionsFor`, so an option cannot be passed to the port and excused here at once.
+  //    `perCallOverrideOrder` is excluded for the same reason `value`/`start`/`end` are: it is not a
+  //    per-call OPTION and no port will ever implement it. It is an ORACLE authoring directive naming
+  //    the order in which VectorOracle applies the two TranslationOptions.Builder setters that clear
+  //    each other, and lokalized-spec refuses it on any case that does not also carry a non-null
+  //    `languageRanges` (tools/vector-oracle/ingest.mjs, backed by an AssertionError in the oracle
+  //    itself), so it can never be the ONLY unimplemented key here and excluding it cannot suppress an
+  //    attribution. Leaving it in split `per-call options are not implemented (languageRanges)` into a
+  //    second bucket differing by one word -- measured, 22 + 2 -- which is exactly the bucket-splitting
+  //    `operationNotImplemented`'s comment warns about, and it named a JS option that does not exist as
+  //    port work M7 owes.
   const TAKES_OPTIONS = new Set(["getResult", "get"]);
   if (TAKES_OPTIONS.has(testCase.operation)) {
     const perCall = Object.keys(testCase.input)
-      .filter((k) => !["key", "locale", "placeholders"].includes(k))
+      .filter((k) => !["key", "locale", "placeholders", "perCallOverrideOrder"].includes(k))
       .filter((k) => !IMPLEMENTED_CALL_OPTIONS.has(k));
     if (perCall.length) return `per-call options are not implemented (${perCall.sort().join(", ")})`;
   }
@@ -1239,7 +1604,8 @@ function classifyFailure(testCase, fixture, actual, wanted) {
 }
 
 // --- run ----------------------------------------------------------------------------------------
-const corpus = JSON.parse(readFileSync(corpusPath, "utf8"));
+const corpusBytes = readFileSync(corpusPath);
+const corpus = JSON.parse(corpusBytes.toString("utf8"));
 const cases = corpus.cases.filter((c) => !familyFilter || c.id.startsWith(familyFilter));
 
 // Re-derive every "no JS counterpart" claim from the spec before using any of them. A stale claim
@@ -1265,10 +1631,12 @@ for (const testCase of cases) {
     // Only for a case that PASSES. Asking whether the diagnostic matches on a case whose RESULT
     // does not is meaningless, and ratcheting one would pin the wording of a path that is still
     // being built.
-    if (outcome.ok && outcome.causeMessage) {
-      const { wanted, actual } = outcome.causeMessage;
-      if (wanted === actual) causeMessageMatched.push(testCase.id);
-      else causeMessageDiverged.push({ id: testCase.id, wanted, actual });
+    if (outcome.ok && outcome.causeMessages?.length) {
+      // A case is banked as matching only when EVERY message it records matches, and the first
+      // divergence is the one reported, so a case cannot half-match its way into the ratchet.
+      const diverged = outcome.causeMessages.find((pair) => pair.wanted !== pair.actual);
+      if (!diverged) causeMessageMatched.push(testCase.id);
+      else causeMessageDiverged.push({ id: testCase.id, wanted: diverged.wanted, actual: diverged.actual });
     }
     if (outcome.ok) {
       passed.push(testCase.id);
@@ -1296,19 +1664,59 @@ for (const testCase of cases) {
   }
 }
 
+// --- what may be RECORDED as passing ------------------------------------------------------------
+/**
+ * Cases that can only pass COINCIDENTALLY, and are therefore never banked by the ratchet.
+ *
+ * A row carrying `perCallOverrideOrder` presents BOTH a per-call `locale` and a non-null
+ * `languageRanges` — a shape whose Java answer is decided by the order in which VectorOracle applies
+ * the two mutually-clearing TranslationOptions.Builder setters, and whose JS counterpart the port is
+ * permanently OBLIGED TO REFUSE (lokalized-spec `TranslationOptions#<init>:70`, disposition
+ * `required`, not oracle-derivable). Such a row passes here only because `callOptionsFor` drops
+ * `languageRanges` on the floor: the runner asks a one-override question and gets the one-override
+ * answer. Banking it would make the ratchet REQUIRE the opposite of the port's obligation — once
+ * `languageRanges` reaches `CALL_OPTION_ADAPTERS`, the port's correct refusal throws, is recorded
+ * FAILED, and `regressions.length` turns the gate red for doing the right thing. Two such rows were
+ * banked by a `--write` before this existed, which is why it is computed from the corpus rather than
+ * kept as a list of ids: a list would have to be maintained, and the next such row would be banked
+ * before anyone noticed. `passed` itself is untouched — these cases DID pass and the run says so;
+ * only what is written down, and what is offered for writing down, is filtered.
+ *
+ * The rows are `informationalIds` by construction: lokalized-spec's ingest refuses any other
+ * partition for a case carrying the key, so nothing here can ever enter a release numerator either.
+ *
+ * This also replaces `xfailedIds`, which was written as a hard-coded `[]` and read nowhere: a
+ * mechanism-shaped hole that looked like the guard this is, and would have been trusted as one.
+ * Removed with the same edit that supplies the real thing.
+ */
+const coincidentalIds = new Set(
+  cases
+    .filter((c) => Object.prototype.hasOwnProperty.call(c.input ?? {}, "perCallOverrideOrder"))
+    .map((c) => c.id),
+);
+const recordablePassed = passed.filter((id) => !coincidentalIds.has(id));
+const notRecorded = passed.filter((id) => coincidentalIds.has(id));
+
 // `unsupportedIds` stays the COMPLETE set of cases that neither passed nor failed, because plan 8.5
 // gates a strict parity-backed release on that set being empty and narrowing it here would quietly
 // relax the release gate. The new fields partition it: what is unbuilt, and what is unbuildable.
 const report = {
-  corpusSha256: corpus.oracle.librarySourcesSha256,
+  // The field named for the corpus now hashes the CORPUS. It used to be assigned
+  // `corpus.oracle.librarySourcesSha256` — the digest of the Java sources the oracle executed, a
+  // useful number under the wrong name — so a baseline could be measured against one corpus revision
+  // and read back against another with nothing to notice: the corpus grew by five cases and this
+  // field did not move. Both are recorded now, each under its own name.
+  corpusSha256: createHash("sha256").update(corpusBytes).digest("hex"),
+  librarySourcesSha256: corpus.oracle.librarySourcesSha256,
   behavioralVectorsVersion: corpus.behavioralVectorsVersion,
   applicable: cases.length,
-  passedIds: passed,
+  passedIds: recordablePassed,
+  /** Passing, but never ratcheted. See `coincidentalIds` — reported, never silently dropped. */
+  coincidentallyPassingIds: notRecorded,
   failedIds: failed.map((f) => f.id),
   unsupportedIds: [...skipped, ...nonportable],
   notImplementedIds: skipped,
   nonportableIds: nonportable,
-  xfailedIds: [],
   causeMessageMatchedIds: causeMessageMatched,
 };
 if (jsonOut) writeFileSync(jsonOut, `${JSON.stringify(report, null, 2)}\n`, "utf8");
@@ -1331,7 +1739,9 @@ if (!familyFilter) {
     const nowPassing = new Set(passed);
     regressions = baseline.passedIds.filter((/** @type {string} */ id) => !nowPassing.has(id));
     const wasPassing = new Set(baseline.passedIds);
-    newlyPassing = passed.filter((id) => !wasPassing.has(id));
+    // Offered for recording, not merely passing: a coincidental row must not be reported as a
+    // candidate for `--write` either, or the next reviewer records it in good faith.
+    newlyPassing = recordablePassed.filter((id) => !wasPassing.has(id));
 
     // The SECOND ratchet, on diagnostics. A case whose Java cause message this port reproduced is
     // not allowed to stop reproducing it: that is the only mechanism standing between the gate's
@@ -1344,7 +1754,7 @@ if (!familyFilter) {
   }
   if (write) {
     mkdirSync(dirname(baselinePath), { recursive: true });
-    writeFileSync(baselinePath, `${JSON.stringify({ ...report, passedIds: [...passed].sort(), failedIds: [], unsupportedIds: [...skipped, ...nonportable].sort(), notImplementedIds: [...skipped].sort(), nonportableIds: [...nonportable].sort(), causeMessageMatchedIds: [...causeMessageMatched].sort() }, null, 2)}\n`, "utf8");
+    writeFileSync(baselinePath, `${JSON.stringify({ ...report, passedIds: [...recordablePassed].sort(), coincidentallyPassingIds: [...notRecorded].sort(), failedIds: [], unsupportedIds: [...skipped, ...nonportable].sort(), notImplementedIds: [...skipped].sort(), nonportableIds: [...nonportable].sort(), causeMessageMatchedIds: [...causeMessageMatched].sort() }, null, 2)}\n`, "utf8");
   }
 }
 
@@ -1435,7 +1845,10 @@ if (!familyFilter) {
       if (causeMessageRegressions.length > 20) console.log(`  ... and ${causeMessageRegressions.length - 20} more`);
     }
   }
-  if (write) console.log(`\nbaseline written: ${passed.length} passing`);
+  if (notRecorded.length)
+    console.log(`\nNOT RATCHETED (${notRecorded.length}) — passing, but only coincidentally; see \`coincidentalIds\`:` +
+      `\n  ${notRecorded.join("\n  ")}`);
+  if (write) console.log(`\nbaseline written: ${recordablePassed.length} recorded of ${passed.length} passing`);
 }
 
 if (staleNonportabilityClaims.length) {

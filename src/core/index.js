@@ -81,6 +81,25 @@ import { PLURAL_DATA_RUNTIME } from "../internal/plural.js";
  * @property {import("../internal/bidi.js").BidiIsolation} [bidiIsolation] whether caller-supplied
  *   values are wrapped in Unicode isolate controls. DEFAULTS TO `"rtl-locales"`, so isolation is on
  *   for RTL evaluation locales with nothing configured; it is not opt-in behavior.
+ * @property {BuiltinFallbackPolicy | FallbackPolicy} [fallbackPolicy] plan section 2.5's
+ *   per-candidate continuation decision. `== null` means unset and selects `"missing-or-no-match"`,
+ *   the same defaulting `bidiIsolation` uses and for the same reason (`DefaultStrings.java:473`
+ *   substitutes the built-in when handed null, so an explicit null and an omitted option are one
+ *   state in Java and must be one state here).
+ * @property {FailureHandler} [onFailure] plan section 3.5's final-failure handler, consulted EXACTLY
+ *   ONCE and only after the walk has ended with nothing. `== null` selects the library default,
+ *   which returns the interpolated key (`DefaultStrings.java:472`).
+ */
+
+/**
+ * @typedef {"missing-translation" | "no-matching-alternative" | "resolution-failure"} FailureReason
+ * @typedef {"missing-or-no-match" | "any-failure" | "never"} BuiltinFallbackPolicy
+ * @typedef {(reason: FailureReason, attemptedLocale: string, cause: unknown) => boolean} FallbackPolicy
+ * @typedef {{ action: "return-key" } | { action: "return-string", translation: string } | { action: "throw" }} FailureResponse
+ * @typedef {(failure: TranslationFailure) => FailureResponse} FailureHandler
+ * @typedef {Readonly<{ key: string, lookupLocale: string, localeMatch: unknown,
+ *   attemptedLocales: readonly string[], placeholders: Readonly<Record<string, unknown>>,
+ *   reason: FailureReason, cause: unknown, message: string }>} TranslationFailure
  */
 
 const freeze = Object.freeze;
@@ -135,6 +154,148 @@ function THROWING_PHONETIC_RESOLVER(term, locale) {
     "No phoneticResolver was configured. Provide one via createStrings({ phoneticResolver }) to " +
       `classify the term supplied for locale '${locale}'`,
   );
+}
+
+/**
+ * Plan section 3.5's three failure responses.
+ *
+ * DISCRIMINATED STRUCTURALLY — the plan says outright that "correctness never depends on singleton
+ * identity", so a handler returning `{ action: "return-key" }` written by hand is treated exactly
+ * as one returning this constant. The constants exist so the common cases are allocation-free and
+ * spelled once; the dispatch in `getResult` reads `.action` and never compares by reference.
+ */
+export const RETURN_KEY = freeze({ action: /** @type {const} */ ("return-key") });
+export const THROW_EXCEPTION = freeze({ action: /** @type {const} */ ("throw") });
+
+/**
+ * `TranslationFailureResponse.returnString(...)`.
+ *
+ * The string is returned VERBATIM — not interpolated and not bidi-isolated, which is the whole
+ * difference between this response and `RETURN_KEY`. The corpus pins both halves against one
+ * another: `bidi-isolation.failure-response.return-string-is-not-interpolated-or-isolated` records
+ * `Fallback for {{name}}` with the braces intact while its `return-key` neighbour records
+ * `Farewell ⁨Sarah⁩` with the isolate controls in place.
+ *
+ * @param {string} translation
+ */
+export function returnString(translation) {
+  if (typeof translation !== "string")
+    throw new TypeError(
+      `returnString(translation) requires a string; received ${JSON.stringify(translation)}`,
+    );
+
+  return freeze({ action: /** @type {const} */ ("return-string"), translation });
+}
+
+/**
+ * `DefaultTranslationFallbackPolicy`'s three members (TranslationFallbackPolicy.java).
+ *
+ * `missing-or-no-match` is the library default and is the one that FORFEITS A REACHABLE
+ * TRANSLATION: it halts the walk on a resolution failure even when a later candidate holds a
+ * perfectly good entry for the key. That is Java's behavior, it is measured, and it is not a bug to
+ * be smoothed over — `fallback-policy.handler.return-string-not-used-when-policy-reaches-donor`
+ * exists precisely to show the same lookup succeeding once the policy is widened to `any-failure`.
+ *
+ * A null prototype so `Object.hasOwn` is not the only thing standing between a caller writing
+ * `fallbackPolicy: "toString"` and a policy that is the Function prototype's method.
+ */
+const BUILTIN_FALLBACK_POLICIES = freeze(
+  Object.assign(Object.create(null), {
+    "missing-or-no-match": (/** @type {FailureReason} */ reason) => reason !== "resolution-failure",
+    "any-failure": () => true,
+    never: () => false,
+  }),
+);
+
+/** @type {FallbackPolicy} */
+const DEFAULT_FALLBACK_POLICY = BUILTIN_FALLBACK_POLICIES["missing-or-no-match"];
+
+/** `TranslationFailureHandler.returnKey()` (DefaultStrings.java:472). @type {FailureHandler} */
+const DEFAULT_FAILURE_HANDLER = () => RETURN_KEY;
+
+/**
+ * @param {unknown} policy
+ * @param {string} where
+ * @returns {FallbackPolicy}
+ */
+function validateFallbackPolicy(policy, where) {
+  if (typeof policy === "function") return /** @type {FallbackPolicy} */ (policy);
+  if (typeof policy === "string" && Object.hasOwn(BUILTIN_FALLBACK_POLICIES, policy))
+    return BUILTIN_FALLBACK_POLICIES[policy];
+
+  throw new RangeError(
+    `${where} must be a function or one of 'missing-or-no-match', 'any-failure', or 'never' but ` +
+      `was ${JSON.stringify(policy)}`,
+  );
+}
+
+/**
+ * @param {unknown} handler
+ * @param {string} where
+ * @returns {FailureHandler}
+ */
+function validateFailureHandler(handler, where) {
+  if (typeof handler !== "function") throw new TypeError(`${where} must be a function`);
+  return /** @type {FailureHandler} */ (handler);
+}
+
+/**
+ * The caller's placeholders as the frozen, null-prototype, enumerable record plan 3.5 promises
+ * `TranslationFailure.placeholders` is — "it has no inherited magic keys", so a handler reading
+ * `failure.placeholders.constructor` gets `undefined` rather than a function.
+ *
+ * A `Map` is accepted for the same reason `catalogEntries` accepts one: plan 3.2 types
+ * `Placeholders` as a record OR a `ReadonlyMap`, and `interpolate.js`'s `lookupFor` already honors
+ * both, so a failure record that only understood the object form would silently report NO
+ * placeholder names for exactly the callers who were told to prefer a `Map`.
+ *
+ * @param {Readonly<Record<string, unknown>> | ReadonlyMap<string, unknown> | undefined} placeholders
+ */
+function placeholderRecord(placeholders) {
+  const record = Object.create(null);
+  if (placeholders instanceof Map) for (const [name, value] of placeholders) record[name] = value;
+  else if (placeholders != null)
+    for (const [name, value] of Object.entries(placeholders)) record[name] = value;
+  return freeze(record);
+}
+
+/**
+ * `DefaultTranslationFailure` plus `TranslationFailure#getMessage`'s default method.
+ *
+ * The message is reproduced VERBATIM from Java, including the `MISSING_TRANSLATION` spelling of the
+ * reason. That is a deliberate choice and not an oversight: the corpus records the string on every
+ * one of the 471 rows that observe a failure, it is already redacted the way plan 3.5 requires (no
+ * placeholder VALUES, no cause message), and reproducing it exactly is what lets the conformance
+ * runner compare the field with no adaptation rule of its own. The JS-facing spelling of the reason
+ * is `failure.reason`, which is the JS vocabulary; the message quotes the Java-compatible token so
+ * a log line from this port and one from lokalized-java can be diffed.
+ *
+ * Frozen and null-prototype, so nothing a handler does to it can reach a later lookup.
+ *
+ * @param {string} key
+ * @param {string} lookupLocale
+ * @param {unknown} localeMatch
+ * @param {readonly string[]} attemptedLocales the FROZEN list handed to the result as well
+ * @param {FailureReason} reason
+ * @param {unknown} cause
+ * @param {Readonly<Record<string, unknown>> | ReadonlyMap<string, unknown> | undefined} placeholders
+ * @returns {TranslationFailure}
+ */
+function translationFailureFor(key, lookupLocale, localeMatch, attemptedLocales, reason, cause,
+    placeholders) {
+  const failure = Object.create(null);
+  failure.key = key;
+  failure.lookupLocale = lookupLocale;
+  failure.localeMatch = localeMatch;
+  failure.attemptedLocales = attemptedLocales;
+  failure.placeholders = placeholderRecord(placeholders);
+  failure.reason = reason;
+  failure.cause = cause ?? null;
+  failure.message =
+    `Unable to resolve translation key '${key}' for locale '${lookupLocale}'. ` +
+    `Reason: ${reason.replace(/-/g, "_").toUpperCase()}. ` +
+    `Attempted locales: [${attemptedLocales.join(", ")}]`;
+  return freeze(failure);
 }
 
 /**
@@ -202,6 +363,20 @@ export function createStrings(options) {
     options.bidiIsolation == null
       ? DEFAULT_BIDI_ISOLATION
       : validateBidiIsolation(options.bidiIsolation, "createStrings({ bidiIsolation })");
+
+  // The same `== null` rule, for the same reason, on the two callbacks the walk consults. Java's
+  // constructor substitutes its built-ins when handed null (`DefaultStrings.java:472-475`), so an
+  // explicitly-null option and an omitted one are ONE state there and must be one state here — and
+  // both are validated at CONSTRUCTION rather than at first failure, because a policy of the wrong
+  // shape would otherwise surface only on the unlucky lookup that first missed.
+  const instanceFallbackPolicy =
+    options.fallbackPolicy == null
+      ? DEFAULT_FALLBACK_POLICY
+      : validateFallbackPolicy(options.fallbackPolicy, "createStrings({ fallbackPolicy })");
+  const instanceFailureHandler =
+    options.onFailure == null
+      ? DEFAULT_FAILURE_HANDLER
+      : validateFailureHandler(options.onFailure, "createStrings({ onFailure })");
 
   /** @type {Map<string, Map<string, Definition>>} */
   const catalogs = new Map();
@@ -339,7 +514,9 @@ export function createStrings(options) {
   /**
    * @param {string} key
    * @param {Readonly<Record<string, unknown>> | undefined} placeholders
-   * @param {{ locale?: string, bidiIsolation?: import("../internal/bidi.js").BidiIsolation } | undefined} callOptions
+   * @param {{ locale?: string, bidiIsolation?: import("../internal/bidi.js").BidiIsolation,
+   *   fallbackPolicy?: BuiltinFallbackPolicy | FallbackPolicy | null,
+   *   onFailure?: FailureHandler | null } | undefined} callOptions
    */
   function getResult(key, placeholders, callOptions) {
     const lookupLocale = normalizeTag(callOptions?.locale ?? ambientLocale);
@@ -350,6 +527,17 @@ export function createStrings(options) {
       callOptions?.bidiIsolation == null
         ? instanceBidiIsolation
         : validateBidiIsolation(callOptions.bidiIsolation, "get({ bidiIsolation })");
+    // The same REPLACEMENT rule, from the same two lines of Java (`DefaultStrings.java:684-686`).
+    // A per-call `never` over an instance `any-failure` halts at the first candidate; a per-call
+    // handler displaces the instance one wholesale rather than running after it.
+    const fallbackPolicy =
+      callOptions?.fallbackPolicy == null
+        ? instanceFallbackPolicy
+        : validateFallbackPolicy(callOptions.fallbackPolicy, "get({ fallbackPolicy })");
+    const onFailure =
+      callOptions?.onFailure == null
+        ? instanceFailureHandler
+        : validateFailureHandler(callOptions.onFailure, "get({ onFailure })");
 
     // Channel one: the diagnostic. Computed for every lookup, never used to redirect the walk.
     const localeMatch = freeze(matchFor(lookupLocale, supported, fallbackLocale, tiebreakers));
@@ -365,49 +553,90 @@ export function createStrings(options) {
     // being absent, and the default policy treats them differently, so it is tracked separately.
     let noMatchingAlternative = false;
 
-    for (const candidate of chain) {
+    // INDEX-DRIVEN, and the index is the point. `DefaultStrings.java:698-741` ends every candidate
+    // the same way — `if (candidateIndex + 1 >= fallbackCandidates.size()) break;` and then exactly
+    // ONE `shouldTryNextLocale` consultation — and the port used to encode that ending three
+    // separate times: `continue` for an absent entry, `continue` for a non-matching alternative, and
+    // an unconditional `break` for a throw. Each was the default policy's answer inlined at the site,
+    // which is why every corpus row still agreed: the decisions were right and unobservable. They
+    // stop being either the moment a caller supplies a policy, and the truncation clauses are about
+    // the calls that DO NOT happen — `custom-policy.finalcandidate.no-call-though-the-last-locale-is
+    // -listed` lists all four locales and records exactly three consultations.
+    for (const [candidateIndex, candidate] of chain.entries()) {
       attempted.push(candidate);
-      const definition = catalogs.get(candidate)?.get(key);
-      if (definition === undefined) continue;
+      // Java's per-attempt pair, reset for every candidate: the reason THIS candidate failed for,
+      // and THIS candidate's cause. Neither is the final failure's — `attemptCause` is the current
+      // throw where `firstFailureCause` is the retained first one, and the two differ on every walk
+      // that fails more than once. `custom-policy.cause.truncated-walk-still-reports-the-first-cause`
+      // is the row that separates them: the policy is handed the SECOND candidate's cause while the
+      // result still carries the first.
+      /** @type {FailureReason} */
+      let attemptFailureReason = "missing-translation";
+      /** @type {unknown} */
+      let attemptCause = null;
 
-      try {
-        // The evaluation locale is the SUPPLYING candidate, not the requested tag. This one argument
-        // is the donor rule, and passing `lookupLocale` here would be silently wrong for every
-        // fallback-served plural, gender, and phonetic selection — and for every ALTERNATIVE, whose
-        // `count == CARDINALITY_ONE` must classify under the donor too.
-        const translation = render(
-          definition,
-          placeholders,
-          renderContextFor(key, candidate, bidiIsolation),
+      const definition = catalogs.get(candidate)?.get(key);
+
+      if (definition !== undefined) {
+        try {
+          // The evaluation locale is the SUPPLYING candidate, not the requested tag. This one
+          // argument is the donor rule, and passing `lookupLocale` here would be silently wrong for
+          // every fallback-served plural, gender, and phonetic selection — and for every
+          // ALTERNATIVE, whose `count == CARDINALITY_ONE` must classify under the donor too.
+          const translation = render(
+            definition,
+            placeholders,
+            renderContextFor(key, candidate, bidiIsolation),
+          );
+
+          if (translation !== null)
+            return freeze({
+              key,
+              translation,
+              status: /** @type {const} */ ("translated"),
+              lookupLocale,
+              localeMatch,
+              resolvedLocale: candidate,
+              attemptedLocales: freeze([...attempted]),
+              isFallback: isFallbackFor(localeMatch, lookupLocale, candidate),
+              failureReason: null,
+              cause: null,
+            });
+
+          // Java's `Optional.empty()`: the entry exists, but no alternative matched and the selected
+          // node carries no translation. A DIFFERENT reason from the key being absent, and the
+          // difference is visible to a policy — `custom-policy.reasons.halts-on-the-unlisted-no-
+          // matching-alternative` halts on it while its neighbour walks past.
+          attemptFailureReason = "no-matching-alternative";
+          noMatchingAlternative = true;
+        } catch (error) {
+          attemptFailureReason = "resolution-failure";
+          attemptCause = error;
+          // First cause wins, never the last: Java assigns `firstFallbackFailure` only while null.
+          if (firstFailureCause === null) firstFailureCause = error;
+        }
+      }
+
+      // BEFORE the consultation, never after. A policy is never asked about the final candidate,
+      // whatever it would have said — which is what makes a throwing policy inert on a one-element
+      // chain, and what makes `policyCalls.length === attemptedLocales.length` true exactly when the
+      // last recorded decision was `false` rather than "always one fewer".
+      if (candidateIndex + 1 >= chain.length) break;
+
+      const shouldTryNextLocale = fallbackPolicy(attemptFailureReason, candidate, attemptCause);
+
+      // `requireNonNull(..., "translationFallbackPolicy returned null")` (DefaultStrings.java:735).
+      // Refused rather than coerced: a policy returning `undefined` is a caller mistake, and reading
+      // it as "stop" would silently truncate every walk it governs. No corpus row reaches this — the
+      // oracle has no return-null behavior, which is plan open question 7 — so it is asserted by
+      // `test/fallback-policy.test.js` and nothing else.
+      if (typeof shouldTryNextLocale !== "boolean")
+        throw new TypeError(
+          "The configured fallbackPolicy must return a boolean; received " +
+            `${JSON.stringify(shouldTryNextLocale) ?? String(shouldTryNextLocale)}`,
         );
 
-        // Java's `Optional.empty()`: the entry exists, but no alternative matched and the selected
-        // node carries no translation. NOT a failure of this candidate — the default policy walks
-        // PAST it to the next donor, so this must never be conflated with the throw below.
-        if (translation === null) {
-          noMatchingAlternative = true;
-          continue;
-        }
-
-        return freeze({
-          key,
-          translation,
-          status: /** @type {const} */ ("translated"),
-          lookupLocale,
-          localeMatch,
-          resolvedLocale: candidate,
-          attemptedLocales: freeze([...attempted]),
-          isFallback: isFallbackFor(localeMatch, lookupLocale, candidate),
-          failureReason: null,
-          cause: null,
-        });
-      } catch (error) {
-        // First cause wins, never the last: Java assigns `firstFallbackFailure` only while null.
-        if (firstFailureCause === null) firstFailureCause = error;
-        // The default policy halts on a resolution failure rather than walking past it, forfeiting
-        // a donor that would have resolved. Policies are out of scope here; the corpus gates them.
-        break;
-      }
+      if (!shouldTryNextLocale) break;
     }
 
     // Java's precedence, and the ORDER is not the order the attempts happened in: a resolution
@@ -418,10 +647,74 @@ export function createStrings(options) {
         ? /** @type {const} */ ("no-matching-alternative")
         : /** @type {const} */ ("missing-translation");
 
-    // The failure key is interpolated under the REQUESTED locale, not a supplying one: by definition
-    // no catalog supplied this entry (DefaultStrings.java:754 passes `locale`, not a candidate).
-    return failure(key, lookupLocale, localeMatch, attempted, failureReason, firstFailureCause,
-        placeholders, shouldApplyBidiIsolation(bidiIsolation, lookupLocale));
+    // ONE frozen list, shared by the failure the handler sees and the result it produces, the same
+    // way `localeMatch` is shared. `matchObjectIdenticalToResult` is a recorded observable on the
+    // Java side and the corpus asserts it `true` on all 370 rows that can compare the two.
+    const attemptedLocales = freeze([...attempted]);
+    const translationFailure = translationFailureFor(key, lookupLocale, localeMatch,
+        attemptedLocales, failureReason, firstFailureCause, placeholders);
+
+    // EXACTLY ONCE, and only here — after the walk, never per candidate. All 471 corpus rows that
+    // observe the handler record exactly one failure, including the walks that failed at four
+    // separate candidates for three distinct reasons.
+    const response = onFailure(translationFailure);
+
+    if (response === null || typeof response !== "object")
+      throw new TypeError(
+        "The configured onFailure handler must return a failure response object; received " +
+          `${JSON.stringify(response) ?? String(response)}`,
+      );
+
+    switch (response.action) {
+      case "return-key":
+        // The failure key is interpolated under the REQUESTED locale, not a supplying one: by
+        // definition no catalog supplied this entry (DefaultStrings.java:754 passes `locale`).
+        return failureResult(translationFailure, "returned-key",
+            interpolateFailureKey(key, placeholders,
+                shouldApplyBidiIsolation(bidiIsolation, lookupLocale)));
+      case "return-string":
+        if (typeof response.translation !== "string")
+          throw new TypeError(
+            "A return-string failure response must carry a string translation; received " +
+              `${JSON.stringify(response.translation) ?? String(response.translation)}`,
+          );
+        // VERBATIM. Not interpolated, not isolated — see `returnString`.
+        return failureResult(translationFailure, "returned-string", response.translation);
+      case "throw":
+        return throwForFailure(translationFailure);
+      default:
+        // `TranslationFailureResponse.Action` has three members and Java's own `default` arm raises
+        // `IllegalArgumentException` on a fourth (DefaultStrings.java:764-766). Reached here by a
+        // handler returning an object of some other shape, which TypeScript's union has already
+        // narrowed away — hence the cast, which is a statement about untyped callers, not a hole.
+        throw new TypeError(
+          `Unsupported failure response action ${JSON.stringify(/** @type {any} */ (response).action)}; ` +
+            "expected 'return-key', 'return-string', or 'throw'",
+        );
+    }
+  }
+
+  /**
+   * The handler-produced `TranslationResult`, for the two responses that produce one.
+   *
+   * @param {TranslationFailure} translationFailure
+   * @param {"returned-key" | "returned-string"} status
+   * @param {string} translation
+   */
+  function failureResult(translationFailure, status, translation) {
+    return freeze({
+      key: translationFailure.key,
+      translation,
+      status,
+      lookupLocale: translationFailure.lookupLocale,
+      localeMatch: translationFailure.localeMatch,
+      resolvedLocale: null,
+      attemptedLocales: translationFailure.attemptedLocales,
+      isFallback: isFallbackFor(/** @type {any} */ (translationFailure.localeMatch),
+          translationFailure.lookupLocale, null),
+      failureReason: translationFailure.reason,
+      cause: translationFailure.cause,
+    });
   }
 
   /**
@@ -1007,38 +1300,21 @@ function resolvePluralData(supplied, catalogs) {
 }
 
 /**
- * @param {string} key
- * @param {string} lookupLocale
- * @param {unknown} localeMatch
- * @param {string[]} attempted
- * @param {"missing-translation" | "no-matching-alternative" | "resolution-failure"} failureReason
- * @param {unknown} cause
- * @param {Readonly<Record<string, unknown>> | undefined} placeholders
- * @param {boolean} isolateValues decided in `getResult` from the REQUESTED locale
+ * `DefaultStrings#throwExceptionFor` (DefaultStrings.java:3196-3213).
+ *
+ * PARTIAL, and deliberately so: the rethrow-by-identity clause is here because it is the half the
+ * walk restructure needs and the half that must never be got wrong — a wrapper around the retained
+ * cause would destroy the identity plan 3.5 promises ("no additional wrapper is added when the cause
+ * is stored"). The other half, `MissingTranslationException`'s JS counterpart with its `code` and
+ * its frozen `failure`, belongs to B2 along with the runner's `expected.thrown` gate; until then a
+ * cause-less throw response raises a plain `Error` carrying the redacted failure message. No corpus
+ * row reaches either arm today: every case whose handler throws records `expected.thrown` and is
+ * attributed to that slice.
+ *
+ * @param {TranslationFailure} translationFailure
+ * @returns {never}
  */
-function failure(key, lookupLocale, localeMatch, attempted, failureReason, cause, placeholders,
-    isolateValues) {
-  // Fail-soft, and the KEY IS A TEMPLATE. Keys routinely contain placeholders — `Farewell {{name}}`
-  // — and Java interpolates the returned key with the caller's values rather than emitting the raw
-  // braces. Returning the key verbatim looks correct until a real catalog has a templated key.
-  //
-  // The SAME scanner the renderer uses, in its lenient mode, rather than a regex over `{{…}}`. The
-  // difference is not cosmetic: escapes are mode-INDEPENDENT, so `\\`, `\}}` and `\{{` are processed
-  // in a returned key exactly as in a translation, and an escaped opening swallows everything
-  // through the next `}}` — including a real, bound placeholder. A regex that only knows about
-  // well-formed tokens gets every one of those wrong while looking right on the common case.
-  const translation = interpolateFailureKey(key, placeholders, isolateValues);
-
-  return freeze({
-    key,
-    translation,
-    status: /** @type {const} */ ("returned-key"),
-    lookupLocale,
-    localeMatch,
-    resolvedLocale: null,
-    attemptedLocales: freeze([...attempted]),
-    isFallback: isFallbackFor(/** @type {any} */ (localeMatch), lookupLocale, null),
-    failureReason,
-    cause: cause ?? null,
-  });
+function throwForFailure(translationFailure) {
+  if (translationFailure.cause !== null) throw translationFailure.cause;
+  throw new Error(translationFailure.message);
 }

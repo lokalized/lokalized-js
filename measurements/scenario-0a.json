@@ -8,20 +8,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 25,
-      "sourceBytes": 599551,
-      "importMs": 0.256,
-      "constructionMs": 0.0953,
-      "firstRenderMs": 0.3146,
-      "retainedBytes": 63272
+      "sourceBytes": 636829,
+      "importMs": 0.294,
+      "constructionMs": 0.1142,
+      "firstRenderMs": 0.3507,
+      "retainedBytes": 63512
     },
     {
       "label": "core + parsed equivalent",
       "modules": 24,
-      "sourceBytes": 593126,
-      "importMs": 0.327,
-      "constructionMs": 0.2368,
-      "firstRenderMs": 0.1813,
-      "retainedBytes": 145000
+      "sourceBytes": 630404,
+      "importMs": 0.39,
+      "constructionMs": 0.2634,
+      "firstRenderMs": 0.2072,
+      "retainedBytes": 179160
     }
   ],
   "rebaselines": [
@@ -145,6 +145,13 @@
       "growth": [
         "root + raw-text catalog: source graph grew 584213 -> 599551 bytes",
         "core + parsed equivalent: source graph grew 577788 -> 593126 bytes"
+      ]
+    },
+    {
+      "reason": "M7 slice batch A3 + B1 + the per-call-override-order oracle slice, re-recorded ONCE at batch close. MEASURED decomposition, root graph 599551 -> 636829 bytes (+37278): src/internal/locale.js +19243 (A3 N-member solver +18375, ablation-verified, plus 868 bytes of comment repair -- two dangling test-file references corrected and the -0 weight comparator divergence documented), src/core/index.js +14994 and src/internal/interpolate.js +3041 (B1 fallback-policy walk, failure handler and the rebuilt-fragment cause ladder). 19243 + 14994 + 3041 = 37278 exactly, so every byte is attributed to a named file. The core graph moved by the IDENTICAL delta, 593126 -> 630404, which is the proof that the growth is all in shared resolution code reachable from both entry points and that nothing new entered the root graph alone. src/negotiate/index.js changed by -824 bytes in the same batch and neither graph moved by it, which is the standing proof that the negotiator and its pinned IANA table stay unreachable from src/index.js. Module count UNCHANGED at 25 root / 24 core, the half of this ratchet a slice can genuinely break.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 599551 -> 636829 bytes",
+        "core + parsed equivalent: source graph grew 593126 -> 630404 bytes"
       ]
     }
   ]
