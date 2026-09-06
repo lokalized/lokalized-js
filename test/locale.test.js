@@ -157,6 +157,37 @@ describe("normalizeTag", () => {
 			assert.throws(() => normalizeTag(tag), RangeError, `expected '${tag}' to be rejected`);
 	});
 
+	it("refuses an ill-formed tag rather than truncating it, as plan §2.2 requires", () => {
+		// THE ILL-FORMED CONTRACT, pinned in the DEFAULT gate. `npm run diff:direct-tag` measures this
+		// class against the pinned JDK — 82 tags where `Locale.forLanguageTag` truncates and the port
+		// refuses, 0 wrongly accepted — and gates it in both directions, but it needs the JDK and is
+		// not part of `npm run verify`. These rows are what makes a leniency toggle fail `npm test`.
+		//
+		// Java's truncation for each. Four are read off that differential's own probe output;
+		// `en-Latin-US` is not in its probe space and was probed directly on the pinned Corretto 21
+		// (`Locale.Builder().setLanguageTag` rejects it, `forLanguageTag` gives `en-Latin`). It is
+		// not a near-miss repair: two of these are not tags at all, and `zh-min-nan.json` truncates
+		// to a language nobody wrote.
+		for (const [tag, javaTruncatesTo] of [
+			["no-NO-NY", "no-NO"],          // the legacy Norwegian spelling; Java answers from `nb`
+			["en-Latin-US", "en-Latin"],    // ...which Java itself then REFUSES as a duplicate
+			["readme.txt", "und"],          // a filename
+			["en-US,en", "en"],             // a whole Accept-Language header
+			["zh-min-nan.json", "min"],     // truncates to a DIFFERENT language
+		])
+			assert.throws(() => normalizeTag(tag), RangeError,
+				`expected '${tag}' to be refused, not truncated to '${javaTruncatesTo}'`);
+
+		// CONTROLS, and they are the point of the row rather than decoration: each is the WELL-FORMED
+		// near-miss of a refusal above, differing only in the ill-formedness under test. A port that
+		// refused too much would fail here, and the two clauses — "accept every well-formed tag" and
+		// "refuse everything else" — would otherwise be indistinguishable. Both expectations are
+		// Java's, re-probed on the pinned Corretto 21 in the same run as the truncations above:
+		// `Locale.Builder` accepts both, and `forLanguageTag(…).toLanguageTag()` gives exactly these.
+		assert.equal(normalizeTag("no-NO-x-lvariant-NY"), "nn-NO");
+		assert.equal(normalizeTag("en-Latn-US"), "en-Latn-US");
+	});
+
 	it("requires an ALPHA extension singleton, as LanguageTag.isExtensionSingleton does", () => {
 		// A DIGIT singleton is not an extension prefix, so the tail is an invalid subtag and the whole
 		// tag is ill-formed. `Locale.forLanguageTag` truncates each of these to a bare `en`.

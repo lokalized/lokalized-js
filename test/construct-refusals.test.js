@@ -25,6 +25,12 @@ import { CONSTRUCT_REFUSAL_ADAPTATIONS } from "../tools/construct-refusals.mjs";
  */
 const CATALOG = { Greeting: { translation: "Hello" } };
 const BASE = { fallbackLocale: "en", locale: "en", strings: { en: CATALOG } };
+/** Two catalogs under one language code: the state every tiebreaker rule below is about. */
+const AMBIGUOUS = {
+  fallbackLocale: "en",
+  locale: "en",
+  strings: { en: CATALOG, "en-US": { Greeting: { translation: "Howdy" } } },
+};
 
 /** @type {Record<string, () => unknown>} keyed by the `DefaultStrings.java` site the table names */
 const SUBJECTS = {
@@ -45,6 +51,63 @@ const SUBJECTS = {
   // :293 -- a null entry inside an otherwise valid catalog.
   "DefaultStrings.java:293": () =>
     createStrings({ ...BASE, strings: { en: [{ key: "Greeting", translation: "Hello" }, null] } }),
+
+  // The `owed-init` half: the fallback and tiebreaker rules of the same constructor. AMBIGUOUS is
+  // the shape all four tiebreaker-list rules need -- two catalogs under one language code -- and it
+  // is deliberately the SAME shape the control below constructs from, so each refusal differs from
+  // an accepting instance in exactly one field.
+  // :309 -- the fallback locale names no loaded catalog.
+  "DefaultStrings.java:309": () =>
+    createStrings({ fallbackLocale: "de", locale: "en", strings: { en: CATALOG } }),
+  // :329 -- two tiebreaker language codes that canonicalize alike. `mo`/`ro` is a CLDR alias pair,
+  // not a JDK legacy one, so a port that only did the JDK's own he->iw mapping still accepts it.
+  "DefaultStrings.java:329": () =>
+    createStrings({
+      fallbackLocale: "ro",
+      locale: "ro",
+      strings: { ro: CATALOG },
+      tiebreakers: { mo: ["mo"], ro: ["ro"] },
+    }),
+  // :349 -- a repeated locale inside one tiebreaker list.
+  "DefaultStrings.java:349": () =>
+    createStrings({ ...AMBIGUOUS, tiebreakers: { en: ["en", "en-US", "en"] } }),
+  // :388 -- a tiebreaker language code with no loaded catalogs at all.
+  "DefaultStrings.java:388": () => createStrings({ ...BASE, tiebreakers: { pt: ["pt-BR"] } }),
+  // :394, first disjunct -- the list is a strict subset, so the SIZES differ.
+  "DefaultStrings.java:394 (size disjunct)": () =>
+    createStrings({ ...AMBIGUOUS, tiebreakers: { en: ["en"] } }),
+  // :394, second disjunct -- right size, wrong membership, so only set equality fails.
+  "DefaultStrings.java:394 (membership disjunct)": () =>
+    createStrings({ ...AMBIGUOUS, tiebreakers: { en: ["en", "en-GB"] } }),
+  // :426 -- two catalogs share a language code and no tiebreakers were supplied at all.
+  "DefaultStrings.java:426": () => createStrings(AMBIGUOUS),
+  // :335 -- a null tiebreaker locale LIST.
+  "DefaultStrings.java:335": () => createStrings({ ...BASE, tiebreakers: { en: null } }),
+  // :343 -- a null entry INSIDE a tiebreaker list.
+  "DefaultStrings.java:343": () => createStrings({ ...BASE, tiebreakers: { en: [null] } }),
+  // :2650 -- a NULL language code, which only the Map half of `TiebreakerMap` can present.
+  "DefaultStrings.java:2650": () =>
+    createStrings({ ...BASE, tiebreakers: new Map([[null, ["en"]]]) }),
+  // :500 -- the same key twice in one locale's ARRAY catalog. A record cannot express it.
+  "DefaultStrings.java:500": () =>
+    createStrings({
+      ...BASE,
+      strings: {
+        en: [
+          { key: "Greeting", translation: "Hello" },
+          { key: "Greeting", translation: "Hello" },
+        ],
+      },
+    }),
+  // :465 -- the fallback tag is canonically equivalent to MORE THAN ONE loaded catalog. Only the
+  // undetermined language reaches it: `und-bokmal` and `und-nynorsk` both canonicalize to `und`,
+  // and neither enters a language bucket, so no tiebreaker list can disambiguate them.
+  "DefaultStrings.java:465": () =>
+    createStrings({
+      fallbackLocale: "und",
+      locale: "und-bokmal",
+      strings: { "und-bokmal": CATALOG, "und-nynorsk": CATALOG },
+    }),
 };
 
 test("the construct-refusal table's JS half is what createStrings actually raises", async (t) => {

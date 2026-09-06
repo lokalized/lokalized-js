@@ -118,6 +118,29 @@ const ERROR_NAME = {
   "com.lokalized.LocalizedStringLoadingException": ["StringsParseError"],
   "java.lang.IllegalArgumentException": ["TypeError", "RangeError"],
   "java.lang.ArithmeticException": ["RangeError"],
+  // A CALLBACK THAT ANSWERED NULL. Java wraps both user callbacks in `requireNonNull`
+  // (DefaultStrings.java:735 for the policy, :749-750 for the handler) and the port refuses the same
+  // two nulls at the same two points with a `TypeError`, so the counterpart is declared here rather
+  // than left undeclared.
+  //
+  // DECLARING IT IS THE STRONGER CHOICE AND IT COSTS FIVE RED ROWS, deliberately. Without the entry
+  // `thrownProjection`'s arm 3 reports the case `unsupported` BEFORE comparing anything, so the five
+  // `null-callbacks.*` rejection rows would verify nothing at all — not the policy's arguments, not
+  // the walk, not which of two null-answering callbacks is rejected first. With it they compare in
+  // full, and they agree with Java on every channel (`policyCalls` down to the RESOLUTION_FAILURE
+  // cause, `failures`, precedence, the two never-consulted controls) and differ ONLY in the composed
+  // message: Java says `translationFallbackPolicy returned null` / `TranslationFailureHandler
+  // returned null`, naming its own identifiers, and the port says `The configured fallbackPolicy must
+  // return a boolean; received null` / `The configured onFailure handler must return a failure
+  // response object; received null`, naming the JS options.
+  //
+  // NOT FIXED HERE, because the fix is not unambiguous and the port contradicts itself on it: for the
+  // two SUPPLIER callbacks it already answers `localeResolver returned null` (core/index.js:900,:914)
+  // — Java's shape with the JS name substituted — while these two use a different shape entirely.
+  // Which of the three wordings is the contract is the same open decision as the `LokalizedError`
+  // hierarchy (plan open question 4), so it is named and left to the user rather than settled by
+  // whichever spelling makes the gate green.
+  "java.lang.NullPointerException": ["TypeError"],
 };
 
 /**
@@ -398,6 +421,18 @@ const RESOLVER_THREW = {
 };
 
 /**
+ * Java exception type -> the JS error name a named `throw-in-policy` behavior raises.
+ *
+ * Separate from `RESOLVER_THREW` for the reason that table is separate from `ERROR_NAME`: these two
+ * behaviors are written independently in this file and in `VectorOracle`, so a shared row would let
+ * one of them change its exception without the other noticing. An unlisted type reports the case
+ * unsupported rather than comparing equal.
+ */
+const POLICY_THREW = {
+  "java.lang.IllegalStateException": "Error",
+};
+
+/**
  * Java exception type -> the JS error NAME the port raises for the same resolution failure.
  *
  * Used only for the `causeType` field of the `failures` and `policyCalls` channels, which is the
@@ -518,14 +553,29 @@ const recordingHandler = (delegate) => (failure) => {
 /**
  * Wrap a fallback policy so every consultation is recorded. `VectorOracle.recordingPolicy`.
  *
- * AFTER the delegate returns, deliberately: a `throw-in-policy` behavior records NOTHING, and that
- * absence is the evidence in the four throw-in-policy cases. Recording first would manufacture a
- * consultation the corpus says is unobservable.
+ * BEFORE the delegate, and the outcome filled in afterwards — mirroring the oracle's own
+ * `try`/`finally` shape (VectorOracle.java:1002-1031) key for key. This used to record AFTER the
+ * delegate returned, because the ORACLE did, so a `throw-in-policy` behavior recorded nothing on
+ * either side and the twelve throw-in-policy rows asserted an absence. That absence was an artifact
+ * of the harness, not of Java: with the oracle fixed, the corpus now states the reason, locale and
+ * cause the throwing policy was handed, and this side must state them too or the new observation
+ * would be compared against an empty channel.
+ *
+ * `threw` is the JS error NAME, null when the consultation returned. On the wanted side
+ * `POLICY_THREW` declares the counterpart for the Java class the oracle records; a `decision` of
+ * null with `threw` null is a policy that RETURNED null, which is a different observation.
  */
 const recordingPolicy = (delegate) => (reason, locale, cause) => {
-  const decision = delegate(reason, locale, cause);
-  policyCalls.push({ reason, locale, causeType: causeNameOf(cause), decision });
-  return decision;
+  const call = { reason, locale, causeType: causeNameOf(cause), decision: null, threw: null };
+  policyCalls.push(call);
+  try {
+    const decision = delegate(reason, locale, cause);
+    call.decision = decision;
+    return decision;
+  } catch (error) {
+    call.threw = error instanceof Error ? error.name : `a thrown ${error === null ? "null" : typeof error}`;
+    throw error;
+  }
 };
 
 /**
@@ -556,6 +606,12 @@ function failureHandlerFor(spec) {
       const message = spec.message ?? "handler failed deliberately";
       return recordingHandler(() => throwSentinel(message));
     }
+    // A handler that answers null instead of a response. Java rejects it at DefaultStrings.java:749
+    // with a NullPointerException whose message it composes; the port refuses it too, at the same
+    // point. Nothing is adapted here — the null is handed to the port verbatim and whatever the port
+    // does with it is the answer compared against Java's.
+    case "return-null":
+      return recordingHandler(() => null);
     default:
       unsupported(`unknown failure handler behavior: ${spec.behavior}`);
   }
@@ -612,6 +668,10 @@ function fallbackPolicyFor(spec) {
       const message = spec.message ?? "fallback policy failed deliberately";
       return recordingPolicy(() => throwSentinel(message));
     }
+    // The policy-side counterpart. Handed to the port verbatim, not pre-validated here: the whole
+    // point of the corpus rows that use it is what the PORT does with a null decision.
+    case "return-null":
+      return recordingPolicy(() => null);
     default:
       unsupported(`unknown custom fallback policy behavior: ${spec.behavior}`);
   }
@@ -815,7 +875,7 @@ function localeSourceFor(fixture, instanceBox) {
           requestedLanguageRanges: (spec.ranges ?? []).map(rangeMemberFrom),
           locale: spec.locale ?? null,
           languageRange: spec.range ?? null,
-          effectiveWeight: spec.weight ?? null,
+          effectiveWeight: fabricatedWeight(spec.weight),
           matchType: adaptEnum(spec.matchType ?? "NONE"),
           fallbackLocale: spec.fallbackLocale ?? "en",
           consideredLocales: spec.consideredLocales ?? [],
@@ -833,6 +893,31 @@ function localeSourceFor(fixture, instanceBox) {
       return match;
     },
   };
+}
+
+/**
+ * A fabricated match's effective weight, including the NON-FINITE value JSON cannot spell.
+ *
+ * `LocaleMatchResult:111` refuses a weight that is not finite, at most 0, or above 1. The last two
+ * are ordinary JSON numbers; the first is why `VectorOracle.fabricatedWeightFrom` accepts a string
+ * sentinel, and this is its counterpart. A closed set of TWO: an unrecognized string is an authoring
+ * mistake and crashes, because silently coercing it (`Number("infnity")` is `NaN`) would still land
+ * on the non-finite arm and make a typo look like the case it was meant to be.
+ *
+ * `nan` is the sentinel that DISCRIMINATES the clause and `infinity` is the one that merely reaches
+ * it. Measured 2026-09-06: deleting `!Number.isFinite(effectiveWeight)` from `src/core/index.js`
+ * leaves the infinity row passing, because `Infinity > 1` refuses it anyway. `NaN > 1` and
+ * `NaN <= 0` are both false, so the finiteness test is the only conjunct that can reject NaN.
+ *
+ * @param {unknown} weight
+ * @returns {number | null}
+ */
+function fabricatedWeight(weight) {
+  if (weight === undefined || weight === null) return null;
+  if (typeof weight === "number") return weight;
+  if (weight === "infinity") return Infinity;
+  if (weight === "nan") return NaN;
+  throw new AuthoringError(`unknown fabricated match weight sentinel '${String(weight)}'`);
 }
 
 /**
@@ -896,8 +981,46 @@ function degenerateCatalogFor(catalogSource, fixture) {
       const [key, definition] = definitions[0];
       return { strings: { en: [{ key, ...definition }, null] } };
     }
+    // :500 -- the SAME key twice inside one locale's iterable. The oracle appends the first loaded
+    // `LocalizedString` to the list twice; the JS counterpart is the same definition object twice in
+    // an ARRAY catalog. A record cannot express it on either side, which is the reason this needs the
+    // array form and the reason a port that only ever built records would never meet the refusal.
+    case "duplicateKey": {
+      const definitions = Object.entries(/** @type {Record<string, object>} */ (firstCatalog));
+      if (definitions.length === 0)
+        throw new AuthoringError(`the first catalog of a duplicateKey fixture must hold a definition`);
+      const [key, definition] = definitions[0];
+      return { strings: { en: [{ key, ...definition }, { key, ...definition }] } };
+    }
     default:
       throw new AuthoringError(`unknown constructionOverrides.catalogSource '${catalogSource}'`);
+  }
+}
+
+/**
+ * The degenerate tiebreaker map a `constructionOverrides.tiebreakerSource` names.
+ *
+ * Three shapes a JSON `tiebreakers` object cannot spell and a JS caller can, because plan 3.1 types
+ * the construction input as a `TiebreakerMap` — a record OR a `ReadonlyMap` — and only the Map half
+ * can carry a null key. Closed set, mirroring `VectorOracle.buildStrings` value for value; an
+ * unknown value THROWS rather than quietly handing `createStrings` a valid map.
+ *
+ * @param {string} tiebreakerSource
+ * @returns {{ tiebreakers: unknown }}
+ */
+function degenerateTiebreakersFor(tiebreakerSource) {
+  switch (tiebreakerSource) {
+    // :335 -- a null locale LIST for a language code.
+    case "nullList":
+      return { tiebreakers: { en: null } };
+    // :343 -- a null entry INSIDE a list.
+    case "nullEntry":
+      return { tiebreakers: { en: [null] } };
+    // :2650 -- a NULL language code, which needs the Map form on both sides.
+    case "nullLanguageCode":
+      return { tiebreakers: new Map([[null, ["en"]]]) };
+    default:
+      throw new AuthoringError(`unknown constructionOverrides.tiebreakerSource '${tiebreakerSource}'`);
   }
 }
 
@@ -950,6 +1073,18 @@ function createStringsOptionsFor(fixture, instanceBox, overrides) {
   if (overrides?.localeSource === undefined)
     localeOption = localeSource ?? { locale: fixture.instanceLocale ?? fixture.fallbackLocale };
   else if (overrides.localeSource === "omit") localeOption = {};
+  // Strings.java:288 / :310 — a NULL setter argument does not clear the sibling supplier, so the
+  // surviving source decides and the instance BUILDS. The JS analogue of "the caller wrote the key
+  // and its value was null" is an explicit `undefined` beside the other resolver: a config object
+  // has no setters, so `undefined` is the only way to spell "named but not supplied", and the port
+  // must read it as ABSENT rather than as a second specified source. Reaching for `null` instead
+  // would test a different proposition — Java's builder was handed null, but its CONSTRUCTOR was
+  // handed nothing at all, and it is the constructor's "exactly one" rule that these rows are read
+  // against.
+  else if (overrides.localeSource === "explicitNullLocaleSupplier")
+    localeOption = { ...localeSource, localeResolver: undefined };
+  else if (overrides.localeSource === "explicitNullMatchSupplier")
+    localeOption = { ...localeSource, localeMatchResolver: undefined };
   else throw new AuthoringError(`unknown constructionOverrides.localeSource '${overrides.localeSource}'`);
 
   const catalogOption =
@@ -957,12 +1092,26 @@ function createStringsOptionsFor(fixture, instanceBox, overrides) {
       ? { strings: fixture.files }
       : degenerateCatalogFor(overrides.catalogSource, fixture);
 
+  // `instanceCallbacks: "libraryDefaults"` installs NEITHER recording callback, so the port selects
+  // its OWN defaults exactly as `DefaultStrings:472`/`:473` do. It is the one arm where the always-on
+  // wrapping below would erase the observation, which is why it is an override rather than a mode.
+  const libraryDefaults = overrides?.instanceCallbacks === "libraryDefaults";
+  if (overrides?.instanceCallbacks !== undefined && !libraryDefaults)
+    throw new AuthoringError(`unknown constructionOverrides.instanceCallbacks '${overrides.instanceCallbacks}'`);
+
+  const tiebreakerOption =
+    overrides?.tiebreakerSource === undefined
+      ? fixture.tiebreakers
+        ? { tiebreakers: fixture.tiebreakers }
+        : {}
+      : degenerateTiebreakersFor(overrides.tiebreakerSource);
+
   return {
     fallbackLocale: fixture.fallbackLocale,
     ...localeOption,
     ...catalogOption,
     ...(loadingLimits ? { loadingLimits } : {}),
-    ...(fixture.tiebreakers ? { tiebreakers: fixture.tiebreakers } : {}),
+    ...tiebreakerOption,
     ...(Object.keys(pluralData).length ? { pluralData } : {}),
     // Only when the fixture names one. Java's builder is left untouched otherwise, so the library's
     // own fail-fast default resolver stays installed — which is exactly what the `absent-resolver`
@@ -982,8 +1131,12 @@ function createStringsOptionsFor(fixture, instanceBox, overrides) {
     // the delegates are `RETURN_KEY` and `missing-or-no-match`, which is what an unconfigured
     // `createStrings` would have used anyway. The cost is that the port's OWN defaulting is never
     // exercised here; `test/fallback-policy.test.js` covers it.
-    onFailure: failureHandlerFor(fixture.translationFailureHandler),
-    fallbackPolicy: fallbackPolicyFor(fixture.translationFallbackPolicy),
+    ...(libraryDefaults
+      ? {}
+      : {
+          onFailure: failureHandlerFor(fixture.translationFailureHandler),
+          fallbackPolicy: fallbackPolicyFor(fixture.translationFallbackPolicy),
+        }),
   };
 }
 
@@ -1269,10 +1422,25 @@ function operandsWithVisibleDecimalPlaces(value, visibleDecimalPlaces) {
   }
 }
 
-const placeholdersFor = (input) =>
-  input.placeholders === undefined
-    ? undefined
-    : Object.fromEntries(Object.entries(input.placeholders).map(([k, v]) => [k, placeholderValue(v)]));
+/**
+ * The caller's placeholders, in the shape `get`/`getResult` accept.
+ *
+ * `nullPlaceholderName` mirrors the flag `VectorOracle` reads for `DefaultStrings:690`: JSON has no
+ * null object key, so a case asks for one instead of spelling it. It forces the MAP form, which is
+ * the only half of plan 3.2's `Placeholders` union that can carry a null key — a record cannot, and
+ * building one would silently rename the entry to the string "null" and test nothing.
+ */
+const placeholdersFor = (input) => {
+  const named =
+    input.placeholders === undefined
+      ? undefined
+      : Object.entries(input.placeholders).map(
+          (/** @type {[string, unknown]} */ [k, v]) => [k, placeholderValue(v)],
+        );
+
+  if (!input.nullPlaceholderName) return named === undefined ? undefined : Object.fromEntries(named);
+  return new Map([...(named ?? []), [null, "ignored"]]);
+};
 
 /**
  * The eight recorded match fields, from the ACTUAL side.
@@ -1504,15 +1672,26 @@ const expectedSupplierCalls = (expected) =>
     returnedMatchType: call.returnedMatchType === null ? null : adaptEnum(call.returnedMatchType),
   }));
 
-/** The policy consultations this case made, and the ones Java recorded. Same `?? []` rule. */
+/**
+ * The policy consultations this case made, and the ones Java recorded. Same `?? []` rule.
+ *
+ * `threw` is ABSENT from a recorded call that returned and PRESENT only on one whose delegate threw,
+ * which is how the corpus keeps a policy that returned null apart from one that threw — both record
+ * `decision: null`. Normalized to null here so the two sides compare on one shape.
+ */
 const projectPolicyCalls = () => policyCalls.map((call) => ({ ...call }));
 const expectedPolicyCalls = (expected) =>
-  (expected.policyCalls ?? []).map((call) => ({
-    reason: adaptEnum(call.reason),
-    locale: call.locale,
-    causeType: adaptCauseType(call.causeType),
-    decision: call.decision,
-  }));
+  (expected.policyCalls ?? []).map((call) => {
+    if (call.threw !== undefined && !(call.threw in POLICY_THREW))
+      unsupported(`no JS counterpart declared for a fallback policy throwing ${call.threw}`);
+    return {
+      reason: adaptEnum(call.reason),
+      locale: call.locale,
+      causeType: adaptCauseType(call.causeType),
+      decision: call.decision,
+      threw: call.threw === undefined ? null : POLICY_THREW[call.threw],
+    };
+  });
 
 /* --- the throw response ----------------------------------------------------------------------
  *
@@ -1581,6 +1760,35 @@ function caughtIdentity(caught) {
  * JS-idiomatic divergences red and make the ratchet a gate by the side door. Nothing is lost by it:
  * the identity assertion on that arm is strictly stronger than comparing the message would be.
  */
+/**
+ * Java messages whose JS counterpart is DECLARED to differ, with the exact counterpart pinned.
+ *
+ * Arm 3 below compares `thrown.message` exactly, on the premise that the message is "the library's
+ * own composed string on both sides". That premise fails for Java's `requireNonNull` strings, which
+ * name a JAVA identifier: `translationFallbackPolicy` and `TranslationFailureHandler` are Java option
+ * names, and the JS options are `fallbackPolicy` and `onFailure`. Reproducing them verbatim would
+ * point a JS consumer at identifiers this API does not have, which is worse than diverging.
+ *
+ * This is NOT a relaxation of the comparison. The Java message still selects the row, the JS message
+ * is pinned EXACTLY, and a divergence that stops diverging is STALE and fails the run — so the table
+ * cannot rot into a list of excuses the way three known-gap lists in this project already have.
+ * Discovered by the oracle's new `return-null` behaviors, which replaced a port message derived from
+ * READING DefaultStrings.java:735 with one measured against a Java run.
+ */
+const DECLARED_MESSAGE_DIVERGENCES = {
+  "TranslationFailureHandler returned null": {
+    js: "The configured onFailure handler must return a failure response object; received null",
+    why: "Java names its own `TranslationFailureHandler`; the JS option is `onFailure`.",
+  },
+  "translationFallbackPolicy returned null": {
+    js: "The configured fallbackPolicy must return a boolean; received null",
+    why: "Java names its own `translationFallbackPolicy`; the JS option is `fallbackPolicy`.",
+  },
+};
+
+/** Declared-divergence rows whose JS message no longer differs, i.e. entries that must be deleted. */
+const staleMessageDivergences = [];
+
 function thrownProjection(thrown, caught) {
   // ARM 1 — the runner's own sentinel. Guarded on a sentinel having actually been raised, so a
   // future `IllegalStateException` row that is NOT one falls through to arm 3 and is reported
@@ -1606,12 +1814,28 @@ function thrownProjection(thrown, caught) {
   if (!(thrown.type in ERROR_NAME)) unsupported(`no JS counterpart declared for ${thrown.type}`);
   const names = ERROR_NAME[thrown.type];
   const actualName = thrownNameOf(caught);
+  const actualMessage = messageOf(caught === NOTHING_THROWN ? null : caught);
+
+  // A DECLARED divergence: the Java message selects the row and the JS message is pinned exactly, so
+  // this narrows the comparison rather than dropping it. A row that starts matching Java verbatim is
+  // recorded STALE and fails the run, because the entry has outlived its reason.
+  const declared = DECLARED_MESSAGE_DIVERGENCES[thrown.message];
+  if (declared && actualMessage === declared.js) {
+    return {
+      wanted: { name: names.join(" or "), identity: CONSTRUCTED_IDENTITY },
+      actual: { name: names.includes(actualName) ? names.join(" or ") : actualName, identity: caughtIdentity(caught) },
+      ratchetMessage: true,
+    };
+  }
+  if (declared && actualMessage === thrown.message)
+    staleMessageDivergences.push(`${thrown.message} -- the port now reproduces Java verbatim; delete the entry`);
+
   return {
     wanted: { name: names.join(" or "), identity: CONSTRUCTED_IDENTITY, message: thrown.message },
     actual: {
       name: names.includes(actualName) ? names.join(" or ") : actualName,
       identity: caughtIdentity(caught),
-      message: messageOf(caught === NOTHING_THROWN ? null : caught),
+      message: actualMessage,
     },
   };
 }
@@ -1620,9 +1844,10 @@ function thrownProjection(thrown, caught) {
  * Run a `get`/`getResult` case whose recorded outcome is a THROW.
  *
  * The callback channels are compared alongside the throw rather than instead of it, and that is not
- * decoration: the ABSENCE of a `policyCalls` entry is the whole observation in the four
- * throw-in-policy rows (a policy that raises records nothing, because `recordingPolicy` records
- * after the delegate returns), and `callback-interaction.first-cause.handler-exception-displaces-
+ * decoration: the twelve throw-in-policy rows now state exactly which reason, locale and cause the
+ * policy was handed on the consultation that raised — an observation that did not exist until the
+ * oracle's `recordingPolicy` was moved to record BEFORE its delegate, and that a port could
+ * previously have got wrong while passing — and `callback-interaction.first-cause.handler-exception-displaces-
  * retained-resolver-failure` is only meaningful because the `failures` channel still shows the
  * handler was handed the retained cause it then displaced.
  *
@@ -2480,6 +2705,15 @@ function classifyFailure(testCase, fixture, actual, wanted) {
   //    would have relabelled every future per-call isolation defect as "not implemented", inside a
   //    function whose contract says it cannot. `IMPLEMENTED_CALL_OPTIONS` is the single list, shared
   //    with `callOptionsFor`, so an option cannot be passed to the port and excused here at once.
+  //    `nullPlaceholderName` is excluded for exactly the same reason, and it was NOT excluded until
+  //    2026-09-06: `placeholdersFor`'s own doc says it "mirrors the flag `VectorOracle` reads for
+  //    `DefaultStrings:690`", i.e. it is an oracle authoring directive that forces the MAP form of
+  //    plan 3.2's `Placeholders` union, not an option a port could implement. Left in, rule 1
+  //    absorbed the very defect it stands next to. MEASURED both ways in a scratch copy: with this
+  //    exclusion AND the port's `:690` refusal deleted, the run reads 1,940 passed / 6 FAILED and
+  //    `owed-null-placeholder-name.refusal.a-null-placeholder-name-is-refused` is a real FAILURE;
+  //    with the exclusion and the port unmodified it reads 1,941 / 5, byte-identical to the run
+  //    without it. So the exclusion costs the corpus nothing and buys back a live comparison.
   //    `perCallOverrideOrder` is excluded for the same reason `value`/`start`/`end` are: it is not a
   //    per-call OPTION and no port will ever implement it. It is an ORACLE authoring directive naming
   //    the order in which VectorOracle applies the two TranslationOptions.Builder setters that clear
@@ -2493,7 +2727,9 @@ function classifyFailure(testCase, fixture, actual, wanted) {
   const TAKES_OPTIONS = new Set(["getResult", "get"]);
   if (TAKES_OPTIONS.has(testCase.operation)) {
     const perCall = Object.keys(testCase.input)
-      .filter((k) => !["key", "locale", "placeholders", "perCallOverrideOrder"].includes(k))
+      .filter((k) =>
+        !["key", "locale", "placeholders", "perCallOverrideOrder", "nullPlaceholderName"].includes(k),
+      )
       .filter((k) => !IMPLEMENTED_CALL_OPTIONS.has(k));
     if (perCall.length) return `per-call options are not implemented (${perCall.sort().join(", ")})`;
   }
@@ -2861,6 +3097,11 @@ if (staleNonportabilityClaims.length) {
   for (const claim of staleNonportabilityClaims) console.log(`  ${claim}`);
 }
 
+if (staleMessageDivergences.length) {
+  console.log(`\nSTALE DECLARED MESSAGE DIVERGENCE (${staleMessageDivergences.length}):`);
+  for (const entry of staleMessageDivergences) console.log(`  ${entry}`);
+}
+
 // The message-parity table's staleness half, on the same discipline as the nonportability claims
 // above: a correspondence no case consults has stopped standing for anything and must not be left
 // behind as an excuse. Suppressed under `--family`, where most entries legitimately go unconsulted,
@@ -2881,5 +3122,5 @@ if (staleDrops.length) {
 process.exit(
   failed.length === 0 && regressions.length === 0 && causeMessageRegressions.length === 0 &&
   staleNonportabilityClaims.length === 0 && staleAdaptations.length === 0 &&
-  staleDrops.length === 0 ? 0 : 1,
+  staleDrops.length === 0 && staleMessageDivergences.length === 0 ? 0 : 1,
 );

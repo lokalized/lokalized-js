@@ -160,6 +160,182 @@ export const CONSTRUCT_REFUSAL_ADAPTATIONS = [
       "VERBATIM. The failure mode this row names is skipping the null and building a silently " +
       "smaller catalog, which no message wording can excuse.",
   },
+
+  // ---------------------------------------------------------------------------------------------
+  // The `owed-init` family: the FALLBACK and TIEBREAKER halves of the same constructor. Every entry
+  // below adapts nothing but the exception TYPE unless its `why` says otherwise — Java's sentences
+  // here name locales and language codes, not Java API, so they cross unchanged. `RangeError`
+  // throughout, on the convention this file already states: the values are well SHAPED and it is
+  // the CONFIGURATION they describe that is out of range.
+  // ---------------------------------------------------------------------------------------------
+  {
+    site: "DefaultStrings.java:309",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage:
+      "Specified fallback locale is 'de' but no matching localized strings locale was found. Known locales: [en]",
+    jsType: "RangeError",
+    jsMessage:
+      "Specified fallback locale is 'de' but no matching localized strings locale was found. Known locales: [en]",
+    why:
+      "VERBATIM, including the sorted known-locale list, which is the half that discriminates: a " +
+      "port that refused with a bare 'unknown fallback locale' would leave the caller to guess " +
+      "which spelling it loaded.",
+  },
+  {
+    site: "DefaultStrings.java:329",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage: "Tiebreaker language codes 'mo' and 'ro' both normalize to 'ro'",
+    jsType: "RangeError",
+    jsMessage: "Tiebreaker language codes 'mo' and 'ro' both normalize to 'ro'",
+    why:
+      "VERBATIM. Both of the CALLER'S OWN spellings appear, then the code they collapsed to — the " +
+      "only wording that tells a caller which two of their keys collided. This row is a REPAIR: " +
+      "before it the port had no key-collision check and answered the `:394` permutation refusal " +
+      "for this input. The names appear in the order the two keys were SUPPLIED, and the fixture " +
+      "spells them in sorted order for that reason: the corpus artifact is canonical JSON, so a " +
+      "consumer never sees an authored key order, and lokalized-spec's ingest now refuses a " +
+      "fixture that depends on one.",
+  },
+  {
+    site: "DefaultStrings.java:349",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage: "Duplicate tiebreaker locale 'en' encountered for language code 'en'",
+    jsType: "RangeError",
+    jsMessage: "Duplicate tiebreaker locale 'en' encountered for language code 'en'",
+    why:
+      "VERBATIM. Also a REPAIR: the port built its comparison set straight from the caller's array, " +
+      "so a repeated locale was silently deduplicated and the instance CONSTRUCTED where Java " +
+      "refuses. The quoted locale is the NORMALIZED tag and the quoted language code is the " +
+      "caller's own spelling, which is Java's asymmetry, not a slip.",
+  },
+  {
+    site: "DefaultStrings.java:388",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage: "Tiebreaker language code 'pt' has no localized strings locales",
+    jsType: "RangeError",
+    jsMessage: "Tiebreaker language code 'pt' has no localized strings locales",
+    why: "VERBATIM. The quoted code is the NORMALIZED one, matching Java's `:388`.",
+  },
+  {
+    site: "DefaultStrings.java:394 (size disjunct)",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage:
+      "Tiebreaker locales for language code 'en' must be an exact permutation of loaded locales " +
+      "[en, en-US]; missing: [en-US]; unrelated: []",
+    jsType: "RangeError",
+    jsMessage:
+      "Tiebreaker locales for language code 'en' must be an exact permutation of loaded locales " +
+      "[en, en-US]; missing: [en-US]; unrelated: []",
+    why:
+      "VERBATIM. Two entries share this site because the two DISJUNCTS of Java's `:394` produce " +
+      "different diagnostic lists and only distinct inputs put both through their arms; the site " +
+      "label distinguishes them so the staleness check keys on one entry each.",
+  },
+  {
+    site: "DefaultStrings.java:394 (membership disjunct)",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage:
+      "Tiebreaker locales for language code 'en' must be an exact permutation of loaded locales " +
+      "[en, en-US]; missing: [en-US]; unrelated: [en-GB]",
+    jsType: "RangeError",
+    jsMessage:
+      "Tiebreaker locales for language code 'en' must be an exact permutation of loaded locales " +
+      "[en, en-US]; missing: [en-US]; unrelated: [en-GB]",
+    why:
+      "VERBATIM. The RIGHT-SIZE, WRONG-MEMBERSHIP shape: a port that compared only list LENGTH " +
+      "accepts this input, and one that computed the two diagnostic lists by any other rule prints " +
+      "a different sentence.",
+  },
+  {
+    site: "DefaultStrings.java:426",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage:
+      "You must specify tiebreaker locales via 'tiebreakerLocalesByLanguageCode' to resolve " +
+      "ambiguity for language code 'en' because localized strings exist for the following " +
+      "locale[s]: [en, en-US]",
+    jsType: "RangeError",
+    jsMessage:
+      "You must specify tiebreaker locales via createStrings({ tiebreakers }) to resolve " +
+      "ambiguity for language code 'en' because localized strings exist for the following " +
+      "locale[s]: [en, en-US]",
+    why:
+      "`tiebreakerLocalesByLanguageCode` is Java's constructor parameter and does not exist here; " +
+      "the JS message names the option a JavaScript caller actually has, on the same rule that " +
+      "keeps `Strings.Builder` out of the phonetic diagnostic. The DIAGNOSIS — which language code, " +
+      "and which loaded locales collided under it — is Java's verbatim.",
+  },
+  {
+    site: "DefaultStrings.java:465",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage:
+      "Fallback locale 'und' is canonically equivalent to multiple loaded locales " +
+      "[und-bokmal, und-nynorsk]; configure tiebreakerLocalesByLanguageCode to choose one",
+    jsType: "RangeError",
+    jsMessage:
+      "Fallback locale 'und' is canonically equivalent to multiple loaded locales " +
+      "[und-bokmal, und-nynorsk]; configure createStrings({ tiebreakers }) to choose one",
+    why:
+      "The same one-word substitution as `:426`, for the same reason. The locale list is Java's " +
+      "verbatim and in Java's order, which is what makes the row discriminate the SET as well as " +
+      "the refusal.",
+  },
+  {
+    site: "DefaultStrings.java:335",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage: "Null tiebreaker locale list encountered for language code 'en'",
+    jsType: "TypeError",
+    jsMessage: "Null tiebreaker locale list encountered for language code 'en'",
+    why:
+      "VERBATIM, and a REPAIR: the port previously answered its generic 'maps to something else' " +
+      "shape refusal here, which cannot tell a null apart from a string or a number. Java keeps the " +
+      "two apart and now so does this port; the generic message survives for every non-null " +
+      "non-array. TypeError, because a null where a list is required is a shape mistake — the same " +
+      "call this file already makes for `:273` and `:293`.",
+  },
+  {
+    site: "DefaultStrings.java:343",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage: "Null tiebreaker locale encountered for language code 'en'",
+    jsType: "TypeError",
+    jsMessage: "Null tiebreaker locale encountered for language code 'en'",
+    why:
+      "VERBATIM, and a REPAIR: the port reached `normalizeTag(null)` and answered 'A locale tag must " +
+      "be a non-empty string', which names neither the tiebreaker list nor its language code, so a " +
+      "caller could not tell which option was wrong. The check now precedes normalization, exactly " +
+      "as Java's does.",
+  },
+  {
+    site: "DefaultStrings.java:2650",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage: "A tiebreaker language code must not be null",
+    jsType: "TypeError",
+    jsMessage: "A tiebreaker language code must not be null",
+    why:
+      "VERBATIM, and a REPAIR. Only the `Map` half of plan 3.1's `TiebreakerMap` can present a null " +
+      "key; the port used to snapshot it into a RECORD first, which renames the entry to the string " +
+      "'null' and then diagnoses that — it answered \"Tiebreaker language code 'null' has no " +
+      "localized strings locales\", a sentence about a language called null. The refusal now happens " +
+      "before the snapshot.",
+  },
+  {
+    site: "DefaultStrings.java:500",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage: "Duplicate localized string key 'Greeting' encountered for locale 'en'",
+    jsType: "Error",
+    jsMessage: "catalog:en: duplicate localized string key 'Greeting' encountered",
+    why:
+      "THE ONE ENTRY IN THIS TABLE WHERE THE PORT REFUSES AT A DIFFERENT LAYER, and it is recorded " +
+      "as a divergence rather than smoothed over. Java meets the repeat in `DefaultStrings`' own " +
+      "constructor, after the catalog is built; the port meets it while BUILDING the catalog, in " +
+      "M5b's programmatic-input path (`src/internal/catalog.js:1612`), so the message takes that " +
+      "layer's shape — a `source: message` prefix, where the source names the locale Java puts at " +
+      "the end of the sentence. Both refuse the same input for the same reason and both name the " +
+      "key and the locale. What does NOT correspond is the TYPE: every other row here is a " +
+      "`TypeError` or a `RangeError` and this one is a bare `Error`, because that is what M5b's " +
+      "parse-session helper raises for every catalog refusal. Changing it would re-type every M5b " +
+      "diagnostic at once, which is a decision for whoever owns that surface, not something to " +
+      "settle inside a construct-refusal table. Flagged, not fixed.",
+  },
 ];
 
 /** Entries actually consulted by a run, so an entry that matches nothing can be reported as stale. */

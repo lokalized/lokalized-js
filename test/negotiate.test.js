@@ -481,6 +481,23 @@ describe("parseLanguageRanges — the recovery of the JDK's language-equivalence
     // derived member too, which the JDK differential confirms end to end on both inputs.)
     assert.deepEqual(parseLanguageRanges("sgn-de-fr").map((m) => m.range),
       ["sgn-de-fr", "sgn-gsg-fx", "sgn-gsg-fr", "gsg-fx", "gsg-fr", "sgn-dd-fr"]);
+
+    // A THIRD row, because neither of the two above pins the order of the TAIL, and the table's home
+    // was decided at M7 close on the strength of what actually gates it.
+    //
+    // MEASURED: moving `["-fr", "-fx"]` from position 12 to position 14 — a permutation that is
+    // neither hash order nor source order — leaves both rows above green and the whole of
+    // `test/negotiate.test.js` at exit 0, while it really does change the answer: `sgn-fx-fr` reads
+    // `-fx` first and rewrites to `sgn-fr-fr` where the pinned JDK's order reads `-fr` first and
+    // gives `sgn-fx-fx`. `npm run diff:language-range` catches that permutation and names it
+    // (ordered-pair comparison against the JDK's own `regionVariantEquivMap`, exit 1) — but it needs
+    // the pinned JDK and is NOT part of `npm run verify`, so without this row the default gate is
+    // blind to a real behavioral change.
+    //
+    // Oracle-backed, not port-derived: `sgn-fx-fr` is a member of the differential's own probe space
+    // (`run.mjs`'s `inputs()` emits `sgn${subtag}${second}` for every ordered pair of the fourteen),
+    // so this expectation is Java's, confirmed by a green 6,037/6,037 run on the pinned Corretto 21.
+    assert.deepEqual(parseLanguageRanges("sgn-fx-fr").map((m) => m.range), ["sgn-fx-fr", "sgn-fx-fx"]);
   });
 });
 

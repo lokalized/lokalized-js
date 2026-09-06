@@ -23,7 +23,13 @@
  * because the sum of independently-compressed parts overstates the real cost — the same reason
  * `tools/gen-data.js --measure` reports both.
  *
- * This is a REPORTING tool. It gates nothing: scenario 0a owns the ratchet.
+ * This is a REPORTING tool with ONE gate, and the exception is deliberate: a module that enters the
+ * root graph with no recorded purpose exits nonzero (`UNCLASSIFIED` below). Scenario 0a still owns
+ * the byte and module-count ratchets; what it cannot say is WHY a module is here, and an
+ * unclassified module is exactly the state in which nobody can answer that. The section was
+ * report-only until M7 close, when three modules had sat in it unremarked for two milestones — the
+ * same shape as the classpath partition defect, which `conformance.mjs` reported on every run for a
+ * whole milestone while nothing consumed the report.
  *
  *   node tools/graph-size.mjs [--entry <path>] [--json <path>]
  */
@@ -41,12 +47,41 @@ const jsonOut = argOf("--json");
 /* ---------------------------------------------------------------- graph */
 
 /**
+ * Every shape of relative import that puts a module in the runtime graph. Kept character-identical
+ * to `tools/scenario-0a.mjs`'s `IMPORT_PATTERNS`; see `walk` for why the two must not drift.
+ */
+const IMPORT_PATTERNS = [
+  /from\s+"(\.[^"]+)"/g,
+  /(?:^|[^.\w])import\s+"(\.[^"]+)"/gm,
+  /import\(\s*"(\.[^"]+)"/g,
+];
+
+/**
  * The transitive relative-import graph of an entry point.
  *
- * The edge regex matches `tools/scenario-0a.mjs` exactly, deliberately: two tools reporting on the
- * same graph must not disagree about what is in it. Both would miss a dynamic `import()` or an
- * `export ... from`, so the walk asserts afterwards that neither form appears in any reached module
- * rather than quietly under-reporting.
+ * The edge patterns match `tools/scenario-0a.mjs` exactly, deliberately: two tools reporting on the
+ * same graph must not disagree about what is in it. That claim went STALE and is restored here — 0a
+ * gained the bare `import "…"` and dynamic `import("…")` patterns when the containment guard's blind
+ * spot was measured, and this walk was left on `from "…"` alone.
+ *
+ * WHAT THE GAP WAS WORTH, measured rather than assumed, because it is smaller than it looks and
+ * overstating it would be its own defect. Inserting `import "../data/iana-range-equivalents.js";`
+ * into `src/core/index.js` did NOT make this tool under-report: the behavioral render below executes
+ * a stripped COPY of exactly the modules the walk found, so the missing module made that import
+ * fail and the run died with a bare `ERR_MODULE_NOT_FOUND` stack, exit 1. Loud, but it names a
+ * temp-directory path and no cause. With the patterns aligned the same input is reported as the
+ * 26th module and — having no `PURPOSE` entry — fails the UNCLASSIFIED gate by name.
+ *
+ * Comments are stripped before matching, for the reason 0a records: a JSDoc `import("./x.js").Type`
+ * is a type annotation, not an edge, and `src/` is full of them. This file's stripper is the
+ * validated one used for the byte columns rather than 0a's regex, and the two were measured to
+ * reach the IDENTICAL graph: this file at HEAD and this file as it now stands both report
+ * 25 modules / 701.9 KB for `src/index.js` and 24 / 693.8 KB for `src/core/index.js`, which are
+ * `measurements/scenario-0a.json`'s 718,731 and 710,486 source bytes to the precision printed here.
+ *
+ * An `export … from` would still be missed by both; the walk asserts afterwards that no reached
+ * module contains a runtime `import(` the patterns did not resolve, rather than quietly
+ * under-reporting.
  *
  * @param {string} entry repository-relative path
  */
@@ -64,11 +99,13 @@ function walk(entry) {
     const text = readFileSync(file, "utf8");
     nodes.set(file, { bytes: Buffer.byteLength(text), text });
     const deps = [];
-    for (const m of text.matchAll(/from\s+"(\.[^"]+)"/g)) {
-      const dep = resolve(dirname(file), m[1]);
-      deps.push(dep);
-      queue.push(dep);
-    }
+    const scannable = stripComments(text);
+    for (const pattern of IMPORT_PATTERNS)
+      for (const m of scannable.matchAll(pattern)) {
+        const dep = resolve(dirname(file), m[1]);
+        deps.push(dep);
+        queue.push(dep);
+      }
     out.set(file, deps);
   }
   return { nodes, out, missed, entry: resolve(root, entry) };
@@ -235,6 +272,8 @@ const PURPOSE = {
   "src/internal/locale.js": ["tag parsing/canonicalization, fallback chain, matcher, tiebreakers", "always"],
   "src/internal/locale-cldr.js": ["CLDR canonicalization and alias application", "always"],
   "src/internal/locale-jdk-tag.js": ["JDK-compatible tag parse/render", "always"],
+  "src/internal/bidi.js": ["Unicode bidi isolation of caller-supplied values, plus the bounded-output limit", "always: the mode keys off the EVALUATION locale, so every render consults it, and `interpolate.js` imports `outputLimitExceeded` from here on every message"],
+  "src/internal/parse-warnings.js": ["incomplete cardinality/ordinality language-form warnings raised while a catalog is admitted", "always: `parseCatalogInput` builds the reporter for every `CatalogInput` form — a `ParsedStringsFile` replays its own recorded warnings instead, but still pays for the module"],
   "src/data/likely-subtags.js": ["generated: full-triple likely-subtag table", "always: the matcher's likely-subtag tier"],
   "src/data/cardinal.js": ["generated: CLDR cardinal plural rules", "always"],
   "src/data/parents.js": ["generated: CLDR parent locales", "always"],
@@ -246,6 +285,7 @@ const PURPOSE = {
   "src/data/valid-regions.js": ["generated: IANA validity — region subtags", "always"],
   "src/data/valid-scripts.js": ["generated: IANA validity — script subtags", "always"],
   "src/data/valid-variants.js": ["generated: IANA validity — variant subtags", "always"],
+  "src/data/rtl.js": ["generated: CLDR right-to-left scripts", "always: `bidi.js` resolves a locale's direction through it, via the likely-subtag script"],
 };
 
 /* ------------------------------------------------------------------ run */
@@ -256,6 +296,7 @@ const kb = (n) => (n / 1024).toFixed(1);
 
 const entryArg = argOf("--entry") ?? "src/index.js";
 const graph = walk(entryArg);
+let exitCode = 0;
 
 /* Validate the stripper before any stripped byte count is reported. */
 const work = mkdtempSync(join(tmpdir(), "lokalized-graph-size-"));
@@ -266,10 +307,12 @@ try {
     mkdirSync(dirname(dest), { recursive: true });
     const code = stripComments(text);
     writeFileSync(dest, code, "utf8");
-    // A runtime `import()` the shared edge regex cannot see would make every figure below a floor
-    // rather than a total, and that must be loud. Checked on the STRIPPED text, so the codebase's
-    // JSDoc `import("./x.js").Type` annotations — which are types, not edges — do not trip it.
-    if (/[^.\w]import\s*\(/.test(code)) graph.missed.push(`${rel}: runtime dynamic import()`);
+    // A runtime `import()` the shared edge patterns cannot RESOLVE would make every figure below a
+    // floor rather than a total, and that must be loud. `import("./x.js")` is now followed as an
+    // edge, so only a dynamic import whose specifier is not a relative string literal — a computed
+    // or bare specifier — is unresolvable and reported here. Checked on the STRIPPED text, so the
+    // codebase's JSDoc `import("./x.js").Type` annotations — types, not edges — do not trip it.
+    if (/[^.\w]import\s*\(\s*(?!"\.)/.test(code)) graph.missed.push(`${rel}: unresolvable dynamic import()`);
   }
   if (graph.missed.length) {
     console.error("imports the shared edge regex cannot see; every figure below would be a floor:");
@@ -361,7 +404,7 @@ try {
 
   const unclassified = rows.filter((r) => r.needed === "unknown");
   if (unclassified.length) {
-    console.log(`\nUNCLASSIFIED (${unclassified.length}) — a module entered the root graph without a recorded purpose:`);
+    console.log(`\nUNCLASSIFIED (${unclassified.length}) — a module entered the graph of ${entryArg} without a recorded purpose:`);
     for (const r of unclassified) console.log(`  ${r.module}  ${kb(r.bytes)} KB`);
   }
 
@@ -399,6 +442,24 @@ try {
     writeFileSync(jsonOut, `${JSON.stringify({ entry: entryArg, totalBytes: total, totalCodeBytes: totalCode, modules: rows }, null, 2)}\n`, "utf8");
     console.log(`\nwritten: ${jsonOut}`);
   }
+
+  // THE ONE GATE. Printed last so the whole report is on screen first, and after `--json` so a
+  // consumer still gets the artifact describing the graph it is complaining about.
+  //
+  // Reported-only is not a gate: the UNCLASSIFIED section existed and printed three modules for two
+  // milestones without anything acting on it. A `PURPOSE` entry is cheap — one line naming what the
+  // module is for and whether an already-parsed-catalog consumer can avoid it — and the entry is
+  // what makes the exclusive-bytes column above readable as a split decision rather than a number.
+  if (unclassified.length) {
+    console.error(
+      `\nFAILED: ${unclassified.length} module(s) in the graph of ${entryArg} have no PURPOSE entry. ` +
+        "Add one line each to PURPOSE in this file: [what it is for, whether a consumer who only " +
+        "hands createStrings an already-parsed catalog can avoid it].",
+    );
+    exitCode = 2;
+  }
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
+
+process.exit(exitCode);

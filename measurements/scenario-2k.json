@@ -1,0 +1,113 @@
+{
+  "scenario": "2k",
+  "note": "Measurement, not a threshold. Nothing here ratchets; see the tool header.",
+  "generatedBy": "tools/scenario-2k.mjs",
+  "environment": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "catalog": {
+    "keys": 2000,
+    "locales": {
+      "en": 2000,
+      "en-001": 200,
+      "fr": 200
+    },
+    "shapeCensus": {
+      "plain": 500,
+      "placeholder": 500,
+      "pluralGenerated": 500,
+      "alternatives": 500
+    },
+    "rawJsonBytes": 203351,
+    "digest": "84280c24",
+    "derivation": "key i takes shape i % 4 and embeds its own index; no RNG, no seed",
+    "requestLocale": "en-AU (walks en-AU -> en-001 -> en); 'en' measured alongside as the direct-hit control"
+  },
+  "iterations": 9,
+  "variants": [
+    {
+      "label": "root + raw-text catalog",
+      "entry": "src/index.js",
+      "importMs": {
+        "median": 0.5279159999999905,
+        "min": 0.48058299999999576,
+        "max": 13.607124999999996,
+        "spread": 24.864830768531807,
+        "n": 9
+      },
+      "constructionMs": {
+        "median": 8.875665999999995,
+        "min": 8.11333399999998,
+        "max": 20.88375,
+        "spread": 1.4388121409706072,
+        "n": 9
+      },
+      "firstRenderMs": {
+        "median": 0.3728749999999934,
+        "min": 0.25295799999997826,
+        "max": 1.8830839999999966,
+        "spread": 4.37177606436486,
+        "n": 9
+      },
+      "steadyLookupNsFallback": {
+        "median": 79485.521,
+        "min": 78989.4374999999,
+        "max": 80913.08349999996,
+        "spread": 0.024201212696335805,
+        "n": 9
+      },
+      "steadyLookupNsDirect": {
+        "median": 46036.624999999956,
+        "min": 44884.89550000008,
+        "max": 47127.854000000065,
+        "spread": 0.048721175802960974,
+        "n": 9
+      },
+      "retainedAfterConstructionBytes": 1377536,
+      "retainedAfterSweepBytes": 1474216
+    },
+    {
+      "label": "core + parsed equivalent",
+      "entry": "src/core/index.js",
+      "importMs": {
+        "median": 0.8675829999997404,
+        "min": 0.7705000000000837,
+        "max": 1.2740410000001248,
+        "spread": 0.5803951898552551,
+        "n": 9
+      },
+      "constructionMs": {
+        "median": 6.622417000000041,
+        "min": 5.6378749999998945,
+        "max": 7.933665999999903,
+        "spread": 0.3466696524848849,
+        "n": 9
+      },
+      "firstRenderMs": {
+        "median": 0.39574999999967986,
+        "min": 0.340125000000171,
+        "max": 0.6604160000001684,
+        "spread": 0.8093265950732951,
+        "n": 9
+      },
+      "steadyLookupNsFallback": {
+        "median": 82031.27050000012,
+        "min": 79407.22950000009,
+        "max": 87957.79149999999,
+        "spread": 0.10423539642726723,
+        "n": 9
+      },
+      "steadyLookupNsDirect": {
+        "median": 45997.5414999999,
+        "min": 45392.60450000029,
+        "max": 51306.125000000065,
+        "spread": 0.12856166454026213,
+        "n": 9
+      },
+      "retainedAfterConstructionBytes": 1256992,
+      "retainedAfterSweepBytes": 1355360
+    }
+  ]
+}

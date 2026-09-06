@@ -978,6 +978,19 @@ export function createStrings(options) {
     const lookupLocale = lookup.lookupLocale;
     const localeMatch = freeze(lookup.localeMatch);
 
+    // A NULL PLACEHOLDER NAME (`DefaultStrings.java:690`), refused AFTER the locale ingress and
+    // before the walk, which is Java's own order and is observable: a call that also carries a bad
+    // per-call locale reports the locale.
+    //
+    // Only a `Map` can present one — plan 3.2 types `Placeholders` as a record OR a `ReadonlyMap`
+    // and blesses the Map form precisely for generated and untrusted keys, which is also the source
+    // most likely to produce a null name when one entry of a generated list is missing. Ignoring it
+    // is not harmless: the entry silently disappears, so the template either renders an unresolved
+    // placeholder or, worse, resolves from a stale definition, and the caller is told nothing. This
+    // port did ignore it until `owed-null-placeholder-name` measured it against Java.
+    if (placeholders instanceof Map && placeholders.has(null))
+      throw new TypeError("Placeholder names must not be null");
+
     // Channel two: the resolution walk.
     const chain = candidateChain(lookupLocale, supported, fallbackLocale, tiebreakers);
     /** @type {string[]} */
@@ -1150,8 +1163,10 @@ export function createStrings(options) {
       // `requireNonNull(..., "translationFallbackPolicy returned null")` (DefaultStrings.java:735).
       // Refused rather than coerced: a policy returning `undefined` is a caller mistake, and reading
       // it as "stop" would silently truncate every walk it governs. No corpus row reaches this — the
-      // oracle has no return-null behavior, which is plan open question 7 — so it is asserted by
-      // `test/fallback-policy.test.js` and nothing else.
+      // oracle NOW HAS a return-null behavior (plan open question 7, closed at M7 close-out), so
+      // the corpus records what Java does here. Java's own message names the JAVA option
+      // `translationFallbackPolicy`; this one names the JS option, which is a DECLARED divergence
+      // pinned in conformance.mjs's DECLARED_MESSAGE_DIVERGENCES and gated stale if it ever matches.
       if (typeof shouldTryNextLocale !== "boolean")
         throw new TypeError(
           "The configured fallbackPolicy must return a boolean; received " +
@@ -1642,6 +1657,22 @@ function safeTiebreakers(supplied) {
   /** @type {Record<string, readonly string[]>} */
   const safe = Object.create(null);
   for (const [languageCode, locales] of entries) {
+    // `DefaultStrings.java:2650`, through `normalizedTiebreakerLanguageCode`. A record cannot carry a
+    // null key and a `Map` can, which is precisely why plan 3.1 types this input as a `TiebreakerMap`
+    // rather than a record — so the refusal is live, not defensive. It must be refused HERE, before
+    // the snapshot: a record key is a string, so storing one would silently rename the entry to the
+    // four-character code "null" and then diagnose THAT, which is what this port used to do.
+    if (languageCode === null || languageCode === undefined)
+      throw new TypeError("A tiebreaker language code must not be null");
+
+    // `:335`. A null list is not the same mistake as a list of the wrong shape, and Java keeps the
+    // two apart: null is a caller whose own lookup came back empty, where a string or a number is a
+    // caller who misread the option. Only the null arm gets Java's sentence.
+    if (locales === null || locales === undefined)
+      throw new TypeError(
+        `Null tiebreaker locale list encountered for language code '${languageCode}'`,
+      );
+
     if (!Array.isArray(locales))
       throw new TypeError(
         `createStrings({ tiebreakers }) must map a language code to an array of locale tags; ` +
@@ -1667,24 +1698,30 @@ const javaList = (/** @type {readonly string[]} */ tags) => `[${tags.join(", ")}
  * makes the caller say and REFUSES THE INSTANCE otherwise. Building anyway is the worse failure of
  * the two: the resolution order then falls out of catalog insertion order, silently, per lookup.
  *
- * Three rules, and the order between them is Java's:
+ * Five rules, and the order between them is Java's — which is why they run in two passes:
  *
- *   - a supplied language code with no loaded locale at all is a mistake, not a no-op;
+ *   - two supplied language codes that CANONICALIZE alike are two names for one entry (`:329`);
+ *   - a repeated locale within one list is an unrecoverable intent, not a spelling (`:349`);
+ *   - a supplied language code with no loaded locale at all is a mistake, not a no-op (`:388`);
  *   - a supplied list must be an exact permutation of that language code's loaded locales, so a
- *     later-added catalog cannot quietly inherit last place — which is also why an EMPTY list
- *     reports the permutation failure rather than the missing-tiebreaker one;
- *   - only then, a language code with more than one loaded locale and nothing supplied is refused.
+ *     later-added catalog cannot quietly inherit last place (`:394`) — which is also why an EMPTY
+ *     list reports the permutation failure rather than the missing-tiebreaker one, MEASURED on the
+ *     pinned JDK rather than reasoned about;
+ *   - only then, a language code with more than one loaded locale and nothing supplied is refused
+ *     (`:426`).
  *
- * The identity case is the reason the third rule is not simply "every language code needs one":
+ * The identity case is the reason the last rule is not simply "every language code needs one":
  * where exactly one locale carries a language code, Java synthesizes that one-element list as its
  * own tiebreaker. `resolveTiebreakers` in the locale kernel already derives the same entries when it
  * consults this map, so there is nothing for this function to carry forward — only a case it must
  * not reject.
  *
- * No corpus fixture reaches here: every constructing fixture that loads two locales sharing a
- * language code also supplies tiebreakers, and the four that do not are `loadOnly`, so Java never
- * built an instance for them either. The rules above were read off the real `DefaultStrings` on the
- * pinned JDK, message by message.
+ * THE CORPUS NOW REACHES ALL FIVE, and it did not when the first three of them were written: the
+ * `owed-init` family's eight `construct` rows are the Java-recorded refusals, and two of them were
+ * red on their first run. The `:329` and `:349` rules above are the repair — before it, this
+ * function had no key-collision check at all (so `{ ro: [...], mo: [...] }` reported the permutation
+ * refusal Java never reaches) and built its comparison `Set` straight from the caller's array (so a
+ * list naming one locale twice was silently deduplicated and ACCEPTED, where Java refuses).
  *
  * @param {readonly string[]} supported the loaded catalogs' normalized tags, in supplied order
  * @param {Readonly<Record<string, readonly string[]>> | null} tiebreakers the frozen snapshot
@@ -1710,12 +1747,74 @@ function validateTiebreakers(supported, tiebreakers) {
 
   /** @type {Set<string>} */
   const configuredLanguageCodes = new Set();
+  /** normalized code -> the caller's spelling that claimed it first, for the collision diagnostic. */
+  const suppliedByNormalizedCode = new Map();
+  /** normalized code -> that entry's tags, already normalized, in the caller's order. */
+  const providedByLanguageCode = new Map();
 
+  // TWO LOOPS, AND THE SPLIT IS JAVA'S, NOT STYLE. `DefaultStrings.<init>` validates every supplied
+  // entry IN FULL (`:329` key collision, `:349` duplicate locale) before it looks at any of them
+  // against the loaded catalogs (`:388` unknown code, `:394` permutation). A single fused loop
+  // reports whichever rule the FIRST offending entry trips, so a map that both collides and
+  // mis-permutes answers the permutation refusal where Java answers the collision — measured, and it
+  // is exactly how `{ ro: ["ro"], mo: ["mo"] }` used to be diagnosed here.
   for (const [suppliedLanguageCode, locales] of Object.entries(tiebreakers ?? {})) {
     // The SAME key normalization `resolveTiebreakers` applies when it reads this map, so a code
     // that validates here is a code that matching will actually find. `mo` and `ro` are one entry
     // to both.
     const languageCode = primaryLanguage(suppliedLanguageCode) || suppliedLanguageCode.toLowerCase();
+
+    // `DefaultStrings.java:329`. Two keys that CANONICALIZE alike are two names for one entry, and a
+    // record cannot hold both: whichever `resolveTiebreakers` reached last would silently win, so
+    // the ORDER a caller wrote their tiebreakers in would decide which catalog answers. Java names
+    // both of the caller's own spellings and the code they collapsed to; so does this.
+    const existingSuppliedLanguageCode = suppliedByNormalizedCode.get(languageCode);
+
+    if (existingSuppliedLanguageCode !== undefined)
+      throw new RangeError(
+        `Tiebreaker language codes '${existingSuppliedLanguageCode}' and '${suppliedLanguageCode}' ` +
+          `both normalize to '${languageCode}'`,
+      );
+
+    suppliedByNormalizedCode.set(languageCode, suppliedLanguageCode);
+
+    // Normalized before comparison because Java compares `Locale` instances and not the caller's
+    // spelling: `en-us` and `en-US` are one locale to `Locale.forLanguageTag`, and an instance Java
+    // builds must not be refused here over a lowercase region. An ill-formed tag raises
+    // `normalizeTag`'s own error, where Java raises `requireWellFormed`'s.
+    /** @type {string[]} */
+    const provided = [];
+
+    for (const locale of locales) {
+      // `DefaultStrings.java:343`, and it must precede normalization: `normalizeTag(null)` refuses
+      // too, but with "A locale tag must be a non-empty string" — a sentence that names neither the
+      // tiebreaker list nor its language code, so the caller cannot tell which of their options was
+      // wrong. Skipping the null instead would silently shorten the resolution order for an ambiguous
+      // language code, which is the failure this check exists to prevent.
+      if (locale === null || locale === undefined)
+        throw new TypeError(
+          `Null tiebreaker locale encountered for language code '${suppliedLanguageCode}'`,
+        );
+
+      const validated = normalizeTag(locale);
+
+      // `DefaultStrings.java:349`. A repeat is not a harmless spelling of the same preference: this
+      // list IS the resolution order for an ambiguous language code, so a caller who wrote one
+      // locale twice has an intent the library cannot recover. Deduplicating silently — which is
+      // what building the `Set` below straight from `locales` did — accepts it and picks one.
+      if (provided.includes(validated))
+        throw new RangeError(
+          `Duplicate tiebreaker locale '${validated}' encountered for language code ` +
+            `'${suppliedLanguageCode}'`,
+        );
+
+      provided.push(validated);
+    }
+
+    providedByLanguageCode.set(languageCode, provided);
+  }
+
+  for (const [languageCode, provided] of providedByLanguageCode) {
     const loaded = loadedByLanguageCode.get(languageCode);
 
     if (loaded === undefined)
@@ -1723,13 +1822,9 @@ function validateTiebreakers(supported, tiebreakers) {
 
     configuredLanguageCodes.add(languageCode);
 
-    // Normalized before comparison because Java compares `Locale` instances and not the caller's
-    // spelling: `en-us` and `en-US` are one locale to `Locale.forLanguageTag`, and an instance Java
-    // builds must not be refused here over a lowercase region. An ill-formed tag raises
-    // `normalizeTag`'s own error, where Java raises `requireWellFormed`'s.
-    const provided = new Set(locales.map(normalizeTag));
-    const missing = loaded.filter((tag) => !provided.has(tag)).sort();
-    const unrelated = [...provided].filter((tag) => !loaded.includes(tag)).sort();
+    const providedSet = new Set(provided);
+    const missing = loaded.filter((tag) => !providedSet.has(tag)).sort();
+    const unrelated = [...providedSet].filter((tag) => !loaded.includes(tag)).sort();
 
     if (missing.length > 0 || unrelated.length > 0)
       throw new RangeError(

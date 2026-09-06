@@ -255,6 +255,22 @@ if (process.argv.includes("--write")) {
   } else if (baseline?.rebaselines) {
     record.rebaselines = baseline.rebaselines;
   }
+
+  // CARRY THE BROWSER HALF FORWARD. `record` above is built fresh from a Node run and hard-codes
+  // `environments: ["node"]`, so without this a `--write` here silently DELETES whatever
+  // `tools/browser-0a/record.mjs` measured — and the deletion is invisible, because the next Node
+  // run has no way to know a browser figure ever existed. The browser half cannot be re-derived on
+  // demand the way these Node rows can (it needs a real browser driven by hand), so losing it costs
+  // a measurement nobody can cheaply retake. `rebaselines` is preserved three lines up for exactly
+  // this reason; the browser block was simply missed when it was added.
+  //
+  // It is carried VERBATIM and never synthesized: a Node run must not be able to invent, adjust or
+  // freshen a browser number. If the source files have moved since the capture, the stale block is
+  // the honest record and re-capturing it is a person's job.
+  if (baseline?.browser) {
+    record.browser = baseline.browser;
+    record.environments = [...new Set([...record.environments, ...(baseline.environments ?? [])])];
+  }
   mkdirSync(dirname(baselinePath), { recursive: true });
   writeFileSync(baselinePath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
   console.log(`\nbaseline written to measurements/scenario-0a.json${reason ? ` (reason recorded)` : ""}`);
@@ -262,8 +278,49 @@ if (process.argv.includes("--write")) {
   console.log(`\nno baseline at measurements/scenario-0a.json — run with --write to record one`);
 }
 
-console.log(`\nNOT MEASURED: the exact-floor browser half of 0a. Both variants must be measured in a`);
-console.log(`browser before 0a is complete; these are the Node figures only.`);
+/**
+ * The browser half, and whether the recorded one still describes THESE source files.
+ *
+ * It is not re-derivable from here — it needs a real browser driven against `npm run serve:0a` — so
+ * it is reported from the artifact rather than measured. That makes it exactly the kind of record
+ * that rots: the Node graph moves, the browser figures stay, and nothing says so. The transfer size
+ * the browser observed IS the graph's source bytes (no compression, no bundler in the path), so
+ * staleness is DETECTABLE by arithmetic rather than by remembering, and it is printed every run.
+ *
+ * Printed, deliberately not gated. A green `verify` must not depend on a human re-driving a browser,
+ * or the gate becomes something people route around; and the drift is stated loudly enough that
+ * quoting a stale figure takes an act of ignoring the output. Whether it should ratchet is a
+ * decision for whoever owns the budgets, not one this tool may take on their behalf.
+ */
+if (baseline?.browser) {
+  const b = baseline.browser;
+  console.log(`\nbrowser half — RECORDED (${b.userAgent})`);
+  console.log(`  ${"variant".padEnd(26)}${"resources".padStart(10)}${"transfer B".padStart(12)}${"cold import".padStart(13)}${"construct".padStart(11)}${"1st render".padStart(12)}`);
+  /** @type {string[]} */
+  const stale = [];
+  for (const v of b.variants ?? []) {
+    console.log(`  ${v.label.padEnd(26)}${String(v.resources).padStart(10)}${String(v.decodedBytes).padStart(12)}` +
+      `${`${v.coldImportMs} ms`.padStart(13)}${`${v.constructionMs} ms`.padStart(11)}${`${v.firstRenderMs} ms`.padStart(12)}`);
+    const now = record.node.find((n) => n.label === v.label);
+    if (!now) { stale.push(`${v.label}: no Node variant of this name any more`); continue; }
+    if (now.sourceBytes !== v.decodedBytes)
+      stale.push(`${v.label}: captured over ${v.decodedBytes} B, the graph is now ${now.sourceBytes} B`);
+    if (now.modules !== v.resources)
+      stale.push(`${v.label}: captured over ${v.resources} modules, the graph is now ${now.modules}`);
+  }
+  if (stale.length) {
+    console.log(`\n  STALE — the browser capture no longer describes these source files:`);
+    for (const s of stale) console.log(`    ${s}`);
+    console.log(`  Re-drive it: npm run serve:0a, load /?variant=root and /?variant=core, save each`);
+    console.log(`  window.__RESULTS__, then node tools/browser-0a/record.mjs root.json core.json`);
+    console.log(`  (reported, never gated — a green verify must not need a human at a browser)`);
+  } else {
+    console.log(`  fresh: transfer bytes and resource counts match the Node graph exactly in both variants`);
+  }
+} else {
+  console.log(`\nNOT MEASURED: the exact-floor browser half of 0a. Both variants must be measured in a`);
+  console.log(`browser before 0a is complete; these are the Node figures only.`);
+}
 console.log(`NO THRESHOLDS EXIST, by decision: M2 is tracked by engineering measurement. Size and module`);
 console.log(`count ratchet against the baseline; timings and heap are reported and never gated.`);
 

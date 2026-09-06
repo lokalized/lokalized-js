@@ -147,6 +147,37 @@ function checkLanguageRangeGrammar(range) {
  * confirms it end to end on `sgn-de-fr` and its siblings, which is what makes this a measurement
  * rather than a reading of `String.hashCode`.
  *
+ * DECIDED AT M7 CLOSE: THIS STAYS A SOURCE LITERAL. It is not promoted to a generated artifact
+ * under a lock the way the 806-class IANA closure is, and the reasons are specific to this table
+ * rather than a general preference.
+ *
+ *  - **There is no upstream artifact to pin.** `src/data/iana-range-equivalents.js` is generated
+ *    from a file `lokalized-spec` vendors and locks. This table's source is `sun.util.locale`, a
+ *    JDK-internal class reachable only by reflection through `--add-opens`, and its ORDER is a
+ *    `HashMap` iteration order — a property of the running JVM, not of any document. Pinning it as
+ *    an artifact would freeze a transcription of something only an executing JDK can state.
+ *  - **A lock would add a copy, not a check.** This table has already been mis-transcribed twice —
+ *    enumerated as thirteen pairs with `-zr` missing, and named `-mm` as the fourteenth. A
+ *    generated module plus a lock file makes three copies where there are two, and the checker
+ *    would still have to run the JDK to be worth anything, which is exactly what the differential
+ *    already does.
+ *  - **Fourteen pairs against 806 classes.** The artifact machinery exists because a 23 KB table
+ *    cannot be read by a reviewer. This one is four lines and its every entry is visible above.
+ *
+ * WHAT ACTUALLY GATES IT, and what each gate is worth — measured at M7 close, not argued:
+ *
+ *  - `npm run diff:language-range` re-derives `regionVariantEquivMap` from the pinned JDK on every
+ *    run and compares this literal against it as an ORDERED LIST OF PAIRS, then probes every
+ *    ordered pair of the fourteen end to end. **Ablation:** moving `["-fr", "-fx"]` to the end of
+ *    the list exits 1 and prints both lists. It is the strongest gate and it needs the JDK.
+ *  - `npm test` catches a missing or mis-paired entry (dropping `["-zr", "-cd"]` fails
+ *    `test/negotiate.test.js`) and, since M7 close, a tail permutation too — the `sgn-fx-fr` row
+ *    was added because that same `-fr` move left the whole suite GREEN while changing the answer.
+ *    This matters because the differential is not part of `npm run verify`.
+ *
+ * So the literal is checked in two independent places, one of which runs in the default gate, and
+ * neither is a transcription of the other. A pinned artifact would improve none of that.
+ *
  * @type {readonly (readonly [string, string])[]}
  */
 const REGION_VARIANT_EQUIVALENTS = [

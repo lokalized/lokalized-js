@@ -33,9 +33,10 @@
  * So there are two verdicts, not one, and only the first is M7's:
  *
  *   WELL-FORMED (in scope). `normalizeTag(tag)` must equal `forLanguageTag(tag).toLanguageTag()`.
- *   ILL-FORMED (out of scope, reported). Java truncates; the port refuses. That is a contract
- *     decision with no corpus row and no plan sentence, and it is NOT changed here — see
- *     `ILL_FORMED_CONTRACT` below.
+ *   ILL-FORMED (outside the clause, gated in both directions). Java truncates; the port refuses.
+ *     No corpus row discriminates it, but the plan does have a sentence — two — and they prescribe
+ *     the port's refusal. DECIDED at M7 close and unchanged; see `ILL_FORMED_CONTRACT` below for
+ *     the citations, the shape of the 82 rows, and what this run does and does not gate.
  */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -262,31 +263,71 @@ const KNOWN_DIVERGENCES = {};
 const OPEN_PORT_DEFECTS = {};
 
 /**
- * THE ILL-FORMED CONTRACT, stated rather than silently enforced.
+ * THE ILL-FORMED CONTRACT — DECIDED AT M7 CLOSE, and decided from the plan's own words.
  *
  * `Locale.forLanguageTag` truncates at the first ill-formed subtag; `normalizeTag` throws a
- * `RangeError`. Both behaviours are defensible and the difference is a CONTRACT question, not a port
- * defect: it is outside the M7 row's clause, which is scoped to WELL-FORMED direct lookup, and no
- * corpus case discriminates it because `VectorOracle` records what Java answered rather than whether
- * it should have.
+ * `RangeError`. **The port's refusal stands, it is OUTSIDE the M7 acceptance row's clause, and this
+ * differential is its gate.** Nothing about the port changed to record that.
  *
- * The two readings, so a future decision starts from the trade rather than from this file:
+ * WHAT THIS FILE USED TO SAY, AND WHY IT WAS WRONG. It said the difference was "a contract decision
+ * with no corpus row and no plan sentence". The corpus half is true. The plan half is FALSE, and it
+ * decides the question:
+ *
+ *   `IMPLEMENTATION-PLAN-v7.md` §2.2 — "A direct locale is a lookup request, not a catalog selector.
+ *     Any input that normalizes to a well-formed tag is accepted whether or not it is loaded […]
+ *     **Malformed direct input fails at its validation boundary before candidate resolution**,
+ *     fallback policy/observation, or failure handling".
+ *   …and §3.3 again, for the per-call argument — "A direct per-call `locale` and a value returned by
+ *     `localeResolver` need only normalize to a well-formed tag; unknown and unloaded tags are valid
+ *     lookup requests and enter candidate resolution. **Malformed tags fail before candidate
+ *     resolution.**"
+ *
+ * So the plan scopes the acceptance clause to well-formed tags in the same breath in which it
+ * prescribes REFUSAL for everything else, and the port does exactly that. Java's truncation is a
+ * `java.util.Locale` leniency the plan knowingly did not adopt — the revision-7 header restores
+ * "Java's direct-locale contract" for the *well-formed* tag, not `forLanguageTag`'s parser.
+ *
+ * WHAT THE 82 ROWS ACTUALLY ARE, which is the part an argument from principle misses. They are not
+ * near-miss tags. Truncation maps `"readme.txt"`, `"catalog.json"`, `".DS_Store"`, `"not a tag"`,
+ * `" "` and `""` to `und`; `"en-US,en"` (a whole `Accept-Language` header) to `en`; `"de-de.json"`
+ * to `de`; and `"zh-min-nan.json"` to **`min`** — a language nobody wrote. Adopting truncation would
+ * make `createStrings({ locale: "readme.txt" })` a silent request for `und`. That is the concrete
+ * shape of §2.2's "fails at its validation boundary".
+ *
+ * The two readings are kept, because the trade is real and a future reader should see it:
  *
  *   - TRUNCATE (Java). `strings.get(key, ph, { locale: navigator.language })` never throws, and a
  *     browser that hands over a legacy `no-NO-NY` still gets Norwegian. It also means a typo silently
  *     serves a different locale: `en-Latin-US` renders as `en` with no signal anywhere.
- *   - REFUSE (the port today). Every ingress reports a malformed tag at the site that spelled it,
- *     which is the reason `forLocale` exists at all. The cost is that a caller forwarding a hostile
- *     `Accept-Language` value must catch — which `lokalized/negotiate`'s fail-soft
+ *   - REFUSE (the port, and the plan). Every ingress reports a malformed tag at the site that spelled
+ *     it, which is the reason `forLocale` exists at all. The cost is that a caller forwarding a
+ *     hostile `Accept-Language` value must catch — which `lokalized/negotiate`'s fail-soft
  *     `bestMatchForAcceptLanguage` and C2's chooser both already do on the caller's behalf.
  *
- * The run REPORTS this bucket and does not fail on it. What it does fail on is the bucket going
- * EMPTY or the port starting to accept an ill-formed tag: either means the contract moved without a
- * decision, which is the thing this section exists to prevent.
+ * AND IT IS NOT A LENIENCY TOGGLE, which is why "just match Java" was never the cheap option:
+ * `en-Latin-US` truncates to a tag Java then REFUSES as a duplicate, so both sides throw and only
+ * the error class differs. Any future move here has to cover that shape too.
+ *
+ * TWO LIMITS ON THE DECISION, so it is not read as wider than it is:
+ *
+ *   - It is scoped to DIRECT LOOKUP and construction keys, which is what M7 owns. Filenames are in
+ *     this bucket only because the corpus spells them (`de.json`, `readme.txt`); what a directory
+ *     LOADER does with a file it cannot parse as a tag — skip it, or admit it as `und` the way
+ *     `LocalizedStringLoader` does — is M8's to decide and is not decided here.
+ *   - The plan's `LokalizedError` hierarchy with a `code` field has still not landed, so the port
+ *     signals this with a bare `RangeError`. The refusal is contracted; its ERROR TYPE is not.
+ *
+ * HOW THIS RUN GATES IT — in both directions, and neither is the count. The bucket must not go
+ * EMPTY (the probe space stopped covering the class, and every claim here would be vacuous) and the
+ * port must REFUSE every member (`illFormedAccepted` is a term of the exit expression). What is
+ * deliberately NOT gated is the number 82: the probe space grows whenever a slice adds an edge, and
+ * ratcheting it would be the "exact counts, not floors" mistake this project has already made.
  */
 const ILL_FORMED_CONTRACT =
-  "Java TRUNCATES at the first ill-formed subtag; the port raises RangeError. Contract question, " +
-  "outside M7's well-formed clause, unchanged here. See ILL_FORMED_CONTRACT in this file. " +
+  "Java TRUNCATES at the first ill-formed subtag; the port raises RangeError. DECIDED at M7 close: " +
+  "the port's refusal is what plan §2.2 and §3.3 require (\"Malformed direct input fails at its " +
+  "validation boundary before candidate resolution\"), and the clause the M7 row gates is scoped to " +
+  "WELL-FORMED tags. Outside the clause, unchanged, gated here. See ILL_FORMED_CONTRACT in this file. " +
   "MEASURED end-to-end on both sides against catalogs {nn, nb, fr} with fallback fr: `no-NO-NY` is " +
   "TRANSLATED by Java from the `nb` catalog (it truncates to `no-NO`; it does NOT reach `nn`, which " +
   "only the well-formed `no-NO-x-lvariant-NY` does) and raises RangeError in the port. But " +
@@ -452,7 +493,11 @@ try {
     for (const difference of differences.slice(0, 20)) show(difference);
   }
 
-  console.log(`\nILL-FORMED, REPORTED NOT GATED (${illFormedTruncated.length}). ${ILL_FORMED_CONTRACT}`);
+  // The label matters: this bucket IS gated — the run fails if it goes empty or if the port accepts
+  // a member — and only its COUNT is a floor rather than a ratchet. It read "REPORTED NOT GATED"
+  // until M7 close, which understated two terms of the exit expression twelve lines below. The same
+  // wording defect this repository already corrected once, on the cause-message channel.
+  console.log(`\nILL-FORMED — GATED IN BOTH DIRECTIONS, COUNT NOT RATCHETED (${illFormedTruncated.length}). ${ILL_FORMED_CONTRACT}`);
   for (const row of illFormedTruncated.slice(0, 12))
     console.log(`  ${JSON.stringify(row.tag)} -> java ${JSON.stringify(row.java)}, js RangeError`);
   if (illFormedTruncated.length > 12) console.log(`  ... ${illFormedTruncated.length - 12} more`);

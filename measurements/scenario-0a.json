@@ -2,26 +2,27 @@
   "scenario": "0a",
   "note": "Baseline, not a threshold. M2 is tracked by engineering measurement; no go/no-go line exists.",
   "environments": [
-    "node"
+    "node",
+    "browser"
   ],
   "node": [
     {
       "label": "root + raw-text catalog",
       "modules": 25,
-      "sourceBytes": 712878,
-      "importMs": 0.295,
-      "constructionMs": 0.1084,
-      "firstRenderMs": 0.3965,
+      "sourceBytes": 718962,
+      "importMs": 0.322,
+      "constructionMs": 0.1025,
+      "firstRenderMs": 0.3469,
       "retainedBytes": 68496
     },
     {
       "label": "core + parsed equivalent",
       "modules": 24,
-      "sourceBytes": 704633,
-      "importMs": 0.575,
-      "constructionMs": 0.3136,
-      "firstRenderMs": 0.2773,
-      "retainedBytes": 281584
+      "sourceBytes": 710717,
+      "importMs": 0.507,
+      "constructionMs": 0.317,
+      "firstRenderMs": 0.2711,
+      "retainedBytes": 294976
     }
   ],
   "rebaselines": [
@@ -181,6 +182,50 @@
         "root + raw-text catalog: source graph grew 690207 -> 712878 bytes",
         "core + parsed equivalent: source graph grew 681962 -> 704633 bytes"
       ]
+    },
+    {
+      "reason": "owed-branch batch: the 32 owed M7-surface coverage branches. +5,853 bytes in BOTH graphs, all of it src/core/index.js and MEASURED rather than apportioned -- that file went 118,330 -> 124,183 = 5,853, and it is the only file under src/ this batch touched (git diff HEAD --stat -- src/ names exactly one). Root and core moved by the identical delta because every byte landed in the shared graph. Modules unchanged at 25 root / 24 core, so the batch added no module, no import edge and no public export. What the bytes bought: SIX measured port defects repaired [count word corrected 2026-09-06 at M7 close, and the edit is disclosed rather than silent because this artifact is a provenance trail: the word said \"five\" and the enumeration that follows it has always listed six. No figure moved -- root 712,878 -> 718,731 and core 704,633 -> 710,486, both +5,853, src/core/index.js 118,330 -> 124,183, 25 root / 24 core modules, all re-measured and all unchanged] against newly recorded Java behaviour -- DefaultStrings:329 tiebreaker language-code collision (absent entirely; the port answered the :394 permutation refusal), :349 duplicate tiebreaker locale (silently deduplicated and CONSTRUCTED where Java refuses), :335 null tiebreaker list and :2650 null tiebreaker language code (both diagnosed as something else), :343 null tiebreaker entry, and :690 a null placeholder name (silently ignored, so the entry vanished from the caller's map with no diagnostic).",
+      "growth": [
+        "root + raw-text catalog: source graph grew 712878 -> 718731 bytes",
+        "core + parsed equivalent: source graph grew 704633 -> 710486 bytes"
+      ]
+    },
+    {
+      "reason": "M7 close-out: +231 bytes in BOTH graphs, 25/24 modules unchanged. The equal delta is the measurement that matters — it is my correction to the stale comment in src/core/index.js at the fallbackPolicy null-return guard, which claimed the oracle had no return-null behavior. It now has one (plan open question 7, closed this batch), so the corpus records what Java actually does there instead of what a reading of DefaultStrings.java:735 predicted. The rest of this batch's source movement (src/core/index.js +6,084 and src/negotiate/index.js +2,369 against the pushed HEAD) was already in the baseline from the preceding slices. src/negotiate/index.js's bytes are ABSENT from both totals, as always: the equal root/core delta is the standing evidence that lokalized/negotiate and its 806-class IANA table stay unreachable from src/index.js, which is the containment the module-count half of this ratchet exists to prove. Conformance 1,947 passed / 0 FAILED / 221 unsupported after the oracle's new return-null behaviors closed plan open question 7.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 718731 -> 718962 bytes",
+        "core + parsed equivalent: source graph grew 710486 -> 710717 bytes"
+      ]
     }
-  ]
+  ],
+  "browser": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/1.46388.4 Chrome/148.0.7778.280 Safari/537.36",
+    "transferCompression": "none — the harness server does not compress; section 9.2's gzip/brotli ceilings are a separate measure",
+    "memoryKind": "performance.memory (coarse, whole-page)",
+    "note": "One variant per page load: measuring both in one document leaves the second with a warm module cache and zero cold-import, resource and transfer figures.",
+    "variants": [
+      {
+        "label": "root + raw-text catalog",
+        "resources": 25,
+        "encodedBytes": 718731,
+        "decodedBytes": 718731,
+        "coldImportMs": 33.7,
+        "importMs": 1.9,
+        "constructionMs": 0.5,
+        "firstRenderMs": 1.3,
+        "firstRender": "I read 3 books"
+      },
+      {
+        "label": "core + parsed equivalent",
+        "resources": 24,
+        "encodedBytes": 710486,
+        "decodedBytes": 710486,
+        "coldImportMs": 30.5,
+        "importMs": 3,
+        "constructionMs": 1.4,
+        "firstRenderMs": 1.4,
+        "firstRender": "I read 3 books"
+      }
+    ]
+  }
 }
