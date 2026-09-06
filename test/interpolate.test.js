@@ -404,16 +404,13 @@ describe("render across every renderable getResult case", () => {
  * positive gate and fails only here.
  */
 describe("resolution failures the corpus records must also fail here", () => {
-  /**
-   * The only recorded resolution failures this module cannot reproduce: Java's default output budgets
-   * (`maximumInterpolatedOutputCharacters`, `maximumGeneratedExpansionCharacters`), which live on
-   * TranslationRuntimeLimits and are not part of RenderContext.
-   */
-  const OUTPUT_BUDGET_CASES = new Set([
-    "generated-placeholders.limits.cumulative-expansion-exceeds-character-budget",
-    "runtime-limits.expansion.default.one-past-the-budget",
-    "runtime-limits.interpolated-output.default.one-past-the-maximum",
-  ]);
+  // The three default-budget cases USED to be excluded here, on the grounds that
+  // `maximumInterpolatedOutputCharacters` and `maximumGeneratedExpansionCharacters` lived on
+  // `TranslationRuntimeLimits` and not on `RenderContext`. M7 C1 put all three budgets in this
+  // module at their fixed defaults, so the exclusion is deleted rather than kept as a list that no
+  // longer describes anything — the way every known-gap list in this project is required to end.
+  // They are now among the failures asserted below, and `test/runtime-budgets.test.js` pins the
+  // boundaries the corpus cannot reach.
 
   it("throws for every RESOLUTION_FAILURE whose donor entry this module can evaluate", () => {
     let checked = 0;
@@ -426,7 +423,6 @@ describe("resolution failures the corpus records must also fail here", () => {
       const expected = testCase.expected.result;
 
       if (!expected || expected.failureReason !== "RESOLUTION_FAILURE") continue;
-      if (OUTPUT_BUDGET_CASES.has(testCase.id)) continue;
 
       const fixture = corpus.fixtures[testCase.fixture];
 
@@ -493,8 +489,10 @@ describe("resolution failures the corpus records must also fail here", () => {
     // A FLOOR set at the CURRENT count, not the pre-growth one. A floor is right — an exact
     // count fails on corpus growth, the one reason that is unambiguously good news. But leaving
     // the floor at a stale value leaves room for cases to drop out of the sweep unnoticed, and a
-    // floor at today's count is still growth-safe because growth can only raise it.
-    assert.ok(checked >= 90, `checked fell to ${checked}, below the recorded 90`);
+    // floor at today's count is still growth-safe because growth can only raise it. Raised 90 -> 93
+    // at M7 C1: the three default-budget cases are no longer excluded, because this module now
+    // enforces all three budgets itself.
+    assert.ok(checked >= 93, `checked fell to ${checked}, below the recorded 93`);
   });
 });
 

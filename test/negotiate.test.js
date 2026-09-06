@@ -30,7 +30,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { createStrings } from "../src/core/index.js";
-import { createLocaleNegotiator } from "../src/negotiate/index.js";
+import { createLocaleNegotiator, parseLanguageRanges } from "../src/negotiate/index.js";
+import { decode as decodeRangeEquivalents } from "../src/data/iana-range-equivalents.js";
+
+/** The pinned 806-class closure, read once: the recovery check below walks all of it. */
+const RANGE_EQUIVALENTS = decodeRangeEquivalents();
 
 /** @param {Record<string, unknown>} options */
 const negotiatorFor = (options) => createLocaleNegotiator(
@@ -152,11 +156,11 @@ describe("the two ingresses are separate, and must stay separate", () => {
     // what the port did before this slice — turns the second row into the first.
     const asLocale = negotiator.matchFor("sgn-nsl");
     assert.equal(asLocale.matchType, "exact");
-    assert.equal(asLocale.languageRange, "nsl");
+    assert.deepEqual(asLocale.languageRange, { range: "nsl", weight: 1 });
 
     const asRange = negotiator.matchForLanguageRanges([{ range: "sgn-nsl", weight: 1 }]);
     assert.equal(asRange.matchType, "canonical");
-    assert.equal(asRange.languageRange, "sgn-nsl");
+    assert.deepEqual(asRange.languageRange, { range: "sgn-nsl", weight: 1 });
 
     // Both select the same catalog, which is why comparing only `locale` cannot see the difference.
     assert.equal(asLocale.locale, "nsl");
@@ -172,7 +176,7 @@ describe("the two ingresses are separate, and must stay separate", () => {
 describe("the pinned IANA closure, which the root graph's reduced table does not carry", () => {
   it("expands a range through the longest matching PREFIX, not by exact lookup", () => {
     // `no-bok` is not a normalized locale tag, so the reduced table inlined in `src/internal/
-    // locale.js` drops it; the pinned 802-class closure keeps it, and the JDK finds it by truncating
+    // locale.js` drops it; the pinned 806-class closure keeps it, and the JDK finds it by truncating
     // `no-bok-no` one subtag at a time. Without the prefix walk the range expands to nothing and
     // `nb-NO` is unreachable. Corpus case `m3b-canonicalization.compound-alias-no-bok`.
     const negotiator = negotiatorFor({ fallbackLocale: "en", locale: "en", strings: catalog(["en", "nb-NO"]) });
@@ -195,12 +199,12 @@ describe("the N-member solver's contract at this door", () => {
     const match = negotiator.matchForLanguageRanges([{ range: "fr", weight: 0.5 }, { range: "en", weight: 1 }]);
     assert.equal(match.locale, "en");
     assert.equal(match.effectiveWeight, 1);
-    assert.equal(match.languageRange, "en");
+    assert.deepEqual(match.languageRange, { range: "en", weight: 1 });
 
     // Weight order, not list order — the stable weight-descending sort is what decides.
     const reversed = negotiator.matchForLanguageRanges([{ range: "en", weight: 0.5 }, { range: "fr", weight: 1 }]);
     assert.equal(reversed.locale, "fr");
-    assert.equal(reversed.languageRange, "fr");
+    assert.deepEqual(reversed.languageRange, { range: "fr", weight: 1 });
   });
 
   it("answers the EMPTY list as a no-match rather than refusing it", () => {
@@ -292,7 +296,7 @@ describe("the two solver rules the corpus cannot check", () => {
     const match = negotiator.matchForLanguageRanges([{ range: "cmn", weight: 1 }, { range: "zh", weight: 1 }]);
     assert.equal(match.matchType, "exact");
     assert.equal(match.locale, "zh");
-    assert.equal(match.languageRange, "zh");
+    assert.deepEqual(match.languageRange, { range: "zh", weight: 1 });
 
     // The two controls that must PASS, each measured on the same JDK run. They are what proves the
     // pair above is about the anchor-owning restriction and not about the fixture: with one member
@@ -327,7 +331,7 @@ describe("the two solver rules the corpus cannot check", () => {
     const match = negotiator.matchForLanguageRanges([{ range: "sgn-no", weight: 1 }, { range: "nsl", weight: 1 }]);
     assert.equal(match.matchType, "likely-subtag");
     assert.equal(match.locale, "nsi-Latn-DE");
-    assert.equal(match.languageRange, "sgn-no");
+    assert.deepEqual(match.languageRange, { range: "sgn-no", weight: 1 });
 
     // A second witness on unrelated data, so the rule is not pinned to one alias table: `no-bok` and
     // `nb` are one group whose semantic range is `nb`, and `nb` governs the `nb` catalog exactly.
@@ -341,7 +345,7 @@ describe("the two solver rules the corpus cannot check", () => {
     const second = norwegian.matchForLanguageRanges([{ range: "no-bok", weight: 1 }, { range: "nb", weight: 1 }]);
     assert.equal(second.matchType, "cldr-fallback");
     assert.equal(second.locale, "no");
-    assert.equal(second.languageRange, "no-bok");
+    assert.deepEqual(second.languageRange, { range: "no-bok", weight: 1 });
 
     // The controls that must PASS. Each single-member request answers identically under both arms —
     // with one member the governor IS the representative — so a build that collapsed the arm still
@@ -377,6 +381,234 @@ describe("the generated IANA closure module", () => {
       [...decode().entries()].sort(),
       Object.entries(artifact.equivalents).sort(),
     );
-    assert.equal(decode().size, 802);
+    assert.equal(decode().size, 806);
+  });
+});
+
+/**
+ * M7 A4 — `Locale.LanguageRange.parse`, the region/variant map, and the fail-soft header door.
+ *
+ * `tools/language-range-diff/run.mjs` is the primary check on this parser: 6,037 probes against the
+ * real JDK method on the pinned Corretto 21, of which the corpus supplies fewer than a hundred. What
+ * lives here is what a differential CANNOT check — the recovery's totality over the pinned artifact,
+ * and the properties of the two doors ABOVE the parser, which have no JDK counterpart to compare to
+ * because `bestMatchForAcceptLanguage` is lokalized's own method and not the JDK's.
+ *
+ * Every ablation named below was measured by making the edit and re-running, not reasoned about.
+ */
+describe("parseLanguageRanges — the recovery of the JDK's language-equivalence maps", () => {
+  it("re-derives every one of the 806 pinned classes from its own recovered equivalents", () => {
+    // TOTAL, not a sample. The parser does not carry `singleEquivMap`/`multiEquivsMap`; it recovers
+    // them by inverting `parse`'s insertion order out of each recorded class. That inversion is the
+    // one genuinely clever step in the slice, and a clever step with no total check is how a
+    // plausible-looking wrong table ships. Re-parsing each key must reproduce its class byte for
+    // byte, because `parse(key)` is literally what the artifact recorded.
+    //
+    // ABLATED, and the numbers are measured rather than argued: replacing the recovery with
+    // `equivalenceClass.slice(1)` — treating the class as if it were the raw language-equivalents
+    // array — mis-reparses 123 of the 806 keys, turns this test red, turns the JDK differential red
+    // on 849 probes (re-measured against the re-pinned 806-class artifact; it was 728 against the
+    // 802-class one, and carrying the old figure forward is how these notes go stale), and turns
+    // 22 RECORDED CASES red as well (`browser-chooser.alias.zh-cmn-*`,
+    // `.conflict.nsl-*`, the `ingress-matrix-java.extlang.*` family). So this one is not a
+    // corpus-invisible rule — it is checked three ways over — and the note is here to say which of
+    // A4's rules the corpus can see, because most of the neighbouring ones it cannot.
+    const classes = [...RANGE_EQUIVALENTS.entries()];
+    assert.equal(classes.length, 806);
+
+    const wrong = classes
+      .map(([key, expected]) => [key, expected, parseLanguageRanges(key).map((m) => m.range)])
+      .filter(([, expected, actual]) => JSON.stringify(expected) !== JSON.stringify(actual));
+
+    assert.deepEqual(wrong, [], "keys whose recovered equivalents do not re-parse to their class");
+  });
+
+  it("applies the region/variant map, which no corpus row can see", () => {
+    // The gap A4 closes, and the reason this slice ships a JDK differential at all. All thirteen
+    // pairs M7-PLAN.md enumerates, plus the FOURTEENTH the plan and this module's own earlier note
+    // both missed: `-mm` -> `-bu`. `LocaleEquivalentMaps.java:815-828` writes fourteen entries and
+    // sizes the map `HashMap.newHashMap(14)`.
+    const ranges = (/** @type {string} */ header) => parseLanguageRanges(header).map((m) => m.range);
+
+    assert.deepEqual(ranges("de-DE"), ["de-de", "de-dd"]);
+    assert.deepEqual(ranges("de-DD"), ["de-dd", "de-de"]);
+    assert.deepEqual(ranges("fr-FR"), ["fr-fr", "fr-fx"]);
+    assert.deepEqual(ranges("fr-FX"), ["fr-fx", "fr-fr"]);
+    assert.deepEqual(ranges("en-BU"), ["en-bu", "en-mm"]);
+    assert.deepEqual(ranges("en-MM"), ["en-mm", "en-bu"]);
+    assert.deepEqual(ranges("en-TL"), ["en-tl", "en-tp"]);
+    assert.deepEqual(ranges("en-TP"), ["en-tp", "en-tl"]);
+    assert.deepEqual(ranges("en-YD"), ["en-yd", "en-ye"]);
+    assert.deepEqual(ranges("en-YE"), ["en-ye", "en-yd"]);
+    assert.deepEqual(ranges("zh-CD"), ["zh-cd", "zh-zr"]);
+    assert.deepEqual(ranges("zh-ZR"), ["zh-zr", "zh-cd"]);
+    assert.deepEqual(ranges("ja-heploc"), ["ja-heploc", "ja-alalc97"]);
+    assert.deepEqual(ranges("ja-alalc97"), ["ja-alalc97", "ja-heploc"]);
+
+    // The CONTROL that must produce nothing: a subtag that only LOOKS like a map key because it is a
+    // substring, and one hidden behind a singleton extension where `getExtentionKeyIndex` suppresses
+    // the rewrite. Without these, "the map fires" and "the map fires on everything" read the same.
+    assert.deepEqual(ranges("de-deu"), ["de-deu"]);
+    assert.deepEqual(ranges("de-x-fr"), ["de-x-fr"]);
+    assert.deepEqual(ranges("de-Latn"), ["de-latn"]);
+  });
+
+  it("walks the map in the JDK's hash order, not its source order", () => {
+    // `getEquivalentForRegionAndVariant` returns on the FIRST key that occurs in the range, so a
+    // range carrying two of them answers differently under a different iteration order.
+    //
+    // `sgn-de-tl` IS THE DISCRIMINATOR and `sgn-de-fr` IS THE CONTROL, and the distinction was
+    // measured, not assumed: sorting the table into source order leaves `sgn-de-fr` unchanged —
+    // `-de` precedes `-fr` in BOTH orders — so an earlier draft of this test asserted `sgn-de-fr`
+    // alone and PASSED under the ablation it was written to catch. The `zh-123` shape, in a test.
+    // Hash order reaches `-tl` (position 2) before `-de` (position 8) and answers `sgn-de-tp`;
+    // source order reaches `-de` (position 5) first and answers `sgn-dd-tl`.
+    //
+    // ABLATED: source order leaves the corpus at 1,914 passed / 0 FAILED — it is entirely
+    // corpus-invisible — and turns the JDK differential red on 88 probes and this row red on one.
+    // Read the LAST member: `sgn-dd-fr` is `-de` rewritten, which means `-de` was reached before
+    // `-fr`. Source order would have produced `sgn-de-fx` there instead. (The four members between
+    // are `sgn-de`'s own language equivalents `gsg`/`sgn-gsg`, each with its own region rewrite —
+    // `parse` applies the region map to every derived member too, which is a second thing this row
+    // pins and the JDK differential confirms end to end on this exact input.)
+    assert.deepEqual(parseLanguageRanges("sgn-de-tl").map((m) => m.range),
+      ["sgn-de-tl", "sgn-gsg-tp", "sgn-gsg-tl", "gsg-tp", "gsg-tl", "sgn-de-tp"]);
+
+    // The control: same shape, same two-key collision, and both orders agree on it. It is kept so
+    // the row above is known to be about the ORDER rather than about two-key ranges in general.
+    // (The four members between the first and last are `sgn-de`'s own language equivalents
+    // `gsg`/`sgn-gsg`, each with its own region rewrite — `parse` applies the region map to every
+    // derived member too, which the JDK differential confirms end to end on both inputs.)
+    assert.deepEqual(parseLanguageRanges("sgn-de-fr").map((m) => m.range),
+      ["sgn-de-fr", "sgn-gsg-fx", "sgn-gsg-fr", "gsg-fx", "gsg-fr", "sgn-dd-fr"]);
+  });
+});
+
+describe("parseLanguageRanges — the header grammar", () => {
+  const ranges = (/** @type {string} */ header) => parseLanguageRanges(header).map((m) => m.range);
+  const weighted = (/** @type {string} */ header) => parseLanguageRanges(header)
+    .map((m) => `${m.range}@${m.weight}`);
+
+  it("strips spaces GLOBALLY rather than trimming each member", () => {
+    // The pair. `"not a header!"` collapses to ONE member and is refused naming the collapsed text,
+    // and a TAB is not a space so it survives into the refusal. Both messages are recorded verbatim
+    // at `browser-chooser.malformed.free-text` and `.horizontal-tab-ows`; a per-member trim ANSWERS
+    // both instead of refusing them, so neither row alone says which rule is in force.
+    assert.throws(() => parseLanguageRanges("not a header!"), { name: "RangeError", message: "range=notaheader!" });
+    assert.throws(() => parseLanguageRanges("de;q=0.8,\tfr;q=0.9"), { name: "RangeError", message: "range=\tfr" });
+
+    // The control that must PASS: spaces around a legal member are deleted, not rejected.
+    assert.deepEqual(ranges(" de , fr "), ["de", "fr"]);
+    assert.deepEqual(ranges("accept-language: fr,de"), ["fr", "de"]);
+  });
+
+  it("dedups on the range string, first occurrence winning the whole class", () => {
+    // THE PAIR M7-PLAN.md names, and passing one half proves nothing: a group-maximum rule and a
+    // last-wins rule each reproduce one of these and neither reproduces both. `he` arrives as `iw`'s
+    // IANA equivalent AT `iw`'s WEIGHT, and the later explicit `he;q=0.4` is dropped entirely.
+    assert.deepEqual(weighted("iw;q=0.9,he;q=0.4"), ["iw@0.9", "he@0.9"]);
+    assert.deepEqual(weighted("he;q=0.4,iw;q=0.9"), ["he@0.4", "iw@0.4"]);
+    assert.deepEqual(weighted("fr;q=0.5,fr;q=0.9"), ["fr@0.5"]);
+  });
+
+  it("sorts by weight with a stable insertion, and never reorders equal weights", () => {
+    assert.deepEqual(weighted("de;q=0.8,fr;q=0.9,en;q=0.7"), ["fr@0.9", "de@0.8", "en@0.7"]);
+    assert.deepEqual(ranges("es,fr,de"), ["es", "fr", "de"]);
+    assert.deepEqual(ranges("de,fr"), ["de", "fr"]);
+    assert.deepEqual(ranges("fr,de"), ["fr", "de"]);
+  });
+
+  it("splits on commas the way java.lang.String does", () => {
+    // Trailing empty elements are dropped by `split`, interior ones are not — and an interior empty
+    // element reaches the grammar and is refused as `range=`, which is what
+    // `browser-chooser.malformed.empty-list-element` and `.blank-header` record.
+    assert.deepEqual(ranges("fr,"), ["fr"]);
+    assert.deepEqual(ranges(",,,"), []);
+    assert.throws(() => parseLanguageRanges("fr,,de"), { name: "RangeError", message: "range=" });
+    assert.throws(() => parseLanguageRanges(",fr"), { name: "RangeError", message: "range=" });
+    assert.throws(() => parseLanguageRanges("   "), { name: "RangeError", message: "range=" });
+  });
+
+  it("checks the weight before the grammar, and quotes a non-numeric one", () => {
+    // Two different Java messages from one `;q=` clause, and the ORDER is what picks between them:
+    // `fr;q=1.5` never reaches `range=`, and `notarange!;q=abc` reports the WEIGHT rather than the
+    // range even though the range is ill-formed too.
+    assert.throws(() => parseLanguageRanges("fr;q=1.5"),
+      { name: "RangeError", message: 'weight=1.5 for language range "fr". It must be between 0.0 and 1.0.' });
+    assert.throws(() => parseLanguageRanges("fr;q=abc"),
+      { name: "RangeError", message: 'weight="abc" for language range "fr"' });
+    assert.throws(() => parseLanguageRanges("notarange!;q=abc"),
+      { name: "RangeError", message: 'weight="abc" for language range "notarange!"' });
+
+    // `Double.parseDouble`, not `Number()`. JavaScript reads `""` as 0 and `"0x10"` as 16 where Java
+    // throws; Java reads `"1d"` where JavaScript gives NaN. Each direction is a wrong answer.
+    assert.throws(() => parseLanguageRanges("fr;q="), { name: "RangeError", message: 'weight="" for language range "fr"' });
+    assert.throws(() => parseLanguageRanges("fr;q=0x10"),
+      { name: "RangeError", message: 'weight="0x10" for language range "fr"' });
+    assert.deepEqual(weighted("fr;q=1d"), ["fr@1"]);
+    assert.deepEqual(weighted("fr;q=.5"), ["fr@0.5"]);
+    // `"5."` is a legal Java double and an illegal JavaScript numeric literal in this position, and
+    // the message it produces is the second half of the `Double.toString` contract: Java prints
+    // `5.0`, JavaScript's own `String(5)` prints `5`. The recorded `weight=1.5` row cannot see that
+    // difference, because 1.5 spells the same in both.
+    assert.throws(() => parseLanguageRanges("fr;q=5."),
+      { name: "RangeError", message: 'weight=5.0 for language range "fr". It must be between 0.0 and 1.0.' });
+  });
+});
+
+describe("bestMatchForAcceptLanguage — the fail-soft door", () => {
+  const chooser = () => negotiatorFor({
+    fallbackLocale: "ja", locale: "ja", strings: catalog(["de", "en", "fr", "ja"]),
+  });
+
+  it("contradicts matchForLanguageRanges on the same 33-range header, deliberately", () => {
+    // THE CONTRADICTION M7-PLAN.md calls out, and the two halves must BOTH hold: this header's 13
+    // members expand through the IANA closure to 33 ranges. Through `matchFor(List)` that THROWS;
+    // through the fail-soft door it answers the configured fallback. A single shared limit rule
+    // produces one or the other, never both.
+    const header = "he,id,yi,cmn,yue,nan,hak,jbo,tlh,gan,wuu,hsn,ase,fr;q=0.1";
+    assert.equal(parseLanguageRanges(header).length, 33);
+    assert.throws(() => chooser().matchForLanguageRanges(parseLanguageRanges(header)),
+      { name: "RangeError", message: "At most 32 language ranges are supported, but received 33" });
+    assert.equal(chooser().bestMatchForAcceptLanguage(header), "ja");
+
+    // 32 EXACTLY is accepted WHOLE, never truncated — the control that separates "refuses over 32"
+    // from "keeps the first 32". A truncating door answers `fr` on the 33 header too.
+    const atLimit = "he,id,yi,cmn,yue,nan,jbo,tlh,gan,wuu,hsn,ase,fr;q=0.9,de;q=0.8,es;q=0.7,it;q=0.6";
+    assert.equal(parseLanguageRanges(atLimit).length, 32);
+    assert.equal(chooser().bestMatchForAcceptLanguage(atLimit), "fr");
+  });
+
+  it("applies the 4,096 code-unit cap to the RAW value, before normalization", () => {
+    // The recorded pair, and NEITHER ROW ALONE DISCRIMINATES: both headers are commas with `fr` at
+    // the end, and normalization deletes every comma. A cap applied after normalization sees `fr`
+    // in both and answers `fr` twice; no cap at all does the same; an off-by-one loses one half.
+    const atCap = `${",".repeat(4094)}fr`;
+    const overCap = `${",".repeat(4095)}fr`;
+    assert.equal(atCap.length, 4096);
+    assert.equal(overCap.length, 4097);
+    assert.equal(chooser().bestMatchForAcceptLanguage(atCap), "fr");
+    assert.equal(chooser().bestMatchForAcceptLanguage(overCap), "ja");
+  });
+
+  it("treats SPACE and HTAB as OWS, and nothing else", () => {
+    // The width of the OWS set, pinned from OUTSIDE by two characters that are whitespace to every
+    // JavaScript idiom and are not OWS to RFC 9110. A normalizer written against `\s` or against
+    // `String.prototype.trim` answers `fr` on all four of these.
+    assert.equal(chooser().bestMatchForAcceptLanguage("  fr  ,  de  "), "fr");
+    assert.equal(chooser().bestMatchForAcceptLanguage("\tfr\t,de;q=0.1"), "fr");
+    assert.equal(chooser().bestMatchForAcceptLanguage("\nfr"), "ja");
+    assert.equal(chooser().bestMatchForAcceptLanguage(" fr"), "ja");
+  });
+
+  it("answers the fallback for every unusable header, and never throws", () => {
+    for (const header of [null, undefined, "", "   ", ",,,", "not a header!", "fr;q=abc", "fr;q=1.5"])
+      assert.equal(chooser().bestMatchForAcceptLanguage(header), "ja", `header ${JSON.stringify(header)}`);
+
+    // The controls that must PASS, so "never throws" is not being confirmed by a door that answers
+    // the fallback unconditionally.
+    assert.equal(chooser().bestMatchForAcceptLanguage("fr"), "fr");
+    assert.equal(chooser().bestMatchForAcceptLanguage("fr,,de"), "fr");
+    assert.equal(chooser().bestMatchForAcceptLanguage("de;q=0.8,f\tr;q=0.9"), "fr");
   });
 });

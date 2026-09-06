@@ -23,11 +23,22 @@
  * either eagerly and refuses construction when the consumer did not supply them, so a missing table
  * is a construction-time error and never a late lookup surprise.
  *
- * Deliberately absent: the interpolated-output character budget, which belongs with the runtime-limit
- * work — see the note in `bidi.js` on why half of it would be worse than none.
+ * THREE RUNTIME BUDGETS are enforced here, at the fixed defaults plan 4.6 gives v1 (there is no way
+ * to change them; `createStrings` refuses a `runtimeLimits` option outright). They are three
+ * different numbers measuring three different things, and the corpus distinguishes all three:
+ *
+ * - `maximumGeneratedPlaceholderDepth` bounds the RECURSION;
+ * - `maximumInterpolatedOutputCharacters` bounds ONE interpolation's output — every append is
+ *   checked, isolate marks included, and each nesting level is measured against it separately;
+ * - `maximumGeneratedExpansionCharacters` bounds the CUMULATIVE size of every generated expansion
+ *   in one render, charged once per distinct placeholder and only below the top level.
+ *
+ * A port enforcing only the first two proceeds on
+ * `generated-placeholders.limits.cumulative-expansion-exceeds-character-budget`, whose six chains
+ * total 1,572,858 characters while no single expansion reaches 131,073.
  */
 
-import { isolate } from "./bidi.js";
+import { isolate, outputLimitExceeded } from "./bidi.js";
 import { LANGUAGE_FORM_NAMES } from "./catalog.js";
 // The ERROR CLASS only, from the tokenizer that declares it — not the evaluator, whose edges stay
 // out of here by the rule above. `expression-tokenizer.js` is already in both measured graphs
@@ -56,6 +67,42 @@ const DEFAULT_MAXIMUM_GENERATED_PLACEHOLDER_DEPTH = 32;
  * `getRuntimeLimits().getMaximumInterpolatedOutputCharacters()`.
  */
 const DEFAULT_MAXIMUM_INTERPOLATED_OUTPUT_CHARACTERS = 256 * 1024;
+
+/** `TranslationRuntimeLimits.DEFAULT_MAXIMUM_GENERATED_EXPANSION_CHARACTERS`. */
+const DEFAULT_MAXIMUM_GENERATED_EXPANSION_CHARACTERS = 1024 * 1024;
+
+/**
+ * `DefaultStrings.GeneratedExpansionBudget` — the cumulative cost of one render's expansions.
+ *
+ * Constructed in `render`, which is what makes it per-CANDIDATE for free: a walk that fails over
+ * `fr` and then succeeds over `en` gives `en` a fresh budget, because the failed candidate's render
+ * call has already returned. `expansion.fallback.fr-under-any-failure-reaches-en-on-a-fresh-budget`
+ * is the case that sees a budget hoisted onto the instance or onto a per-`getResult` closure.
+ */
+class GeneratedExpansionBudget {
+  /** @param {number} maximumCharacters */
+  constructor(maximumCharacters) {
+    /** @type {number} */
+    this.maximumCharacters = maximumCharacters;
+    /** @type {number} */
+    this.consumedCharacters = 0;
+  }
+
+  /**
+   * @param {number} characters
+   * @param {string} key
+   * @returns {void}
+   */
+  consume(characters, key) {
+    this.consumedCharacters += characters;
+
+    if (this.consumedCharacters > this.maximumCharacters)
+      throw new Error(
+        `Generated placeholder expansion for key '${key}' exceeds the cumulative limit of ` +
+          `${this.maximumCharacters} characters`,
+      );
+  }
+}
 
 /**
  * @typedef {import("./catalog.js").Definition} Definition
@@ -99,6 +146,10 @@ const NO_BINDINGS = /** @type {ReadonlyMap<string, PlaceholderBinding>} */ (new 
  * @property {number} [maximumInterpolatedOutputCharacters]
  *   `TranslationRuntimeLimits.maximumInterpolatedOutputCharacters`, which is also what bounds one
  *   phonetic TERM before it reaches the resolver
+ * @property {number} [maximumGeneratedExpansionCharacters]
+ *   `TranslationRuntimeLimits.maximumGeneratedExpansionCharacters` — the CUMULATIVE budget across
+ *   every generated expansion of one render, which is a different number from the per-output cap
+ *   above and is charged in addition to it
  * @property {boolean} [isolateValues] wrap caller-supplied values in FSI…PDI. ALREADY DECIDED by the
  *   caller, because the decision needs the isolation MODE and the evaluation locale together and
  *   only `createStrings` holds the mode; passing the answer rather than the inputs also keeps the
@@ -137,12 +188,54 @@ function startsWith(text, index, prefix) {
  *
  * Isolation happens after conversion, not before: Java's `render` calls `String.valueOf` and hands
  * the result to `isolate`, so a tagged language form is isolated as `FEMININE`, not as its record.
+ *
+ * MEMOIZED, like Java's — and MEASURED to be an optimization only, which is worth writing down
+ * because it reads like a behavioral rule. One wrapper is built per placeholder NAME, so a template
+ * naming the same value twice isolates once and then re-checks the memoized length against what is
+ * left of the budget. Isolating afresh instead would check the raw length against the same
+ * remainder and then overrun in the append loop, throwing the identical diagnostic: deleting the
+ * memo changes NO row of the corpus and no outcome of the four bounded shapes in
+ * `test/runtime-budgets.test.js` (ablated, both). It is kept because it is Java's shape and because
+ * re-isolating a large value per occurrence is exactly the repeated work the limit exists to
+ * bound — not because any answer depends on it.
  */
 class IsolatedValue {
-  /** @param {unknown} value */
-  constructor(value) {
+  /**
+   * @param {unknown} value
+   * @param {number} maximumOutputCharacters the whole budget, which the diagnostic names
+   */
+  constructor(value, maximumOutputCharacters) {
+    if (maximumOutputCharacters <= 0)
+      throw new RangeError("maximumOutputCharacters must be positive");
+
     /** @type {unknown} */
     this.value = value;
+    /** @type {number} */
+    this.maximumOutputCharacters = maximumOutputCharacters;
+    /** @type {string | null} */
+    this.rendered = null;
+  }
+
+  /**
+   * `BidiUtils.BoundedIsolatedValue.render`.
+   *
+   * @param {number} maximumCharacters what remains of the budget, or -1 for no limit
+   * @returns {string}
+   */
+  render(maximumCharacters) {
+    if (this.rendered !== null) {
+      if (maximumCharacters >= 0 && this.rendered.length > maximumCharacters)
+        throw outputLimitExceeded(this.maximumOutputCharacters);
+
+      return this.rendered;
+    }
+
+    this.rendered = isolate(
+      stringifyValue(this.value),
+      maximumCharacters,
+      this.maximumOutputCharacters,
+    );
+    return this.rendered;
   }
 }
 
@@ -156,31 +249,59 @@ class IsolatedValue {
  *
  * @param {unknown} value
  * @param {boolean} isolateValues
+ * @param {number} maximumOutputCharacters
  * @returns {unknown}
  */
-function markForIsolation(value, isolateValues) {
+function markForIsolation(value, isolateValues, maximumOutputCharacters) {
   if (!isolateValues || value === null || value === undefined) return value;
-  return new IsolatedValue(value);
+  return new IsolatedValue(value, maximumOutputCharacters);
 }
 
 /**
  * Faithful port of `StringInterpolator.interpolate`.
  *
+ * Every append goes through one of the two checked appenders, and the two are NOT the same test.
+ * Java appends a single character only when the buffer is strictly below the limit
+ * (`length >= maximum` refuses), and a run of `n` only when `n <= maximum - length` — so a run of
+ * length 0 is always allowed, even at the limit. Both are reproduced literally, because a message
+ * landing exactly on the limit passes and one character past it fails, and
+ * `runtime-limits.interpolated-output.default.*` pins that pair from both sides.
+ *
+ * `maximumOutputCharacters` of 0 means NO LIMIT, which is Java's convention here and not a limit of
+ * zero: `placeholderNamesIn` scans with 0 precisely so a name scan can never overrun.
+ *
  * @param {string} text
  * @param {(name: string) => unknown} lookup returns `undefined`/`null` when a name is unbound
  * @param {boolean} strict
+ * @param {number} [maximumOutputCharacters] 0 for no limit
  * @returns {{ value: string, unresolved: string[] }}
  */
-function interpolate(text, lookup, strict) {
+function interpolate(text, lookup, strict, maximumOutputCharacters = 0) {
   let out = "";
   /** @type {string[]} */
   const unresolved = [];
   let index = 0;
 
+  /** `StringInterpolator.appendChecked(StringBuilder, char, int)`. */
+  const appendCharacter = (/** @type {string} */ character) => {
+    if (maximumOutputCharacters > 0 && out.length >= maximumOutputCharacters)
+      throw outputLimitExceeded(maximumOutputCharacters);
+
+    out += character;
+  };
+
+  /** `StringInterpolator.appendChecked(StringBuilder, CharSequence, int, int, int)`. */
+  const appendSequence = (/** @type {string} */ value) => {
+    if (maximumOutputCharacters > 0 && value.length > maximumOutputCharacters - out.length)
+      throw outputLimitExceeded(maximumOutputCharacters);
+
+    out += value;
+  };
+
   while (index < text.length) {
     if (text.charAt(index) === ESCAPE_CHARACTER) {
       if (startsWith(text, index + 1, ESCAPE_CHARACTER)) {
-        out += ESCAPE_CHARACTER;
+        appendCharacter(ESCAPE_CHARACTER);
         index += 2;
         continue;
       }
@@ -190,22 +311,22 @@ function interpolate(text, lookup, strict) {
         const escapedEnd = text.indexOf(PLACEHOLDER_END, escapedStart + PLACEHOLDER_START.length);
 
         if (escapedEnd < 0) {
-          out += text.slice(escapedStart);
+          appendSequence(text.slice(escapedStart));
           break;
         }
 
-        out += text.slice(escapedStart, escapedEnd + PLACEHOLDER_END.length);
+        appendSequence(text.slice(escapedStart, escapedEnd + PLACEHOLDER_END.length));
         index = escapedEnd + PLACEHOLDER_END.length;
         continue;
       }
 
       if (startsWith(text, index + 1, PLACEHOLDER_END)) {
-        out += PLACEHOLDER_END;
+        appendSequence(PLACEHOLDER_END);
         index += 1 + PLACEHOLDER_END.length;
         continue;
       }
 
-      out += ESCAPE_CHARACTER;
+      appendCharacter(ESCAPE_CHARACTER);
       ++index;
       continue;
     }
@@ -216,13 +337,13 @@ function interpolate(text, lookup, strict) {
           `Unexpected placeholder closing delimiter '${PLACEHOLDER_END}' at index ${index}`,
         );
 
-      out += PLACEHOLDER_END;
+      appendSequence(PLACEHOLDER_END);
       index += PLACEHOLDER_END.length;
       continue;
     }
 
     if (!startsWith(text, index, PLACEHOLDER_START)) {
-      out += text.charAt(index);
+      appendCharacter(text.charAt(index));
       ++index;
       continue;
     }
@@ -236,7 +357,7 @@ function interpolate(text, lookup, strict) {
     if (placeholderEnd < 0) {
       if (strict) throw new Error(`Unclosed placeholder starting at index ${placeholderStart}`);
 
-      out += text.slice(placeholderStart);
+      appendSequence(text.slice(placeholderStart));
       break;
     }
 
@@ -250,7 +371,7 @@ function interpolate(text, lookup, strict) {
             "Unicode numbers, Unicode combining marks, underscores, or hyphens",
         );
 
-      out += text.slice(placeholderStart, placeholderEnd + PLACEHOLDER_END.length);
+      appendSequence(text.slice(placeholderStart, placeholderEnd + PLACEHOLDER_END.length));
       index = placeholderEnd + PLACEHOLDER_END.length;
       continue;
     }
@@ -259,11 +380,22 @@ function interpolate(text, lookup, strict) {
 
     if (value === null || value === undefined) {
       if (!unresolved.includes(name)) unresolved.push(name);
-      out += PLACEHOLDER_START + name + PLACEHOLDER_END;
+      // THREE checked appends, not one concatenation: Java charges the delimiters and the name
+      // separately, so a name that overruns is reported after the opening delimiter is already in.
+      appendSequence(PLACEHOLDER_START);
+      appendSequence(name);
+      appendSequence(PLACEHOLDER_END);
     } else if (value instanceof IsolatedValue) {
-      out += isolate(stringifyValue(value.value));
+      // `StringInterpolator.BoundedReplacementValue`: the wrapper is told what is LEFT of the
+      // budget so it can refuse before materializing, and the result is charged again on the way
+      // in. 0 means no limit here, and -1 means no limit there.
+      appendSequence(
+        value.render(
+          maximumOutputCharacters === 0 ? -1 : maximumOutputCharacters - out.length,
+        ),
+      );
     } else {
-      out += stringifyValue(value);
+      appendSequence(stringifyValue(value));
     }
 
     index = placeholderEnd + PLACEHOLDER_END.length;
@@ -283,6 +415,16 @@ function interpolate(text, lookup, strict) {
  */
 export function placeholderNamesIn(text) {
   return interpolate(text, () => undefined, true).unresolved;
+}
+
+/**
+ * `StringInterpolator.placeholderNamesInLeniently` — the same scan with the error branches off.
+ *
+ * @param {string} text
+ * @returns {string[]}
+ */
+function placeholderNamesInLeniently(text) {
+  return interpolate(text, () => undefined, false).unresolved;
 }
 
 /**
@@ -307,12 +449,24 @@ export function placeholderNamesIn(text) {
  * @param {string} key
  * @param {Placeholders} placeholders
  * @param {boolean} isolateValues
+ * @param {number} [maximumOutputCharacters]
  * @returns {string}
  */
-export function interpolateFailureKey(key, placeholders, isolateValues) {
+export function interpolateFailureKey(key, placeholders, isolateValues, maximumOutputCharacters) {
   try {
+    const maximum = maximumOutputCharacters ?? DEFAULT_MAXIMUM_INTERPOLATED_OUTPUT_CHARACTERS;
     const lookup = lookupFor(placeholders);
-    return interpolate(key, (name) => markForIsolation(lookup(name), isolateValues), false).value;
+    // A CONTEXT MAP built up front, one entry per name, the way Java builds it
+    // (DefaultStrings.java:1399-1412), rather than a lookup closure marking each occurrence as it
+    // is reached. One wrapper per name is the shape `interpolateTemplate` already uses, so the two
+    // interpolation entry points isolate the same way; see `IsolatedValue` on why the memo it
+    // enables is an optimization and not a behavior.
+    const interpolationContext = new Map();
+
+    for (const name of placeholderNamesInLeniently(key))
+      interpolationContext.set(name, markForIsolation(lookup(name), isolateValues, maximum));
+
+    return interpolate(key, (name) => interpolationContext.get(name), false, maximum).value;
   } catch {
     return key;
   }
@@ -920,6 +1074,8 @@ function resolvePlaceholder(binding, lookup, values, context, placeholderName) {
  * @param {string[]} path active generated-placeholder path, for cycle detection
  * @param {number} depth
  * @param {number} maximumDepth
+ * @param {number} maximumOutputCharacters
+ * @param {GeneratedExpansionBudget} budget
  * @returns {string}
  */
 function interpolateTemplate(
@@ -933,6 +1089,8 @@ function interpolateTemplate(
   path,
   depth,
   maximumDepth,
+  maximumOutputCharacters,
+  budget,
 ) {
   if (depth > maximumDepth)
     throw new Error(
@@ -981,6 +1139,8 @@ function interpolateTemplate(
             path,
             depth + 1,
             maximumDepth,
+            maximumOutputCharacters,
+            budget,
           );
           expanded.set(name, expandedValue);
           interpolationContext.set(name, expandedValue);
@@ -1002,16 +1162,30 @@ function interpolateTemplate(
       // (DefaultStrings.java:1365-1371), so one rendered message can legitimately carry an isolated
       // caller value beside a bare generated one — which is the whole shape of
       // `bidi-isolation.generated.file-defined-value-not-isolated`.
-      interpolationContext.set(name, markForIsolation(lookup(name), context.isolateValues === true));
+      interpolationContext.set(
+        name,
+        markForIsolation(lookup(name), context.isolateValues === true, maximumOutputCharacters),
+      );
     }
   }
 
-  const result = interpolate(template, (name) => interpolationContext.get(name), true);
+  const result = interpolate(
+    template,
+    (name) => interpolationContext.get(name),
+    true,
+    maximumOutputCharacters,
+  );
 
   if (result.unresolved.length > 0)
     throw new Error(
       `Missing value for placeholder(s) [${result.unresolved.join(", ")}] in key '${context.key}'`,
     );
+
+  // `depth > 0` — the TOP-LEVEL message is not a generated expansion and is never charged, which is
+  // what `expansion.limit-zero.no-generated` pins: a budget of zero still renders a message that
+  // generates nothing. Charged AFTER the interpolation, so a level that overruns the per-output cap
+  // reports that cap rather than the cumulative one.
+  if (depth > 0) budget.consume(result.value.length, context.key);
 
   return result.value;
 }
@@ -1087,6 +1261,13 @@ export function render(definition, placeholders, context) {
   const lookup = lookupFor(placeholders);
   const maximumDepth =
     context.maximumGeneratedPlaceholderDepth ?? DEFAULT_MAXIMUM_GENERATED_PLACEHOLDER_DEPTH;
+  const maximumOutputCharacters =
+    context.maximumInterpolatedOutputCharacters ?? DEFAULT_MAXIMUM_INTERPOLATED_OUTPUT_CHARACTERS;
+  // HERE, not on the instance and not in `getResult`: one budget per render call is one budget per
+  // CANDIDATE, so the next locale in a fallback walk starts fresh.
+  const budget = new GeneratedExpansionBudget(
+    context.maximumGeneratedExpansionCharacters ?? DEFAULT_MAXIMUM_GENERATED_EXPANSION_CHARACTERS,
+  );
 
   const selected = selectDefinition(definition, placeholders, context, NO_BINDINGS, context.key);
 
@@ -1147,5 +1328,7 @@ export function render(definition, placeholders, context) {
     [],
     0,
     maximumDepth,
+    maximumOutputCharacters,
+    budget,
   );
 }

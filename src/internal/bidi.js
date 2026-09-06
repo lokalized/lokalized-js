@@ -19,13 +19,17 @@
  * - **Isolation wraps the VALUE, not the message.** Only caller-supplied values are wrapped;
  *   translation-owned generated text is inserted bare even when it was produced by the same render.
  *
- * `isolate` is deliberately unbounded here. Java's `BidiUtils` also carries a
- * `maximumOutputCharacters` contract, where FSI and PDI count against the interpolated-output
- * budget; that budget is not enforced anywhere in this port yet, and adding half of it — a limit
- * that fires only for isolated values — would be worse than not having it, because the same value
- * would pass or fail depending on whether the locale happened to be RTL. The seam belongs with the
- * runtime-limit work that owns `maximumInterpolatedOutputCharacters`, and it lands whole or not at
- * all.
+ * `isolate` is BOUNDED, and it landed whole together with the interpolated-output budget in
+ * `interpolate.js` rather than on its own: a limit that fired only for isolated values would make
+ * the same value pass or fail depending on whether the locale happened to be RTL. The two numbers
+ * the bounded form carries are separate on purpose — `maximumCharacters` is what remains of the
+ * message's budget at the point the value is substituted, while `reportedMaximumCharacters` is the
+ * whole budget, which is the number the diagnostic names. `owed.m3b.bidi.repeated-placeholder-
+ * second-occurrence-overruns` records Java telling them apart — a reported maximum of 11 where only
+ * 5 characters remained — but that row's fixture LOWERS a runtime limit, so `conformance.mjs` can
+ * never replay it against a port that (by plan 4.6) refuses `runtimeLimits`. It is reproduced as a
+ * module-level assertion in `test/runtime-budgets.test.js` instead, which is the only place the
+ * distinction is checkable at all.
  */
 
 import { decode as decodeRightToLeftScripts } from "../data/rtl.js";
@@ -190,6 +194,21 @@ function isIsolated(value) {
 }
 
 /**
+ * The interpolated-output limit diagnostic, shared with `interpolate.js`.
+ *
+ * A plain `Error`, because Java raises `IllegalStateException` and `conformance.mjs`'s `CAUSE_NAME`
+ * maps that to `Error`. The wording is `StringInterpolator.outputLimitExceeded`'s verbatim, and it
+ * has to be: the two files raise the SAME diagnostic for the same budget, and a value that overruns
+ * inside `isolate` must be indistinguishable from one that overran in the interpolator.
+ *
+ * @param {number} maximumCharacters
+ * @returns {Error}
+ */
+export function outputLimitExceeded(maximumCharacters) {
+  return new Error(`Interpolated output exceeds the maximum of ${maximumCharacters} characters`);
+}
+
+/**
  * `BidiUtils.isolate`: wrap a value in FSI … PDI, repairing the isolate structure as it copies.
  *
  * Idempotent for an already-isolated value, and structure-repairing for everything else: an
@@ -197,33 +216,69 @@ function isIsolated(value) {
  * value's direction into the surrounding message), and an unclosed initiator is balanced with as
  * many PDIs as it left open before the wrapper's own PDI. The empty string gets no marks at all.
  *
+ * BOUNDED, and the length rejection comes FIRST — before the empty-string exit and before the
+ * already-isolated fast path. Java's reason is a WORK bound rather than an answer: balancing could
+ * discard stray pop marks and bring an oversized value back under the limit, but discovering that
+ * would do exactly the unbounded scanning the limit exists to prevent.
+ *
+ * MEASURED, and it corrects the claim the corpus case makes about itself.
+ * `owed.m3b.bidi.pre-isolated-value-longer-than-budget-rejected-before-early-return` says a port
+ * that moved this test after the fast path "would return this value unchecked". Through the
+ * interpolator it would not: `StringInterpolator.appendChecked` immediately re-tests the returned
+ * value against the SAME remainder and raises the SAME diagnostic, so that row records an identical
+ * answer either way. Moving the test is observable only on a direct `isolate` call, which is why
+ * `test/runtime-budgets.test.js` asserts it there — ablating the order leaves conformance at
+ * 1,917 / 0 and changes exactly one module-level assertion.
+ *
  * @param {string} value
+ * @param {number} [maximumCharacters] characters still available, or -1 for no limit
+ * @param {number} [reportedMaximumCharacters] the whole budget, which is what the diagnostic names
  * @returns {string}
  */
-export function isolate(value) {
+export function isolate(value, maximumCharacters = -1, reportedMaximumCharacters = maximumCharacters) {
+  if (maximumCharacters < -1)
+    throw new RangeError("maximumCharacters must be non-negative or -1 for no limit");
+
   const length = value.length;
+
+  // BEFORE the empty check and the fast path. See the note above.
+  if (maximumCharacters >= 0 && length > maximumCharacters)
+    throw outputLimitExceeded(reportedMaximumCharacters);
 
   if (length === 0) return "";
   if (isIsolated(value)) return value;
 
-  let isolated = FIRST_STRONG_ISOLATE;
+  let isolated = "";
   let isolateDepth = 0;
+
+  /** `BidiUtils.appendChecked`: the marks are charged to the budget, exactly like the value. */
+  const append = (/** @type {string} */ character) => {
+    if (maximumCharacters >= 0 && isolated.length >= maximumCharacters)
+      throw outputLimitExceeded(reportedMaximumCharacters);
+
+    isolated += character;
+  };
+
+  append(FIRST_STRONG_ISOLATE);
 
   for (let index = 0; index < length; ++index) {
     const character = value.charAt(index);
 
     if (isIsolateInitiator(character)) {
       ++isolateDepth;
-      isolated += character;
+      append(character);
     } else if (character === POP_DIRECTIONAL_ISOLATE) {
       if (isolateDepth > 0) {
         --isolateDepth;
-        isolated += character;
+        append(character);
       }
     } else {
-      isolated += character;
+      append(character);
     }
   }
 
-  return isolated + POP_DIRECTIONAL_ISOLATE.repeat(isolateDepth) + POP_DIRECTIONAL_ISOLATE;
+  for (let index = 0; index < isolateDepth; ++index) append(POP_DIRECTIONAL_ISOLATE);
+
+  append(POP_DIRECTIONAL_ISOLATE);
+  return isolated;
 }

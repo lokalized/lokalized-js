@@ -32,7 +32,7 @@ import { javaSplit, jdkLanguageSubtag, jdkLanguageTag, parseJdkTag, renderJdkTag
  * selects a loaded `nsl` even though CLDR maps `sgn-NO` to `nsi`. Java consults both tables, so a
  * port that has only the CLDR aliases gets that case wrong.
  *
- * Slice: the pinned registry has 802 classes; only two kinds of entry can ever be observed here, so
+ * Slice: the pinned registry has 806 classes; only two kinds of entry can ever be observed here, so
  * the rest are omitted.
  *   - keys are restricted to tags that survive `normalizeTag` (`jdkLanguageTag(k) === k`), because
  *     every range this kernel builds is an already-normalized locale tag — grandfathered forms
@@ -328,7 +328,10 @@ export const IANA_RANGE_EQUIVALENTS = new Map([
  * @property {string} fallbackLocale
  * @property {string[]} consideredLocales
  * @property {number | null} effectiveWeight
- * @property {string | null} languageRange
+ * @property {string | WeightedLanguageRange | null} languageRange the range that WON, spelled either
+ *   as a bare string — the one-argument `LanguageRange` spelling, whose weight is 1.0 by definition —
+ *   or as the `{ range, weight }` pair. Java's field is a `LanguageRange`, which always carries its
+ *   weight; the port PRODUCES the pair for that reason, and accepts either from a caller.
  * @property {WeightedLanguageRange[]} requestedLanguageRanges
  */
 
@@ -1670,7 +1673,26 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 			fallbackLocale,
 			consideredLocales: sortedSupported,
 			effectiveWeight: governorWeightByLocale[localeIndex] ?? 0,
-			languageRange: governor.range,
+			// THE PAIR, not the bare range text, and the weight is the GOVERNING MEMBER'S OWN — never
+			// `effectiveWeight`, which is a different number: `supplied-match.range.identity-includes-
+			// weight` is a row whose effective weight is 0.5 against a range weight of 1.0, and Java
+			// refuses it. Java's `LocaleMatchResult#getLanguageRange` is a `LanguageRange`, which
+			// carries its weight, and `LocaleMatchResult:108` checks `requestedLanguageRanges.contains`
+			// it — an equality that INCLUDES the weight (re-probed: `new LanguageRange("he")` does not
+			// equal `new LanguageRange("he", 0.5)`).
+			//
+			// Emitting the bare string here made the port produce a match its OWN validator refuses:
+			// `matchForLanguageRanges([{range:"fr",weight:0.5}])` answered `languageRange: "fr"`, which
+			// layer one reads as weight 1.0, and handing that straight back through `{ localeMatch }`
+			// raised "The matched language range must be present in requested language ranges". Two
+			// corpus rows A4 unlocks turn on it (`supplied-match.contradiction.per-call-ranges-bypass-
+			// invalid-supplier` at q=0.8 and `browser-chooser.shape.advance-past-unmatched-serves-
+			// translation` at q=0.7); every per-call row that lands TODAY has a weight-1 winner, which
+			// is the only reason it was invisible.
+			//
+			// `governor` is one of `sortedRanges`, a permutation of `requestedLanguageRanges` with the
+			// range text and weight carried verbatim, so the pair is present there BY CONSTRUCTION.
+			languageRange: { range: governor.range, weight: governor.weight },
 			requestedLanguageRanges,
 		};
 	};

@@ -8,20 +8,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 25,
-      "sourceBytes": 636829,
-      "importMs": 0.294,
-      "constructionMs": 0.1142,
-      "firstRenderMs": 0.3507,
-      "retainedBytes": 63512
+      "sourceBytes": 712878,
+      "importMs": 0.295,
+      "constructionMs": 0.1084,
+      "firstRenderMs": 0.3965,
+      "retainedBytes": 68496
     },
     {
       "label": "core + parsed equivalent",
       "modules": 24,
-      "sourceBytes": 630404,
-      "importMs": 0.39,
-      "constructionMs": 0.2634,
-      "firstRenderMs": 0.2072,
-      "retainedBytes": 179160
+      "sourceBytes": 704633,
+      "importMs": 0.575,
+      "constructionMs": 0.3136,
+      "firstRenderMs": 0.2773,
+      "retainedBytes": 281584
     }
   ],
   "rebaselines": [
@@ -152,6 +152,34 @@
       "growth": [
         "root + raw-text catalog: source graph grew 599551 -> 636829 bytes",
         "core + parsed equivalent: source graph grew 593126 -> 630404 bytes"
+      ]
+    },
+    {
+      "reason": "M7 B2+B3 batch (throw response, ambient resolvers, per-call locale/localeMatch, two-layer supplied-match validation) plus the B2/B3 review repairs. Re-recorded ONCE for the whole batch. MEASURED decomposition, +28774 bytes root / +27590 core: src/core/index.js +24986 (MissingTranslationError, throwForFailure's constructed arm, localeLookupFor's four ingress arms, both supplied-match validation layers), src/internal/locale.js +1904 (matchForRanges now emits languageRange as the { range, weight } pair Java's LanguageRange carries), src/internal/plural.js +700 (eager validateOperandOptions), src/index.js +1184 (pluralOperands' eager operand refusal). The two graphs differ by exactly 1184 bytes, which is src/index.js verbatim: the root entry point is in the root graph only, every other byte landed in code both graphs already reached, and NO new module entered either. Module count unchanged at 25 root / 24 core, which is what keeps lokalized/negotiate, lokalized/data/* and the 802-class table out of the root graph; MissingTranslationError was deliberately NOT declared in src/internal/parse-diagnostics.js, which is imported only by src/parse/index.js and sits in neither graph, because declaring it there would have pulled that module into both.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 636829 -> 665603 bytes",
+        "core + parsed equivalent: source graph grew 630404 -> 657994 bytes"
+      ]
+    },
+    {
+      "reason": "M7 A4+B4 batch close, ONE re-record for the batch. MEASURED DECOMPOSITION, not attributed by assumption: root + raw-text catalog 665,603 -> 669,991 (+4,388); core + parsed equivalent 657,994 -> 662,382 (+4,388). The two deltas are IDENTICAL, and that is the load-bearing fact rather than a coincidence: both graphs are the same file set as before, and enumerating all 25 root / 24 core modules with their mtimes against the previous record (15:42:18) shows src/core/index.js (98,012 bytes) is the ONLY module in either graph touched since. The other 24 root and 23 core modules are byte-unchanged, so the whole +4,388 is src/core/index.js and nothing else moved. That file's growth is B4's construction refusals (the five per-entry checks plus the locale-source XOR at :437-445, B3's at-most-one extended to exactly-one); A4 added source only in src/negotiate/index.js, which is outside BOTH graphs. MODULE COUNT UNCHANGED at 25 root / 24 core, which is the half of the ratchet A4 most endangered and the half that proves the containment: src/negotiate/index.js and the generated 802-class src/data/iana-range-equivalents.js are confirmed absent from both graphs by direct enumeration, so the header parser and the pinned IANA closure stay out of the root graph exactly as plan 3.1 requires. src drift 0.7% in both.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 665603 -> 669991 bytes",
+        "core + parsed equivalent: source graph grew 657994 -> 662382 bytes"
+      ]
+    },
+    {
+      "reason": "M7 C1+C2 batch close, ONE re-record for the whole batch (the IANA re-pin, C1 bounded output, C2 chooser). MEASURED DECOMPOSITION, and it is exact in BOTH graphs rather than attributed by assumption. Root + raw-text catalog 669,991 -> 690,207 (+20,216); core + parsed equivalent 662,382 -> 681,962 (+19,580). The split was measured by materializing the pre-C2 tree with `git checkout-index` and running scenario:0a inside it: that tree reads 681,819 root / 674,210 core. So C1 contributes +11,828 to BOTH graphs (src/internal/interpolate.js and src/internal/bidi.js: the append-checked output builder, isolate(value, maximumCharacters, reportedMaximumCharacters) with Java pre-scan rejection ordered before the empty check, the IsolatedValue memo, and the per-candidate GeneratedExpansionBudget), and C2 contributes +8,388 root / +7,752 core. C2 splits exactly: src/core/index.js 98,012 -> 105,764 (+7,752 -- chooseLocaleForPreferredLanguages, chooseBrowserLocale, and the three-trap note that records why the strict kernel, the silent 32-entry truncation and the RESOLVED fallback each had to be chosen) and src/index.js 7,609 -> 8,245 (+636 -- the two re-exports plus the placement note). The core figure carries only the first because the core graph does not reach src/index.js: 674,210 + 7,752 = 681,962 exactly, which is the check that the decomposition is a measurement and not a story. The A4/B4 baseline recorded src/core/index.js at 98,012 bytes and the pre-C2 tree still reads 98,012 there, so C1 touched no root module other than the two named. THE 806-CLASS IANA TABLE CONTRIBUTES ZERO to either graph, and that is the load-bearing half of this record: the re-pin grew src/data/iana-range-equivalents.js (806 equivalence classes, 23,477 bytes) and neither number appears above, because that table is reachable only from lokalized/negotiate and test/pinned-data-only.test.js names it in the forbidden list that keeps it out of the root. The chooser exists so a browser can pick a locale without pulling it in, and it entered NO new module -- both symbols live in src/core/index.js, which the root graph already reaches. MODULE COUNT UNCHANGED at 25 root / 24 core, which is the half of this ratchet a slice can genuinely break.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 669991 -> 690207 bytes",
+        "core + parsed equivalent: source graph grew 662382 -> 681962 bytes"
+      ]
+    },
+    {
+      "reason": "M7 close-out batch: the normalizeTag/x-lvariant/-u- slice, the onFallback observer slice, and the review-repair pass. MEASURED DECOMPOSITION, not estimated. Total +22671 bytes in BOTH graphs (root 690207 -> 712878, core 681962 -> 704633). Two src files moved and the arithmetic closes exactly on them. (1) src/internal/locale-jdk-tag.js +10105, measured by ABLATION: reverting only that file to HEAD and re-running 0a reads 702773 root / 694528 core, i.e. 712878-702773 = 704633-694528 = 10105. That is the normalizeTag slice whole. (2) src/core/index.js +12566, of which +2036 is this repair pass -- measured by reverse-applying its three edits (raw-key duplicate diagnostic, its comment, the getResult JSDoc bracket form): 118330 -> 116294 bytes -- leaving +10530 for the onFallback wiring. 10105 + 12566 = 22671, so no third src file contributed. ROOT AND CORE MOVED BY THE IDENTICAL DELTA, and that is the load-bearing observation rather than a coincidence: every byte landed in the SHARED graph both entry points reach, so neither slice put anything into the root-only raw-text parser half and neither pulled an optional data module (lokalized/data/ordinal, .../ranges) toward src/index.js. MODULE COUNT UNCHANGED at 25 root / 24 core, so the batch added no module, no import edge and no public export; symbol-allowlist.json needed no entry. Timings and heap are reported and never gated; the exact-floor browser half of 0a remains NOT MEASURED, by decision.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 690207 -> 712878 bytes",
+        "core + parsed equivalent: source graph grew 681962 -> 704633 bytes"
       ]
     }
   ]

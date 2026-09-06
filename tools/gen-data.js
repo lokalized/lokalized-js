@@ -5,7 +5,7 @@
  *
  * Reads the SHA-pinned artifacts vendored in the sibling lokalized-spec checkout and emits
  * `src/data/*.js`. This tool carries no CLDR knowledge: every semantic decision was made upstream
- * by CldrDataGenerator, and every encoding decision is recorded in lokalized-spec/ENCODING-DECISION.md.
+ * by CldrDataGenerator, and every encoding decision is recorded in the planning directory's ENCODING-DECISION.md.
  *
  * Guarantees, all verified by `--check`:
  *   - LOSSLESS: each emitted module is imported, decoded, and its canonical JCS projection compared
@@ -54,7 +54,7 @@ const banner = (what) =>
   `// Contains data derived from Unicode CLDR, licensed under Unicode License v3. See NOTICE.\n`;
 
 /* ------------------------------------------------------------------ encoders
- * Selected per lokalized-spec/ENCODING-DECISION.md, which chose by best Brotli-q5 because
+ * Selected per the planning directory's ENCODING-DECISION.md, which chose by best Brotli-q5 because
  * dynamic CDN compression is the production-realistic case and the q11 penalty is negligible.
  */
 
@@ -187,12 +187,151 @@ const MODULES = [
   },
 ];
 
-/** Enumerated so the omission is a recorded decision rather than an accident. */
+/**
+ * Every canonical field this encoder drops, ENUMERATED AND CHECKED — not merely recorded.
+ *
+ * WHY THIS IS NOW MACHINE-CHECKED. Plan M1 requires that "justified non-runtime omissions are
+ * enumerated", and the M7 row requires that "every M1 assertion that a canonical field is omitted as
+ * non-runtime is revalidated against M7's final consumer graph". Until this change, both clauses
+ * rested on the PROSE list below being printed by `--measure` and read by a human: no test named it,
+ * and `--check` never looked at it.
+ *
+ * It could not be caught downstream either, and that is the part worth stating plainly.
+ * `verifyLossless()` compares `decode()` against `m.source` — but `m.source` is ALREADY the
+ * projection, so a canonical field that quietly stopped being omitted, or a NEW field appearing in an
+ * upstream CLDR release, round-trips perfectly and changes nothing. The losslessness proof is a proof
+ * about the projection, not about the projection being the one that was approved.
+ *
+ * `verifyOmissions()` closes that by walking the upstream sub-tree each module CLAIMS (its `what`)
+ * against the projected `source`, collecting every field present upstream and absent downstream, and
+ * requiring that set to equal the declaration here EXACTLY. Both directions fail:
+ *
+ *   - an upstream field dropped but NOT declared here  -> a silent new omission (a new CLDR field)
+ *   - a field declared here but no longer dropped      -> a stale entry, the way known-gap lists rot
+ *
+ * `omitted: []` is a real assertion, not a placeholder: it says this projection drops nothing, and it
+ * fails the moment it starts to.
+ */
 const NON_RUNTIME_OMISSIONS = [
-  { from: "cldr-plural-data.json", omitted: "integerExample / decimalExample on every rule", why: "display examples; no public JS API exposes them" },
-  { from: "cldr-plural-data.json", omitted: "integerExample / decimalExample on ordinal and range rules", why: "display examples; no public JS API exposes them" },
-  { from: "cldr-conformance-vectors.json", omitted: "entire artifact", why: "test-time corpus; never shipped in the runtime graph" },
+  {
+    from: "cldr-plural-data.cardinalRuleGroups",
+    omitted: ["[].rules[].integerExample", "[].rules[].decimalExample"],
+    why: "display examples; no public JS API exposes them",
+  },
+  {
+    from: "cldr-plural-data.ordinalRuleGroups",
+    omitted: ["[].rules[].integerExample", "[].rules[].decimalExample"],
+    why: "display examples; no public JS API exposes them",
+  },
+  {
+    from: "cldr-plural-data.cardinalRangeGroups",
+    omitted: [],
+    why: "nothing is dropped; CLDR states start/end/result and all three ship",
+  },
+  {
+    from: "cldr-conformance-vectors.json",
+    omitted: ["entire artifact"],
+    why: "test-time corpus; never shipped in the runtime graph",
+    wholeArtifact: true,
+  },
 ];
+
+/**
+ * Field paths present in `upstream` and absent from `projected`, compared in parallel.
+ *
+ * Arrays are compared element-wise and their per-element key sets unioned, so a field that appears on
+ * only some rules is still seen. Only the SHAPE is compared; values are `verifyLossless()`'s job.
+ *
+ * @param {unknown} upstream
+ * @param {unknown} projected
+ * @param {string} path
+ * @param {Set<string>} into
+ */
+function collectDroppedFields(upstream, projected, path, into) {
+  if (Array.isArray(upstream)) {
+    if (!Array.isArray(projected)) return;
+    for (let i = 0; i < upstream.length; ++i)
+      collectDroppedFields(upstream[i], projected[i], `${path}[]`, into);
+    return;
+  }
+
+  if (upstream === null || typeof upstream !== "object") return;
+  if (projected === null || typeof projected !== "object" || Array.isArray(projected)) return;
+
+  for (const key of Object.keys(upstream)) {
+    const where = path ? `${path}.${key}` : key;
+    if (!(key in projected)) {
+      into.add(where);
+      continue;
+    }
+    collectDroppedFields(
+      /** @type {any} */ (upstream)[key],
+      /** @type {any} */ (projected)[key],
+      where,
+      into,
+    );
+  }
+}
+
+/** Resolves a `what` like `cldr-plural-data.cardinalRuleGroups` to the live upstream sub-tree. */
+function upstreamSubtree(what) {
+  const [artifact, ...rest] = what.split(".");
+  const roots = { "cldr-plural-data": plural, "cldr-locale-data": locale };
+  let node = /** @type {any} */ (roots)[artifact];
+  for (const segment of rest) node = node?.[segment];
+  return node;
+}
+
+/**
+ * Revalidates every declared non-runtime omission against the CURRENT upstream artifacts.
+ *
+ * @returns {string[]} problems, empty when every declaration is exact
+ */
+function verifyOmissions() {
+  const problems = [];
+
+  for (const omission of NON_RUNTIME_OMISSIONS) {
+    if (omission.wholeArtifact) {
+      // A whole artifact is omitted by never being sourced. Assert that literally, so "we do not ship
+      // the conformance vectors" cannot quietly become false by a module starting to read them.
+      const path = join(specDir, "vendor/lokalized-java/src/build/resources/cldr", omission.from);
+      if (!existsSync(path))
+        problems.push(`${omission.from}: declared omitted, but no such upstream artifact exists — stale declaration`);
+      if (MODULES.some((m) => m.what.startsWith(omission.from.replace(/\.json$/, ""))))
+        problems.push(`${omission.from}: declared omitted, but a generated module now sources it`);
+      continue;
+    }
+
+    const module = MODULES.find((m) => m.what === omission.from);
+    if (!module) {
+      problems.push(`${omission.from}: declared omitted, but no generated module claims that sub-tree — stale declaration`);
+      continue;
+    }
+
+    const upstream = upstreamSubtree(omission.from);
+    if (upstream === undefined) {
+      problems.push(`${omission.from}: not present in the pinned upstream artifact — stale declaration`);
+      continue;
+    }
+
+    /** @type {Set<string>} */
+    const dropped = new Set();
+    collectDroppedFields(upstream, module.source, "", dropped);
+
+    const found = [...dropped].sort();
+    const declared = [...omission.omitted].sort();
+    if (JSON.stringify(found) !== JSON.stringify(declared))
+      problems.push(
+        `${omission.from}: the fields this encoder actually drops have changed.\n` +
+          `       declared: ${declared.length ? declared.join(", ") : "(none)"}\n` +
+          `       measured: ${found.length ? found.join(", ") : "(none)"}\n` +
+          `       An undeclared drop is a new non-runtime omission that nobody approved; a declared ` +
+          `drop that no longer happens is a stale entry.`,
+      );
+  }
+
+  return problems;
+}
 
 /* ------------------------------------------------------------------ run */
 
@@ -246,11 +385,12 @@ if (mode === "measure") {
   console.log("\nIntegrated is the figure that matters: one compression window is shared across tables,");
   console.log("so the sum of independently-compressed parts overstates the real cost.");
   console.log("\nNon-runtime omissions:");
-  for (const o of NON_RUNTIME_OMISSIONS) console.log(`  ${o.from}: ${o.omitted}\n     ${o.why}`);
+  for (const o of NON_RUNTIME_OMISSIONS)
+    console.log(`  ${o.from}: ${o.omitted.length ? o.omitted.join(", ") : "(nothing dropped)"}\n     ${o.why}`);
 } else if (mode === "write") {
-  const failures = await verifyLossless();
+  const failures = [...(await verifyLossless()), ...verifyOmissions()];
   if (failures.length) {
-    console.error(`refusing to write; ${failures.length} losslessness failure(s):`);
+    console.error(`refusing to write; ${failures.length} losslessness/omission failure(s):`);
     for (const f of failures) console.error(`  ${f}`);
     process.exit(1);
   }
@@ -269,11 +409,20 @@ if (mode === "measure") {
     if (onDisk !== m.text) problems.push(`${m.file}: on-disk bytes differ from regeneration`);
   }
   problems.push(...(await verifyLossless()));
+  problems.push(...verifyOmissions());
   if (problems.length) {
     console.error(JSON.stringify({ status: "stale-or-lossy", problems }, null, 2));
     process.exit(1);
   }
-  console.log(JSON.stringify({ status: "current", modules: emitted.length, lossless: true, cldrVersion: locale.cldrVersion }));
+  console.log(JSON.stringify({
+    status: "current",
+    modules: emitted.length,
+    lossless: true,
+    // Reported as its own field so a reader can see the M1 omission clause was revalidated on THIS
+    // run against THESE upstream artifacts, rather than inferred from the absence of a complaint.
+    omissionsRevalidated: NON_RUNTIME_OMISSIONS.length,
+    cldrVersion: locale.cldrVersion,
+  }));
 } else {
   console.error("usage: node tools/gen-data.js --write | --check | --measure");
   process.exit(2);

@@ -238,6 +238,31 @@ describe("maximize", () => {
 });
 
 /**
+ * The matched range as a `{ range, weight }` pair on both sides.
+ *
+ * The port PRODUCES the pair, because Java's `languageRange` is a whole `LanguageRange` whose weight
+ * is part of its identity; the corpus records only `getRange()`. The weight is not invented here —
+ * it is read back out of the recorded `requestedLanguageRanges`, which Java's own constructor
+ * guarantees contains the matched range. Ambiguity throws rather than falling back to the range
+ * text, which is how a comparison quietly stops comparing.
+ *
+ * @param {unknown} languageRange
+ * @param {{ range: string, weight: number }[] | undefined} requested
+ */
+function weightedRange(languageRange, requested) {
+	if (languageRange === null || languageRange === undefined) return null;
+
+	const text = typeof languageRange === "string" ? languageRange : /** @type {any} */ (languageRange).range;
+	const weights = new Set((requested ?? []).filter((r) => r.range === text).map((r) => r.weight));
+
+	assert.equal(weights.size, 1,
+		`the recorded languageRange ${JSON.stringify(text)} carries ${weights.size} distinct weights ` +
+		`in requestedLanguageRanges; the weight is no longer derivable`);
+
+	return { range: text, weight: [...weights][0] };
+}
+
+/**
  * Drives one recorded match result through the module and returns the [actual, expected] pair.
  *
  * @param {any} testCase
@@ -255,7 +280,7 @@ function driveMatch(testCase, expected) {
 		fallbackLocale: actual.fallbackLocale,
 		consideredLocales: actual.consideredLocales,
 		effectiveWeight: actual.effectiveWeight,
-		languageRange: actual.languageRange,
+		languageRange: weightedRange(actual.languageRange, actual.requestedLanguageRanges),
 		requestedLanguageRanges: actual.requestedLanguageRanges,
 	}, {
 		matchType: MATCH_TYPES[/** @type {keyof typeof MATCH_TYPES} */ (expected.matchType)],
@@ -264,7 +289,7 @@ function driveMatch(testCase, expected) {
 		fallbackLocale: expected.fallbackLocale,
 		consideredLocales: expected.consideredLocales,
 		effectiveWeight: expected.effectiveWeight ?? null,
-		languageRange: expected.languageRange ?? null,
+		languageRange: weightedRange(expected.languageRange ?? null, expected.requestedLanguageRanges),
 		requestedLanguageRanges: expected.requestedLanguageRanges,
 	}];
 }

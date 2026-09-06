@@ -316,10 +316,18 @@ function validateOptionalLimit(value, description, maximum) {
  * order matters: a non-finite double supplied alongside a rejected compact exponent reports the
  * exponent, because Java never gets as far as converting the number.
  *
+ * EXPORTED so `pluralOperands()` can run it at VALUE CONSTRUCTION, which is where Java runs it.
+ * `PluralOperands.Builder` seeds itself with `TranslationRuntimeLimits.defaults()` and nothing in
+ * `Strings` reaches back into it, so an out-of-range option is refused while the caller is building
+ * the value and never becomes a translation failure — `runtime-limits.ceilings.operand-builder-
+ * still-rejects-visible-decimal-places-1025` records that refusal on an instance whose own ceiling
+ * was raised to 4096, byte-identical to the defaults fixture. The limits here are the DEFAULTS on
+ * purpose: threading an instance's limits into this call would resolve that case and diverge.
+ *
  * @param {OperandsOptions} options
  * @returns {OperandLimits}
  */
-function validateOperandOptions(options) {
+export function validateOperandOptions(options) {
   return {
     compactExponent:
       validateOptionalLimit(options.compactExponent, "Compact exponent", MAXIMUM_COMPACT_EXPONENT) ?? 0,

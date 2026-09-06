@@ -53,7 +53,10 @@ for (const testCase of cases) {
   // The spike has no bounded limits by design — see its header. A budget case therefore over-expands
   // instead of failing, which is the absence of a feature rather than a wrong answer.
   if (testCase.id.includes(".limits.")) {
-    outOfScope.push({ id: testCase.id, why: "the spike enforces no expansion budget (M5b/M6 own limits)" });
+    outOfScope.push({
+      id: testCase.id,
+      why: "the spike enforces no expansion budget; the shipping renderer does, since M7 C1",
+    });
     continue;
   }
   failed.push({ id: testCase.id, wanted, actual });

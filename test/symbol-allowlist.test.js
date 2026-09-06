@@ -82,6 +82,12 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     ["core", "RETURN_KEY", "failure policy/observer/handler types and helpers"],
     ["core", "THROW_EXCEPTION", "failure policy/observer/handler types and helpers"],
     ["core", "returnString", "failure policy/observer/handler types and helpers"],
+    // Plan 3.1 gives core the "core errors" category and plan 3.5 declares this member of it by
+    // name — `const MissingTranslationError: CatchOnlyErrorClass<MissingTranslationError>`, code
+    // `MISSING_TRANSLATION`, exposing its frozen `failure: TranslationFailure`. It is exported
+    // because catching it is the point: a `THROW_EXCEPTION` failure response with no retained cause
+    // raises one, and a consumer who cannot name the class can only match on a message.
+    ["core", "MissingTranslationError", "core errors"],
     ["core", "cardinalityForNumber", "cardinal classifiers/support probes"],
     ["core", "cardinalityForOperands", "cardinal classifiers/support probes"],
     ["core", "supportedCardinalitiesForLocale", "cardinal classifiers/support probes"],
@@ -91,6 +97,15 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     ["data/ordinal", "supportedOrdinalitiesForLocale", "number/operand ordinal classifiers and support probes"],
     ["data/ordinal", "getSupportedOrdinalityLocaleTags", "number/operand ordinal classifiers and support probes"],
     ["negotiate", "createLocaleNegotiator", "range parser/factory/option helpers"],
+    // `Locale.LanguageRange.parse`, ported in M7 A4. It is exported rather than kept private for the
+    // reason plan 3.1's category names it a "range PARSER": the JDK's own parse is a public static
+    // that callers use OUTSIDE the matcher, and the corpus records that separation directly --
+    // `VectorOracle:1022` parses a header into a list and only then hands it to `matchFor(List)`, so
+    // a header that refuses is an error from the PARSER, while the 32-member cap is enforced by the
+    // matcher on the already-expanded list. A caller who cannot reach the parser cannot reproduce
+    // that split, and `bestMatchForAcceptLanguage` on the negotiator would be the only door left --
+    // which is the fail-soft one, and answers the fallback where the recorded behavior throws.
+    ["negotiate", "parseLanguageRanges", "range parser/factory/option helpers"],
   ]);
 
   /** @param {string} owner @returns {Set<string>} */

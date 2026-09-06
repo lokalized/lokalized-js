@@ -21,8 +21,10 @@
  *     record. The runner reads named fields off it and would not notice an inherited `constructor`.
  *   - THAT THE POLICY IS NOT CONSULTED FOR THE FINAL CANDIDATE when the chain has exactly one
  *     element. The corpus states this in `custom-policy.singlecandidate.throwing-policy-is-inert-and-
- *     the-handler-fires`, which carries `expected.thrown` and is therefore attributed to B2; until
- *     that gate lifts this file is where the clause is checked.
+ *     the-handler-fires`. That row is no longer attributed — B2 landed the throw comparison and it
+ *     passes — so the clause now has two independent witnesses rather than one. It stays here
+ *     because the corpus row reaches it through a THROWING policy, and a port that consulted the
+ *     final candidate with a well-behaved policy would still be wrong and still be green there.
  */
 
 import assert from "node:assert/strict";

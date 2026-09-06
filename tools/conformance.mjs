@@ -39,6 +39,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+// The `construct` family's Java->JS refusal correspondence, kept OUT of this file on purpose: this
+// file's diff is read for exactly the shape a message-parity table has, so the table is a reviewable
+// artifact of its own with one entry per DefaultStrings refusal site. It cannot turn a mismatch into
+// an `unsupported` — a Java refusal it does not declare keeps its Java values and FAILS — and an
+// entry no case consults turns the run red. See the decision recorded at the top of that file.
+import { adaptConstructRefusal, staleConstructAdaptations } from "./construct-refusals.mjs";
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const specDir = process.env.LOKALIZED_SPEC_DIR ? resolve(process.env.LOKALIZED_SPEC_DIR) : resolve(root, "../lokalized-spec");
 const corpusPath = join(specDir, "generated/behavioral-vectors.json");
@@ -47,6 +54,20 @@ const verbose = process.argv.includes("--verbose");
 const familyFilter = process.argv.includes("--family") ? process.argv[process.argv.indexOf("--family") + 1] : null;
 const jsonOut = process.argv.includes("--json") ? process.argv[process.argv.indexOf("--json") + 1] : null;
 const write = process.argv.includes("--write");
+/**
+ * Authorizes a `--write` that would REMOVE an id from `passedIds`, and is recorded verbatim in the
+ * artifact beside the ids it removed.
+ *
+ * Without it a `--write` absorbs a regression in silence, which is not hypothetical: B3's write
+ * dropped `per-call-override-order.zh-tw.ranges-only-on-zh-hant-only-key` from the baseline, and the
+ * only reason nobody saw it is that the drop was reported against a baseline the same command then
+ * overwrote. The run DID print `REGRESSIONS (1)` at the time; nothing made writing it away
+ * deliberate. Now the write refuses, and an authorized drop leaves its reason in the file — the same
+ * discipline `scenario:0a --write --reason` already applies to the byte ratchet.
+ */
+const dropReason = process.argv.includes("--drop-reason")
+  ? process.argv[process.argv.indexOf("--drop-reason") + 1] ?? null
+  : null;
 const baselinePath = join(root, "measurements/conformance.json");
 
 /**
@@ -189,23 +210,12 @@ const OWNER_MILESTONE = {
   // because programmatic construction and the catalog model are its scope; M5b is closed, so these
   // are new required IDs against a closed milestone rather than work it left unfinished.
   define: "M5b",
-  // `construct` observes DefaultStrings' CONSTRUCTION-TIME validation: eight rows, one control that
-  // constructs plus seven deliberately degenerate builder configurations -- catalog omitted, catalog
-  // null, a null locale key, two supported tags that normalize to the same tag, a null catalog value,
-  // a null entry, and no locale source at all. The JS analogue is `createStrings`, which SHIPS, so what
-  // is missing is not the feature but a runner able to hand it a degenerate record; that makes this the
-  // `define` situation rather than the `matchFor` one.
-  //
-  // NAMING THE OWNER IS A JUDGEMENT, and it is recorded as one. Three of the seven refusals (null locale
-  // key, colliding normalized tags, absent locale source) are locale-source and supported-tag semantics
-  // that plan v7 gives the resolution core; the other four are the catalog map's shape. lokalized's
-  // CLAUDE.md records `construct` as specifying "resolution-core behavior M7 is built against", and that
-  // is the basis for M7 here. This entry was ADDED during the acceptLanguage/define repair, where an
-  // adversarial review found these eight reporting a reason and NO owner -- the one thing the
-  // unsupported list is not allowed to do. It annotates the reason text only; it is not an attribution
-  // rule and changes no case's outcome. If M7's scope turns out to exclude construction-time record
-  // validation, MOVE it rather than dropping it.
-  construct: "M7",
+  // `construct` HAD AN ENTRY HERE AND NO LONGER NEEDS ONE. M7 B4 gave the operation a real arm, so
+  // no `construct` case can reach `operationNotImplemented` any more and an owner annotation for it
+  // would be a label on a bucket that is permanently empty. Deleted rather than left in place, on
+  // this project's standing lesson that a rule outlives its capability by being deleted with it:
+  // an attribution table that keeps entries for implemented operations stops being readable as the
+  // list of what is unbuilt, which is the one thing it is for.
 };
 
 /**
@@ -220,11 +230,72 @@ function assertStillNonportable(specDirectory) {
     return [`symbol-allowlist.json is unreadable, so the "no JS counterpart" claims cannot be verified`];
   }
   const text = JSON.stringify(allowlist).toLowerCase();
-  return Object.entries(NO_JS_COUNTERPART)
+  const stale = Object.entries(NO_JS_COUNTERPART)
     .filter(([, entry]) => text.includes(entry.absentFrom))
     .map(([operation, entry]) =>
       `the symbol allowlist now mentions '${entry.absentFrom}', so '${operation}' may have a JS counterpart:` +
       ` delete its NO_JS_COUNTERPART entry and let those cases report as unsupported or run`);
+
+  return [...stale, ...bothPerCallSourcesStillRefused()];
+}
+
+/**
+ * The second "no JS counterpart" claim, re-derived the same way the first is — by ABLATION rather
+ * than by argument.
+ *
+ * `callOptionsFor` reports the both-present per-call state as nonportable because plan 3.3 declares
+ * `locale` and `localeMatch` mutually exclusive AT RUNTIME. That is a claim about the PORT, not about
+ * the JVM, so it can go stale in a way the allowlist cannot see: a future edit that made the port
+ * resolve the pair by precedence would leave those six rows silently parked in a bucket labelled
+ * "these can never move" while the port had quietly started answering them.
+ *
+ * So the claim is tested. A three-line instance, one lookup naming both sources, and the run FAILS
+ * if nothing is refused. Known-gap lists rot; this one cannot.
+ *
+ * AND THE THROW IS IDENTIFIED, not merely counted. A bare `catch {}` here would be the `zh-123`
+ * shape in its purest form: any throw at all would read as proof of the refusal this function names,
+ * so replacing the refusal in `localeLookupFor` with an unrelated `TypeError` — or breaking
+ * `createStrings` outright — would leave the guard silent and green. Measured, not argued: with the
+ * bare catch, substituting `throw new TypeError("unrelated internal failure")` for the refusal kept
+ * the run at exit 0. Hence the CONTROL below, which must succeed, and the bound `error`, which must
+ * be the refusal itself.
+ */
+function bothPerCallSourcesStillRefused() {
+  if (!core?.createStrings) return [];
+
+  const strings = core.createStrings({
+    fallbackLocale: "en",
+    locale: "en",
+    strings: { en: { "K": "v" }, fr: { "K": "v" } },
+  });
+  const localeMatch = strings.getDirectLocaleContext("fr").localeMatch;
+
+  // THE CONTROL, expected to pass: one per-call source alone must still answer. Without it a wholly
+  // broken instance — every lookup throwing for any reason — reads as a passing guard below.
+  try {
+    strings.getResult("K", undefined, { locale: "en" });
+  } catch (error) {
+    return [`the both-per-call-sources probe cannot run: its CONTROL lookup, which names only ` +
+      `'locale', threw ${error instanceof Error ? `${error.constructor.name}: ${error.message}` : String(error)}. ` +
+      `Nothing about the six per-call-override-order rows was tested.`];
+  }
+
+  try {
+    strings.getResult("K", undefined, { locale: "en", localeMatch });
+  } catch (error) {
+    // The refusal, by type AND by the phrase `localeLookupFor` raises it with. Anything else is a
+    // different failure wearing the refusal's clothes, and is reported rather than accepted.
+    if (error instanceof RangeError && error.message.includes("names two locale sources")) return [];
+
+    return [`the both-per-call-sources probe threw something that is NOT the per-call refusal: ` +
+      `${error instanceof Error ? `${error.constructor.name}: ${error.message}` : String(error)}. ` +
+      `Either the refusal moved and this claim is untested, or the port is failing for an unrelated ` +
+      `reason; the six per-call-override-order rows' nonportability is unverified either way.`];
+  }
+
+  return ["the port no longer refuses a per-call options object carrying both 'locale' and " +
+    "'localeMatch', so the six per-call-override-order rows may have a JS counterpart: delete the " +
+    "noCounterpart in callOptionsFor and let them run"];
 }
 
 const adaptEnum = (value) => {
@@ -385,6 +456,54 @@ const failureCalls = [];
 const policyCalls = [];
 
 /**
+ * Ambient locale/match resolver consultations observed during the case currently executing.
+ *
+ * ORDERED LIKE THE ORACLE'S, and the ordering is the whole point. `VectorOracle` builds a fabricated
+ * `LocaleMatchResult` INSIDE the supplier lambda and appends to `SUPPLIER_CALLS` only afterwards
+ * (`VectorOracle.java:1076-1101`), so a fabrication the constructor refuses records NOTHING while a
+ * value the INSTANCE later refuses records a call. That absence/presence is the two-layer
+ * discriminator, and 20 corpus rows depend on it: `supplied-match.considered.empty-list-fails-in-
+ * the-constructor` carries no `supplierCalls` and reports the layer-one fallback-containment
+ * message, while `.subset-is-rejected` carries one and reports layer two's set message. A runner
+ * that recorded first would make the two indistinguishable here.
+ *
+ * @type {{ kind: string, returnedLocale: string | null, returnedMatchType: string | null }[]}
+ */
+const supplierCalls = [];
+
+/**
+ * Every error one of THIS RUNNER's own throwing callback behaviors raised during the case
+ * currently executing, in the order they were raised.
+ *
+ * The oracle's `throw-in-handler` and `throw-in-policy` behaviors raise `IllegalStateException`
+ * with the fixture's message and no cause; 34 corpus rows record such a throw escaping the lookup.
+ * Nothing about that throw is the PORT's — the runner wrote it — so comparing it by error name
+ * would verify only that the runner's own `new Error` survived a function call, and mapping
+ * `java.lang.IllegalStateException` into `ERROR_NAME` to do so would be worse than useless: that
+ * type means two different things in this corpus, and a name table cannot tell them apart. With
+ * `causeType` null it is this sentinel escaping verbatim; with `causeType` `IllegalStateException`
+ * and a message beginning `Unable to resolve generated placeholder` it is the LIBRARY's error being
+ * rethrown by identity. One table entry would accept either for either.
+ *
+ * So the sentinel arm asserts REFERENCE IDENTITY instead — `caught === sentinelThrows.at(-1)` —
+ * which is strictly stronger than any name comparison and is what "propagates immediately" actually
+ * claims: not an error of the same shape, but this very object, unwrapped and unreplaced. Recorded
+ * at THROW time rather than at installation, so a case that installs two throwing handlers and
+ * fires one (`ingress-matrix.handler.per-call-throw-in-handler-overrides-instance-message`) records
+ * one entry, and the escaping error is the last one raised because nothing catches them.
+ *
+ * @type {unknown[]}
+ */
+const sentinelThrows = [];
+
+/** Raise, and record, one of this runner's own sentinel errors. @returns {never} */
+function throwSentinel(message) {
+  const error = new Error(message);
+  sentinelThrows.push(error);
+  throw error;
+}
+
+/**
  * Wrap a failure handler so every invocation is recorded. `VectorOracle.recording`, mirrored.
  *
  * BEFORE the delegate, deliberately, and the order is load-bearing in the opposite direction from
@@ -414,9 +533,11 @@ const recordingPolicy = (delegate) => (reason, locale, cause) => {
  *
  * `null`/absent yields the LIBRARY DEFAULT wrapped in the recorder, exactly as the oracle does, so
  * the observation channel exists for every case without a fixture opting in and without changing
- * what any case does. `throw-in-handler` raises a plain `Error`: the oracle raises
- * `IllegalStateException`, and every case that observes it carries `expected.thrown`, which is B2's
- * gate — so the kind is not compared here and is not claimed to be.
+ * what any case does. `throw-in-handler` raises a plain `Error` through `throwSentinel`, where the
+ * oracle raises `IllegalStateException`. The KIND is still not compared and still is not claimed to
+ * be — mapping that Java type onto a JS error name would be actively wrong, for the reason set out
+ * at `sentinelThrows`. What IS compared, now that the `expected.thrown` gate has lifted, is
+ * REFERENCE IDENTITY: the object this function threw must be the object that escaped the lookup.
  */
 function failureHandlerFor(spec) {
   if (spec === null || spec === undefined) return recordingHandler(() => core.RETURN_KEY);
@@ -433,7 +554,7 @@ function failureHandlerFor(spec) {
     }
     case "throw-in-handler": {
       const message = spec.message ?? "handler failed deliberately";
-      return recordingHandler(() => { throw new Error(message); });
+      return recordingHandler(() => throwSentinel(message));
     }
     default:
       unsupported(`unknown failure handler behavior: ${spec.behavior}`);
@@ -489,7 +610,7 @@ function fallbackPolicyFor(spec) {
     }
     case "throw-in-policy": {
       const message = spec.message ?? "fallback policy failed deliberately";
-      return recordingPolicy(() => { throw new Error(message); });
+      return recordingPolicy(() => throwSentinel(message));
     }
     default:
       unsupported(`unknown custom fallback policy behavior: ${spec.behavior}`);
@@ -576,17 +697,225 @@ function phoneticResolverFor(spec) {
   };
 }
 
-/** Build a Strings instance for a fixture, or declare the case unsupported. */
-function stringsFor(fixture) {
+/**
+ * One `{ range, weight }` member, from whichever of the two spellings the corpus used.
+ *
+ * The ORACLE's own decoding, `VectorOracle.languageRangesFrom` at `:1016-1028`: a bare string
+ * element is `new Locale.LanguageRange(s)`, whose weight is 1.0 by definition. This is authoring
+ * vocabulary, not library API — `languageRangeFrom` in `lokalized/negotiate` requires the object
+ * form deliberately — so the translation belongs here, on the runner's side of the line.
+ *
+ * A HEADER STRING is not decoded here and never will be: `Locale.LanguageRange.parse` expands the
+ * pinned IANA closure (measured on the pinned Corretto 21: `parse("iw")` is `[iw, he]`,
+ * `parse("sgn-BE-FR")` is `[sgn-be-fr, sgn-sfb, sfb, sgn-be-fx]`), so a runner that split on commas
+ * would be inventing a different answer and calling it the port's.
+ */
+const rangeMemberFrom = (element) =>
+  typeof element === "string" ? { range: element, weight: 1 } : { range: element.range, weight: element.weight };
+
+/**
+ * The ambient locale ingress a fixture names, as the port's `localeResolver`/`localeMatchResolver`.
+ *
+ * TWO RULES, both taken from `VectorOracle` rather than invented here.
+ *
+ * The behavior is decided on the SPEC'S SHAPE before anything is constructed, so a behavior this
+ * port cannot yet reproduce reports the capability that blocks it and never runs. `match-ranges` is
+ * the only such behavior and it is blocked on the header parser, which is A4's — every one of the
+ * 26 fixtures naming it carries an Accept-Language string, none an explicit list.
+ *
+ * The RECORDER runs in the oracle's order: the value is produced first and appended afterwards, so
+ * a fabrication refused by `LocaleMatchResult`'s own rules records no call at all. `forLocaleMatch`
+ * is what makes that expressible on this side — it is the JS analogue of that constructor, applying
+ * the instance-INDEPENDENT layer at the site that spelled the value, which is exactly where the
+ * oracle applies it.
+ *
+ * `strings` arrives through a box because Java hands the supplier `this`: the two matcher-backed
+ * behaviors negotiate against the very instance being built, which does not exist until
+ * `createStrings` returns.
+ */
+function localeSourceFor(fixture, instanceBox) {
+  const localeSpec = fixture.localeSupplier;
+  const matchSpec = fixture.localeMatchSupplier;
+
+  if (!localeSpec && !matchSpec) return null;
+  if (localeSpec && matchSpec)
+    throw new Error(`fixture ${fixture.id} sets both localeSupplier and localeMatchSupplier`);
+
+  const spec = localeSpec ?? matchSpec;
+
+  // `match-ranges` is the realistic browser shape and A4 is what unblocks it: every one of the 26
+  // fixtures naming it carries an Accept-Language STRING, not an explicit list, so it could not run
+  // before the parser existed. The module guard stays where the other three ingresses have it --
+  // decided on the subpath's existence, before any range is matched.
+  if (spec.behavior === "match-ranges" &&
+    (!negotiateApi?.createLocaleNegotiator || !negotiateApi?.parseLanguageRanges))
+    unsupported("createLocaleNegotiator is not implemented");
+
+  /**
+   * `matcher.matchFor(languageRangesFrom(config.get("ranges")))` (`VectorOracle:1046`, `:1075`),
+   * where `matcher` is the instance itself. Built HERE, per call, rather than closed over: the
+   * instance does not exist until `createStrings` returns, and its `getLocaleConfiguration()` is the
+   * fallback Java has already resolved to a loaded catalog.
+   */
+  const rangeMatch = () => negotiateApi.createLocaleNegotiator(instanceBox.strings.getLocaleConfiguration())
+    .matchForLanguageRanges(
+      typeof spec.ranges === "string" ? negotiateApi.parseLanguageRanges(spec.ranges) : (spec.ranges ?? []).map(rangeMemberFrom));
+
+  if (localeSpec) {
+    if (spec.behavior !== "constant" && spec.behavior !== "match-ranges")
+      unsupported(`unknown locale supplier behavior: ${spec.behavior}`);
+
+    if (spec.behavior === "match-ranges")
+      return {
+        localeResolver: () => {
+          // `.getLocale().orElse(...getFallbackLocale())` -- the oracle negotiates twice and takes the
+          // fallback from the second result; one call answers the same thing, because the matcher is
+          // pure and both results carry the same `fallbackLocale`.
+          const match = rangeMatch();
+          const locale = match.locale ?? match.fallbackLocale;
+          supplierCalls.push({ kind: "localeSupplier", returnedLocale: locale, returnedMatchType: null });
+          return locale;
+        },
+      };
+
+    return {
+      localeResolver: () => {
+        // Normalized at the site that spelled it, which is what `forLocale` exists for, and recorded
+        // in the same spelling Java records — `Locale#toLanguageTag`. Re-probed rather than assumed:
+        // `normalizeTag` reproduces `forLanguageTag(x).toLanguageTag()` on every alias, extlang and
+        // mixed-case tag this corpus uses.
+        const locale = core.forLocale(spec.locale).locale;
+        supplierCalls.push({ kind: "localeSupplier", returnedLocale: locale, returnedMatchType: null });
+        return locale;
+      },
+    };
+  }
+
+  return {
+    localeMatchResolver: () => {
+      let match;
+
+      if (spec.behavior === "match-ranges") {
+        // The WHOLE match travels, not just its locale: `LocaleMatchResult`'s eight fields are what
+        // the two-layer supplied-match validation reads, and a match rebuilt from the locale alone
+        // would lose `languageRange`, `effectiveWeight` and `requestedLanguageRanges` -- the fields
+        // `supplied-match.*` exists to pin.
+        match = rangeMatch();
+      } else if (spec.behavior === "match-locale") {
+        // `matcher.matchFor(Locale)` on the instance itself. `getDirectLocaleContext` is the plan's
+        // declared counterpart and is the SAME kernel `getResult` computes its own diagnostic from,
+        // so this cannot supply a match the translation path would disagree with.
+        match = instanceBox.strings.getDirectLocaleContext(spec.locale).localeMatch;
+      } else if (spec.behavior === "fabricated") {
+        // `new LocaleMatchResult(...)`, argument for argument. `range` becomes a bare range string
+        // because the oracle builds it with the ONE-argument `Locale.LanguageRange` constructor,
+        // whose weight is 1.0 — which is what `supplied-match.range.identity-includes-weight`
+        // depends on: its requested list carries `fr@0.5`, so the containment check must fail.
+        match = core.forLocaleMatch({
+          requestedLanguageRanges: (spec.ranges ?? []).map(rangeMemberFrom),
+          locale: spec.locale ?? null,
+          languageRange: spec.range ?? null,
+          effectiveWeight: spec.weight ?? null,
+          matchType: adaptEnum(spec.matchType ?? "NONE"),
+          fallbackLocale: spec.fallbackLocale ?? "en",
+          consideredLocales: spec.consideredLocales ?? [],
+          isMatch: (spec.locale ?? null) !== null,
+        }).localeMatch;
+      } else {
+        unsupported(`unknown locale match supplier behavior: ${spec.behavior}`);
+      }
+
+      supplierCalls.push({
+        kind: "localeMatchSupplier",
+        returnedLocale: match.locale ?? null,
+        returnedMatchType: match.matchType,
+      });
+      return match;
+    },
+  };
+}
+
+/**
+ * An authoring mistake in a `constructionOverrides` value. NOT an `Unsupported` and NOT a refusal:
+ * it must escape `runCase` as a crash so the run reports it, because the one thing a
+ * refusal-recording harness must never do is bank a typo as a believable observation. That exact
+ * mistake has already been made once in this project, on the `define` decoder, where nine mistyped
+ * shapes were silently recorded as plausible refusals.
+ */
+class AuthoringError extends Error {}
+
+/**
+ * The degenerate catalog map a `constructionOverrides.catalogSource` names.
+ *
+ * The set is CLOSED and mirrors `VectorOracle.buildStrings` value for value; an unknown value
+ * THROWS rather than quietly handing `createStrings` a valid record, which would close the case with
+ * a pass that observed nothing. Each degenerate map is built from the fixture's own first catalog,
+ * exactly as the oracle's `firstCatalogOf(loaded)` does, so the only difference between the control
+ * and a refusal row is the one degeneracy.
+ *
+ * @param {string} catalogSource
+ * @param {{ files: Record<string, unknown> }} fixture
+ * @returns {Record<string, unknown> | undefined} the `strings` slice of the createStrings options
+ */
+function degenerateCatalogFor(catalogSource, fixture) {
+  const entries = Object.entries(fixture.files ?? {});
+  if (entries.length === 0)
+    throw new AuthoringError(`a constructionOverrides fixture must declare files to degenerate`);
+
+  // `firstCatalogOf(loaded)` — the map's first VALUE, which is this family's `{ Greeting: ... }`.
+  const [, firstCatalog] = entries[0];
+
+  switch (catalogSource) {
+    // :250 -- no catalog source at all. The option is omitted, not set to undefined-by-spread.
+    case "omit":
+      return undefined;
+    // :262 -- a supplier that answers null. `createStrings` takes the map itself, so an explicit
+    // null map is the state Java's null-returning supplier produces.
+    case "returnsNull":
+      return { strings: null };
+    // :273 -- a null locale key, which needs a Map: a record cannot carry one.
+    case "nullLocaleKey":
+      return { strings: new Map([[null, firstCatalog]]) };
+    // :280 -- two DISTINCT keys whose tags collide once lowercased. Measured on the pinned Corretto
+    // 21: new Locale("en","US","POSIX").toLanguageTag() is "en-US-POSIX" and the "posix" one is
+    // "en-US-posix", so these two tags ARE the oracle's two Locale keys. A record holds both — JS
+    // object keys are case-sensitive — so unlike the null key this needs no Map.
+    case "duplicateNormalizedTag":
+      return { strings: { "en-US-POSIX": firstCatalog, "en-US-posix": firstCatalog } };
+    // :286 -- a null catalog for one locale.
+    case "nullCatalogValue":
+      return { strings: { en: null } };
+    // :293 -- a null entry INSIDE an otherwise valid catalog. The oracle takes the first
+    // LocalizedString of the loaded catalog and appends null; the JS counterpart of
+    // `Iterable<LocalizedString>` is plan 3.2's `LocalizedStringInput[]`, so the first definition is
+    // spelled as one input object and a null follows it.
+    case "nullEntry": {
+      const definitions = Object.entries(/** @type {Record<string, object>} */ (firstCatalog));
+      if (definitions.length === 0)
+        throw new AuthoringError(`the first catalog of a nullEntry fixture must hold a definition`);
+      const [key, definition] = definitions[0];
+      return { strings: { en: [{ key, ...definition }, null] } };
+    }
+    default:
+      throw new AuthoringError(`unknown constructionOverrides.catalogSource '${catalogSource}'`);
+  }
+}
+
+/**
+ * The `createStrings` options for a fixture, with any `constructionOverrides` applied.
+ *
+ * Split out of `stringsFor` so the `construct` arm can build the options OUTSIDE its try block and
+ * let only `createStrings` itself throw inside it. Without the split, an `AuthoringError` or an
+ * `Unsupported` raised while assembling options would be caught and recorded as a construction
+ * refusal — a harness turning its own mistakes into observations.
+ *
+ * @param {any} fixture
+ * @param {{ strings: any }} instanceBox filled by the caller the moment construction returns
+ * @param {{ catalogSource?: string, localeSource?: string } | null} overrides
+ */
+function createStringsOptionsFor(fixture, instanceBox, overrides) {
   if (!core?.createStrings) unsupported("createStrings is not implemented");
   if (fixture.loadOnly) unsupported("load-only fixture: no Strings instance is constructed");
-  if (fixture.localeSupplier || fixture.localeMatchSupplier) unsupported("ambient locale/match suppliers are not implemented");
-  // `runtimeLimits` is deliberately NOT skipped here, and `loadingOptions` is honored rather than
-  // skipped. Both used to abandon their cases before running them, which is the skip-then-guess this
-  // function's neighbours exist to avoid: 44 of the 83 cases that named a custom runtime limit turn
-  // out to produce Java's exact answer under the fixed v1 limits, because the fixture raised a
-  // ceiling the value never approached or lowered one it still fit under. Those are passes, not
-  // remaining work. The 24 that genuinely differ are attributed after the fact in `classifyFailure`.
   if (Object.keys(fixture.rawFiles ?? {}).length || Object.keys(fixture.rawFilesBase64 ?? {}).length)
     unsupported("raw/byte fixtures require the bounded parser's failure paths");
 
@@ -606,10 +935,32 @@ function stringsFor(fixture) {
   // capability when the capability was built and simply never handed the caller's number.
   const loadingLimits = parseLimitsFor(fixture.loadingOptions);
 
-  return core.createStrings({
+  // The locale source, and EXACTLY ONE of them. A fixture naming a supplier has its `instanceLocale`
+  // IGNORED by the oracle — `VectorOracle.java:268-276` installs the constant-locale supplier only in
+  // the both-absent arm — so passing `locale` alongside a resolver here would ask the port for a
+  // state Java never built, and the port refuses it at construction on `DefaultStrings:254`'s
+  // proposition. The box is filled by the caller, before any lookup can consult a resolver.
+  const localeSource = localeSourceFor(fixture, instanceBox);
+
+  // `constructionOverrides.localeSource`, a closed set of exactly one value. "omit" installs
+  // NEITHER source, which is Java's both-absent arm; the oracle has no "both" value because Java
+  // cannot be put in that state (its two builder setters clear each other), and the port's refusal
+  // of the both-present literal is the user's recorded decision that B3 landed, not this arm's.
+  let localeOption;
+  if (overrides?.localeSource === undefined)
+    localeOption = localeSource ?? { locale: fixture.instanceLocale ?? fixture.fallbackLocale };
+  else if (overrides.localeSource === "omit") localeOption = {};
+  else throw new AuthoringError(`unknown constructionOverrides.localeSource '${overrides.localeSource}'`);
+
+  const catalogOption =
+    overrides?.catalogSource === undefined
+      ? { strings: fixture.files }
+      : degenerateCatalogFor(overrides.catalogSource, fixture);
+
+  return {
     fallbackLocale: fixture.fallbackLocale,
-    locale: fixture.instanceLocale ?? fixture.fallbackLocale,
-    strings: fixture.files,
+    ...localeOption,
+    ...catalogOption,
     ...(loadingLimits ? { loadingLimits } : {}),
     ...(fixture.tiebreakers ? { tiebreakers: fixture.tiebreakers } : {}),
     ...(Object.keys(pluralData).length ? { pluralData } : {}),
@@ -633,7 +984,89 @@ function stringsFor(fixture) {
     // exercised here; `test/fallback-policy.test.js` covers it.
     onFailure: failureHandlerFor(fixture.translationFailureHandler),
     fallbackPolicy: fallbackPolicyFor(fixture.translationFallbackPolicy),
-  });
+  };
+}
+
+/**
+ * Build a Strings instance for a fixture, or declare the case unsupported.
+ *
+ * `runtimeLimits` is deliberately NOT skipped, and `loadingOptions` is honored rather than skipped
+ * (both in `createStringsOptionsFor`). Both used to abandon their cases before running them, which
+ * is the skip-then-guess that function's neighbours exist to avoid: 44 of the 83 cases that named a
+ * custom runtime limit turn out to produce Java's exact answer under the fixed v1 limits, because
+ * the fixture raised a ceiling the value never approached or lowered one it still fit under. Those
+ * are passes, not remaining work. The 24 that genuinely differ are attributed after the fact in
+ * `classifyFailure`.
+ */
+function stringsFor(fixture) {
+  // A `constructionOverrides` fixture is a DEGENERATE record whose subject is the refusal itself, and
+  // `construct` is the only operation that can observe one. lokalized-spec's ingest already refuses
+  // to pair such a fixture with any other operation, so reaching here means the corpus and this
+  // runner disagree — which is reported as a crash rather than quietly built with the overrides
+  // ignored, since ignoring them would run a DIFFERENT configuration under the case's name.
+  if (fixture.constructionOverrides)
+    throw new AuthoringError(
+      "a fixture carrying constructionOverrides is only observable through the 'construct' operation",
+    );
+
+  const instanceBox = { strings: null };
+  instanceBox.strings = core.createStrings(createStringsOptionsFor(fixture, instanceBox, null));
+  return instanceBox.strings;
+}
+
+/**
+ * Evidence that a constructed instance is USABLE and not merely allocated.
+ *
+ * `VectorOracle.describeConstructionProbe` asks the new instance for `input.probeKey`, so the one
+ * row that constructs is backed by an answer rather than by the absence of a throw. Without it, a
+ * `construct` family made entirely of refusals would never show that the operation can tell
+ * acceptance from refusal at all — which is what the control case's own note says it is for.
+ *
+ * @param {any} strings
+ * @param {{ probeKey?: string }} input
+ */
+function constructionProbe(strings, input) {
+  if (input.probeKey == null) return null;
+
+  try {
+    return { value: strings.get(input.probeKey), threwType: null };
+  } catch (error) {
+    // Recorded, not rethrown, for the oracle's reason: a key that throws is still evidence the
+    // instance is live, and letting it escape would be indistinguishable from a refused
+    // construction. The JS constructor name will not equal any Java class name, so a row recording
+    // a throwing probe FAILS here rather than passing — there is no such row today, and the guard
+    // in `expectedConstructionProbe` says so before this one can be reached.
+    return { value: null, threwType: /** @type {Error} */ (error).constructor.name };
+  }
+}
+
+/**
+ * The recorded probe, projected onto the names this runner raises.
+ *
+ * A recorded `threwType` is a JAVA class name. It is carried through UNTRANSLATED and left to fail
+ * the comparison, which is deliberate and is a change from this function's first draft.
+ *
+ * The first draft reported `unsupported(\`no JS counterpart declared for a construction probe
+ * throwing ${probe.threwType}\`)` here. That is defensible — it keys on the RECORDED JAVA type
+ * rather than on the port's output, so it could not absorb a port defect, and `expectedResolverCalls`
+ * and `ERROR_NAME` take the same shape. But it is still a new `unsupported(` on the WANTED side of a
+ * comparison arm, which is the literal construct this file is grepped for, and it bought nothing: a
+ * Java class name compared against a JS constructor name simply differs, so the row FAILS either
+ * way, and FAILED is the louder and more accurate of the two. The asymmetry settled it — a probe
+ * that throws on the JS side ALREADY fails against a recorded `threwType: null`, with no guard
+ * offering it an attribution, so the guard was excusing one direction of a symmetric comparison.
+ *
+ * Removing it cannot weaken the runner: it can only turn attributed non-work into a FAILED row,
+ * never the reverse. No corpus row is affected in either direction. All eight `construct` cases were
+ * checked against `behavioral-vectors.json` rather than against this comment: seven record
+ * `probe: null` and the eighth, `owed-construct.control.ordinary-fixture-constructs`, records
+ * `{threwType: null, value: "Hello"}`.
+ *
+ * @param {{ value: unknown, threwType: string | null } | null} probe
+ */
+function expectedConstructionProbe(probe) {
+  if (probe == null) return null;
+  return { value: probe.value, threwType: probe.threwType };
 }
 
 /** The recorded Java resolver invocations, projected onto the names this runner raises. */
@@ -662,18 +1095,38 @@ function expectedResolverCalls(expected) {
  *
  * The alternative was to compare warnings as an unordered set, which would have silently retired
  * the one case whose entire purpose is the ordering.
+ *
+ * THE FALLBACK IS NOW SAID OUT LOUD, and the bare `catch` that hid it is gone. It was the same
+ * swallow shape `optionalSubpath()` was introduced to remove: with `lokalized-spec/fixtures/` absent,
+ * `warnings.order.parse-matches-directory-traversal-order` failed DETERMINISTICALLY — a missing
+ * input reported as a port defect, which cost a reviewer a false baseline before they found it. So
+ * the three outcomes are now distinguished. Absent, or present with different content (the corpus
+ * and the checkout disagree about the fixture, so the on-disk order is not this fixture's order):
+ * fall back, and record it. Present and unreadable or malformed: THROW, because that is a broken
+ * input and not a missing one. Measured today: 550 of 550 fixtures are present and byte-equal, so
+ * nothing takes the fallback and the reported list is empty.
  */
 const declaredFilesCache = new Map();
+/** @type {string[]} */
+const declaredOrderFallbacks = [];
 function declaredFilesFor(fixtureId, fixture) {
   if (!declaredFilesCache.has(fixtureId)) {
+    const path = join(specDir, `fixtures/${fixtureId}.json`);
     let declared = null;
-    try {
-      const onDisk = JSON.parse(readFileSync(join(specDir, `fixtures/${fixtureId}.json`), "utf8"));
+
+    if (!existsSync(path)) {
+      declaredOrderFallbacks.push(`${fixtureId}: no ${path}`);
+    } else {
+      // No catch: a fixture file that exists and cannot be read or parsed is a broken checkout, and
+      // silently substituting the alphabetized copy for it is how an ordering case reports a defect
+      // it does not have.
+      const onDisk = JSON.parse(readFileSync(path, "utf8"));
+
       // Same content or it is not the same fixture: order may differ, nothing else may.
       if (jcs(onDisk.files ?? {}) === jcs(fixture.files ?? {})) declared = onDisk.files ?? {};
-    } catch {
-      declared = null;
+      else declaredOrderFallbacks.push(`${fixtureId}: ${path} declares different content`);
     }
+
     declaredFilesCache.set(fixtureId, declared ?? fixture.files ?? {});
   }
   return declaredFilesCache.get(fixtureId);
@@ -833,6 +1286,57 @@ const placeholdersFor = (input) =>
  * the actual value alone, so a port emitting a match where Java records none is a `jcs` mismatch
  * rather than a pass.
  */
+/**
+ * The matched range, as a `{ range, weight }` pair on BOTH sides — a strictly stronger comparison
+ * than the bare-string one it replaces, not a widened one.
+ *
+ * The corpus records `languageRange` as a string, because `describeMatch` projects
+ * `LanguageRange#getRange()`. Java's field is a whole `LanguageRange` and its weight IS part of its
+ * identity (`LocaleMatchResult:108` checks `requestedLanguageRanges.contains(languageRange)`, and
+ * `new LanguageRange("he")` does not equal `new LanguageRange("he", 0.5)`), so the weight was
+ * information the projection simply dropped. It is recoverable without inventing anything: Java's
+ * own constructor guarantees the matched range is one of the requested ones, and MEASURED over the
+ * corpus, all 1,307 rows carrying a `languageRange` name a range text that appears in
+ * `requestedLanguageRanges` exactly once — 0 missing, 0 ambiguous. So the wanted weight is a fact
+ * the corpus already states, and 34 rows have a governing weight that is not 1.
+ *
+ * A range text that is absent, or present under two different weights, THROWS. It would mean the
+ * derivation no longer holds, and the alternative — falling back to comparing the text alone — is
+ * the shape that silently retires a comparison the moment the corpus grows a row it did not expect.
+ *
+ * Both sides normalize the bare-string spelling to weight 1.0, which is what a one-argument
+ * `LanguageRange` means. That keeps the ACTUAL side honest in both directions: a port that regressed
+ * to emitting the bare text is compared as `{text, 1}` and MISMATCHES any row whose governing weight
+ * is 0.9, rather than passing because the texts agree.
+ */
+const asWeightedRange = (languageRange) =>
+  languageRange === null || languageRange === undefined
+    ? null
+    : typeof languageRange === "string"
+      ? { range: languageRange, weight: 1 }
+      : { range: languageRange.range, weight: languageRange.weight };
+
+const expectedWeightedRange = (languageRange, requestedLanguageRanges) => {
+  if (languageRange === null || languageRange === undefined) return null;
+
+  const text = typeof languageRange === "string" ? languageRange : languageRange.range;
+  const hits = (requestedLanguageRanges ?? []).filter((r) => r.range === text);
+  // A DUPLICATE range text is fine and two rows rely on it — `owed.m3b.electionguard.duplicate-
+  // member-does-not-reelect` requests `nsl` twice. What must be unique is the WEIGHT, which is the
+  // fact being derived; requiring a unique HIT instead turned those two rows red for a reason that
+  // had nothing to do with them.
+  const weights = new Set(hits.map((r) => r.weight));
+
+  if (weights.size !== 1)
+    throw new Error(
+      `the corpus records languageRange ${JSON.stringify(text)} against ${hits.length} requested ranges ` +
+        `of that text carrying ${weights.size} distinct weights; the weight is no longer derivable and ` +
+        `this projection must be revisited rather than narrowed back to the range text`,
+    );
+
+  return { range: text, weight: [...weights][0] };
+};
+
 const projectMatch = (match) => match ? {
   matchType: match.matchType,
   locale: match.locale ?? null,
@@ -840,7 +1344,7 @@ const projectMatch = (match) => match ? {
   fallbackLocale: match.fallbackLocale,
   consideredLocales: match.consideredLocales,
   effectiveWeight: match.effectiveWeight,
-  languageRange: match.languageRange,
+  languageRange: asWeightedRange(match.languageRange),
   requestedLanguageRanges: match.requestedLanguageRanges,
 } : null;
 
@@ -853,7 +1357,7 @@ const expectedMatchProjection = (match) => match === null ? null : {
   fallbackLocale: match.fallbackLocale,
   consideredLocales: match.consideredLocales,
   effectiveWeight: match.effectiveWeight,
-  languageRange: match.languageRange,
+  languageRange: expectedWeightedRange(match.languageRange, match.requestedLanguageRanges),
   requestedLanguageRanges: match.requestedLanguageRanges,
 };
 
@@ -983,6 +1487,23 @@ function failureCauseMessages(expected) {
     .filter((pair) => pair.wanted != null);
 }
 
+/**
+ * The resolver consultations this case made, and the ones Java recorded. Same `?? []` rule as the
+ * two channels beside it, and joined into the comparison on the same terms `resolverCalls`,
+ * `failures` and `policyCalls` each earned: it left the `get` gate in the SAME hunk that added this
+ * comparison, which is this file's standing precedent for a channel leaving that list.
+ *
+ * `returnedMatchType` is `adaptEnum`'d on the wanted side only, because the actual side already
+ * speaks the JS vocabulary — the same asymmetry every other enum in this file has.
+ */
+const projectSupplierCalls = () => supplierCalls.map((call) => ({ ...call }));
+const expectedSupplierCalls = (expected) =>
+  (expected.supplierCalls ?? []).map((call) => ({
+    kind: call.kind,
+    returnedLocale: call.returnedLocale,
+    returnedMatchType: call.returnedMatchType === null ? null : adaptEnum(call.returnedMatchType),
+  }));
+
 /** The policy consultations this case made, and the ones Java recorded. Same `?? []` rule. */
 const projectPolicyCalls = () => policyCalls.map((call) => ({ ...call }));
 const expectedPolicyCalls = (expected) =>
@@ -992,6 +1513,161 @@ const expectedPolicyCalls = (expected) =>
     causeType: adaptCauseType(call.causeType),
     decision: call.decision,
   }));
+
+/* --- the throw response ----------------------------------------------------------------------
+ *
+ * `expected.thrown` records THREE fields — `type`, `message`, `causeType` — and the three of them
+ * together name which of three DIFFERENT things escaped the lookup. Collapsing them onto one error
+ * table is the mistake this block exists to avoid. MEASURED, over the 116 `get`/`getResult` rows
+ * that carry a `thrown` block, the corpus decomposes as:
+ *
+ *   causeType != null  (25)  the retained FIRST cause, rethrown unwrapped. `thrown.type` is the
+ *                            cause's Java class, not `MissingTranslationException`: 22
+ *                            `IllegalStateException`, 1 `IllegalArgumentException`, and 2
+ *                            `ExpressionEvaluationException` — a type nothing else here produces.
+ *   causeType == null, `IllegalStateException`  (34)  THIS RUNNER's own sentinel, from a
+ *                            `throw-in-handler` / `throw-in-policy` behavior. Nothing about it is
+ *                            the port's.
+ *   causeType == null, anything else  (57)  an error the port CONSTRUCTED: 23
+ *                            `MissingTranslationException`, and 34 `IllegalArgumentException`
+ *                            ingress/operand refusals (31 of which are B3's supplied-match ingress
+ *                            and stay attributed).
+ *
+ * `java.lang.IllegalStateException` is therefore ABSENT from `ERROR_NAME` and must stay absent: it
+ * appears in this corpus with both a null and a non-null `causeType`, meaning the sentinel in one
+ * and a rethrown library error in the other, and one table row would accept either for either.
+ * `RESOLVER_THREW` set the precedent — the runner declares the counterpart for errors the runner
+ * itself raises, separately from the errors the LIBRARY raises.
+ */
+
+/** The recorded throw is this runner's own sentinel, escaping unwrapped. */
+const SENTINEL_IDENTITY = "the sentinel this runner's own callback threw";
+/** The recorded throw is the retained first cause, rethrown with no wrapper added. */
+const RETHROWN_IDENTITY = "the retained first cause, rethrown unwrapped";
+/** The recorded throw is an error the port built for this failure. */
+const CONSTRUCTED_IDENTITY = "an error the port constructed";
+/** Nothing was thrown at all. Distinct from every identity above, and always a failure. */
+const NOTHING_THROWN = Symbol("nothing thrown");
+
+/** The JS error name of whatever escaped, in the shape both sides of the comparison use. */
+const thrownNameOf = (caught) =>
+  caught === NOTHING_THROWN ? "no exception"
+    : caught instanceof Error ? caught.name
+      : `a thrown ${caught === null ? "null" : typeof caught}`;
+
+/**
+ * WHICH object escaped, not merely which shape. This is the half of the comparison a name table
+ * cannot make, and it is the half the rethrow-by-identity clause actually claims.
+ *
+ * `failureCalls.at(-1).cause` is the retained first cause: the handler is consulted exactly once,
+ * after the walk, and is handed the frozen failure whose `cause` is the FIRST failure retained. A
+ * port that wrapped, re-messaged or re-created that error reports `CONSTRUCTED_IDENTITY` here and
+ * fails, while one that copied Java's wording into a fresh error would sail past a message compare.
+ */
+function caughtIdentity(caught) {
+  if (caught === NOTHING_THROWN) return "no exception";
+  if (sentinelThrows.length && caught === sentinelThrows.at(-1)) return SENTINEL_IDENTITY;
+  const retained = failureCalls.length ? failureCalls.at(-1).cause : null;
+  if (retained != null && caught === retained) return RETHROWN_IDENTITY;
+  return CONSTRUCTED_IDENTITY;
+}
+
+/**
+ * One recorded Java throw against what the port raised, as a jcs-comparable pair.
+ *
+ * `ratchetMessage` marks the arm whose message is the CAUSE's own diagnostic wording rather than a
+ * library-composed string. Those go to `causeMessageMatchedIds` on exactly the terms the failure
+ * channel's `causeMessage` already goes there — gating on them would turn 36 reviewed, declared
+ * JS-idiomatic divergences red and make the ratchet a gate by the side door. Nothing is lost by it:
+ * the identity assertion on that arm is strictly stronger than comparing the message would be.
+ */
+function thrownProjection(thrown, caught) {
+  // ARM 1 — the runner's own sentinel. Guarded on a sentinel having actually been raised, so a
+  // future `IllegalStateException` row that is NOT one falls through to arm 3 and is reported
+  // `unsupported` for want of a declared counterpart rather than silently compared against ours.
+  if (thrown.causeType === null && thrown.type === "java.lang.IllegalStateException" && sentinelThrows.length)
+    return {
+      wanted: { name: "Error", identity: SENTINEL_IDENTITY, message: thrown.message },
+      actual: { name: thrownNameOf(caught), identity: caughtIdentity(caught), message: messageOf(caught === NOTHING_THROWN ? null : caught) },
+    };
+
+  // ARM 2 — rethrow by identity. `CAUSE_NAME`, not `ERROR_NAME`: this is the same error the
+  // `failures` channel already reports through `causeType`, so the two must agree on its name or
+  // the same object would be described two ways in one comparison.
+  if (thrown.causeType !== null)
+    return {
+      wanted: { name: adaptCauseType(thrown.causeType), identity: RETHROWN_IDENTITY },
+      actual: { name: thrownNameOf(caught), identity: caughtIdentity(caught) },
+      ratchetMessage: true,
+    };
+
+  // ARM 3 — an error the port constructed, compared on the DECLARED counterpart name and on the
+  // message exactly, because the message is the library's own composed string on both sides.
+  if (!(thrown.type in ERROR_NAME)) unsupported(`no JS counterpart declared for ${thrown.type}`);
+  const names = ERROR_NAME[thrown.type];
+  const actualName = thrownNameOf(caught);
+  return {
+    wanted: { name: names.join(" or "), identity: CONSTRUCTED_IDENTITY, message: thrown.message },
+    actual: {
+      name: names.includes(actualName) ? names.join(" or ") : actualName,
+      identity: caughtIdentity(caught),
+      message: messageOf(caught === NOTHING_THROWN ? null : caught),
+    },
+  };
+}
+
+/**
+ * Run a `get`/`getResult` case whose recorded outcome is a THROW.
+ *
+ * The callback channels are compared alongside the throw rather than instead of it, and that is not
+ * decoration: the ABSENCE of a `policyCalls` entry is the whole observation in the four
+ * throw-in-policy rows (a policy that raises records nothing, because `recordingPolicy` records
+ * after the delegate returns), and `callback-interaction.first-cause.handler-exception-displaces-
+ * retained-resolver-failure` is only meaningful because the `failures` channel still shows the
+ * handler was handed the retained cause it then displaced.
+ *
+ * `projectFailures(null)` on both paths: a throwing lookup produces no result object, so
+ * `matchObjectIdenticalToResult` is NOT COMPARABLE. All 135 recorded thrown rows carry null there,
+ * measured — so the tri-state null arm is the corpus's own answer, not this runner's convenience.
+ */
+function thrownCase(expected, run) {
+  /** @type {unknown} */
+  let caught = NOTHING_THROWN;
+  try {
+    run();
+  } catch (error) {
+    // `Unsupported` and `NoCounterpart` are this runner's control flow, never the port's answer.
+    // They travel out through the same `catch` a real throw would, so they are re-raised before
+    // anything can read one as a conformant refusal — the shape that turns an unbuilt capability
+    // into a passing throw comparison.
+    if (error instanceof Unsupported || error instanceof NoCounterpart) throw error;
+    caught = error;
+  }
+
+  const projection = thrownProjection(expected.thrown, caught);
+  const actual = {
+    thrown: projection.actual,
+    resolverCalls: [...resolverCalls],
+    failures: projectFailures(null),
+    policyCalls: projectPolicyCalls(),
+    supplierCalls: projectSupplierCalls(),
+  };
+  const wanted = {
+    thrown: projection.wanted,
+    resolverCalls: expectedResolverCalls(expected),
+    failures: expectedFailures(expected),
+    policyCalls: expectedPolicyCalls(expected),
+    supplierCalls: expectedSupplierCalls(expected),
+  };
+  const causeMessages = [
+    ...failureCauseMessages(expected),
+    ...(projection.ratchetMessage
+      ? [{ wanted: expected.thrown.message, actual: messageOf(caught === NOTHING_THROWN ? null : caught) }]
+      : []),
+  ];
+
+  return jcs(actual) === jcs(wanted) ? { ok: true, causeMessages } : { ok: false, actual, wanted, causeMessages };
+}
 
 /**
  * The per-call `TranslationOptions` a case names, in the shape `get`/`getResult` accept.
@@ -1022,11 +1698,97 @@ const CALL_OPTION_ADAPTERS = {
     adapt: (spec) => (spec === null ? null : failureHandlerFor(spec)),
   },
 };
-const IMPLEMENTED_CALL_OPTIONS = new Set(Object.keys(CALL_OPTION_ADAPTERS));
+/**
+ * The corpus keys `callOptionsFor` actually applies to the port, which is what `classifyFailure`
+ * scans. `languageRanges` is listed EXPLICITLY rather than through `CALL_OPTION_ADAPTERS` because it
+ * is not a per-call option of the JS surface at all: plan 3.3 has no such key, so the runner
+ * negotiates it into a `localeMatch` first. It still belongs here, and the reason is the rule
+ * `classifyFailure` states in its own comment — an option the runner PASSES to the port may never
+ * also be excused there. Leaving it out would relabel every future per-call selection defect as
+ * "not implemented", inside the function whose contract says it cannot.
+ */
+const IMPLEMENTED_CALL_OPTIONS = new Set([...Object.keys(CALL_OPTION_ADAPTERS), "languageRanges"]);
 
-function callOptionsFor(input) {
+/**
+ * Cases whose input carried a per-call `languageRanges` that this runner did NOT hand to the port.
+ *
+ * MEASURED from the runner's own control flow rather than guessed from the input's shape, because
+ * the shape is the wrong discriminator: `per-call-override-order.zh-tw.ranges-only-on-zh-hant-only-
+ * key` carries a header string and NO per-call locale, so `coincidentalIds`' `perCallOverrideOrder`
+ * key never saw it, and it passed — and was banked — for exactly as long as `callOptionsFor` dropped
+ * the ranges on the floor. Deriving the set here means it empties itself the moment a delivery path
+ * exists (A4's header parser), instead of needing a future author to remember to delete a clause.
+ *
+ * An id is added when the ranges are seen and deleted when they are actually delivered, so every
+ * path that leaves without delivering — a `throw` included — leaves its id marked.
+ */
+const undeliveredSelectionIds = new Set();
+/** The case `runCase` is executing, so `callOptionsFor` can name it. Set by `runCase`, nowhere else. */
+let currentCaseId = "";
+
+function callOptionsFor(input, strings) {
   const options = {};
+
+  // DECIDED ON THE INPUT'S SHAPE, before the port is asked anything, and it is the corpus's own
+  // marker that decides: `perCallOverrideOrder` is present on a case IFF that case presents BOTH a
+  // per-call `locale` and a non-null `languageRanges` — lokalized-spec's `ingest.mjs` refuses the
+  // key on any other input, and `VectorOracle` raises an `AssertionError` for a both-present input
+  // that omits it (`VectorOracle.java:826-855`). So the marker cannot drift away from the shape it
+  // names.
+  //
+  // That shape has NO JS COUNTERPART, and this is a recorded decision rather than unbuilt work.
+  // Java's answer to it is decided by which of two mutually-CLEARING `TranslationOptions.Builder`
+  // setters ran last (`TranslationOptions.java:309-313`, `:330-333`) — the reverse order gives the
+  // opposite answer, and the corpus now records both orders because the oracle was taught to state
+  // one. A JavaScript object literal has no "last setter"; plan 3.3 declares `locale` and
+  // `localeMatch` mutually exclusive "in declarations and runtime validation", and B3 makes the port
+  // refuse the pair. Reproducing Java here would mean electing one setter order and calling it a
+  // specification.
+  //
+  // These rows have never been ratcheted — `coincidentalIds` computes them from this same key — so
+  // moving them out of `passed` changes nothing the gate reads. Two of them DID pass, coincidentally,
+  // for exactly as long as this runner dropped `languageRanges` on the floor.
+  if (Object.prototype.hasOwnProperty.call(input, "perCallOverrideOrder"))
+    noCounterpart(
+      "a per-call options object presenting BOTH a locale and languageRanges has no JS counterpart: " +
+        "Java's answer is decided by which of two mutually-clearing TranslationOptions.Builder setters " +
+        "ran last, and plan 3.3 declares the JS pair mutually exclusive at runtime",
+    );
+
   if (input.locale) options.locale = input.locale;
+
+  // `"languageRanges": null` is a PRESENT key that applies nothing: `VectorOracle.optionsFrom`
+  // reads `languageRangesFrom(null)` as null and never calls the setter, so the instance source
+  // stands. The port reaches the same state through the `== null` rule every other option uses, and
+  // the `owed-null-options.ranges.*` rows are what pin the two together — including the one that
+  // carries an explicit null ALONGSIDE a per-call locale and is therefore not two sources at all.
+  const ranges = input.languageRanges;
+
+  if (ranges != null) {
+    // Marked BEFORE any decision about them, cleared only where they are genuinely delivered below.
+    undeliveredSelectionIds.add(currentCaseId);
+
+    // A HEADER STRING goes through `Locale.LanguageRange.parse`, ported in A4 -- never through a
+    // comma split here, which would be this runner inventing a range list and attributing it to the
+    // port: the parser applies the pinned IANA closure, so `"iw"` is `[iw, he]` and `"sgn-BE-FR"` is
+    // four members, and it refuses shapes a split would happily accept.
+    if (!negotiateApi?.createLocaleNegotiator || !negotiateApi?.parseLanguageRanges)
+      unsupported("createLocaleNegotiator is not implemented");
+
+    // Java's per-call arm negotiates INSIDE the library (`DefaultStrings:2442`) and uses the
+    // selection as the lookup locale. The JS surface has no per-call `languageRanges`: plan 3.3
+    // keeps the size-heavy solver in `lokalized/negotiate` and takes its RESULT as `localeMatch`.
+    // So the caller negotiates first and hands the match over — which is the same two steps in the
+    // same order, with the seam moved out of the root graph. The match is then held to BOTH
+    // validation layers by the port, which a Java-built one never is; it passes because it was built
+    // from this instance's own `getLocaleConfiguration()`.
+    const negotiator = negotiateApi.createLocaleNegotiator(strings.getLocaleConfiguration());
+    options.localeMatch = negotiator.matchForLanguageRanges(
+      typeof ranges === "string"
+        ? negotiateApi.parseLanguageRanges(ranges)
+        : [...ranges].map(rangeMemberFrom));
+    undeliveredSelectionIds.delete(currentCaseId);
+  }
 
   for (const [name, { option, adapt }] of Object.entries(CALL_OPTION_ADAPTERS))
     if (input[name] !== undefined) options[option] = adapt(input[name]);
@@ -1040,15 +1802,30 @@ function runCase(testCase, fixture) {
 
   // Per case, exactly as the oracle clears its own channels per case. A fresh `Strings` is built for
   // every case, so nothing survives here except what this case's lookup did.
+  currentCaseId = testCase.id;
   resolverCalls.length = 0;
   failureCalls.length = 0;
   policyCalls.length = 0;
+  supplierCalls.length = 0;
+  sentinelThrows.length = 0;
 
   switch (operation) {
     case "getResult": {
-      if (expected.thrown) unsupported("throwing cases need the failure-handler contract");
       const strings = stringsFor(fixture);
-      const result = strings.getResult(input.key, placeholdersFor(input), callOptionsFor(input));
+      // AFTER `stringsFor`, deliberately. 31 of the 34 `IllegalArgumentException` rows here are
+      // pre-walk `localeMatchSupplier` ingress refusals, and the port has no supplier ingress yet;
+      // they must keep reporting THAT and not be run against a refusal the port makes for some
+      // other reason. The remaining 3 are the operand-builder refusals, which construct fine.
+      //
+      // The placeholders are built INSIDE the thunk for the same reason Java refuses inside the
+      // caller's own value construction: `pluralOperands("1", { compactExponent: 65 })` throws
+      // before any lookup happens, and a runner that built its placeholders outside the try would
+      // see that escape as a crash rather than as the recorded answer.
+      if (expected.thrown)
+        return thrownCase(expected, () =>
+          strings.getResult(input.key, placeholdersFor(input), callOptionsFor(input, strings)));
+
+      const result = strings.getResult(input.key, placeholdersFor(input), callOptionsFor(input, strings));
       // The resolver channel joins the projection rather than sitting beside it. Two thirds of the
       // phonetic corpus renders a string a wrong implementation would also render — a memoizing one,
       // or one handing the resolver the REQUESTED locale — so comparing the translation alone would
@@ -1065,12 +1842,14 @@ function runCase(testCase, fixture) {
         resolverCalls: [...resolverCalls],
         failures: projectFailures(result.localeMatch ?? null),
         policyCalls: projectPolicyCalls(),
+        supplierCalls: projectSupplierCalls(),
       };
       const wanted = {
         ...expectedResultProjection(expected.result),
         resolverCalls: expectedResolverCalls(expected),
         failures: expectedFailures(expected),
         policyCalls: expectedPolicyCalls(expected),
+        supplierCalls: expectedSupplierCalls(expected),
       };
 
       // The recorded Java DIAGNOSTIC, carried out separately from the projection above. It is
@@ -1107,29 +1886,35 @@ function runCase(testCase, fixture) {
       // case records resolver calls alone, so nothing moved on this line by itself — which is the
       // point: the gate is about what is verified, not about what it lets through.
       //
-      // `failures` and `policyCalls` leave it HERE, in the same hunk that adds their comparison two
-      // lines below — the precedent `resolverCalls` set, and the only terms on which a channel may
-      // leave this gate. `supplierCalls` (B3) and `thrown` (B2) stay, because nothing compares them.
-      // The message names the channels the list actually holds. It read "failure/policy/supplier
-      // calls or a thrown error" for one slice after `failures` and `policyCalls` left the list, so
-      // 46 cases carried a reason-table label naming two channels that ARE compared.
-      const observed = ["supplierCalls", "thrown"].filter((k) => k in expected);
-      if (observed.length) unsupported("get cases recording supplier calls or a thrown error need the callback contracts");
+      // `failures` and `policyCalls` left it on those terms; `thrown` left it at B2, on the same
+      // terms — compared by declared name, by message where the message is the library's own, and
+      // by REFERENCE IDENTITY on the two arms where identity is the actual claim. `supplierCalls`
+      // leaves it HERE, in the same hunk that adds `projectSupplierCalls`/`expectedSupplierCalls`
+      // to all three comparisons above, which is the only way a channel has ever been allowed to
+      // leave this list: it earns the removal by being compared, never by being inconvenient. The
+      // list is now EMPTY, so it is gone rather than kept as a mechanism-shaped hole that would
+      // read as a guard while gating nothing — the `xfailedIds` mistake this file already made once.
       const strings = stringsFor(fixture);
+      if (expected.thrown)
+        return thrownCase(expected, () =>
+          strings.get(input.key, placeholdersFor(input), callOptionsFor(input, strings)));
+
       const actual = {
-        translation: strings.get(input.key, placeholdersFor(input), callOptionsFor(input)),
+        translation: strings.get(input.key, placeholdersFor(input), callOptionsFor(input, strings)),
         resolverCalls: [...resolverCalls],
         // No result object exists on this path, so `matchObjectIdenticalToResult` is NOT COMPARABLE
         // and is recorded null on both sides — which is what the oracle does by passing null to
         // `describeObservedFailures`, and why that field is tri-state rather than boolean.
         failures: projectFailures(null),
         policyCalls: projectPolicyCalls(),
+        supplierCalls: projectSupplierCalls(),
       };
       const wanted = {
         translation: expected.translation,
         resolverCalls: expectedResolverCalls(expected),
         failures: expectedFailures(expected),
         policyCalls: expectedPolicyCalls(expected),
+        supplierCalls: expectedSupplierCalls(expected),
       };
       // `get` produces no result object, so the only cause message it can record is the failure
       // channel's — 73 of the 227 rows the ratchet used to miss entirely.
@@ -1154,7 +1939,16 @@ function runCase(testCase, fixture) {
       // design: plan 3.7 routes explicit visible places through `pluralOperands` instead. Any value
       // that can be written as exact decimal text takes that route; a `double` cannot (its text is
       // the JDK conversion, not the corpus's literal), so that combination stays unsupported.
-      const value =
+      //
+      // A THUNK, not a value, and the deferral is load-bearing: three of these cases record a throw
+      // Java raises while CONSTRUCTING the operands, not while classifying them — `compactExponent`
+      // 65 and -1, and `visibleDecimalPlaces` -1, all of which `PluralOperands.Builder.build()`
+      // refuses before it touches the number. Now that `pluralOperands()` refuses at the same phase,
+      // building the value outside the try below would let the recorded answer escape as a runner
+      // crash. `numeric-boundaries.trailing-zeros.reducing-visible-decimal-places-throws-instead-of-
+      // rounding` is the control on the other side: its `ArithmeticException` comes from the
+      // classifier proper and it must keep passing either way.
+      const buildValue = () =>
         input.visibleDecimalPlaces === undefined
           ? placeholderValue(input.value)
           : operandsWithVisibleDecimalPlaces(input.value, input.visibleDecimalPlaces);
@@ -1167,7 +1961,7 @@ function runCase(testCase, fixture) {
         const wantedNames = ERROR_NAME[javaType];
         const wanted = wantedNames.join(" or ");
         try {
-          classifier(value, input.locale);
+          classifier(buildValue(), input.locale);
           return { ok: false, actual: "no exception", wanted };
         } catch (error) {
           if (error instanceof Unsupported) throw error;
@@ -1176,7 +1970,7 @@ function runCase(testCase, fixture) {
         }
       }
 
-      const classified = classifier(value, input.locale);
+      const classified = classifier(buildValue(), input.locale);
       const actual = { name: classified?.name ?? null };
       const wanted = { name: expected.classification.name };
       return jcs(actual) === jcs(wanted) ? { ok: true } : { ok: false, actual, wanted };
@@ -1324,12 +2118,111 @@ function runCase(testCase, fixture) {
       return jcs(actual) === jcs(wanted) ? { ok: true } : { ok: false, actual, wanted };
     }
 
+    case "construct": {
+      // CONSTRUCTION ITSELF as the observation. `DefaultStrings`' constructor performs a series of
+      // validations that no well-formed fixture can reach, because an ordinary fixture installs
+      // exactly one catalog source and exactly one locale source; `constructionOverrides` names one
+      // degeneracy from a CLOSED set and the family reads each refusal against the one control that
+      // constructs.
+      //
+      // THE OPTIONS ARE BUILT OUTSIDE THE TRY, deliberately. Only `createStrings` may throw inside
+      // it: an `AuthoringError` from an unknown override value, or an `Unsupported` from a fixture
+      // this runner cannot drive, must escape rather than be banked as "the port refused this".
+      // Recording the harness's own mistakes as believable refusals is precisely how the `define`
+      // decoder banked nine mistyped shapes, and this arm is the same shape of machine.
+      const instanceBox = { strings: null };
+      const options = createStringsOptionsFor(fixture, instanceBox, fixture.constructionOverrides ?? null);
+
+      /** @type {{ constructed: boolean, failureType: string | null, failureMessage: string | null, probe: unknown }} */
+      let actual;
+      try {
+        instanceBox.strings = core.createStrings(options);
+        actual = {
+          constructed: true,
+          failureType: null,
+          failureMessage: null,
+          probe: constructionProbe(instanceBox.strings, input),
+        };
+      } catch (error) {
+        if (error instanceof Unsupported || error instanceof NoCounterpart || error instanceof AuthoringError)
+          throw error;
+
+        // The refusal's IDENTITY, which is what every note in this family says the discriminator is:
+        // a port that accepts the input, or refuses it with a different error or wording, differs
+        // here and nowhere else.
+        actual = {
+          constructed: false,
+          failureType: /** @type {Error} */ (error).constructor.name,
+          failureMessage: messageOf(error),
+          probe: null,
+        };
+      }
+
+      const wantedConstruct = expected.construct;
+      let wanted;
+
+      if (wantedConstruct.constructed) {
+        wanted = {
+          constructed: true,
+          failureType: null,
+          failureMessage: null,
+          probe: expectedConstructionProbe(wantedConstruct.probe),
+        };
+      } else {
+        // Adapted through the declared table in `tools/construct-refusals.mjs`, keyed on the recorded
+        // Java pair EXACTLY. A refusal the table does not declare keeps its Java spelling here and is
+        // reported FAILED — there is no arm in which a missing entry becomes an `unsupported`.
+        const adapted = adaptConstructRefusal(wantedConstruct.failureType, wantedConstruct.failureMessage);
+        wanted = {
+          constructed: false,
+          failureType: adapted ? adapted.jsType : wantedConstruct.failureType,
+          failureMessage: adapted ? adapted.jsMessage : wantedConstruct.failureMessage,
+          probe: expectedConstructionProbe(wantedConstruct.probe),
+        };
+      }
+
+      return jcs(actual) === jcs(wanted) ? { ok: true } : { ok: false, actual, wanted };
+    }
+
+    case "acceptLanguage": {
+      // Channel two of the matcher's observations, and the one that must NOT throw. Java's
+      // `LocaleMatcher#bestMatchForAcceptLanguage` (`:117-139`) is a fail-soft default method over
+      // `bestMatchFor(List)`: absent, over the 4,096 UTF-16 code-unit cap, blank, normalizing to
+      // nothing, unparseable, or parsing to more than 32 ranges each answer the configured fallback.
+      // The oracle records only `bestMatch`, because the method returns a bare `Locale`
+      // (`VectorOracle:424`), so the emitted tag IS the JS return value and there is nothing to adapt.
+      //
+      // THIS ARM AND THE `matchFor` ARM MUST DISAGREE on one recorded input, and that disagreement is
+      // the reason they are separate arms rather than one shared call. The 13-member header
+      // `he,id,yi,cmn,yue,nan,hak,jbo,tlh,gan,wuu,hsn,ase,fr;q=0.1` expands through the pinned IANA
+      // closure to 33 ranges: `browser-chooser.limit.alias-expansion-crosses-thirty-two` records it
+      // THROWING through `matchFor(List)` and `accept-language.limit.thirty-three-expanded-ranges`
+      // records it answering `ja` here. Its 32-member sibling is accepted WHOLE by both doors, never
+      // truncated. A runner that routed both through one entry point would lose one of those two.
+      //
+      // The module guard is the same one the other three ingresses carry, decided on the subpath's
+      // existence rather than on anything the port did with a header.
+      const strings = stringsFor(fixture);
+
+      if (!negotiateApi?.createLocaleNegotiator) unsupported("createLocaleNegotiator is not implemented");
+
+      // The instance's OWN configuration, exactly as `matchForCase` does it: `bestMatchForAcceptLanguage`
+      // returns the CONFIGURED FALLBACK on six of its exits, so a negotiator built from anything else
+      // would report a locale this `Strings` never resolved.
+      const negotiator = negotiateApi.createLocaleNegotiator(strings.getLocaleConfiguration());
+      const actual = { bestMatch: negotiator.bestMatchForAcceptLanguage(input.header) };
+      const wanted = { bestMatch: expected.acceptLanguage.bestMatch };
+
+      return jcs(actual) === jcs(wanted) ? { ok: true } : { ok: false, actual, wanted };
+    }
+
     case "matchFor": {
       // Channel one of the two the corpus records: what the MATCHER selects, observed on its own
       // rather than through a translation. `Strings#matchFor` has two overloads and the corpus
       // exercises both under this one operation name — 137 cases hand it a `Locale`, 164 hand it a
-      // `List<LanguageRange>`. Both are routed here now; of the list cases, the 74 that arrive as an
-      // EXPLICIT ARRAY run, and the 90 spelled as an Accept-Language HEADER do not.
+      // `List<LanguageRange>`. As of A4 ALL of them run: the 74 that arrive as an EXPLICIT ARRAY and
+      // the 90 spelled as an Accept-Language HEADER, which `parseLanguageRanges` turns into a list
+      // exactly where the oracle turns it into one.
       //
       // In JAVA these are one solver, not two: `matchFor(Locale)` is the DEFAULT interface method at
       // `LocaleMatcher.java:63-65`, which wraps `locale.toLanguageTag()` in a single `LanguageRange`
@@ -1345,17 +2238,17 @@ function runCase(testCase, fixture) {
       // `matchForRange` is shared.
       //
       // ROUTING ON THE INPUT SHAPE, decided before anything executes — not a catch around a call
-      // that ran. A HEADER STRING is still not parsed, and that guard is the only `unsupported` on
-      // the answering path: it is the same call the default arm below makes, on the same operation,
-      // producing the same reason string, so those cases report exactly what they reported before
-      // this arm existed. (Two others exist and neither can absorb a matcher defect:
-      // `matchForCase`'s module-availability check, which decides on the subpath's existence before
-      // any range is matched, and the recorded-throw branch's undeclared-Java-type check, which
-      // fires on the CORPUS's vocabulary rather than on anything the port did.)
+      // that ran. A4 leaves NO `unsupported` on the answering path at all: the shape guard below now
+      // admits both spellings the corpus uses and fires only on a third one, which no case has. The
+      // two that remain reachable cannot absorb a matcher defect — `matchForCase`'s
+      // module-availability check, which decides on the subpath's existence before any range is
+      // matched, and the recorded-throw branch's undeclared-Java-type check, which fires on the
+      // CORPUS's vocabulary rather than on anything the port did.
       //
       // A0 wrote the guard as `!singleMember`, which ALSO routed away the 24 explicit multi-member
-      // arrays. A3 implements those, so the count drops out of the condition entirely; a guard that
-      // still counted members would now be refusing work the port does.
+      // arrays. A3 implements those, so the count drops out of the condition entirely, and A4 takes
+      // the SHAPE out of it too; a guard that still counted members, or still refused strings, would
+      // now be refusing work the port does.
       //
       // A `try { … } catch { unsupported(…) }` around the answering call would convert a real
       // matcher defect into attributed non-work and look identical in the headline count, which is
@@ -1365,13 +2258,17 @@ function runCase(testCase, fixture) {
       // here; if a future edit made them report a reason instead, this arm would be lying.
       const ranges = input.languageRanges;
 
-      if (input.locale === undefined && !Array.isArray(ranges)) operationNotImplemented(operation);
+      // STILL DECIDED ON THE INPUT'S SHAPE, before anything executes. A4 implements the header
+      // ingress, so a string is now routed IN rather than away -- but the guard stays, because the
+      // two shapes the corpus uses are the two this arm knows how to run, and a third shape arriving
+      // from a future corpus must report rather than be coerced into one of them.
+      if (input.locale === undefined && !Array.isArray(ranges) && typeof ranges !== "string")
+        operationNotImplemented(operation);
 
       // EIGHT `matchFor` cases record `expected.thrown` and carry NO `expected.match`: the two
-      // 33-member limit rows and the six malformed headers. Seven are header strings and are still
-      // routed away by the guard above; the eighth,
-      // `browser-chooser.limit.explicit-thirty-three-ranges-rejected`, is a real 33-entry ARRAY and
-      // reaches this branch as of A3, where the port's own 32-member cap answers it.
+      // 33-member limit rows and the six malformed headers. Since A4 all eight reach this branch —
+      // seven raised by `parseLanguageRanges` and one, `browser-chooser.limit.explicit-thirty-three-
+      // ranges-rejected`, by the port's own 32-member cap on a real 33-entry ARRAY.
       // Without it, `const recorded = expected.match` is `undefined` and `recorded.matchType` dies
       // as a TypeError where an error-identity comparison belongs.
       //
@@ -1389,9 +2286,10 @@ function runCase(testCase, fixture) {
       // because a header STRING is iterable, so `[..."not a header!"]` refuses its first character
       // as a non-object and throws a `RangeError` that has nothing to do with the header grammar.
       // That is the `zh-123` shape exactly: a check confirming something it never exercised. With
-      // the message compared, seven fail and only `.explicit-thirty-three-ranges-rejected` — a real
-      // 33-member array, refused by a rule the port already implements — passes, which is the true
-      // state of the port before A4.
+      // the message compared, seven failed and only `.explicit-thirty-three-ranges-rejected` — a real
+      // 33-member array, refused by a rule the port already implemented — passed, which was the true
+      // state of the port before A4. All eight pass now, on the message; the branch is what made the
+      // seven parser refusals a real check rather than a formality the moment A4 routed them in.
       //
       // If A4 finds a wording it must diverge from, that is a recorded decision and a visible edit
       // here, not a comparison quietly narrowed back to the kind.
@@ -1432,7 +2330,7 @@ function runCase(testCase, fixture) {
         fallbackLocale: match.fallbackLocale,
         consideredLocales: match.consideredLocales,
         effectiveWeight: match.effectiveWeight,
-        languageRange: match.languageRange,
+        languageRange: asWeightedRange(match.languageRange),
         requestedLanguageRanges: match.requestedLanguageRanges,
       };
       const recorded = expected.match;
@@ -1443,7 +2341,7 @@ function runCase(testCase, fixture) {
         fallbackLocale: recorded.fallbackLocale,
         consideredLocales: recorded.consideredLocales,
         effectiveWeight: recorded.effectiveWeight,
-        languageRange: recorded.languageRange,
+        languageRange: expectedWeightedRange(recorded.languageRange, recorded.requestedLanguageRanges),
         requestedLanguageRanges: recorded.requestedLanguageRanges,
       };
       return jcs(actual) === jcs(wanted) ? { ok: true } : { ok: false, actual, wanted };
@@ -1492,13 +2390,26 @@ function matchForCase(fixture, input, ranges) {
   // exist, before any range is matched — never on a range that ran. `optionalSubpath` distinguishes
   // a subpath that is absent from one that threw on import, so a broken `negotiate` cannot arrive
   // here disguised as an unimplemented one.
-  if (!negotiateApi?.createLocaleNegotiator) unsupported("createLocaleNegotiator is not implemented");
+  // It names BOTH exports A4 needs, under the ONE reason string: they ship from the same module, so
+  // two strings would split one bucket in the report and read as a second capability appearing.
+  if (!negotiateApi?.createLocaleNegotiator || !negotiateApi?.parseLanguageRanges)
+    unsupported("createLocaleNegotiator is not implemented");
 
   // The instance's OWN applicable configuration, read back through the public accessor rather than
   // rebuilt from the fixture: its `fallbackLocale` is the one `createStrings` resolved to a loaded
   // catalog, so the negotiator matches against exactly what the `Strings` would.
   const negotiator = negotiateApi.createLocaleNegotiator(strings.getLocaleConfiguration());
-  return negotiator.matchForLanguageRanges(ranges);
+
+  // A HEADER STRING is parsed OUTSIDE the library, which is where Java parses it too:
+  // `VectorOracle:1022` calls `Locale.LanguageRange.parse(spec.asString())` and hands the resulting
+  // list to `strings.matchFor(List)`. Two consequences, and both are recorded rows. A parse refusal
+  // is the operation's own `expected.thrown` and must travel out of here rather than be caught. And
+  // the 32-member cap is applied by the LIBRARY, on the already-expanded list -- which is why
+  // `browser-chooser.limit.alias-expansion-crosses-thirty-two` throws here while the identical
+  // header at `accept-language.limit.thirty-three-expanded-ranges`, arriving through the fail-soft
+  // door, answers the fallback instead.
+  return negotiator.matchForLanguageRanges(
+    typeof ranges === "string" ? negotiateApi.parseLanguageRanges(ranges) : ranges);
 }
 
 /**
@@ -1513,7 +2424,20 @@ function matchForCase(fixture, input, ranges) {
  */
 function operationNotImplemented(operation) {
   const owner = OWNER_MILESTONE[operation];
-  unsupported(`operation '${operation}' is not implemented${owner ? ` (${owner})` : ""}`);
+  // AN UNSUPPORTED REASON MUST NAME AN OWNER, and nothing used to enforce it. The ternary below
+  // silently degraded to a bare `operation 'x' is not implemented` for any operation missing from
+  // the table -- which is precisely the one thing `OWNER_MILESTONE`'s own header says the unsupported
+  // list may not do, since a reason with no owning milestone is a gap nobody has agreed to close.
+  // Deleting an entry for an operation that gained an arm (as B4 correctly did for `construct`) is
+  // safe; deleting one that can still be REACHED was indistinguishable from it until now. This makes
+  // the difference structural rather than conventional, on the same reasoning as the `no counterpart`
+  // re-derivation: an authoring mistake fails the run instead of printing a plausible line.
+  if (!owner)
+    throw new AuthoringError(
+      `operation '${operation}' reported unsupported with no entry in OWNER_MILESTONE. Every reason ` +
+      `must name the milestone that owes the work; add an entry, or give the operation an arm.`,
+    );
+  unsupported(`operation '${operation}' is not implemented (${owner})`);
 }
 
 /**
@@ -1588,10 +2512,22 @@ function classifyFailure(testCase, fixture, actual, wanted) {
   //    escape defect — including the two traps the corpus exists to catch, an escaped region copied
   //    without escape processing and an escaped opening swallowing a following real placeholder.
 
-  // 2e. Default output/expansion budgets. Attributable only when Java failed on a budget and this
-  //     implementation SUCCEEDED, with no explicit limits set — i.e. the default was not enforced.
-  if (wanted?.failureReason === "resolution-failure" && actual?.failureReason === null && !fixture.runtimeLimits)
-    return "default runtime output/expansion budgets are not enforced (M5b/M6)";
+  // 2e REMOVED at M7 C1, together with the capability it stood for, and it is the widest rule this
+  //    file has ever carried. Its text said "Java failed on a budget and this implementation
+  //    SUCCEEDED", but what it actually tested was `wanted.failureReason === "resolution-failure"
+  //    && actual.failureReason === null` — ANY resolution failure the port did not reproduce, on
+  //    any fixture without explicit limits. It was sound only while no budget existed to enforce.
+  //    `interpolate.js` now enforces all three defaults (output, cumulative expansion, depth), so
+  //    the rule could no longer tell "not built yet" from "built wrong" and its next firing would
+  //    have been a real defect wearing an owner's name — the exact failure mode rules 2, 2b, 2c and
+  //    2d were deleted for. Its three rows now PASS: two by ablation-verified mechanisms (the output
+  //    cap alone converts `runtime-limits.interpolated-output.default.one-past-the-maximum`, the
+  //    cumulative budget alone converts `runtime-limits.expansion.default.one-past-the-budget`) and
+  //    the third, `generated-placeholders.limits.cumulative-expansion-exceeds-character-budget`,
+  //    on the compared fields under EITHER mechanism, with only its `causeMessage` naming which one
+  //    fired. That message is now in `causeMessageMatchedIds`, which is where its discrimination
+  //    actually lives; the note in `interpolate.js` says so rather than leaving the row looking
+  //    sharper than it is.
 
   // 3 REMOVED at M5b, for the same reason as 2d. It attributed a mismatch to bidi isolation whenever
   //   deleting the isolate controls from Java's answer made the two sides identical. That rule was
@@ -1688,12 +2624,27 @@ for (const testCase of cases) {
  * This also replaces `xfailedIds`, which was written as a hard-coded `[]` and read nowhere: a
  * mechanism-shaped hole that looked like the guard this is, and would have been trusted as one.
  * Removed with the same edit that supplies the real thing.
+ *
+ * THE MARKER KEY ALONE WAS TOO NARROW, and the gap cost a banked id. `perCallOverrideOrder` marks a
+ * both-present input, so it never saw `per-call-override-order.zh-tw.ranges-only-on-zh-hant-only-
+ * key`, whose input is `{key, languageRanges: "en"}` — ranges with NO per-call locale. That row
+ * passed at HEAD for the same coincidental reason the two marked ones did, was banked, and then
+ * genuinely stopped passing when B3 taught `callOptionsFor` to report the header arm instead of
+ * dropping it. RECORDED, because it is the one id this batch removed from `passedIds`: it is now
+ * `notImplementedIds` under `per-call Accept-Language header ranges need the header parser (M7)`,
+ * and A4 is the slice that earns it back. Restoring it to the baseline is not an option — it does
+ * not pass — and `deliberatelyDroppedIds` in the artifact carries the same fact where a reader of
+ * the measurement, rather than of this file, will find it.
+ *
+ * So the second half of the set is `undeliveredSelectionIds`, taken from what the runner DID rather
+ * than from what the input looks like.
  */
-const coincidentalIds = new Set(
-  cases
+const coincidentalIds = new Set([
+  ...cases
     .filter((c) => Object.prototype.hasOwnProperty.call(c.input ?? {}, "perCallOverrideOrder"))
     .map((c) => c.id),
-);
+  ...undeliveredSelectionIds,
+]);
 const recordablePassed = passed.filter((id) => !coincidentalIds.has(id));
 const notRecorded = passed.filter((id) => coincidentalIds.has(id));
 
@@ -1728,6 +2679,24 @@ let regressions = [];
 let newlyPassing = [];
 /** @type {string[]} */
 let causeMessageRegressions = [];
+/**
+ * Entries of `deliberatelyDroppedIds` that are still marked OPEN but whose id passes again.
+ *
+ * `deliberatelyDroppedIds` is append-only BY CONSTRUCTION — `--write` copies `previouslyDropped`
+ * forward — so without a staleness rule it can only grow, and it had already grown into a
+ * contradiction: one id sat in `deliberatelyDroppedIds` and in `passedIds` at the same time, its
+ * reason carrying an appended "RESTORED by M7 A4" clause. A prose clause is not a distinction a
+ * machine can read, and the next reader gets a list mixing live losses with dead ones, which is the
+ * "known-gap lists rot" failure `../CLAUDE.md` names and requires new lists to be immune to.
+ *
+ * So the field gains a `resolved` flag and this gate. An entry is OPEN unless `resolved` is true;
+ * an OPEN entry whose id currently passes is STALE and fails the run. Resolving one is a deliberate
+ * edit that states the win, exactly as deleting a coverage disposition does — and the flag is never
+ * set by `--write`, because a field that heals itself is not a ratchet.
+ *
+ * @type {{ id: string, reason: string }[]}
+ */
+let staleDrops = [];
 let baseline = null;
 if (!familyFilter) {
   try {
@@ -1743,6 +2712,10 @@ if (!familyFilter) {
     // candidate for `--write` either, or the next reviewer records it in good faith.
     newlyPassing = recordablePassed.filter((id) => !wasPassing.has(id));
 
+    staleDrops = (Array.isArray(baseline.deliberatelyDroppedIds) ? baseline.deliberatelyDroppedIds : [])
+      .filter((/** @type {{id: string, resolved?: boolean}} */ entry) =>
+        entry.resolved !== true && nowPassing.has(entry.id));
+
     // The SECOND ratchet, on diagnostics. A case whose Java cause message this port reproduced is
     // not allowed to stop reproducing it: that is the only mechanism standing between the gate's
     // "errors match Java cases" clause and a silent rewording, because the result projection above
@@ -1753,8 +2726,24 @@ if (!familyFilter) {
     );
   }
   if (write) {
-    mkdirSync(dirname(baselinePath), { recursive: true });
-    writeFileSync(baselinePath, `${JSON.stringify({ ...report, passedIds: [...recordablePassed].sort(), coincidentallyPassingIds: [...notRecorded].sort(), failedIds: [], unsupportedIds: [...skipped, ...nonportable].sort(), notImplementedIds: [...skipped].sort(), nonportableIds: [...nonportable].sort(), causeMessageMatchedIds: [...causeMessageMatched].sort() }, null, 2)}\n`, "utf8");
+    // A `--write` that REMOVES ids from `passedIds` is how a regression becomes invisible: the drop
+    // is reported against the baseline this same command is about to overwrite, so the next run is
+    // clean and the record of the loss is gone. Refused unless the caller says why, and the reason
+    // is kept in the artifact next to the ids it removed. Kept ratchet-shaped rather than
+    // conscience-shaped: nothing here decides whether a drop is legitimate, only that it is stated.
+    if (regressions.length && dropReason === null) {
+      console.log(`\nREFUSING TO WRITE: ${regressions.length} id(s) would leave passedIds. Re-run with` +
+        `\n  --write --drop-reason "why each of these no longer passes"` +
+        `\nif the removal is deliberate; the reason is recorded in the baseline beside the ids.`);
+    } else {
+      const previouslyDropped = Array.isArray(baseline?.deliberatelyDroppedIds) ? baseline.deliberatelyDroppedIds : [];
+      const deliberatelyDroppedIds = [
+        ...previouslyDropped,
+        ...regressions.map((/** @type {string} */ id) => ({ id, reason: dropReason })),
+      ];
+      mkdirSync(dirname(baselinePath), { recursive: true });
+      writeFileSync(baselinePath, `${JSON.stringify({ ...report, passedIds: [...recordablePassed].sort(), coincidentallyPassingIds: [...notRecorded].sort(), failedIds: [], unsupportedIds: [...skipped, ...nonportable].sort(), notImplementedIds: [...skipped].sort(), nonportableIds: [...nonportable].sort(), causeMessageMatchedIds: [...causeMessageMatched].sort(), deliberatelyDroppedIds }, null, 2)}\n`, "utf8");
+    }
   }
 }
 
@@ -1769,12 +2758,18 @@ console.log(`  unsupported    ${String(skipped.length).padStart(5)}   not implem
 if (nonportable.length)
   console.log(`  no counterpart ${String(nonportable.length).padStart(5)}   JVM-only by design; these can never move`);
 
-// Diagnostics, reported and ratcheted but never gated on: see `causeMessageMatchedIds`.
+// Diagnostics. PRECISELY: the divergence COUNT is not gated — a row that never reproduced Java's
+// cause message may keep diverging, and a newly-compared row may join them without failing the run.
+// But the channel is NOT ungated: `causeMessageRegressions` (an id in the baseline's
+// `causeMessageMatchedIds` that has stopped matching) IS a term of the exit expression below, so a
+// message that once matched Java and then drifts FAILS. Said the loose way — "ratcheted, not gated"
+// — this reads as though nothing here can turn the run red, which is wrong in the direction that
+// matters. See `causeMessageMatchedIds`.
 const causeMessageTotal = causeMessageMatched.length + causeMessageDiverged.length;
 if (causeMessageTotal)
   console.log(
     `\nJava cause messages reproduced: ${causeMessageMatched.length}/${causeMessageTotal}` +
-      ` (${causeMessageDiverged.length} JS-idiomatic divergence(s), ratcheted, not gated)`,
+      ` (${causeMessageDiverged.length} JS-idiomatic divergence(s); the count is not gated, a REGRESSION is)`,
   );
 
 if (verbose && causeMessageDiverged.length) {
@@ -1848,7 +2843,17 @@ if (!familyFilter) {
   if (notRecorded.length)
     console.log(`\nNOT RATCHETED (${notRecorded.length}) — passing, but only coincidentally; see \`coincidentalIds\`:` +
       `\n  ${notRecorded.join("\n  ")}`);
-  if (write) console.log(`\nbaseline written: ${recordablePassed.length} recorded of ${passed.length} passing`);
+  if (write && !(regressions.length && dropReason === null))
+    console.log(`\nbaseline written: ${recordablePassed.length} recorded of ${passed.length} passing` +
+      (regressions.length ? `, ${regressions.length} deliberately dropped` : ""));
+}
+
+if (declaredOrderFallbacks.length) {
+  console.log(`\nDECLARED-ORDER FALLBACK (${declaredOrderFallbacks.length}) — the per-fixture spec file was not usable, so`);
+  console.log(`the alphabetized corpus copy stands in. Any warning-ORDER case over these fixtures is comparing`);
+  console.log(`an order the corpus cannot carry, and a failure there is a missing input, not a port defect:`);
+  for (const note of declaredOrderFallbacks.slice(0, 10)) console.log(`  ${note}`);
+  if (declaredOrderFallbacks.length > 10) console.log(`  ... and ${declaredOrderFallbacks.length - 10} more`);
 }
 
 if (staleNonportabilityClaims.length) {
@@ -1856,7 +2861,25 @@ if (staleNonportabilityClaims.length) {
   for (const claim of staleNonportabilityClaims) console.log(`  ${claim}`);
 }
 
+// The message-parity table's staleness half, on the same discipline as the nonportability claims
+// above: a correspondence no case consults has stopped standing for anything and must not be left
+// behind as an excuse. Suppressed under `--family`, where most entries legitimately go unconsulted,
+// exactly as the passing-ID ratchet is.
+const staleAdaptations = familyFilter ? [] : staleConstructAdaptations();
+if (staleAdaptations.length) {
+  console.log(`\nSTALE CONSTRUCT-REFUSAL ADAPTATION (${staleAdaptations.length}):`);
+  for (const claim of staleAdaptations) console.log(`  ${claim}`);
+}
+
+if (staleDrops.length) {
+  console.log(`\nSTALE DELIBERATE DROP (${staleDrops.length}) — recorded as dropped, but passing again:`);
+  for (const entry of staleDrops) console.log(`  ${entry.id}`);
+  console.log(`Mark each resolved in measurements/conformance.json ("resolved": true) with what` +
+    `\nearned it back, or delete the entry. An open drop that passes is a contradiction, not history.`);
+}
+
 process.exit(
   failed.length === 0 && regressions.length === 0 && causeMessageRegressions.length === 0 &&
-  staleNonportabilityClaims.length === 0 ? 0 : 1,
+  staleNonportabilityClaims.length === 0 && staleAdaptations.length === 0 &&
+  staleDrops.length === 0 ? 0 : 1,
 );

@@ -77,6 +77,17 @@ test("no module under src/ evaluates code at runtime", () => {
   assert.deepEqual(offenders, [], "CLDR rule conditions compile to closures, never to evaluated code");
 });
 
+/** Erases comments so JSDoc type imports are not mistaken for runtime graph edges. */
+const withoutComments = (/** @type {string} */ text) =>
+  text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'\\])\/\/[^\n]*/g, "$1");
+
+/** `from "…"`, a bare side-effect `import "…"`, and a dynamic `import("…")`. */
+const IMPORT_PATTERNS = [
+  /from\s+"(\.[^"]+)"/g,
+  /(?:^|[^.\w])import\s+"(\.[^"]+)"/gm,
+  /import\(\s*"(\.[^"]+)"/g,
+];
+
 test("the root graph carries no optional plural data", () => {
   // The optional modules are what the root's size ratchet is protecting. Following the root's own
   // imports is the check that matters; a name that only appears in `src/data/ordinal.js` or
@@ -89,14 +100,27 @@ test("the root graph carries no optional plural data", () => {
     const file = queue.pop();
     if (file === undefined || reached.has(file)) continue;
     reached.add(file);
-    const source = readFileSync(file, "utf8");
-    for (const match of source.matchAll(/from\s+"(\.[^"]+)"/g)) {
-      const specifier = match[1];
-      if (specifier !== undefined) queue.push(new URL(specifier, `file://${file}`).pathname);
-    }
+    // EVERY shape of relative import, not just `from "…"`, and comments stripped first.
+    //
+    // The `from`-only walk had a silent hole, measured rather than supposed: inserting
+    // `import "../data/iana-range-equivalents.js";` at the top of `src/core/index.js` left this test
+    // 4/4 GREEN and `scenario:0a` reporting 25 root modules, while the 806-class table was genuinely
+    // in the root graph at runtime. Written `import { decode } from "…"` the same line WAS caught —
+    // the control that makes the first measurement mean something. A dynamic `import("…")` was the
+    // same hole again.
+    //
+    // Comments are stripped so JSDoc type imports (`{import("../internal/catalog.js").Definition}`),
+    // which are erased at runtime, do not count as edges. Landing this changed no measurement: the
+    // root graph is still exactly 25 modules.
+    const source = withoutComments(readFileSync(file, "utf8"));
+    for (const pattern of IMPORT_PATTERNS)
+      for (const match of source.matchAll(pattern)) {
+        const specifier = match[1];
+        if (specifier !== undefined) queue.push(new URL(specifier, `file://${file}`).pathname);
+      }
   }
 
-  // `data/iana-range-equivalents.js` joins the list at M7 A2: the 802-class IANA closure belongs to
+  // `data/iana-range-equivalents.js` joins the list at M7 A2: the 806-class IANA closure belongs to
   // `lokalized/negotiate` by plan 3.1, and the root graph carries only the reduced slice inlined in
   // `src/internal/locale.js`. Naming it here is what keeps it out — the byte ratchet would not.
   for (const forbidden of ["ordinal-rules.js", "cardinal-ranges.js", "data/ordinal.js", "data/ranges.js",

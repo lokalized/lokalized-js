@@ -11,9 +11,18 @@ import {
   cardinalRuleLocaleTags,
   operandsForPluralValue,
   supportedCardinalCategoriesFor,
+  validateOperandOptions,
 } from "./internal/plural.js";
 
 export { createStrings } from "./core/index.js";
+
+// Plan 3.4: "The root graph instead exports a pure small chooser and a browser convenience." They
+// are core's symbols (allowlist owner `core`, `reExportedByRoot`) and they enter NO new module —
+// both live in `src/core/index.js`, which the root graph already reaches, so the 0a module count
+// stays 25 root / 24 core. That is the half of the ratchet that keeps `lokalized/negotiate` and its
+// 806-class IANA table out of the browser graph, and the chooser exists precisely so a browser does
+// not have to pull them in to pick a locale.
+export { chooseBrowserLocale, chooseLocaleForPreferredLanguages } from "./core/index.js";
 
 const freeze = Object.freeze;
 
@@ -83,6 +92,20 @@ export function decimal(value) {
  */
 export function pluralOperands(value, options) {
   decimal(value); // reuse the grammar check
+  // EAGERLY, at value construction, because that is where Java refuses. `PluralOperands.Builder`
+  // carries its OWN `TranslationRuntimeLimits`, defaulted to `TranslationRuntimeLimits.defaults()`,
+  // and `build()` checks the options before it touches the number at all — so a caller writing
+  // `pluralOperands("1", { compactExponent: 65 })` gets `Compact exponent 65 exceeds the maximum of
+  // 64` from THIS call, not a translation failure from a later `get`.
+  //
+  // The divergence this closes was invisible: deferring the check to `operandsForPluralValue` still
+  // raised the same error with the same message, but at the wrong phase, so the walk turned it into
+  // a RESOLUTION_FAILURE and the default handler returned the key. Java throws out of the caller's
+  // own value construction, and `runtime-limits.numeric.default.compact-exponent-65` and
+  // `.visible-decimal-places-1025` record exactly that — a `thrown` block with no failure channel at
+  // all. Their at-limit twins (`-64`, `-1024`) stay TRANSLATED, which is the control that says this
+  // is a boundary and not a blanket refusal.
+  validateOperandOptions(options ?? {});
   return freeze({
     $lokalized: /** @type {const} */ ("plural-operands"),
     value,

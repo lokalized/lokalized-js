@@ -358,7 +358,10 @@ test("only the parse hook adds the loader's wording; createStrings keeps the eva
   const catalog = { A: { translation: "t", alternatives: [{ "count ==": { translation: "y" } }] } };
 
   assert.throws(
-    () => createStrings({ fallbackLocale: "en", strings: { en: catalog } }),
+    // `locale` is named because B4 made the ambient locale source required (plan 3.2's "exactly one
+    // of"), and without it this assertion would be satisfied by THAT refusal instead of the
+    // expression one it is written to pin — an earlier guard answering for a later check.
+    () => createStrings({ fallbackLocale: "en", locale: "en", strings: { en: catalog } }),
     { message: /^Invalid expression 'count ==': / },
   );
   assert.throws(

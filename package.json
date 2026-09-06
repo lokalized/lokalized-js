@@ -65,6 +65,8 @@
     "size:graph": "node tools/graph-size.mjs",
     "serve:0a": "node tools/browser-0a/serve.mjs",
     "spike:placeholders": "node spike/generated-placeholders/run.mjs",
+    "diff:language-range": "node tools/language-range-diff/run.mjs",
+    "diff:direct-tag": "node tools/direct-tag-diff/run.mjs",
     "diff:tokenizer": "node tools/tokenizer-diff/run.mjs",
     "diff:parse": "node tools/parse-diff/run.mjs",
     "diff:phonetic": "node tools/phonetic-diff/run.mjs",

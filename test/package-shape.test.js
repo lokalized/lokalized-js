@@ -9,7 +9,7 @@ const root = new URL("../", import.meta.url);
 const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
 
 /**
- * The nine entry points documented in IMPLEMENTATION-PLAN-v7.md section 3.1.
+ * The nine entry points documented in IMPLEMENTATION-PLAN-v7.md section 3.1 (internal; see ../planning/).
  * This list is intentionally hand-written: it is the contract, and the export
  * map is the implementation of it. Deriving one from the other would let both
  * drift together silently.
