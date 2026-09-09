@@ -16,12 +16,31 @@ jobs:
       fail-fast: false
       matrix:
         node: ["22", "24", "current"]
+    # Every corpus-driven gate resolves `../lokalized-spec` as a SIBLING of this checkout, so both
+    # repositories are checked out side by side under the workspace. Without this the spec artifacts
+    # are simply absent: `npm test` skipped 43 tests and crashed 5 files outright, and `conformance`
+    # — the project's central gate — could never have run at all.
+    defaults:
+      run:
+        working-directory: lokalized-js
     steps:
       - uses: actions/checkout@v4
         with:
+          path: lokalized-js
           # Plan validators reject shallow repositories: they verify capacity
           # and start-record commit ancestry with `git merge-base --is-ancestor`.
           fetch-depth: 0
+      - name: Check out the behavioral corpus and pinned artifacts
+        uses: actions/checkout@v4
+        with:
+          repository: lokalized/lokalized-spec
+          path: lokalized-spec
+          # Shallow is fine here: nothing reads the spec's history, only its artifacts.
+          fetch-depth: 1
+          # `github.token` is scoped to THIS repository. It is sufficient while lokalized-spec is
+          # public; if it is ever made private, add a SPEC_REPO_TOKEN secret with read access and
+          # this picks it up without another edit.
+          token: ${{ secrets.SPEC_REPO_TOKEN || github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
@@ -30,8 +49,27 @@ jobs:
         run: npm run check
       - name: Emit declarations
         run: npm run types
+      # A SKIP IS A GATE THAT STOPPED GATING. Each corpus-driven test skips when the sibling spec
+      # checkout is absent, which is right for a bare local clone and WRONG here: with the spec
+      # checked out above, nothing may skip. Asserting that is what stops a silently shrinking suite
+      # from reading as a green run — the failure mode that hid this for as long as it did.
+      #
+      # The status is read from `$?` on a redirected run, never through a pipe: `npm test | tail`
+      # reports `tail`'s status, and this project has already banked a passing status that way.
       - name: Unit tests
-        run: npm test
+        run: |
+          npm test > test.log 2>&1; status=$?
+          cat test.log
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          # Format-agnostic on purpose: node --test prints `# skipped N` under TAP and `i skipped N`
+          # under the spec reporter, and CI and a local run do not use the same one. An earlier
+          # version of this line matched neither and could never have failed.
+          skipped=$(awk '/skipped[[:space:]]+[0-9]+[[:space:]]*$/ { n = $NF } END { print n + 0 }' test.log)
+          echo "skipped: ${skipped:-0}"
+          if [ "${skipped:-0}" -ne 0 ]; then
+            echo "::error::${skipped} test(s) skipped. With lokalized-spec checked out nothing may skip."
+            exit 1
+          fi
       # M2 is tracked by engineering measurement rather than frozen thresholds, so these ARE the
       # gate. Conformance enforces zero failures plus a ratchet on the passing-ID set; 0a ratchets
       # the deterministic size/module figures and reports the noisy timings without gating them.

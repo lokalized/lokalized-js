@@ -25,12 +25,30 @@ const compileExpressionAtLoad = (/** @type {string} */ expression) =>
 
 import { parseCatalog } from "../src/internal/catalog.js";
 
-const corpus = JSON.parse(
-  readFileSync(
-    new URL("../../lokalized-spec/generated/behavioral-vectors.json", import.meta.url),
-    "utf8",
-  ),
-);
+/**
+ * The sibling spec checkout, guarded.
+ *
+ * This read used to be BARE, so a clone without `../lokalized-spec` did not skip — it CRASHED the
+ * whole file, and with it every self-contained test in it. CI hit exactly that. The other corpus
+ * gates in this suite already guard the read and skip; these five did not, which is why five files
+ * died while forty tests reported a tidy `# SKIP`.
+ *
+ * Skipping is only half the answer, and on its own it is the failure mode this project keeps
+ * relearning: a suite that quietly shrinks has stopped gating. CI therefore checks out
+ * `lokalized-spec` AND fails when ANY test skips, so the skip below can only ever be a local
+ * convenience, never a green CI run that verified nothing.
+ */
+let corpus = null;
+try {
+  corpus = JSON.parse(
+    readFileSync(new URL("../../lokalized-spec/generated/behavioral-vectors.json", import.meta.url), "utf8"),
+  );
+} catch {
+  // Sibling spec checkout not present.
+}
+const corpusSkip = corpus
+  ? false
+  : "behavioral vectors not found at ../lokalized-spec/generated/behavioral-vectors.json";
 
 /**
  * Fixture files whose Java outcome parseCatalog deliberately does not reproduce in M2.
@@ -109,7 +127,7 @@ function limitsFor(fixture) {
   return { limits };
 }
 
-describe("parseCatalog against every corpus fixture", () => {
+describe("parseCatalog against every corpus fixture", { skip: corpusSkip }, () => {
   const parseCases = parseCasesByFile();
   const loadFailures = loadFailuresByFile();
 
@@ -330,7 +348,7 @@ describe("parseCatalog model", () => {
   });
 });
 
-describe("parseCatalog bounds", () => {
+describe("parseCatalog bounds", { skip: corpusSkip }, () => {
   it("counts translation nodes while parsing: keys, placeholders, and alternatives", () => {
     const catalog = {
       "Key.A": {

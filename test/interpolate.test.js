@@ -87,12 +87,30 @@ function contextFor(key, evaluationLocale) {
   };
 }
 
-const corpus = JSON.parse(
-  readFileSync(
-    new URL("../../lokalized-spec/generated/behavioral-vectors.json", import.meta.url),
-    "utf8",
-  ),
-);
+/**
+ * The sibling spec checkout, guarded.
+ *
+ * This read used to be BARE, so a clone without `../lokalized-spec` did not skip — it CRASHED the
+ * whole file, and with it every self-contained test in it. CI hit exactly that. The other corpus
+ * gates in this suite already guard the read and skip; these five did not, which is why five files
+ * died while forty tests reported a tidy `# SKIP`.
+ *
+ * Skipping is only half the answer, and on its own it is the failure mode this project keeps
+ * relearning: a suite that quietly shrinks has stopped gating. CI therefore checks out
+ * `lokalized-spec` AND fails when ANY test skips, so the skip below can only ever be a local
+ * convenience, never a green CI run that verified nothing.
+ */
+let corpus = null;
+try {
+  corpus = JSON.parse(
+    readFileSync(new URL("../../lokalized-spec/generated/behavioral-vectors.json", import.meta.url), "utf8"),
+  );
+} catch {
+  // Sibling spec checkout not present.
+}
+const corpusSkip = corpus
+  ? false
+  : "behavioral vectors not found at ../lokalized-spec/generated/behavioral-vectors.json";
 
 /** Unicode bidi isolate controls; isolation is not part of M2. */
 const BIDI_ISOLATES = /[⁦-⁩]/;
@@ -163,7 +181,7 @@ function donorFor(testCase) {
   return { locale: donor, catalog };
 }
 
-describe("render under the supplying locale (evaluation-locale corpus family)", () => {
+describe("render under the supplying locale (evaluation-locale corpus family)", { skip: corpusSkip }, () => {
   const cases = corpus.cases.filter(
     (/** @type {any} */ testCase) =>
       testCase.operation === "getResult" && testCase.fixture.startsWith("evaluation-locale"),
@@ -321,7 +339,7 @@ describe("render under the supplying locale (evaluation-locale corpus family)", 
   });
 });
 
-describe("render across every renderable getResult case", () => {
+describe("render across every renderable getResult case", { skip: corpusSkip }, () => {
   it("matches the corpus translation wherever this module covers the entry", () => {
     let rendered = 0;
     /** @type {string[]} */
@@ -403,7 +421,7 @@ describe("render across every renderable getResult case", () => {
  * skipped an unselectable branch, or stringified a value it should have rejected passes every
  * positive gate and fails only here.
  */
-describe("resolution failures the corpus records must also fail here", () => {
+describe("resolution failures the corpus records must also fail here", { skip: corpusSkip }, () => {
   // The three default-budget cases USED to be excluded here, on the grounds that
   // `maximumInterpolatedOutputCharacters` and `maximumGeneratedExpansionCharacters` lived on
   // `TranslationRuntimeLimits` and not on `RenderContext`. M7 C1 put all three budgets in this

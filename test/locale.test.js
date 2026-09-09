@@ -12,7 +12,7 @@
  */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
@@ -27,8 +27,30 @@ import {
 import { canonicalLanguageTag } from "../src/internal/locale-cldr.js";
 import { javaSplit, jdkLanguageTag } from "../src/internal/locale-jdk-tag.js";
 
-const corpus = JSON.parse(readFileSync(
-	new URL("../../lokalized-spec/generated/behavioral-vectors.json", import.meta.url), "utf8"));
+/**
+ * The sibling spec checkout, guarded.
+ *
+ * This read used to be BARE, so a clone without `../lokalized-spec` did not skip — it CRASHED the
+ * whole file, and with it every self-contained test in it. CI hit exactly that. The other corpus
+ * gates in this suite already guard the read and skip; these five did not, which is why five files
+ * died while forty tests reported a tidy `# SKIP`.
+ *
+ * Skipping is only half the answer, and on its own it is the failure mode this project keeps
+ * relearning: a suite that quietly shrinks has stopped gating. CI therefore checks out
+ * `lokalized-spec` AND fails when ANY test skips, so the skip below can only ever be a local
+ * convenience, never a green CI run that verified nothing.
+ */
+let corpus = null;
+try {
+  corpus = JSON.parse(
+    readFileSync(new URL("../../lokalized-spec/generated/behavioral-vectors.json", import.meta.url), "utf8"),
+  );
+} catch {
+  // Sibling spec checkout not present.
+}
+const corpusSkip = corpus
+  ? false
+  : "behavioral vectors not found at ../lokalized-spec/generated/behavioral-vectors.json";
 
 /** Corpus enum values are Java's; the JS contract uses kebab-lower. */
 const MATCH_TYPES = /** @type {const} */ ({
@@ -325,7 +347,7 @@ function driveMatch(testCase, expected) {
 	}];
 }
 
-describe("matchFor against the corpus", () => {
+describe("matchFor against the corpus", { skip: corpusSkip }, () => {
 	/** @type {any[]} */
 	const cases = corpus.cases.filter((/** @type {any} */ testCase) =>
 		testCase.operation === "matchFor" && typeof testCase.input.locale === "string");
@@ -453,7 +475,7 @@ describe("matchFor against the corpus", () => {
 	});
 });
 
-describe("candidateChain against the corpus", () => {
+describe("candidateChain against the corpus", { skip: corpusSkip }, () => {
 	/** @type {any[]} */
 	const cases = corpus.cases.filter((/** @type {any} */ testCase) =>
 		testCase.operation === "getResult" && Array.isArray(testCase.expected?.result?.attemptedLocales));
@@ -539,7 +561,15 @@ describe("candidateChain against the corpus", () => {
 	});
 });
 
-describe("the inlined IANA language-range equivalence table", () => {
+// A DIFFERENT spec artifact from the corpus above, so it needs its own guard: `corpusSkip` covers
+// `behavioral-vectors.json` and says nothing about the pinned IANA registry.
+const ianaRegistryPath = new URL(
+	"../../lokalized-spec/generated/iana-language-range-equivalents.json", import.meta.url);
+const ianaSkip = existsSync(ianaRegistryPath)
+	? false
+	: "pinned IANA registry not found at ../lokalized-spec/generated/iana-language-range-equivalents.json";
+
+describe("the inlined IANA language-range equivalence table", { skip: ianaSkip }, () => {
 	it("matches the spec's pinned registry, restricted to normalized tags", () => {
 		const registry = JSON.parse(readFileSync(new URL(
 			"../../lokalized-spec/generated/iana-language-range-equivalents.json", import.meta.url), "utf8"));
