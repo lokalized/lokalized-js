@@ -36,19 +36,33 @@ import java.util.Locale.LanguageRange;
  *   <li>THE INGRESS. {@code LocaleUtils.requireWellFormed} is called at 24 CALL SITES in this
  *       library outside {@code LocaleUtils} itself, carrying 15 DISTINCT diagnostic descriptions —
  *       measured, correcting an earlier "ten sites with ten descriptions" here that made this probe
- *       space look more complete than it is. FOUR of them produce the refusals this tool can
- *       observe, and all four are driven here: the per-call {@code Locale override}
- *       ({@code TranslationOptions.java:73/310}), the ambient {@code localeSupplier result}
- *       ({@code DefaultStrings.java:2457}), the matcher's {@code Requested locale}
- *       ({@code LocaleMatcher.java:64}), and the walk's own {@code Attempted locale}
- *       ({@code TranslationResult.java:116}, {@code MissingTranslationException.java:153}). FIVE
- *       MORE sit on a lookup's path and stay silent in Java ONLY because an ingress check fires
- *       first — {@code TranslationResult.java:109} and {@code :111},
- *       {@code MissingTranslationException.java:146}, and {@code LocaleMatchResult.java:97} and
- *       {@code :117} — so a port WITHOUT the ingress checks has five further Java diagnostics that
- *       could surface where Java's never do. Probing only the per-call ingress would have gated one
- *       of the four observable sites and said nothing about the others — the "probe space derived
- *       from the thing under test" trap, at ingress rather than at tag level.
+ *       space look more complete than it is. TEN of them produce refusals this tool can observe,
+ *       and all ten are driven here — {@code run.mjs}'s {@code DESCRIPTIONS} is the closed list and
+ *       this comment must not restate a shorter one. FOUR are on the lookup/matcher axis: the
+ *       per-call {@code Locale override} ({@code TranslationOptions.java:73/310}), the ambient
+ *       {@code localeSupplier result} ({@code DefaultStrings.java:2457}), the matcher's
+ *       {@code Requested locale} ({@code LocaleMatcher.java:64}), and the walk's own
+ *       {@code Attempted locale} ({@code TranslationResult.java:116},
+ *       {@code MissingTranslationException.java:153}). THREE are at CONSTRUCTION
+ *       ({@code DefaultStrings.java:248}, {@code :276}, {@code :347}) and THREE at INSPECTION
+ *       ({@code :2713}, {@code :2735}, {@code :2736}), driven by the {@code illformed-*} catalog
+ *       sets and by the four keyless inspection shapes respectively.
+ *       <p>THREE MORE SIT ON A LOOKUP'S PATH AND STAY SILENT IN JAVA only because an ingress check
+ *       fires first — {@code TranslationResult.java:109} and {@code :111}, and
+ *       {@code MissingTranslationException.java:146} — so a port WITHOUT the ingress checks has
+ *       three further Java diagnostics that could surface where Java's never do.
+ *       <p>{@code LocaleMatchResult.java:97} AND {@code :117} WERE LISTED HERE AS SILENT AND THAT WAS
+ *       TRUE OF A LOOKUP AND FALSE OF THE CLASS. That constructor is PUBLIC and documented as public
+ *       ({@code LocaleMatchResult.java:65-80}), so {@code Selected locale}, {@code Fallback locale}
+ *       ({@code :101}) and {@code Considered locale} are caller-facing through it and through the
+ *       port's {@code forLocaleMatch} / {@code localeMatchResolver} / per-call {@code localeMatch}
+ *       surfaces. The port had NO counterpart for any of the three until 2026-09-09 and accepted all
+ *       three ill-formed inputs. This tool still does not drive them — it has no supplied-match
+ *       shape — and saying so is the point: probing only the per-call ingress would have gated one
+ *       of the four observable sites and said nothing about the others, which is the "probe space
+ *       derived from the thing under test" trap at ingress rather than at tag level, and the
+ *       supplied-match surface is where that trap bit a second time. {@code
+ *       test/supplied-match-ingress.test.js} is its whole enforcement.
  *       <p>THE AXIS NOW HAS THREE MEMBERS, NOT TWO. It had two — per-call and ambient — while the
  *       third observable site, {@code LocaleMatcher.java:64}'s {@code Requested locale}, sat outside
  *       the probe space and was named in this tool's own defect entry as unprobed. It is reached by
@@ -73,9 +87,14 @@ import java.util.Locale.LanguageRange;
  * <p>Output is TSV: one {@code C} line per catalog set recording whether it CONSTRUCTED and, when it
  * did not, the refusal's fully-qualified class and message — a set Java refuses and the port accepts
  * (or the reverse) is a defect in its own right and must never be silently skipped, and a set both
- * sides refuse for DIFFERENT reasons is one too. Then one {@code P} line per probe carrying SEVEN
- * six-field outcomes: the cross of three keys and the two lookup ingresses, then the keyless matcher
- * ingress.
+ * sides refuse for DIFFERENT reasons is one too. Then one {@code P} line per probe carrying ELEVEN
+ * SEVEN-field outcomes: the cross of three keys and the two lookup ingresses, then the keyless
+ * matcher ingress, then the four inspection ingresses.
+ *
+ * <p>THE SEVENTH FIELD IS THE CALL TRACE and it is new — the outcomes were six fields until
+ * 2026-09-09, and six fields are an OUTCOME. See {@link #TRACE} for the measurement that says an
+ * outcome is not enough: two libraries reached the same refusal for {@code en-x-lvariant-NY} by
+ * running a walk and by never starting one, and every field this oracle printed agreed.
  *
  * <p>CONSTRUCTION IS AN INGRESS AXIS IN ITS OWN RIGHT, and it was blind until it carried its
  * reason. Java validates {@code Fallback locale} ({@code Strings.java:211},
@@ -86,6 +105,21 @@ import java.util.Locale.LanguageRange;
  * anyway, because it breaks the exact-permutation rule. Measured — deleting the port's fallback
  * check left this differential GREEN. Only the message says which of the two libraries is answering
  * the question that was asked.
+ *
+ * <p>AND UNTIL 2026-09-09 THAT MEASUREMENT STILL STOOD, because the fix had been made on this side
+ * only: the class and message were emitted in separate fields here and {@code run.mjs} kept the
+ * class, dropped the message, and compared the BUILT/REFUSED boolean. The refusal is now compared
+ * through the same {@code agree} and {@code KNOWN_DIVERGENCES} machinery a lookup's is, and the
+ * three ablations that delete one construction check each are all caught — one as a set the port
+ * BUILDS and Java refuses, two as construction rows whose port message names the wrong check. A fix
+ * to the oracle half of a differential is half a fix.
+ *
+ * <p>ONE MORE TRAP LIVED IN THE CATALOG SETS THEMSELVES, and it is the {@code zh-123} shape inside
+ * the probe space built to gate {@code :276}: catalogs were parsed by
+ * {@code LocalizedStringLoader.parse(stream, locale, name)}, which validates its own locale argument
+ * at {@code LocalizedStringLoader.java:1165} with the description {@code "Locale"} — so the
+ * {@code illformed-catalog} set was refused by the LOADER and never reached {@code :276}. Both
+ * sides refused, the boolean matched, and the set proved nothing. See {@code parseLocaleFor}.
  */
 public class LookupDiff {
   /** The key every catalog defines, so the walk is decided by locale and never by a missing key. */
@@ -111,11 +145,90 @@ public class LookupDiff {
    */
   static Locale ambient = Locale.forLanguageTag("und");
 
+  /**
+   * A WELL-FORMED locale no catalog set loads, used as the SOURCE of the inspection ordering probe.
+   *
+   * <p>It is what turns {@code getMissingKeys} into a test of Java's CHECK ORDER rather than of its
+   * refusals: {@code :2735} and {@code :2736} validate BOTH locales for well-formedness before
+   * {@code :2738} asks whether the source is supported, so {@code getMissingKeys(de, en__NY)} must
+   * answer about the TARGET's well-formedness and not about the source's absence. A port that
+   * resolved source-then-target answers the other one, and no boolean anywhere else can see it.
+   */
+  static final Locale UNSUPPORTED_PROBE = Locale.forLanguageTag("de");
+
+  /**
+   * A locale that is ILL-FORMED as a {@code Locale} — {@code de__XX}, whose two-character variant
+   * {@code Locale.Builder} will not take back — used as the TARGET of the source-first probe.
+   *
+   * <p>It is what separates {@code :2735} from {@code :2736}. With one ill-formed argument either
+   * check could be the one that answered; with the PROBE TAG in the source role and this constant in
+   * the target role, a tag that is itself ill-formed must answer about the SOURCE and every other
+   * tag must answer about the TARGET. Deleting the source check alone leaves both answers naming
+   * the target, and nothing else in this tool can see it — measured.
+   */
+  static final Locale ILL_FORMED_PROBE = Locale.forLanguageTag("de-x-lvariant-XX");
+
+  /**
+   * THE CALL TRACE — what the {@code TranslationFallbackPolicy} and the
+   * {@code TranslationFailureHandler} were actually handed, in order, for the probe currently
+   * running.
+   *
+   * <p>WHY IT EXISTS. The six outcome fields this oracle printed before are an OUTCOME, and two
+   * libraries can reach the same outcome by running completely different walks. That is not
+   * hypothetical here — it is how the ingress defect hid: for {@code en-x-lvariant-NY} Java records
+   * NO calls at all, because {@code TranslationOptions.Builder#locale} refuses at
+   * {@code TranslationOptions.java:310} and the walk never starts, while the port ran a whole walk
+   * with five callback invocations and then refused from inside it. Both refused, both raised the
+   * same class, both carried the same sentence, and {@code run.mjs}'s {@code agree} was therefore
+   * clean. The walk was observable and nothing observed it.
+   *
+   * <p>RECORDED ON EVERY INSTANCE, not only the throwing ones. A policy that DELEGATES to
+   * {@code fallbackOnMissingTranslationOrNoMatchingAlternative()} and a handler that returns
+   * {@code returnKey()} are behaviourally identical to the defaults {@code DefaultStrings:472-475}
+   * installs when neither is supplied, so the trace is a pure observation: every outcome field this
+   * oracle emitted before these callbacks existed is unchanged, which was verified by running the
+   * differential across the change.
+   *
+   * <p>THE ENCODING is one entry per call, {@code ;}-joined, each entry {@code |}-separated:
+   *
+   * <pre>
+   *   P|REASON|attemptedLocale.toLanguageTag()|causeClass
+   *   H|REASON|lookupLocale.toLanguageTag()|attempted~attempted~…|causeClass
+   * </pre>
+   *
+   * <p>with {@code -} for an absent cause and for an empty attempted list. The CAUSE CLASS is the
+   * one field {@code run.mjs} may not compare verbatim — JavaScript cannot spell
+   * {@code java.lang.IllegalArgumentException} — so it travels fully qualified and is compared
+   * through the same {@code ERROR_NAME} table a thrown outcome's class is. Every other field is
+   * compared byte for byte.
+   */
+  static final List<String> TRACE = new ArrayList<>();
+
+  /**
+   * Runs one probe with a FRESH trace and appends the trace as the outcome's seventh field.
+   *
+   * <p>The clear happens here rather than inside each probe method so that a probe that throws
+   * before it records anything still emits an empty trace rather than the previous probe's — which
+   * is the exact observation that matters, since {@code calls=[]} is the evidence an ingress check
+   * fired before the walk started.
+   */
+  static String traced(java.util.function.Supplier<String> probe) {
+    TRACE.clear();
+    String outcome = probe.get();
+    return outcome + "\t" + (TRACE.isEmpty() ? "-" : String.join(";", TRACE));
+  }
+
+  /** A cause's fully-qualified class, or {@code -}. See {@link #TRACE} for why it is not simplified. */
+  static String causeOf(Throwable cause) {
+    return cause == null ? "-" : cause.getClass().getName();
+  }
+
   public static void main(String[] args) throws Exception {
     List<String> lines = Files.readAllLines(Paths.get(args[0]), StandardCharsets.UTF_8);
 
     Map<String, Strings> perCall = new LinkedHashMap<>();
     Map<String, Strings> viaAmbient = new LinkedHashMap<>();
+    Map<String, Locale> fallbackBySet = new LinkedHashMap<>();
     StringBuilder out = new StringBuilder();
 
     for (String line : lines) {
@@ -129,6 +242,7 @@ public class LookupDiff {
           // reads the mutable cell. Two instances rather than one, because a `localeSupplier` that
           // ignored the cell would silently turn the ambient axis into a copy of the per-call one.
           Locale instance = Locale.forLanguageTag(f[3]);
+          fallbackBySet.put(name, Locale.forLanguageTag(f[2]));
           perCall.put(name, buildStrings(f[2], f[4], f[5], f[6], matcher -> instance));
           viaAmbient.put(name, buildStrings(f[2], f[4], f[5], f[6], matcher -> ambient));
           out.append("C\t").append(name).append("\tBUILT\t-\t-\n");
@@ -167,12 +281,22 @@ public class LookupDiff {
       row.append("P\t").append(setName).append('\t').append(f[2]).append('\t').append(wellFormed);
 
       for (String key : new String[] {KEY_EVERYWHERE, KEY_SPARSE, KEY_ABSENT}) {
-        row.append('\t').append(direct == null ? noSet() : perCall(direct, key, tag));
-        row.append('\t').append(indirect == null ? noSet() : ambient(indirect, key, tag));
+        row.append('\t').append(direct == null ? noSet() : traced(() -> perCall(direct, key, tag)));
+        row.append('\t').append(indirect == null ? noSet() : traced(() -> ambient(indirect, key, tag)));
       }
 
       // THE THIRD INGRESS, and it takes no key because it performs no lookup. See `matcher`.
-      row.append('\t').append(direct == null ? noSet() : matcher(direct, tag));
+      row.append('\t').append(direct == null ? noSet() : traced(() -> matcher(direct, tag)));
+
+      // THE FOURTH INGRESS — inspection. FOUR outcomes rather than one, because the three Java
+      // sites ask different questions and two of them are questions about ORDER. See `keysFor`,
+      // `missingFrom`, `missingInto` and `missingSourceFirst` — the last added after this comment
+      // was written, which is why it said "three" until 2026-09-09.
+      Locale fallback = fallbackBySet.get(setName);
+      row.append('\t').append(direct == null ? noSet() : traced(() -> keysFor(direct, tag)));
+      row.append('\t').append(direct == null ? noSet() : traced(() -> missingFrom(direct, tag, fallback)));
+      row.append('\t').append(direct == null ? noSet() : traced(() -> missingInto(direct, tag)));
+      row.append('\t').append(direct == null ? noSet() : traced(() -> missingSourceFirst(direct, tag)));
 
       out.append(row).append('\n');
     }
@@ -180,8 +304,9 @@ public class LookupDiff {
     System.out.print(out);
   }
 
+  /** Seven fields, like every traced outcome: the six of the outcome plus an empty trace. */
   static String noSet() {
-    return "NOSET\t-\t-\t-\t-\t-";
+    return "NOSET\t-\t-\t-\t-\t-\t-";
   }
 
   /** The per-call ingress: `TranslationOptions.Builder#locale`, which validates at :310. */
@@ -249,6 +374,88 @@ public class LookupDiff {
     }
   }
 
+  /**
+   * THE INSPECTION INGRESS, part 1 — {@code Strings#getKeysForLocale(Locale)}, whose first statement
+   * is {@code requireWellFormed(locale, "Locale")} ({@code DefaultStrings.java:2713}).
+   *
+   * <p>ADDED BECAUSE NOTHING ANYWHERE DROVE IT. The construction and lookup ingresses were both
+   * probed here before inspection was, and inspection is the surface where Java's ORDER — validate,
+   * then test support — is observable at all: {@code getKeysForLocale(en__NY)} answers
+   * {@code Locale 'en__NY' is not a well-formed IETF BCP 47 locale} where a locale that is merely
+   * absent answers {@code Locale 'de' is not supported}. Measured on the pinned Corretto 21 before
+   * this shape existed; the port answered the SUPPORT sentence to both, and no gate in either
+   * repository could see it — no corpus row reaches an inspection call, and this differential drove
+   * lookups only. It goes in THIS tool for the reason the matcher ingress did: same instance, same
+   * catalog sets, same tag sweep, same staleness gate.
+   *
+   * <p>SIX FIELDS like every other outcome. A key set is a sorted list of short identifiers, so it
+   * fits one field and the remaining four are padding rather than information.
+   */
+  static String keysFor(Strings strings, String tag) {
+    try {
+      return "KEYS\t" + join(strings.getKeysForLocale(Locale.forLanguageTag(tag))) + "\t-\t-\t-\t-";
+    } catch (Throwable t) {
+      return thrown(t);
+    }
+  }
+
+  /**
+   * THE INSPECTION INGRESS, part 2 — the probe tag in the SOURCE role of
+   * {@code getMissingKeys(source, target)} ({@code DefaultStrings.java:2735}, "Source locale").
+   *
+   * <p>The target is the set's own FALLBACK locale, which every set loads, so the target half can
+   * never be what refuses and any refusal here is attributable to the source.
+   */
+  static String missingFrom(Strings strings, String tag, Locale fallback) {
+    try {
+      return "MISSING\t" + join(strings.getMissingKeys(Locale.forLanguageTag(tag), fallback))
+          + "\t-\t-\t-\t-";
+    } catch (Throwable t) {
+      return thrown(t);
+    }
+  }
+
+  /**
+   * THE INSPECTION INGRESS, part 3 — the probe tag in the TARGET role, against a source that is
+   * well-formed and UNSUPPORTED ({@code DefaultStrings.java:2736}, "Target locale").
+   *
+   * <p>THIS IS THE ORDER PROBE, not a third copy of the second. Java validates both locales before
+   * it tests either for support, so for a tag denoting an ill-formed {@code Locale} the answer must
+   * name the TARGET's well-formedness even though the SOURCE is already known to be unsupported;
+   * for every other tag it must name the source's absence. One shape, and the partition between its
+   * two answers IS the check order. See {@code UNSUPPORTED_PROBE}.
+   */
+  static String missingInto(Strings strings, String tag) {
+    try {
+      return "MISSING\t" + join(strings.getMissingKeys(UNSUPPORTED_PROBE, Locale.forLanguageTag(tag)))
+          + "\t-\t-\t-\t-";
+    } catch (Throwable t) {
+      return thrown(t);
+    }
+  }
+
+  /**
+   * THE INSPECTION INGRESS, part 4 — the probe tag in the SOURCE role against a target that is
+   * itself ill-formed ({@code ILL_FORMED_PROBE}).
+   *
+   * <p>THE ORDER OF THE TWO WELL-FORMEDNESS CHECKS, which part 3 cannot see: {@code :2735} runs
+   * before {@code :2736}, so a tag denoting an ill-formed {@code Locale} answers about the SOURCE
+   * even though the target is ill-formed too, and every other tag answers about the TARGET.
+   */
+  static String missingSourceFirst(Strings strings, String tag) {
+    try {
+      return "MISSING\t" + join(strings.getMissingKeys(Locale.forLanguageTag(tag), ILL_FORMED_PROBE))
+          + "\t-\t-\t-\t-";
+    } catch (Throwable t) {
+      return thrown(t);
+    }
+  }
+
+  /** A key set, in the order the member returned it — Java's {@code TreeSet} order. */
+  static String join(Set<String> keys) {
+    return keys.isEmpty() ? "-" : String.join(",", keys);
+  }
+
   static String describe(TranslationResult r) {
     List<String> attempted = new ArrayList<>();
     for (Locale locale : r.getAttemptedLocales()) attempted.add(locale.toLanguageTag());
@@ -266,6 +473,23 @@ public class LookupDiff {
     return "THROWN\t" + t.getClass().getName() + "\t" + flatten(t.getMessage()) + "\t-\t-\t-";
   }
 
+  /**
+   * A locale the LOADER will accept, for parsing a catalog whose KEY is deliberately ill-formed.
+   *
+   * <p>The language and region are kept and only the unrepresentable variant is dropped, so the
+   * parsed strings are validated under the same plural rules the caller's locale would have used.
+   * The map is still keyed by the caller's own locale, which is the input {@code DefaultStrings:276}
+   * is being asked about.
+   */
+  static Locale parseLocaleFor(Locale locale) {
+    try {
+      new Locale.Builder().setLocale(locale).build();
+      return locale;
+    } catch (RuntimeException e) {
+      return new Locale.Builder().setLanguage(locale.getLanguage()).setRegion(locale.getCountry()).build();
+    }
+  }
+
   static Strings buildStrings(String fallbackTag, String tiebreakerSpec, String handlerSpec,
       String catalogSpec, java.util.function.Function<LocaleMatcher, Locale> localeSupplier) {
     Map<Locale, Set<LocalizedString>> byLocale = new LinkedHashMap<>();
@@ -273,8 +497,15 @@ public class LookupDiff {
       String[] parts = catalog.split("::", 2);
       Locale locale = Locale.forLanguageTag(parts[0]);
       byte[] bytes = Base64.getDecoder().decode(parts[1]);
-      byLocale.put(locale,
-          LocalizedStringLoader.parse(new ByteArrayInputStream(bytes), locale, "catalog:" + parts[0]));
+      // PARSED UNDER A WELL-FORMED LOCALE, KEYED BY THE CALLER'S. `LocalizedStringLoader.parse`
+      // validates its own locale argument (`LocalizedStringLoader.java:1165`, description "Locale"),
+      // so parsing under the ill-formed key made the `illformed-catalog` set refuse at the LOADER
+      // and never reach `DefaultStrings:276` at all — the `zh-123` shape, inside the probe space
+      // built to gate that site. MEASURED: before this line Java answered `Locale 'en__NY' is not a
+      // well-formed IETF BCP 47 locale` there and the port answered `Localized strings locale
+      // '…'`, two different sites reading as one refusal while the run compared only BUILT/REFUSED.
+      byLocale.put(locale, LocalizedStringLoader.parse(
+          new ByteArrayInputStream(bytes), parseLocaleFor(locale), "catalog:" + parts[0]));
     }
 
     Strings.Builder builder = Strings.withFallbackLocale(Locale.forLanguageTag(fallbackTag))
@@ -297,8 +528,30 @@ public class LookupDiff {
     // (`MissingTranslationException.java:153`) runs the same attempted-locale validation. So a
     // throwing handler reaches a validation site the default handler never does, and a differential
     // that only ever used the default handler would gate two of the three sites and call it three.
-    if (handlerSpec.equals("throw"))
-      builder = builder.translationFailureHandler(failure -> TranslationFailureResponse.throwException());
+    //
+    // BOTH CALLBACKS ARE NOW ALWAYS INSTALLED, and both are RECORDING DELEGATES rather than
+    // behaviour changes. The policy answers exactly what
+    // `fallbackOnMissingTranslationOrNoMatchingAlternative()` answers — the default
+    // `DefaultStrings:473-475` installs when none is supplied — and the handler answers exactly what
+    // `returnKey()` answers (`:472`), except on the sets whose whole purpose is the throwing path.
+    // See `TRACE`: the walk is the observation, and a differential that compares only the outcome
+    // cannot see two libraries reaching one outcome by two different walks.
+    boolean throwing = handlerSpec.equals("throw");
+
+    builder = builder
+        .translationFallbackPolicy((reason, attemptedLocale, cause) -> {
+          TRACE.add("P|" + reason + "|" + attemptedLocale.toLanguageTag() + "|" + causeOf(cause));
+          return reason != TranslationFailureReason.RESOLUTION_FAILURE;
+        })
+        .translationFailureHandler(failure -> {
+          List<String> attempted = new ArrayList<>();
+          for (Locale locale : failure.getAttemptedLocales()) attempted.add(locale.toLanguageTag());
+          TRACE.add("H|" + failure.getReason()
+              + "|" + failure.getLookupLocale().toLanguageTag()
+              + "|" + (attempted.isEmpty() ? "-" : String.join("~", attempted))
+              + "|" + causeOf(failure.getCause().orElse(null)));
+          return throwing ? TranslationFailureResponse.throwException() : TranslationFailureResponse.returnKey();
+        });
 
     return builder.build();
   }

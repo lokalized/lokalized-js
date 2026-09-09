@@ -21,7 +21,29 @@
  *   no tag-layer differential can reach.
  *
  * So a differential that compares tags cannot, in principle, gate the clause. This one compares
- * outcomes.
+ * outcomes AND WALKS.
+ *
+ * IT COMPARED ONLY OUTCOMES UNTIL 2026-09-09, and its own docblock said so rather than assuming
+ * otherwise: "a port that matched Java's OUTCOME while running a different walk would show 0
+ * unexplained in this tool". That was not a hypothetical. It is exactly how the ingress defect hid —
+ * for `en-x-lvariant-NY` Java records `calls=[]`, because `TranslationOptions.Builder#locale`
+ * refuses at `TranslationOptions.java:310` and the walk is never entered, while the port ran a whole
+ * walk with FIVE callback invocations and then refused from inside it. Both refused, both raised the
+ * mapped class, both carried the same sentence, and this tool reported agreement. **The walk is
+ * observable and it was not being observed.**
+ *
+ * EVERY OUTCOME NOW CARRIES A SEVENTH FIELD: the `fallbackPolicy` consultations and the `onFailure`
+ * invocation, in order, with their reasons, locales, attempted lists and cause classes. Both sides
+ * install RECORDING DELEGATES of the library defaults — `fallbackOnMissingTranslationOrNoMatching
+ * Alternative()` / `returnKey()` in Java, their exact port counterparts here — so the channel
+ * observes the walk without steering it. That claim is measured rather than argued: across the
+ * change every outcome number this tool prints is byte-identical (320,234/520,597 identical,
+ * 200,366 declared, 0 unexplained, 7/10 construction, 2,156 ill-formed refused).
+ *
+ * A DIVERGENCE RULE CANNOT ABSORB A TRACE DIFFERENCE — `KNOWN_DIVERGENCES` is consulted only for
+ * rows whose traces already agree. Every rule in the table argues about wording or an error class
+ * and none of them has anything to say about which callbacks ran, so letting one explain a
+ * different WALK would be the widening this file's own tables exist to prevent.
  *
  * THE CATALOG SET IS PART OF THE INPUT. This is the design constraint, and it was measured rather
  * than assumed. On the pinned Corretto 21:
@@ -63,13 +85,29 @@
  * `Resolved locale`, `Requested locale`, `Localized strings locale`, `Locale key`,
  * `Considered locale`.
  *
- * FOUR OF THEM PRODUCE THE REFUSALS THIS TOOL CAN OBSERVE, and all four are DRIVEN here:
+ * TEN OF THEM PRODUCE REFUSALS THIS TOOL CAN OBSERVE, and all ten are DRIVEN here. It said FOUR
+ * until 2026-09-09, and the six that were missing are not an oversight in this list — they are the
+ * six a LOOKUP cannot reach, which is a different question from the one this list is supposed to
+ * answer. Confusing the two is the trap this file's own header warns about, one axis over: the four
+ * were how many sites the probe space observed, not how many sites Java has.
  *
  *   `TranslationOptions.java:73/310`        "Locale override"        the per-call `{ locale }`
  *   `DefaultStrings.java:2457`              "localeSupplier result"  the ambient locale
  *   `LocaleMatcher.java:64`                 "Requested locale"       `matchFor(Locale)`
  *   `TranslationResult.java:116` and
  *     `MissingTranslationException.java:153` "Attempted locale"      the synthesized chain
+ *   `Strings.java:211`, `DefaultStrings.java:248`
+ *                                           "Fallback locale"           construction
+ *   `DefaultStrings.java:276`               "Localized strings locale"  construction
+ *   `DefaultStrings.java:347`               "Tiebreaker locale"         construction
+ *   `DefaultStrings.java:2713`              "Locale"                    `getKeysForLocale`
+ *   `DefaultStrings.java:2735`              "Source locale"             `getMissingKeys`
+ *   `DefaultStrings.java:2736`              "Target locale"             `getMissingKeys`
+ *
+ * The three CONSTRUCTION sites are reached by the `illformed-*` catalog sets and compared on the
+ * `C` line; the three INSPECTION sites by the four keyless inspection shapes in `PROBE_SHAPES`.
+ * Neither group was compared before 2026-09-09 — the construction sets existed and the run threw
+ * their refusal away, and inspection had no shape at all.
  *
  * The first three are INGRESS checks a caller's own locale meets before resolution begins; the
  * fourth validates locales the WALK synthesized. `LocaleMatcher.java:64` is unreachable through a
@@ -77,14 +115,27 @@
  * their own ingress check has passed — so it needs the keyless `matcher` shape in `PROBE_SHAPES`,
  * and nothing else in this tool reaches it.
  *
- * FIVE MORE ARE ON A LOOKUP'S PATH AND UNREACHABLE ONLY BECAUSE AN INGRESS CHECK FIRES FIRST —
- * `TranslationResult.java:109` ("Lookup locale") and `:111` ("Resolved locale"),
- * `MissingTranslationException.java:146` ("Lookup locale"), and `LocaleMatchResult.java:97` /
- * `:117` ("Selected locale" / "Considered locale"). They stay silent because an ingress check fires
- * first, which is why the port's ingress checks are not a diagnostic nicety: a port without them has
- * five further Java diagnostics that could surface where Java's never do.
- * `LocaleMatchResult.java:101` ("Fallback locale") is a sixth on the same path, pre-empted instead
- * by `DefaultStrings.java:248` at construction.
+ * THREE MORE ARE ON A LOOKUP'S PATH AND UNREACHABLE ONLY BECAUSE AN INGRESS CHECK FIRES FIRST —
+ * `TranslationResult.java:109` ("Lookup locale") and `:111` ("Resolved locale"), and
+ * `MissingTranslationException.java:146` ("Lookup locale"). They stay silent because an ingress
+ * check fires first, which is why the port's ingress checks are not a diagnostic nicety: a port
+ * without them has three further Java diagnostics that could surface where Java's never do.
+ *
+ * `LocaleMatchResult.java:97` / `:101` / `:117` ("Selected locale" / "Fallback locale" / "Considered
+ * locale") WERE LISTED ABOVE AS TWO MORE OF THAT KIND, AND THAT WAS TRUE OF A LOOKUP AND FALSE OF
+ * THE CLASS. A lookup does pre-empt them; the constructor is nevertheless PUBLIC and documented as
+ * public (`LocaleMatchResult.java:65-80`, "This is public so custom LocaleMatcher implementations
+ * can expose the same diagnostics"), so all three are caller-facing through it — and through the
+ * port's `forLocaleMatch`, `localeMatchResolver` and per-call `{ localeMatch }`. THE PORT ACCEPTED
+ * ALL THREE ILL-FORMED INPUTS until 2026-09-09.
+ *
+ * THIS TOOL IS STRUCTURALLY BLIND TO THEM and stays so: it has no SUPPLIED-MATCH shape, only lookup,
+ * matcher, construction and inspection ones, and a lookup can never reach a caller-built
+ * `LocaleMatchResult`. That is recorded here rather than fixed because the alternative — letting the
+ * instrument's reach decide the scope of the fix — is the exact failure this file's own defect entry
+ * names one axis over. `test/supplied-match-ingress.test.js` is the enforcement; if a supplied-match
+ * shape is ever added here, `DESCRIPTIONS` below gains "Selected locale" and "Considered locale"
+ * (identities both), and not before — an entry nothing can match explains nothing.
  *
  * A differential that drove only the per-call ingress would gate one of the four observable sites
  * and say nothing about the others — the same "a probe space derived from the thing under test is
@@ -108,10 +159,15 @@
  *
  * PROVEN TO GO RED, by ablation rather than by argument. Each row below was measured by patching the
  * named file, running this tool, and restoring the file; every one was caught, and none by a
- * neighbouring rule. RE-MEASURED IN FULL when the matcher ingress landed, because the baseline
- * moved: the run now compares 331,289 well-formed rows rather than 283,962, and every number in the
- * table below is from the new probe space. Baseline for comparison: exit 0, 0 unexplained, 11,201
- * declared, 0 open port defects.
+ * neighbouring rule.
+ *
+ * TWO TABLES, BECAUSE THE PROBE SPACE MOVED TWICE AND A SINGLE TABLE WOULD BE HALF STALE. The first
+ * seven rows were measured against the 331,289-row space the matcher ingress produced; the six new
+ * rows against today's 520,597-row space (11 shapes, and the `C` line comparing refusals rather
+ * than a boolean). What carries across a space change is the DIRECTION — every one of these
+ * ablations is still caught — and not the count, so the counts are dated rather than restated.
+ *
+ * Baseline for the FIRST table: exit 0, 0 unexplained, 11,201 declared, 0 open port defects.
  *
  *   | ablation                                                        | unexplained | exit |
  *   |---|---:|---|
@@ -140,6 +196,84 @@
  * fourth rows are there because a differential that only ever caught refusals would be a refusal
  * differential; `isFallback` and the tiebreaker election are ordinary result fields with no
  * exception anywhere near them.
+ *
+ * THE SECOND TABLE — 2026-09-09, the construction and inspection ingresses. Baseline: exit 0,
+ * 0 unexplained, 200,366 declared, 7/10 construction outcomes identical, 2,156 ill-formed refused.
+ * Every ablation deletes ONE `requireJdkWellFormedLocale` call in `src/core/index.js` and leaves
+ * every other check standing; each is paired in `npm test` with controls that must stay GREEN, and
+ * they did.
+ *
+ *   | ablation (one deleted check)          | what this tool reports              | npm test |
+ *   |---|---|---|
+ *   | `Fallback locale` (:248)              | 1 unexplained, construction row:    | 2 fail   |
+ *   |                                       | the port names the missing catalog  |          |
+ *   | `Localized strings locale` (:276)     | CATALOG SET DISAGREEMENT: js BUILT  | 2 fail   |
+ *   | `Tiebreaker locale` (:347)            | 1 unexplained, construction row:    | 3 fail   |
+ *   |                                       | the port names the permutation      |          |
+ *   | `Locale` (:2713, getKeysForLocale)    | 1,547 unexplained, all inspect-keys  | 1 fail  |
+ *   | `Source locale` (:2735)               | 1,547 unexplained, all              | 1 fail   |
+ *   |                                       | inspect-missingSourceFirst          |          |
+ *   | `Target locale` (:2736)               | 47,254 unexplained (45,707 inspect- | 1 fail   |
+ *   |                                       | missingSourceFirst + 1,547 inspect- |          |
+ *   |                                       | missingInto) + 196 ill-formed       |          |
+ *   |                                       | WRONGLY ACCEPTED                    |          |
+ *
+ * THE `Target locale` CELL READ "1,547 unexplained (inspect-missingInto)" UNTIL A REVIEWER RERAN IT,
+ * and the error is this table's own subject one axis over: 1,547 was measured against the TEN-shape
+ * space, before `missingSourceFirst` was added, while the header above says all six rows were
+ * measured against today's eleven-shape / 520,597-row space. A count that drifted as the instrument
+ * grew inside its own batch. The composition is read off the rule's by-ingress line: baseline
+ * `requireWellFormed-names-a-Locale-toString` consumes 63,172 rows (inspect-missingSourceFirst
+ * 47,327, inspect-missingInto 1,547); under the ablation it consumes 15,918 (inspect-
+ * missingSourceFirst 1,620, inspect-missingInto none), so 45,707 + 1,547 = 47,254 rows moved. The
+ * OTHER FIVE ROWS REPRODUCE EXACTLY, each moving only its own rows with every paired control green
+ * and `npm run conformance` unmoved at 1,960 / 0.
+ *
+ * THE `Source locale` ROW IS WHY THE FOURTH INSPECTION SHAPE EXISTS. With three shapes that
+ * ablation left this tool GREEN and only `test/inspection.test.js` red: no shape passed TWO
+ * ill-formed locales at once, so the surviving validation inside `keysForExactLocale` still named
+ * the source on every one-sided input. The hole was found by running the ablation, not by reading
+ * the code, and it was closed by widening the probe space rather than by recording it.
+ *
+ * AND THE NEW RULE IS GATED LIKE EVERY OTHER: neutering
+ * `inspection-unsupported-locale-follows-plan-3.3`'s Java-side regexp turns its 137,194 rows into
+ * 137,194 unexplained AND trips STALE, exit 1. Measured, not asserted.
+ *
+ * THE THIRD TABLE — 2026-09-09, THE CALL TRACE. Baseline: exit 0, 0 unexplained, 200,366 declared,
+ * 0 rows whose walks differ, and 274,136 of the 520,597 compared rows recording at least one call
+ * ON EACH SIDE — that last number is the channel's own staleness gate, since a trace comparison in
+ * which nothing was ever recorded compares `-` against `-` and reports agreement it has not earned.
+ *
+ * A COMPARISON THAT HAS NEVER FAILED IS UNPROVEN, so each row below was produced by patching
+ * `src/core/index.js`, running this tool, and restoring the file. The column that matters is the
+ * LAST one: rows the six-field outcome comparison called IDENTICAL and the trace channel does not.
+ *
+ *   | ablation (one edit to the port's walk)                | unexplained | exit | outcome-identical |
+ *   |---|---:|---|---:|
+ *   | one extra `fallbackPolicy` call on the FINAL candidate |   101,958   |  1   |      101,586      |
+ *   | the port's per-call `Locale override` ingress deleted  |     4,641   |  1   |           0       |
+ *   | the policy handed `lookupLocale`, not the candidate    |   229,396   |  1   |     229,024       |
+ *
+ * ROW 1 IS THE PROOF THE TASK ASKED FOR and it is the sharpest of the three: discarding the return
+ * value of one extra consultation leaves every outcome field untouched, and 101,586 rows this tool
+ * called identical the run before now fail. Row 3 changes a single ARGUMENT — the default policy
+ * ignores the locale, so again no outcome moves — and catches 229,024 the same way, which says the
+ * per-entry fields are compared and not merely the entry count.
+ *
+ * ROW 2 IS THE HISTORICAL DEFECT, REPRODUCED. Deleting the port's per-call ingress check restores
+ * exactly the state the ingress batch found by hand: `java trace -` against
+ * `P|MISSING_TRANSLATION|en-x-lvariant-NY|-;P|…;P|…;P|…;H|RESOLUTION_FAILURE|…`, five port calls
+ * against Java's none. Its outcome-identical column is 0 — today the DESCRIPTION diverges too, so
+ * the outcome channel catches it as well — and that is the point rather than a weakness: the two
+ * channels are independent, and the trace one reports the asymmetry directly (278,777 js rows
+ * recording a call against Java's 274,136) instead of as a wording mismatch.
+ *
+ * AND THE CHANNEL'S OWN STALENESS GATE IS NEGATIVE-TESTED, because a comparison that goes green when
+ * it stops observing anything is the failure mode every table in this repository is built against.
+ * Silencing BOTH recorders — `LookupDiff.java`'s two installs and this file's two `jsTrace.push`
+ * calls — leaves `0 row(s) whose WALKS differ`, which reads exactly like the passing baseline, and
+ * the run exits 1 printing both STALE lines on `0 java / 0 js row(s) recorded at least one call`.
+ * Silencing one side alone is caught twice over, as an asymmetry and as 274,136 differing walks.
  */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -558,6 +692,19 @@ const DESCRIPTIONS = {
   "localeSupplier result": "localeResolver result",
   "Requested locale": "Requested locale",
   "Attempted locale": "Attempted locale",
+  // CONSTRUCTION (`Strings.java:211` / `DefaultStrings.java:248`, `:276`, `:347`) and INSPECTION
+  // (`:2713`, `:2735`, `:2736`). Six more Java sites, none of which a LOOKUP can reach, and all six
+  // identities: not one of them contains a Java identifier to substitute, so the maintainer's rule
+  // — Java's SHAPE with the JS name substituted — has nothing to substitute and reproduces them
+  // verbatim. They are here rather than absent because this map is CLOSED in both directions: a
+  // refusal carrying a description this map does not know explains nothing, which is what stops a
+  // port refusing at the wrong site from reading as a naming difference.
+  "Fallback locale": "Fallback locale",
+  "Localized strings locale": "Localized strings locale",
+  "Tiebreaker locale": "Tiebreaker locale",
+  "Locale": "Locale",
+  "Source locale": "Source locale",
+  "Target locale": "Target locale",
 };
 
 const KNOWN_DIVERGENCES = [
@@ -571,15 +718,26 @@ const KNOWN_DIVERGENCES = [
       "same locale by its BCP 47 tag, which is the only spelling it speaks. EVERY OTHER CHANNEL " +
       "AGREES: the same refusal, raised at the same SITE, with the same error class, the same " +
       "sentence around the quoted name, and the same description under `DESCRIPTIONS` below. " +
-      "\n\n  IT COVERS ALL FOUR SITES, not just the walk's. Java validates a caller's locale at " +
-      "three lookup-reachable ingresses — `Locale override` (TranslationOptions.java:73/310), " +
-      "`localeSupplier result` (DefaultStrings.java:2457) and `Requested locale` " +
-      "(LocaleMatcher.java:64) — and the walk's own synthesized chain at `Attempted locale` " +
-      "(TranslationResult.java:116, MissingTranslationException.java:153). The port implements all " +
-      "four, at the same points, and the ONLY remaining difference at any of them is how the locale " +
-      "is spelled. Recorded in `src/internal/locale-jdk-tag.js`'s `requireJdkWellFormedLocale` and " +
-      "`LOCALE_INGRESS_DESCRIPTION`, and pinned by `test/attempted-locale-refusal.test.js` and " +
-      "`test/requested-locale-refusal.test.js`.",
+      "\n\n  IT COVERS EVERY SITE THIS TOOL DRIVES, which is TEN and no longer four. It said four " +
+      "while the run had grown a construction axis and four inspection shapes around it, and its " +
+      "own by-ingress histogram was already showing it consuming rows at eight ingresses — the " +
+      "count in the prose is what a reviewer reads to judge whether the rule is too wide, so a " +
+      "stale one is worse here than elsewhere. The four on the lookup/matcher axis are `Locale " +
+      "override` (TranslationOptions.java:73/310), `localeSupplier result` " +
+      "(DefaultStrings.java:2457), `Requested locale` (LocaleMatcher.java:64) and the walk's own " +
+      "synthesized `Attempted locale` (TranslationResult.java:116, " +
+      "MissingTranslationException.java:153); three more are at CONSTRUCTION " +
+      "(DefaultStrings.java:248, :276, :347) and three at INSPECTION (:2713, :2735, :2736). " +
+      "\n\n  WHAT KEEPS THE RULE NARROW IS NOT THIS PARAGRAPH BUT `DESCRIPTIONS`, which is a CLOSED " +
+      "map in both directions: a refusal carrying a description the map does not know explains " +
+      "nothing, so a port refusing at the WRONG SITE can never read as a naming difference. The " +
+      "port implements all ten, at the same points, and the ONLY remaining difference at any of " +
+      "them is how the locale is spelled. Recorded in `src/internal/locale-jdk-tag.js`'s " +
+      "`requireJdkWellFormedLocale` and `LOCALE_INGRESS_DESCRIPTION`, and pinned by " +
+      "`test/attempted-locale-refusal.test.js`, `test/requested-locale-refusal.test.js`, " +
+      "`test/construction-ingress.test.js` and `test/inspection.test.js`. Two FURTHER Java sites — " +
+      "`LocaleMatchResult.java:97` and `:117` — are caller-facing through a public constructor and " +
+      "are NOT in this map, because no shape here can reach them; see the header.",
     matches: (row) => {
       if (row.java[0] !== "THROWN" || row.js[0] !== "THROWN") return false;
 
@@ -611,6 +769,42 @@ const KNOWN_DIVERGENCES = [
       // `chainSeedOrNull`: the alternative is no identity check at all on these rows, and the tag
       // layer of these very probes is compared row by row by `npm run diff:direct-tag`.
       return js[2] === lookupLocaleOrNull(row.tag) || js[2] === chainSeedOrNull(row.tag);
+    },
+  },
+  {
+    id: "inspection-unsupported-locale-follows-plan-3.3",
+    why:
+      "THE INSPECTION SUPPORT REFUSAL, and it is a MAINTAINER DECISION rather than an accident — " +
+      "M7-STATUS.md's decision 3, made on 2026-09-06. Java raises `IllegalArgumentException` with " +
+      "`Locale '<tag>' is not supported` (DefaultStrings.java:2718, :2739, :2742); plan 3.3:771 " +
+      "names `UnsupportedLocaleError` and its sentence for the JS surface, and it was deliberately " +
+      "NOT settled by widening `tools/conformance.mjs`'s shared `IllegalArgumentException` row, " +
+      "which would have cost 34 unrelated comparisons their discrimination." +
+      "\n\n  WHAT THIS RULE DOES NOT RELAX. The QUOTED LOCALE must be byte-identical on both " +
+      "sides: Java's three messages quote `Locale#toLanguageTag`, not `Locale#toString`, so there " +
+      "is no spelling difference here to forgive and none is forgiven — a port naming a different " +
+      "locale than Java is unexplained, and that is what discriminates the ROLE — but by PROXY, " +
+      "not directly, and the distinction is worth stating exactly because an earlier draft of this " +
+      "paragraph overclaimed it. Java says `Source locale` or `Target locale` where the argument's " +
+      "position matters; `matches` below compares only the QUOTED LOCALE, so what the rule requires " +
+      "is that both sides refused about the SAME QUOTED LOCALE. In the `missingInto` shape the " +
+      "source is the constant `de` and the target is the probe tag, so the two locales differ and a " +
+      "port that answered about the source where Java answered about the target is unexplained — " +
+      "EXCEPT on the single row where the probe tag IS `de`, where both roles name one locale and a " +
+      "role swap would be absorbed. One row out of the shape's sweep; named rather than papered " +
+      "over. What the rule forgives is exactly the class and the sentence the plan chose." +
+      "\n\n  A KNOWN LOSS, recorded rather than hidden: the port's sentence does not say WHICH " +
+      "of `getMissingKeys`'s two arguments was unsupported, where Java's does. That is a property " +
+      "of the plan's single-argument `UnsupportedLocaleError`, is unchanged by this batch, and is " +
+      "worth a maintainer's attention on its own.",
+    matches: (row) => {
+      if (row.java[0] !== "THROWN" || row.js[0] !== "THROWN") return false;
+      if (row.java[1] !== "java.lang.IllegalArgumentException") return false;
+      if (row.js[1] !== "UnsupportedLocaleError") return false;
+
+      const java = /^(?:Locale|Source locale|Target locale) '(.*)' is not supported$/.exec(row.java[2]);
+      const js = /^Unsupported locale '(.*)' was provided$/.exec(row.js[2]);
+      return java !== null && js !== null && java[1] === js[1];
     },
   },
 ];
@@ -729,7 +923,34 @@ const PROBE_SHAPES = [
   // so it takes no key and `key` is a label rather than an input. See `LookupDiff.java`'s `matcher`
   // for why it lives in THIS tool, and `matcherJs` below for the port surface it drives.
   { key: "-", matcher: true },
+  // THE INSPECTION INGRESS — `DefaultStrings.java:2713` ("Locale"), `:2735` ("Source locale") and
+  // `:2736` ("Target locale"). FOUR shapes rather than one because the three Java statements ask
+  // different questions and the last two ask about ORDER: see `LookupDiff.java`'s `keysFor`,
+  // `missingFrom`, `missingInto` and `missingSourceFirst`, and `inspectionJs` below. This list is
+  // the only authority on the count — three other texts said "three" after `missingSourceFirst`
+  // landed, and all three are corrected as of 2026-09-09.
+  { key: "-", inspect: /** @type {const} */ ("keys") },
+  { key: "-", inspect: /** @type {const} */ ("missingFrom") },
+  { key: "-", inspect: /** @type {const} */ ("missingInto") },
+  { key: "-", inspect: /** @type {const} */ ("missingSourceFirst") },
 ];
+
+/**
+ * The well-formed, UNSUPPORTED source of the ordering probe. Must equal `LookupDiff.UNSUPPORTED_PROBE`
+ * and must name a locale NO catalog set loads, or the shape stops being an ordering probe.
+ */
+const UNSUPPORTED_PROBE = "de";
+
+/**
+ * The ILL-FORMED target of the source-first probe. Must equal `LookupDiff.ILL_FORMED_PROBE`.
+ *
+ * ADDED AFTER AN ABLATION FOUND THE HOLE: deleting the port's `Source locale` pre-check left this
+ * differential GREEN while `test/inspection.test.js` went red, because no shape here passed TWO
+ * ill-formed locales at once and the surviving `keysForExactLocale` validation still named the
+ * source correctly on every one-sided input. A gate that a measured ablation walks through is not a
+ * gate, so the shape was added rather than the hole recorded.
+ */
+const ILL_FORMED_PROBE = "de-x-lvariant-XX";
 
 /**
  * The port's side of one lookup, in the SAME six fields `LookupDiff.java` prints.
@@ -804,28 +1025,87 @@ function matcherJs(strings, tag) {
   }
 }
 
+/**
+ * The port's side of the INSPECTION ingress, in the SAME six fields `LookupDiff.java`'s `keysFor`,
+ * `missingFrom` and `missingInto` print.
+ *
+ * THE SURFACE IT DRIVES IS THE PUBLIC ONE — `getKeysForLocale` and `getMissingKeys` on the very
+ * instance the lookup and matcher shapes use, so a divergence cannot be an artifact of a differently
+ * configured object. Java's members take a `Locale` and the port's take a tag; that is the whole
+ * adaptation, and `npm run diff:direct-tag` is what licenses treating the two as the same input.
+ *
+ * @param {any} strings
+ * @param {string} tag
+ * @param {"keys" | "missingFrom" | "missingInto" | "missingSourceFirst"} kind
+ * @param {string} fallback the catalog set's own fallback locale — a locale every set loads, so in
+ *   `missingFrom` the TARGET half can never be what refuses
+ * @returns {string[]}
+ */
+function inspectionJs(strings, tag, kind, fallback) {
+  const pad = ["-", "-", "-", "-"];
+  /** @param {string[]} keys */
+  const join = (keys) => (keys.length === 0 ? "-" : keys.join(","));
+  try {
+    if (kind === "keys") return ["KEYS", join(strings.getKeysForLocale(tag)), ...pad];
+    if (kind === "missingFrom") return ["MISSING", join(strings.getMissingKeys(tag, fallback)), ...pad];
+    if (kind === "missingInto") return ["MISSING", join(strings.getMissingKeys(UNSUPPORTED_PROBE, tag)), ...pad];
+    return ["MISSING", join(strings.getMissingKeys(tag, ILL_FORMED_PROBE)), ...pad];
+  } catch (error) {
+    const raised = /** @type {Error} */ (error);
+    return ["THROWN", raised?.name ?? "?", flatten(raised?.message ?? String(error)), "-", "-", "-"];
+  }
+}
+
 /** @param {unknown} value */
 const flatten = (value) =>
   String(value).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
 
 /**
- * Do the two six-field outcomes agree?
+ * THE PORT'S CALL TRACE for the probe currently running — the `fallbackPolicy` consultations and
+ * the `onFailure` invocation, in order, in `LookupDiff.java`'s `TRACE` encoding.
+ *
+ * One array for the whole run rather than one per set, cleared immediately before each probe by the
+ * loop. The clear is what makes an EMPTY trace an observation rather than an accident: `calls=[]` is
+ * the evidence that an ingress check fired before the walk started, so a probe that inherits the
+ * previous probe's entries would report the opposite of what happened.
+ *
+ * @type {string[]}
+ */
+const jsTrace = [];
+
+/**
+ * A port `FailureReason` in the spelling Java's `TranslationFailureReason` enum prints.
+ *
+ * The SAME adaptation `lookupJs` already makes for `status` and `failureReason` — `-` to `_`,
+ * uppercased — and not a second dialect. `missing-translation` is `MISSING_TRANSLATION`.
+ *
+ * @param {string} reason
+ */
+const javaReason = (reason) => reason.replace(/-/g, "_").toUpperCase();
+
+/**
+ * The class of a trace entry's cause, or `-`.
+ *
+ * The port's side of the one field in a trace entry that has a language boundary in it: Java sends
+ * a fully-qualified class name and this sends an `Error#name`, and `traceAgrees` maps between them
+ * with the SAME `ERROR_NAME` table a thrown outcome's class uses. A non-Error cause — a policy can
+ * be handed anything a `render` threw — reports its `typeof`, so it can still never accidentally
+ * equal a Java class name.
+ *
+ * @param {unknown} cause
+ */
+function causeClass(cause) {
+  if (cause == null) return "-";
+  if (cause instanceof Error) return cause.name;
+  return `non-error:${typeof cause}`;
+}
+
+/**
+ * Do the two six-field OUTCOMES agree? The trace is NOT compared here — see `traceAgrees`.
  *
  * The ONLY adaptation is the error class, which JavaScript cannot spell Java's way. Everything else
  * — status, rendered string, supplying locale, the whole attempted-locale list, failure reason,
  * fallback flag, and the refusal MESSAGE — is compared verbatim.
- *
- * AND HERE IS WHAT IT DOES NOT COMPARE, stated because a reader could otherwise take it as gated.
- * These are SIX OUTCOME FIELDS. The `fallbackPolicy` / `onFailure` CALL TRACE is not among them —
- * and that trace is what makes the ingress checks a BEHAVIOURAL difference rather than a diagnostic
- * one. Before they landed, both sides refused `en-x-lvariant-NY` with the same class and the port's
- * outcome differed only in the DESCRIPTION; the trace differed completely (`calls=[]` in Java, five
- * calls in the port). That evidence is HAND-MEASURED on the pinned JDK and reproducible from
- * `test/requested-locale-refusal.test.js`'s header; it is not gated here. CONSEQUENCE: a port that
- * matched Java's OUTCOME while running a different walk would show 0 unexplained in this tool. What
- * covers that today is the corpus's `policyCalls` channel (for the ~416 cases carrying it) and the
- * empty-trace assertions in that test file. Widening `agree()` to the trace is real work with a real
- * oracle change behind it, not a line of code, so it is named rather than quietly assumed.
  *
  * THE MATCHER SHAPE'S SIX FIELDS ARE DIFFERENT SIX FIELDS — marker, selected locale, winning range,
  * match type, matched flag, requested ranges — and `agree` compares them the same way, position by
@@ -835,14 +1115,87 @@ const flatten = (value) =>
  * @param {string[]} java
  * @param {string[]} js
  */
-function agree(java, js) {
+function agreeOnOutcome(java, js) {
   if (java[0] === "THROWN" || js[0] === "THROWN") {
     if (java[0] !== js[0]) return false;
     const permitted = ERROR_NAME[java[1]];
     if (permitted === undefined || !permitted.includes(js[1])) return false;
     return java[2] === js[2];
   }
-  return java.every((field, index) => field === js[index]);
+  return OUTCOME_FIELDS.every((index) => java[index] === js[index]);
+}
+
+/** The six OUTCOME fields of a row; field 6 is the trace and is compared by `traceAgrees`. */
+const OUTCOME_FIELDS = [0, 1, 2, 3, 4, 5];
+
+/** The index of the CALL TRACE within a row's fields, on both sides. */
+const TRACE_FIELD = 6;
+
+/**
+ * Do the two CALL TRACES agree — the `fallbackPolicy` consultations and the `onFailure` invocation,
+ * in order, with their reasons, locales, attempted lists and causes?
+ *
+ * WHY THIS FUNCTION EXISTS, and it is not a refinement of `agreeOnOutcome`. Six outcome fields are
+ * an OUTCOME, and two libraries can reach one outcome by running two different walks. That is how
+ * the ingress defect hid: for `en-x-lvariant-NY` Java records `calls=[]` because
+ * `TranslationOptions.Builder#locale` refuses before the walk is ever entered, while the port ran a
+ * whole walk with five callback invocations and refused from inside it. Both refused, both raised
+ * the mapped class, both carried the same sentence around the same description — and this tool
+ * reported 0 unexplained. The walk was observable and nothing observed it. This file's own docblock
+ * carried that as a NAMED gap ("a port matching Java's outcome while running a different walk would
+ * show 0 unexplained") rather than as an assumption, which is the only reason it was cheap to close.
+ *
+ * THE COMPARISON IS SYMMETRIC AND HAS NO DEFAULTS. Entry counts must match, entry arities must
+ * match, and every field is compared verbatim EXCEPT the last one of each entry — the cause class,
+ * which JavaScript cannot spell Java's way and which travels through the SAME `ERROR_NAME` table a
+ * thrown outcome's class does. There is no `?? expected`, no short-circuit on an empty side, and no
+ * one-sided field: an absent cause is the literal `-` on both sides and `-` matches only `-`. A
+ * missing trace on either side is a length mismatch, which is a disagreement.
+ *
+ * WHAT MAKES IT A REAL OBSERVATION RATHER THAN AN ARTIFACT. `LookupDiff.java` installs a policy
+ * that answers exactly what `fallbackOnMissingTranslationOrNoMatchingAlternative()` answers and a
+ * handler that answers exactly what `returnKey()` answers — the two defaults `DefaultStrings:472-475`
+ * installs when neither is supplied — and this file installs their port counterparts on the same
+ * terms. Both sides are observed, neither is steered: every outcome field both sides emitted before
+ * the callbacks existed is unchanged, measured by running the differential across the change.
+ *
+ * A DIVERGENCE RULE CANNOT ABSORB A TRACE DIFFERENCE. `KNOWN_DIVERGENCES` is consulted only for
+ * rows whose traces already agree, so a rule written about a DIAGNOSTIC can never quietly explain
+ * away a different WALK. That is deliberate: every rule in the table today argues about wording or
+ * about an error class, and none of them has anything to say about which callbacks ran.
+ *
+ * @param {string} javaField the java side's seventh field
+ * @param {string} jsField the port side's seventh field
+ */
+function traceAgrees(javaField, jsField) {
+  // NOT named `jsTrace`: that is the module-level recorder this file pushes into, and shadowing it
+  // with the string being compared is exactly the kind of thing a later reader mis-reads.
+  const java = javaField === "-" ? [] : javaField.split(";");
+  const js = jsField === "-" ? [] : jsField.split(";");
+  if (java.length !== js.length) return false;
+
+  for (let index = 0; index < java.length; ++index) {
+    const javaEntry = java[index].split("|");
+    const jsEntry = js[index].split("|");
+    if (javaEntry.length !== jsEntry.length) return false;
+
+    // Every field but the last is compared verbatim: the marker (`P` / `H`), the reason, the
+    // locale, and — for the handler entry — the whole attempted-locale list.
+    for (let field = 0; field < javaEntry.length - 1; ++field)
+      if (javaEntry[field] !== jsEntry[field]) return false;
+
+    // The cause class, the one field with a language boundary in it, through the SAME table.
+    const javaCause = javaEntry[javaEntry.length - 1];
+    const jsCause = jsEntry[jsEntry.length - 1];
+    if (javaCause === "-" || jsCause === "-") {
+      if (javaCause !== jsCause) return false;
+      continue;
+    }
+    const permitted = ERROR_NAME[javaCause];
+    if (permitted === undefined || !permitted.includes(jsCause)) return false;
+  }
+
+  return true;
 }
 
 const work = mkdtempSync(join(tmpdir(), "lokalized-lookupdiff-"));
@@ -885,7 +1238,7 @@ try {
 
   /** @type {Map<string, {java: string[], wellFormed: boolean}[]>} keyed by `rowKey(set, tag)` */
   const javaRows = new Map();
-  /** @type {Map<string, {built: boolean, detail: string}>} */
+  /** @type {Map<string, {built: boolean, errorClass: string, message: string}>} */
   const javaConstruction = new Map();
 
   // A tag may contain anything the transport survived — a space, a comma, an astral character — so
@@ -897,15 +1250,42 @@ try {
     if (!line) continue;
     const fields = line.split("\t");
     if (fields[0] === "C") {
-      javaConstruction.set(fields[1], { built: fields[2] === "BUILT", detail: fields[3] });
+      // CLASS AND MESSAGE BOTH KEPT. They were emitted in separate fields by the oracle and the
+      // message was DROPPED here — so the run compared the BUILT/REFUSED boolean and nothing else,
+      // which is the exact failure `LookupDiff.java`'s own docblock says was fixed. It was fixed on
+      // the oracle side only. Measured before this change: deleting the port's `Fallback locale`
+      // check left this differential GREEN, because the port refuses that set anyway for the
+      // unrelated reason that the fallback names no loaded catalog.
+      javaConstruction.set(fields[1], {
+        built: fields[2] === "BUILT",
+        errorClass: fields[3],
+        message: fields[4] ?? "-",
+      });
       continue;
     }
     const tag = Buffer.from(fields[2], "base64").toString("utf8");
     const wellFormed = fields[3] === "true";
-    javaRows.set(
-      rowKey(fields[1], tag),
-      PROBE_SHAPES.map((_, index) => ({ java: fields.slice(4 + index * 6, 10 + index * 6), wellFormed })),
-    );
+    // SEVEN fields per outcome, not six: the seventh is the `fallbackPolicy` / `onFailure` CALL
+    // TRACE. See `traceAgrees` and `LookupDiff.java`'s `TRACE`.
+    const outcomes = PROBE_SHAPES.map((_, index) => ({
+      java: fields.slice(4 + index * 7, 11 + index * 7),
+      wellFormed,
+    }));
+
+    // THE ARITY GATE, and it is not paranoia: the two files agree on this layout by convention and
+    // nothing else, so a shape added on one side and not the other would silently shift every
+    // outcome after it — comparing an ambient row against a per-call one, or reading a trace out of
+    // a message field. A short final slice would also make `row.java[TRACE_FIELD]` `undefined`,
+    // which `traceAgrees` would then compare against a real trace. Fail loudly instead.
+    for (const outcome of outcomes)
+      if (outcome.java.length !== 7)
+        throw new Error(
+          `the oracle emitted ${outcome.java.length} field(s) for one outcome where 7 are expected ` +
+            `(${fields.length} field(s) on the line, ${PROBE_SHAPES.length} shape(s) x 7 + 4 = ` +
+            `${PROBE_SHAPES.length * 7 + 4} expected) — LookupDiff.java and run.mjs have drifted`,
+        );
+
+    javaRows.set(rowKey(fields[1], tag), outcomes);
   }
 
   /**
@@ -925,6 +1305,57 @@ try {
   let wellFormedAgree = 0;
   let wellFormedCompared = 0;
   let illFormedRefused = 0;
+  let constructionAgree = 0;
+  let constructionCompared = 0;
+  // What the TRACE comparison, and only the trace comparison, decided. `traceDisagreed` is every
+  // row whose walks differ; `traceOnlyDisagreed` is the subset whose SIX OUTCOME FIELDS agree —
+  // rows this tool called identical before 2026-09-09 and now does not. That second number is the
+  // honest measure of what the widening bought, and printing it is how a future reader can tell
+  // whether the trace channel is still discriminating anything or has become decoration.
+  let traceDisagreed = 0;
+  let traceOnlyDisagreed = 0;
+  // …and the staleness gate for the channel itself. A trace comparison in which NEITHER side ever
+  // recorded a call is not a green comparison, it is a dead one — an oracle that stopped installing
+  // its callbacks, or a probe space in which no walk ever fails, would report `0 rows whose walks
+  // differ` and mean nothing by it. Counted per side so a channel that went dead on ONE side is
+  // reported as the asymmetry it is rather than as agreement.
+  let javaTracesRecorded = 0;
+  let jsTracesRecorded = 0;
+
+  /**
+   * Compare one row and file it. Returns whether the two sides fully agree.
+   *
+   * ONE ROUTER FOR EVERY SHAPE — construction, lookup, matcher and inspection alike — so a row can
+   * never be compared under one contract in one place and another contract in another. The previous
+   * code inlined this twice and the two copies had already drifted once: the construction copy
+   * compared the BUILT/REFUSED boolean while the probe copy compared six fields.
+   *
+   * THE TRACE IS CHECKED FIRST AND OUTSIDE THE RULE TABLE. A `KNOWN_DIVERGENCES` rule is consulted
+   * only when the traces already agree, so no rule — present or future — can absorb a row whose
+   * WALK differs by arguing about its wording. A trace divergence that is genuinely deliberate would
+   * need a rule that says so and a `matches` that reads the trace, which no rule does today.
+   *
+   * @param {Row} row
+   */
+  function route(row) {
+    if (row.java[TRACE_FIELD] !== "-") javaTracesRecorded++;
+    if (row.js[TRACE_FIELD] !== "-") jsTracesRecorded++;
+    const tracesAgree = traceAgrees(row.java[TRACE_FIELD], row.js[TRACE_FIELD]);
+    const outcomeAgrees = agreeOnOutcome(row.java, row.js);
+    if (tracesAgree && outcomeAgrees) return true;
+
+    if (!tracesAgree) {
+      traceDisagreed++;
+      if (outcomeAgrees) traceOnlyDisagreed++;
+      unexplained.push(row);
+      return false;
+    }
+
+    const rule = KNOWN_DIVERGENCES.find((candidate) => candidate.matches(row));
+    if (rule === undefined) unexplained.push(row);
+    else /** @type {Row[]} */ (consumed.get(rule.id)).push(row);
+    return false;
+  }
 
   for (const set of CATALOG_SETS) {
     const java = javaConstruction.get(set.name);
@@ -943,25 +1374,58 @@ try {
     let perCall = null;
     /** @type {any} */
     let viaAmbient = null;
-    /** @type {string | null} */
+    /** @type {{name: string, message: string} | null} */
     let jsRefusal = null;
     try {
       const shared = {
         fallbackLocale: set.fallback,
         strings: set.strings,
         ...(set.tiebreakers === null ? {} : { tiebreakers: set.tiebreakers }),
-        // `TranslationFailureResponse.throwException()`'s JS counterpart. The port's own
-        // `throwForFailure` is the analogue of Java's `throwExceptionFor`, and it is the path that
-        // reaches `MissingTranslationException`'s copy of the attempted-locale validation.
-        ...(set.throwOnFailure === true
-          ? { onFailure: () => ({ action: /** @type {const} */ ("throw") }) }
-          : {}),
+        // THE RECORDING CALLBACKS — the port's half of the CALL TRACE, and the counterparts of the
+        // two `LookupDiff.java` installs. Both DELEGATE rather than decide: the policy answers
+        // `reason !== "resolution-failure"`, which is `BUILTIN_FALLBACK_POLICIES["missing-or-no-
+        // match"]` and Java's `fallbackOnMissingTranslationOrNoMatchingAlternative()` alike, and the
+        // handler answers `RETURN_KEY`, which is `DEFAULT_FAILURE_HANDLER` and Java's `returnKey()`
+        // alike — except on the sets whose whole purpose is the throwing path, where it answers
+        // `throw` on both sides. So installing them observes the walk and does not steer it.
+        //
+        // `TranslationFailureResponse.throwException()`'s JS counterpart is that `throw` action:
+        // the port's `throwForFailure` is the analogue of Java's `throwExceptionFor`, and it is the
+        // path that reaches `MissingTranslationException`'s copy of the attempted-locale validation.
+        fallbackPolicy: (/** @type {string} */ reason, /** @type {string} */ locale,
+            /** @type {unknown} */ cause) => {
+          jsTrace.push(`P|${javaReason(reason)}|${locale}|${causeClass(cause)}`);
+          return reason !== "resolution-failure";
+        },
+        onFailure: (/** @type {any} */ failure) => {
+          jsTrace.push(
+            `H|${javaReason(failure.reason)}|${failure.lookupLocale}` +
+              `|${failure.attemptedLocales.length === 0 ? "-" : failure.attemptedLocales.join("~")}` +
+              `|${causeClass(failure.cause)}`,
+          );
+          return { action: /** @type {const} */ (set.throwOnFailure === true ? "throw" : "return-key") };
+        },
       };
       perCall = createStrings({ ...shared, locale: set.instance });
       viaAmbient = createStrings({ ...shared, localeResolver: () => armed });
     } catch (error) {
-      jsRefusal = `${/** @type {Error} */ (error).name}: ${/** @type {Error} */ (error).message}`;
+      const raised = /** @type {Error} */ (error);
+      jsRefusal = { name: raised?.name ?? "?", message: flatten(raised?.message ?? String(error)) };
     }
+
+    // BOTH OR NEITHER, asserted rather than assumed. The two instances differ only in their locale
+    // SOURCE, so today one cannot build while the other refuses — but both are inside one `try`, and
+    // if that ever stopped holding `perCall` would be non-null with `jsRefusal` also set, the
+    // `perCall === null` guard below would not fire, and every probe would run against a null
+    // `viaAmbient` and silently record `THROWN | TypeError | Cannot read properties of null` for the
+    // whole ambient half — a fabricated refusal on 46,000 rows dressed as a measurement. An implicit
+    // invariant in an instrument is one an instrument cannot report on, so it is made explicit.
+    if ((perCall === null) !== (viaAmbient === null))
+      throw new Error(
+        `${set.name}: createStrings built one instance and refused the other — the per-call and ` +
+          `ambient halves of this set must be both or neither, and this tool's construction row ` +
+          `cannot describe a half-built set`,
+      );
 
     // A set DECLARED refused that Java builds has stopped testing what it was added to test. Checked
     // before the two-sided comparison below, because that comparison would pass — both sides would
@@ -976,11 +1440,39 @@ try {
     // how a differential loses its probe space without saying so.
     if (java.built !== (perCall !== null)) {
       constructionMismatches.push(
-        `${set.name}: java ${java.built ? "BUILT" : `REFUSED (${java.detail})`}, ` +
-          `js ${perCall !== null ? "BUILT" : `REFUSED (${jsRefusal})`}`,
+        `${set.name}: java ${java.built ? "BUILT" : `REFUSED (${java.errorClass}: ${java.message})`}, ` +
+          `js ${perCall !== null ? "BUILT" : `REFUSED (${jsRefusal?.name}: ${jsRefusal?.message})`}`,
       );
       continue;
     }
+
+    // CONSTRUCTION IS AN OUTCOME, COMPARED THE SAME WAY EVERY OTHER OUTCOME IS. Both sides refusing
+    // is not agreement: `LookupDiff.java` records that two of the three construction sites cannot be
+    // discriminated by the boolean at all, because the port refuses an ill-formed fallback anyway
+    // (it names no loaded catalog) and an ill-formed tiebreaker anyway (it breaks the permutation
+    // rule). Only the MESSAGE says which library answered the question that was asked, so the
+    // refusal travels through `route` and `KNOWN_DIVERGENCES` exactly like a lookup's.
+    //
+    // The SEVENTH field is the call trace and it is `-` on both sides here BY CONSTRUCTION rather
+    // than by omission: neither library consults a fallback policy or a failure handler while
+    // building a `Strings`, so an entry on either side would itself be the divergence — which is
+    // what `route` would report, since `-` matches only `-`.
+    /** @type {Row} */
+    const constructionRow = {
+      set: set.name,
+      tag: "-",
+      key: "-",
+      ingress: "construction",
+      java: java.built
+        ? ["BUILT", "-", "-", "-", "-", "-", "-"]
+        : ["THROWN", java.errorClass, java.message, "-", "-", "-", "-"],
+      js: jsRefusal === null
+        ? ["BUILT", "-", "-", "-", "-", "-", "-"]
+        : ["THROWN", jsRefusal.name, jsRefusal.message, "-", "-", "-", "-"],
+    };
+    constructionCompared++;
+    if (route(constructionRow)) constructionAgree++;
+
     if (perCall === null) continue;
 
     for (const tag of tags) {
@@ -991,15 +1483,31 @@ try {
         const shape = PROBE_SHAPES[index];
         const { java: javaOutcome, wellFormed } = recorded[index];
         armed = tag;
-        const jsOutcome = shape.matcher === true
-          ? matcherJs(perCall, tag)
-          : lookupJs(shape.viaAmbient ? viaAmbient : perCall, shape.key, tag, shape.viaAmbient === true);
+        // FRESH TRACE PER PROBE, cleared here and read immediately after, exactly as
+        // `LookupDiff.java`'s `traced` does on the oracle side. Both sides must clear BEFORE the
+        // call and not after it, because an empty trace is the observation on every probe whose
+        // ingress check fires before the walk starts.
+        jsTrace.length = 0;
+        const jsOutcome = [
+          ...(shape.matcher === true
+            ? matcherJs(perCall, tag)
+            : shape.inspect !== undefined
+              ? inspectionJs(perCall, tag, shape.inspect, set.fallback)
+              : lookupJs(shape.viaAmbient ? viaAmbient : perCall, shape.key, tag, shape.viaAmbient === true)),
+          jsTrace.length === 0 ? "-" : jsTrace.join(";"),
+        ];
         /** @type {Row} */
         const row = {
           set: set.name,
           tag,
           key: shape.key,
-          ingress: shape.matcher === true ? "matcher" : shape.viaAmbient ? "ambient" : "per-call",
+          ingress: shape.matcher === true
+            ? "matcher"
+            : shape.inspect !== undefined
+              ? `inspect-${shape.inspect}`
+              : shape.viaAmbient
+                ? "ambient"
+                : "per-call",
           java: javaOutcome,
           js: jsOutcome,
         };
@@ -1013,14 +1521,7 @@ try {
         }
 
         wellFormedCompared++;
-        if (agree(javaOutcome, jsOutcome)) {
-          wellFormedAgree++;
-          continue;
-        }
-
-        const rule = KNOWN_DIVERGENCES.find((candidate) => candidate.matches(row));
-        if (rule === undefined) unexplained.push(row);
-        else /** @type {Row[]} */ (consumed.get(rule.id)).push(row);
+        if (route(row)) wellFormedAgree++;
       }
     }
   }
@@ -1035,8 +1536,11 @@ try {
     `end-to-end lookup differential against lokalized-3.0.0 on the pinned JDK: ` +
       `${wellFormedAgree}/${wellFormedCompared} well-formed lookups identical over ` +
       `${tags.length} tag(s) x ${CATALOG_SETS.length} catalog set(s) x ${PROBE_SHAPES.length} shape(s) ` +
-      `(${new Set(PROBE_SHAPES.filter((shape) => shape.matcher !== true).map((shape) => shape.key)).size} ` +
-      `keys x 2 lookup ingresses, plus the keyless matcher ingress), ` +
+      `(${new Set(
+        PROBE_SHAPES.filter((shape) => shape.matcher !== true && shape.inspect === undefined)
+          .map((shape) => shape.key),
+      ).size} keys x 2 lookup ingresses, plus the keyless matcher and four inspection ingresses), ` +
+      `${constructionAgree}/${constructionCompared} construction outcomes identical, ` +
       `${explained - openDefectRows(consumed)} declared divergence(s), ` +
       `${openDefectRows(consumed)} row(s) under ${defective.length} OPEN PORT DEFECT(s), ` +
       `${unexplained.length} unexplained; ` +
@@ -1044,12 +1548,22 @@ try {
       `${illFormedAccepted.length} ill-formed lookup(s) WRONGLY ACCEPTED`,
   );
 
+  console.log(
+    `the CALL TRACE channel (fallbackPolicy consultations + the onFailure invocation, in order): ` +
+      `${traceDisagreed} row(s) whose WALKS differ, of which ${traceOnlyDisagreed} agree on all six ` +
+      `OUTCOME fields — those are the rows only this channel can see. A trace divergence is always ` +
+      `unexplained: no KNOWN_DIVERGENCES rule is consulted for a row whose walks differ. ` +
+      `${javaTracesRecorded} java / ${jsTracesRecorded} js row(s) recorded at least one call.`,
+  );
+
   /** @param {Row} row */
   const show = (row) =>
     console.log(
       `\n  [${row.set} / ${row.ingress}] ${JSON.stringify(row.tag)} key ${row.key}` +
-        `\n    java ${row.java.join(" | ")}` +
-        `\n    js   ${row.js.join(" | ")}`,
+        `\n    java ${row.java.slice(0, TRACE_FIELD).join(" | ")}` +
+        `\n    js   ${row.js.slice(0, TRACE_FIELD).join(" | ")}` +
+        `\n    java trace ${row.java[TRACE_FIELD]}` +
+        `\n    js   trace ${row.js[TRACE_FIELD]}`,
     );
 
   if (constructionMismatches.length) {
@@ -1097,6 +1611,19 @@ try {
   if (illFormedRefused === 0)
     console.log("STALE: no ill-formed probe reached the oracle — probes() section (7) has gone empty");
 
+  // The CALL TRACE channel's own staleness gate, one per side. A channel where nothing was ever
+  // recorded compares "-" against "-" on every row and reports agreement it has not earned.
+  if (javaTracesRecorded === 0)
+    console.log(
+      "STALE: the oracle recorded no fallbackPolicy or onFailure call on any row — LookupDiff's " +
+        "recording callbacks are no longer installed, or no probe reaches a failing walk",
+    );
+  if (jsTracesRecorded === 0)
+    console.log(
+      "STALE: the port recorded no fallbackPolicy or onFailure call on any row — the recording " +
+        "callbacks in `shared` are no longer installed, or no probe reaches a failing walk",
+    );
+
   // An OPEN PORT DEFECT does NOT make the run green — it only makes the failure print its own root
   // cause instead of arriving as anonymous mismatches. Same rule as `tools/direct-tag-diff/`'s.
   process.exit(
@@ -1106,7 +1633,9 @@ try {
       constructionMismatches.length === 0 &&
       stale.length === 0 &&
       illFormedRefused > 0 &&
-      wellFormedCompared > 0
+      wellFormedCompared > 0 &&
+      javaTracesRecorded > 0 &&
+      jsTracesRecorded > 0
       ? 0
       : 1,
   );

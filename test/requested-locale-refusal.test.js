@@ -33,6 +33,15 @@
  * the walk would satisfy the message half on its own — which is exactly what the port did before
  * this slice.
  *
+ * THAT MEASUREMENT IS NO LONGER HAND-MADE, as of 2026-09-09. `npm run diff:lookup` now records the
+ * `fallbackPolicy` / `onFailure` call trace on BOTH sides and compares it as a seventh outcome
+ * field, so the table above is reproduced by a gate rather than by a session: deleting the per-call
+ * ingress check in `src/core/index.js` makes that tool report 4,641 rows whose WALKS differ —
+ * `java trace -` against the port's five calls — and exit 1. This file is still the JS-side
+ * SPECIFICATION (it pins the wording, the sites and the controls, and it runs inside `npm test`
+ * where the differential does not), but it is no longer the only thing standing between the port
+ * and a walk Java never runs.
+ *
  * AND EVERY REFUSAL IS PAIRED WITH A CONTROL THAT MUST STILL SERVE. "These tags throw" is the wrong
  * statement and a port that refused everything would satisfy the refusal half of this file wholesale.
  * The controls are not invented here either: `en-US-x-lvariant-POSIX`, `ja-JP-x-lvariant-JP` and

@@ -9,20 +9,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 25,
-      "sourceBytes": 755188,
-      "importMs": 0.238,
-      "constructionMs": 0.1094,
-      "firstRenderMs": 0.3583,
+      "sourceBytes": 761288,
+      "importMs": 0.247,
+      "constructionMs": 0.1035,
+      "firstRenderMs": 0.3541,
       "retainedBytes": 68816
     },
     {
       "label": "core + parsed equivalent",
       "modules": 24,
-      "sourceBytes": 746943,
-      "importMs": 0.528,
-      "constructionMs": 0.3358,
-      "firstRenderMs": 0.2712,
-      "retainedBytes": 344424
+      "sourceBytes": 753043,
+      "importMs": 0.555,
+      "constructionMs": 0.3761,
+      "firstRenderMs": 0.2728,
+      "retainedBytes": 354536
     }
   ],
   "rebaselines": [
@@ -238,10 +238,24 @@
         "root + raw-text catalog: source graph grew 746939 -> 755188 bytes",
         "core + parsed equivalent: source graph grew 738694 -> 746943 bytes"
       ]
+    },
+    {
+      "reason": "Close the last two requireWellFormed ingress surfaces' GATES: +1,063 B of comments in src/core/index.js only, correcting two gate-naming claims that were false — src/core/index.js named test/construction-ingress.test.js, which did not exist, and said no differential drives inspection, which is now untrue. No executable change: the five checks themselves shipped earlier and are byte-identical here. Modules unchanged 25/24; the delta lands in a module both graphs contain, so src/index.js is untouched.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 755188 -> 756251 bytes",
+        "core + parsed equivalent: source graph grew 746943 -> 748006 bytes"
+      ]
+    },
+    {
+      "reason": "Ingress repair batch, 2026-09-09: the three LocaleMatchResult requireWellFormed sites plus the getSupportedLocales ordering fix. Root 756251 -> 761288 B (+5037), core 748006 -> 753043 B (+5037); modules unchanged at 25 root / 24 core. The two deltas are IDENTICAL and that is the load-bearing fact, not a coincidence: every added byte lands in a module BOTH graphs contain. Decomposition, measured file by file against the previous baseline's tree: src/core/index.js +4019 (the three requireJdkWellFormedLocale wrappers in validateLocaleMatchStructure, two .sort(compareTags) at the getSupportedLocales and getLocaleConfiguration accessors, and the comment at :1845 that named a check which was not there) and src/internal/locale-jdk-tag.js +1018 (selectedLocale and consideredLocale added to LOCALE_INGRESS_DESCRIPTION, TEN -> TWELVE, and the caller-facing-site count corrected nine -> eleven). 4019 + 1018 = 5037, twice. src/negotiate/index.js also grew by 1543 for the negotiator's own construction ingress and appears in NEITHER graph, which is the module-count ratchet doing exactly the job it exists for: lokalized/negotiate and its 806-class IANA table stay out of the browser graph. Both halves are behaviour, not comment: the port accepted all three ill-formed locales Java's public LocaleMatchResult constructor refuses, and reported the caller's insertion order where Java and plan 3.3:759 both sort.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 756251 -> 761288 bytes",
+        "core + parsed equivalent: source graph grew 748006 -> 753043 bytes"
+      ]
     }
   ],
   "browser": {
-    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/1.46388.4 Chrome/148.0.7778.280 Safari/537.36",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/1.49585.0 Chrome/152.0.7977.76 Safari/537.36",
     "transferCompression": "none — the harness server does not compress; section 9.2's gzip/brotli ceilings are a separate measure",
     "memoryKind": "performance.memory (coarse, whole-page)",
     "note": "One variant per page load: measuring both in one document leaves the second with a warm module cache and zero cold-import, resource and transfer figures.",
@@ -249,23 +263,23 @@
       {
         "label": "root + raw-text catalog",
         "resources": 25,
-        "encodedBytes": 718731,
-        "decodedBytes": 718731,
-        "coldImportMs": 33.7,
-        "importMs": 1.9,
-        "constructionMs": 0.5,
-        "firstRenderMs": 1.3,
+        "encodedBytes": 761288,
+        "decodedBytes": 761288,
+        "coldImportMs": 34.3,
+        "importMs": 2.2,
+        "constructionMs": 0.9,
+        "firstRenderMs": 2.4,
         "firstRender": "I read 3 books"
       },
       {
         "label": "core + parsed equivalent",
         "resources": 24,
-        "encodedBytes": 710486,
-        "decodedBytes": 710486,
-        "coldImportMs": 30.5,
-        "importMs": 3,
+        "encodedBytes": 753043,
+        "decodedBytes": 753043,
+        "coldImportMs": 24,
+        "importMs": 2.6,
         "constructionMs": 1.4,
-        "firstRenderMs": 1.4,
+        "firstRenderMs": 1.3,
         "firstRender": "I read 3 books"
       }
     ]

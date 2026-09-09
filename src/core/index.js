@@ -572,8 +572,16 @@ export function createStrings(options) {
   // THE CORPUS IS BLIND TO ALL THREE OF THESE SITES, measured: every locale spelled by every
   // fixture — catalog keys, fallback locales, instance locales and tiebreaker lists — is
   // `jdkLocaleWellFormed`, 0 exceptions across 2,346 cases. Adding these checks moves no conformance
-  // row in either direction. What gates them is `tools/lookup-diff/`'s `C` line (the `illformed-*`
-  // catalog sets, which exist for exactly this axis) and `test/construction-ingress.test.js`.
+  // row in either direction. What gates them is `test/construction-ingress.test.js` — the default
+  // gate, and the only one inside `npm run verify` — and `tools/lookup-diff/`'s `C` line, whose
+  // `illformed-*` catalog sets exist for exactly this axis.
+  //
+  // THE `C` LINE DID NOT ACTUALLY GATE THEM UNTIL 2026-09-09, and the correction is worth keeping:
+  // it compared the BUILT/REFUSED boolean and threw the refusal away, so two of the three sites
+  // could not be discriminated there at all — the port refuses an ill-formed FALLBACK anyway
+  // (it names no loaded catalog) and an ill-formed TIEBREAKER anyway (it breaks the permutation
+  // rule), and only the message says which library answered. It now compares the refusal through
+  // the same `agree`/`KNOWN_DIVERGENCES` machinery a lookup's uses.
   requireJdkWellFormedLocale(configuredFallbackLocale, LOCALE_INGRESS_DESCRIPTION.fallbackLocale);
 
   // `DefaultStrings.java:250` — the catalog SOURCE is absent. Java's counterpart is a null
@@ -1497,10 +1505,20 @@ export function createStrings(options) {
     // The support half is unchanged and is deliberately NOT Java's wording — plan 3.3:771 names
     // `UnsupportedLocaleError` and its sentence, and that decision is out of scope here.
     //
-    // NOTHING ELSE GATES THIS: no differential drives inspection and no corpus row reaches it (the
-    // Java branches are `required` and still owe a case, because fixing the PORT closes no JAVA
-    // branch). `test/inspection.test.js` is its whole specification, and it carried no
-    // well-formedness assertion until this change.
+    // WHAT GATES IT: `test/inspection.test.js`, which carried no well-formedness assertion until
+    // 2026-09-09, and `tools/lookup-diff/`'s FOUR inspection shapes, added the same day because
+    // NOTHING drove this surface — no corpus row reaches an inspection call (the Java branches are
+    // `required` and still owe a case, since fixing the PORT closes no JAVA branch) and the
+    // differential drove lookups only. The four shapes sweep `getKeysForLocale`, the tag in
+    // `getMissingKeys`'s SOURCE role, the tag in its TARGET role against a well-formed UNSUPPORTED
+    // source, and BOTH roles ill-formed at once. The last two are the ORDER probes: Java answers
+    // about the target's well-formedness where a port that resolved source-then-target answers about
+    // the source, and names the SOURCE when both are ill-formed.
+    //
+    // "Three" here was a stale count, not a design: `missingSourceFirst` was added while the
+    // differential grew inside its own batch and three of the four places that name the number were
+    // never revisited. Corrected 2026-09-09; `PROBE_SHAPES` in `tools/lookup-diff/run.mjs` is the
+    // only authority.
     const normalized = requireJdkWellFormedLocale(normalizeTag(locale), description);
     const catalog = catalogs.get(normalized);
     if (catalog === undefined) throw new UnsupportedLocaleError(normalized);
@@ -1511,7 +1529,20 @@ export function createStrings(options) {
     get,
     t: get,
     getResult,
-    getSupportedLocales: () => freeze([...supported]),
+    // SORTED, and the sort is the contract rather than a convenience. Plan 3.3:759 — "Supported
+    // locales are sorted by normalized serialized tag" — and `DefaultStrings.java:520-521` sorts
+    // `sortedSupportedLocales` by `Comparator.comparing(Locale::toLanguageTag)`, which
+    // `getSupportedLocales()` (`:2700-2702`) then hands back through a `LinkedHashSet`.
+    //
+    // MEASURED with catalogs `{fr, en-fonipa, de, ar}`: Java answers `[ar, de, en__fonipa, fr]`;
+    // this accessor and `getLocaleConfiguration().supportedLocales` both answered `["fr",
+    // "en-fonipa", "de", "ar"]` — the caller's insertion order — until 2026-09-09. Nothing caught it
+    // because every OTHER consumer sorts locally (`:818`, `:829`, `:1708`, `:1713`) and
+    // `consideredLocales` is sorted inside `src/internal/locale.js:447`, so the matcher agreed with
+    // Java and only the two ACCESSORS did not: the port was right where it is used and wrong only
+    // where it is observed. `compareTags` is `<`/`>` on the serialized tag, i.e. UTF-16 code-unit
+    // order, which is what `String.compareTo` gives Java's comparator.
+    getSupportedLocales: () => freeze([...supported].sort(compareTags)),
     /**
      * Plan 3.3:771. INSPECTION IS EXACT-LOCALE-ONLY: normalize, then look the tag up exactly. No
      * equivalence, no negotiation, no fallback — which is what separates this from every other
@@ -1559,7 +1590,10 @@ export function createStrings(options) {
       // map it is about to iterate.
       freeze({
         fallbackLocale,
-        supportedLocales: freeze([...supported]),
+        // Sorted for the same reason `getSupportedLocales` above is: plan 3.3:765 says a directly
+        // constructed instance's configuration "likewise contains that loaded set", and :759 sorts
+        // it. The two accessors were the only places the port reported the raw insertion order.
+        supportedLocales: freeze([...supported].sort(compareTags)),
         tiebreakers: tiebreakers ?? EMPTY_TIEBREAKERS,
       }),
     getCatalogIdentity: () => null,
@@ -1830,11 +1864,36 @@ function validateLocaleMatchStructure(supplied, where) {
       throw new TypeError(`${where} requestedLanguageRanges entries must be { range, weight }`);
 
   const locale = match.locale ?? null;
-  // `LocaleUtils.requireWellFormed`, applied to the two locales the constructor validates at
-  // `:97` and `:101` — before the matched/unmatched arms, which is why a malformed selected locale
-  // is reported as a malformed tag and not as a shape contradiction.
-  const selectedLocale = locale === null ? null : normalizeTag(locale);
-  const matchFallbackLocale = normalizeTag(match.fallbackLocale);
+  // THE SUPPLIED-MATCH INGRESS — `LocaleUtils.requireWellFormed` at `LocaleMatchResult.java:97`
+  // ("Selected locale"), `:101` ("Fallback locale") and `:117` ("Considered locale"), the third of
+  // which is in the considered loop below. These are CALLER-FACING: `LocaleMatchResult`'s
+  // constructor is public on purpose (`:65-80`, "This is public so custom LocaleMatcher
+  // implementations can expose the same diagnostics"), and the port's counterpart surfaces are
+  // `forLocaleMatch`, per-call `{ localeMatch }` and `localeMatchResolver`.
+  //
+  // UNTIL 2026-09-09 THIS COMMENT CLAIMED THE CHECK AND THE CODE CALLED `normalizeTag` ALONE — the
+  // tag-level guard, which ACCEPTS `en-x-lvariant-NY`. That is the one shape a reader is actively
+  // told exists, so it is worth naming: the port accepted all three of Java's refusals, and
+  // `createLocaleNegotiator({ fallbackLocale: "fr", supportedLocales: ["fr",
+  // "en-x-lvariant-NY"] }).matchFor("fr").consideredLocales` answered with a `LocaleMatch` value
+  // Java's type system cannot construct.
+  //
+  // MEASURED on pinned Corretto 21 against `lokalized-3.0.0.jar`, both controls constructing:
+  // `new LocaleMatchResult([en], en__NY, en, 1.0, EXACT, fr, [en__NY, fr])` -> `Selected locale
+  // 'en__NY' is not a well-formed IETF BCP 47 locale`; the same with `fallbackLocale = en__NY` ->
+  // `Fallback locale '…'`; with `en__NY` only inside `consideredLocales` -> `Considered locale '…'`.
+  //
+  // THE ORDER IS THE BEHAVIOUR, not a tidiness preference. `:97` precedes the unmatched-arm check at
+  // `:103`, so a `{ locale: en__NY, matchType: "none" }` result is reported as a MALFORMED LOCALE
+  // and not as a shape contradiction — the port answered `A matched locale result requires a range,
+  // weight, and non-NONE match type`, refusing for the wrong reason. Likewise `:117` precedes the
+  // duplicate-tag check at `:119`. Both orderings are pinned by `test/supplied-match-ingress.test.js`.
+  const selectedLocale =
+    locale === null
+      ? null
+      : requireJdkWellFormedLocale(normalizeTag(locale), LOCALE_INGRESS_DESCRIPTION.selectedLocale);
+  const matchFallbackLocale = requireJdkWellFormedLocale(
+    normalizeTag(match.fallbackLocale), LOCALE_INGRESS_DESCRIPTION.fallbackLocale);
   const languageRange = match.languageRange ?? null;
   const effectiveWeight = match.effectiveWeight ?? null;
   const matchType = match.matchType;
@@ -1872,7 +1931,10 @@ function validateLocaleMatchStructure(supplied, where) {
   const normalizedConsidered = [];
 
   for (const consideredLocale of considered) {
-    const normalized = normalizeTag(consideredLocale);
+    // `LocaleMatchResult.java:117`, inside the loop and BEFORE the duplicate test at `:119` — so an
+    // ill-formed member is reported as ill-formed even when it is also a duplicate.
+    const normalized = requireJdkWellFormedLocale(
+      normalizeTag(consideredLocale), LOCALE_INGRESS_DESCRIPTION.consideredLocale);
 
     // Java lowercases `toLanguageTag()` before the duplicate test (`:118`). `normalizeTag` already
     // produces the canonical serialization, so two spellings of one locale collide here exactly as

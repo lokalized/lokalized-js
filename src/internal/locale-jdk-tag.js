@@ -673,11 +673,19 @@ export function jdkLocaleWellFormed(tag) {
  *
  * THIS SAID "THE THREE PLACES" AND THAT WAS THE PORT'S OWN SCOPE, NOT JAVA'S. Three is how many
  * sites a LOOKUP can reach, which is how many `tools/lookup-diff/` could see; Java validates at
- * nine distinct caller-facing descriptions, and the six the lookup ingress does not reach — three
- * at construction, three at inspection — were each a live defect until they were added. The number
+ * ELEVEN distinct caller-facing descriptions, and the eight the lookup ingress does not reach —
+ * three at construction, three at inspection, two on the public `LocaleMatchResult` constructor —
+ * were each a live defect until they were added. The number
  * that mattered was never "how many sites does the instrument observe" but "how many does Java
  * have", and the two were confused here for a whole slice. `LOCALE_INGRESS_DESCRIPTION` below is
  * the inventory; it is deliberately the only place any of these strings is spelled.
+ *
+ * THE COUNT MOVED TWICE FOR THE SAME REASON, which is why it is spelled out rather than trusted.
+ * It read "three" while six more were missing, then "nine" while `LocaleMatchResult.java:97`
+ * ("Selected locale") and `:117` ("Considered locale") were still missing — both reached through a
+ * PUBLIC Java constructor and through the port's allowlisted `forLocaleMatch`, and both invisible to
+ * `tools/lookup-diff/` because a LOOKUP pre-empts them at an earlier ingress. A probe space derived
+ * from the thing under test is blind to that thing's gaps, one axis over, for the third time.
  *
  * The predicate is `jdkLocaleWellFormed`'s and is not restated; what this adds is Java's sentence
  * and Java's TIMING. Timing is the whole behaviour: Java refuses `en__NY` before
@@ -713,7 +721,7 @@ export function requireJdkWellFormedLocale(normalizedTag, description) {
 }
 
 /**
- * THE TEN DIAGNOSTIC DESCRIPTIONS, in one place because they are a CONTRACT rather than ten
+ * THE TWELVE DIAGNOSTIC DESCRIPTIONS, in one place because they are a CONTRACT rather than twelve
  * strings: a differential, a test file and the conformance runner all compare them literally, and
  * three copies of `"Requested locale"` across three modules is how one of them silently drifts.
  *
@@ -741,10 +749,13 @@ export function requireJdkWellFormedLocale(normalizedTag, description) {
  * `Requested locale`), and it is refused at the SAME point in the lookup as the resolver arm — the
  * pre-walk ingress — so the observable timing matches Java's constant supplier exactly.
  *
- * SIX MORE WERE ADDED AFTER THE LOOKUP INGRESS SHIPPED, AND ALL SIX ARE VERBATIM JAVA. Three sit at
- * CONSTRUCTION (`Fallback locale` at `Strings.java:211` and `DefaultStrings.java:248`, `Localized
- * strings locale` at `:276`, `Tiebreaker locale` at `:347`) and three at INSPECTION (`Locale` at
- * `:2713`, `Source locale` at `:2735`, `Target locale` at `:2736`). None of the six carries a Java
+ * EIGHT MORE WERE ADDED AFTER THE LOOKUP INGRESS SHIPPED, AND ALL EIGHT ARE VERBATIM JAVA. Three sit
+ * at CONSTRUCTION (`Fallback locale` at `Strings.java:211` and `DefaultStrings.java:248`, `Localized
+ * strings locale` at `:276`, `Tiebreaker locale` at `:347`), three at INSPECTION (`Locale` at
+ * `:2713`, `Source locale` at `:2735`, `Target locale` at `:2736`), and two on the PUBLIC
+ * `LocaleMatchResult` constructor (`Selected locale` at `:97`, `Considered locale` at `:117`; its
+ * third site, `Fallback locale` at `:101`, reuses the construction key because it is the same Java
+ * sentence). None of the eight carries a Java
  * IDENTIFIER — they are plain noun phrases for a caller's own argument, exactly like `Locale
  * override` and `Requested locale` — so the substitution rule that produced `localeResolver result`
  * has nothing to substitute and they are reproduced unchanged. **That is why they needed no
@@ -759,7 +770,8 @@ export function requireJdkWellFormedLocale(normalizedTag, description) {
  *
  * @type {Readonly<Record<"perCallLocale" | "instanceLocale" | "localeResolverResult" |
  *   "requestedLocale" | "fallbackLocale" | "localizedStringsLocale" | "tiebreakerLocale" |
- *   "inspectionLocale" | "sourceLocale" | "targetLocale", string>>}
+ *   "inspectionLocale" | "sourceLocale" | "targetLocale" | "selectedLocale" |
+ *   "consideredLocale", string>>}
  */
 export const LOCALE_INGRESS_DESCRIPTION = Object.freeze({
 	perCallLocale: "Locale override",
@@ -772,4 +784,6 @@ export const LOCALE_INGRESS_DESCRIPTION = Object.freeze({
 	inspectionLocale: "Locale",
 	sourceLocale: "Source locale",
 	targetLocale: "Target locale",
+	selectedLocale: "Selected locale",
+	consideredLocale: "Considered locale",
 });

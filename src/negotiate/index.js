@@ -724,8 +724,26 @@ function applicableConfiguration(configuration) {
 	if (typeof configuration !== "object" || configuration === null)
 		throw new RangeError("A locale configuration is required");
 
-	const supportedLocales = [...configuration.supportedLocales].map((tag) => normalizeTag(tag));
-	const fallbackLocale = normalizeTag(configuration.fallbackLocale);
+	// THE NEGOTIATOR'S CONSTRUCTION INGRESS, and it exists because of what a matcher RETURNS rather
+	// than what it accepts. Every `matchFor*` result carries these tags as `consideredLocales` and
+	// this one as `fallbackLocale`, and in Java those two fields are populated by handing exactly
+	// these values to `new LocaleMatchResult(...)` (`DefaultStrings.java:1945/:1951`), whose `:117`
+	// and `:101` are `LocaleUtils.requireWellFormed` — so an ill-formed member makes the JAVA
+	// CONSTRUCTOR THROW. Java's own matcher can never reach that throw, because
+	// `DefaultStrings.java:276` refuses an ill-formed catalog locale at construction; this port's
+	// `LocaleConfiguration` is hand-buildable, so the same guarantee has to be stated here.
+	//
+	// MEASURED before this check existed: `createLocaleNegotiator({ fallbackLocale: "fr",
+	// supportedLocales: ["fr", "en-x-lvariant-NY"] }).matchFor("fr").consideredLocales` answered
+	// `["en-x-lvariant-NY", "fr"]` — a `LocaleMatch` VALUE JAVA'S TYPE SYSTEM CANNOT CONSTRUCT. The
+	// descriptions are Java's for the fields these become, not invented: `Considered locale` and
+	// `Fallback locale`. Refusing once at ingress rather than per result is Java's own arrangement —
+	// validate the set at construction and the result constructor's checks become unreachable — and
+	// keeps every `matchFor` off a per-call well-formedness scan.
+	const supportedLocales = [...configuration.supportedLocales].map((tag) =>
+		requireJdkWellFormedLocale(normalizeTag(tag), LOCALE_INGRESS_DESCRIPTION.consideredLocale));
+	const fallbackLocale = requireJdkWellFormedLocale(
+		normalizeTag(configuration.fallbackLocale), LOCALE_INGRESS_DESCRIPTION.fallbackLocale);
 
 	// Not a stylistic guard. Every `matchFor*` reports `fallbackLocale` in its result and every
 	// `bestMatchFor*` RETURNS it, so a fallback that names no supported catalog would hand callers a

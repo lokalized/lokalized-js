@@ -232,7 +232,12 @@ test("the catalog map may be a Map, not only a record", () => {
   ]);
   const instance = createStrings({ fallbackLocale: "en", locale: "en", strings: map });
 
-  assert.deepEqual([...instance.getSupportedLocales()], ["en", "fr", "de", "es"]);
+  // SORTED, not the Map's insertion order — `getSupportedLocales` reports
+  // `DefaultStrings.java:520-521`'s `sortedSupportedLocales` (plan 3.3:759). This line read
+  // `["en", "fr", "de", "es"]` until 2026-09-09, which was the accessor's own defect written down as
+  // an expectation; what the test claims is that all four catalogs LOADED, and the Map's order is
+  // pinned nowhere. `test/construction-ingress.test.js` owns the ordering claim itself.
+  assert.deepEqual([...instance.getSupportedLocales()], ["de", "en", "es", "fr"]);
   assert.equal(instance.get("Greeting", { name: "Ada" }), "Hello, Ada");
   assert.equal(instance.get("Greeting", { name: "Ada" }, { locale: "fr" }), "Bonjour, Ada");
   assert.equal(instance.get("Greeting", { name: "Ada" }, { locale: "de" }), "Hallo, Ada");
