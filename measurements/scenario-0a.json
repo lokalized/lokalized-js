@@ -9,20 +9,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 25,
-      "sourceBytes": 718962,
-      "importMs": 0.322,
-      "constructionMs": 0.1025,
-      "firstRenderMs": 0.3469,
-      "retainedBytes": 68496
+      "sourceBytes": 755188,
+      "importMs": 0.238,
+      "constructionMs": 0.1094,
+      "firstRenderMs": 0.3583,
+      "retainedBytes": 68816
     },
     {
       "label": "core + parsed equivalent",
       "modules": 24,
-      "sourceBytes": 710717,
-      "importMs": 0.507,
-      "constructionMs": 0.317,
-      "firstRenderMs": 0.2711,
-      "retainedBytes": 294976
+      "sourceBytes": 746943,
+      "importMs": 0.528,
+      "constructionMs": 0.3358,
+      "firstRenderMs": 0.2712,
+      "retainedBytes": 344424
     }
   ],
   "rebaselines": [
@@ -195,6 +195,48 @@
       "growth": [
         "root + raw-text catalog: source graph grew 718731 -> 718962 bytes",
         "core + parsed equivalent: source graph grew 710486 -> 710717 bytes"
+      ]
+    },
+    {
+      "reason": "M7 decision 1, resolved as option 1: the port now speaks ONE dialect for a callback that returns null. +866 bytes in BOTH graphs, 25/24 modules unchanged; the equal delta is the standing evidence that lokalized/negotiate and its IANA table remain unreachable from src/index.js. The fallbackPolicy and onFailure guards were each SPLIT into two arms: null reproduces Java's requireNonNull SHAPE with the JS option name ('fallbackPolicy returned null', 'onFailure returned null'), matching what localeResolver/localeMatchResolver already did at src/core/index.js:900/:914; a non-null wrong type keeps the port's own informative wording, because Java's type system makes that arm unreachable so there is no Java text to match. Both arms are now tested as a pair -- previously one arm stood for both. The remaining difference from Java is the IDENTIFIER alone (Java names translationFallbackPolicy / TranslationFailureHandler), still declared in conformance.mjs DECLARED_MESSAGE_DIVERGENCES with the JS string pinned exactly and gated STALE if it ever stops differing. Conformance 1,947 passed / 0 FAILED; 798 tests.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 718962 -> 719828 bytes",
+        "core + parsed equivalent: source graph grew 710717 -> 711583 bytes"
+      ]
+    },
+    {
+      "reason": "M7 decision 3 (maintainer's call): getKeysForLocale fixed and getMissingKeys added. Equal delta in BOTH graphs, 25/24 modules unchanged, no new module and no new import — UnsupportedLocaleError was already reachable because src/core/index.js already imports from src/internal/plural.js. TWO MEASURED PORT DEFECTS CLOSED: an unsupported locale returned [] where Java throws (DefaultStrings.java:2718-2720), so the port refused nothing at all; and keys came back in catalog INSERTION order where Java's TreeSet returns them sorted. getMissingKeys did not exist and is now implemented, applying the support rule independently to source and target. The thrown type follows PLAN 3.3:771 (UnsupportedLocaleError), not Java's IllegalArgumentException, because no corpus row arbitrates and widening conformance.mjs's shared IllegalArgumentException row to settle it would weaken 34 unrelated comparisons. Verified by ablation: restoring the one-line pre-fix body turns 4 of the 9 new tests red while every paired control stays green. Conformance 1,947 passed / 0 FAILED; 807 tests.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 719828 -> 722263 bytes",
+        "core + parsed equivalent: source graph grew 711583 -> 714018 bytes"
+      ]
+    },
+    {
+      "reason": "M7 clause 12 (attempted-locale chain refusal) plus this repair batch. +13,156 bytes in BOTH graphs, 25 root / 24 core modules UNCHANGED. The equal delta is the measurement, not the total: every added byte lands in a module both graphs contain, so src/index.js -- the one module root has and core does not -- is untouched, and lokalized/negotiate with its 806-class IANA table stays unreachable from src/index.js. That containment is what the module-count half of this ratchet exists to hold and it is intact.\n\nDECOMPOSITION, measured per file rather than inferred: src/core/index.js 127,715 -> 136,068 (+8,353) and src/internal/locale-jdk-tag.js 19,650 -> 24,453 (+4,803); 8,353 + 4,803 = 13,156 exactly, and those are the only two files under src/ that differ from HEAD, so nothing else can be hiding in the delta. Cross-check: the graph at HEAD computes to 718,962 B and the baseline being replaced is 722,263 B, a difference of 3,301 = the decision-1 (+866) and decision-3 (+2,435) rebaselines, both in src/core/index.js, which is exactly what the two preceding entries in this file record.\n\nWHAT THE BYTES ARE. (1) src/core/index.js gains attemptedLocaleRefusal and three call sites: inside the walk, where a refusal becomes THIS candidate the walk continues from, matching Java catching TranslationResult construction inside the try at DefaultStrings.java:713-726; and in failureResult and throwForFailure, where the second construction escapes to the caller. Java throws IllegalArgumentException for en-US-x-lvariant-POSIX, ja-JP-x-lvariant-JP and th-TH-x-lvariant-TH where the port previously answered the fallback -- measured end to end on pinned Corretto 21 against lokalized-3.0.0.jar with catalogs {nn, nb, fr}. Of the +8,353, 1,284 B is a docblock added by THIS repair batch recording a contradiction now proven in both directions: raising TypeError leaves .failures[0].causeType as the row lvariant.exhausting-walk.en-us-posix.duplicate-attempted-language-tag fails on, raising bare Error leaves .thrown.name as the only failing field, both runs 1,957/1/223 byte-identical -- so no value of that constructor makes the row green and the red row is a conformance.mjs CAUSE_NAME/ERROR_NAME inconsistency, not a port defect. (2) src/internal/locale-jdk-tag.js gains JdkTagParts.undetermined, recording whether the primary language subtag was spelled exactly \"und\" in lowercase BEFORE lowercasing, because InternalLocaleBuilder.setLanguageTag compares with equals and not equalsIgnoreCase. The old code was wrong in BOTH directions on the pinned JDK -- re-probed independently this session: Locale.forLanguageTag(\"UND-x-a\").toLanguageTag() is und-x-a and not x-a, and Locale.forLanguageTag(\"zh-und\").getLanguage() is und and not empty. This changes normalizeTag output for a public input class and is gated by test/lookup-differential-findings.test.js and by 25 new direct-tag probes (46,375 -> 46,400 well-formed, measured by diffing the two probe sets, 0 removed).\n\nNOT A TIMING RE-RECORD AND NOT DEFERRED. The browser half is re-reported as STALE by this run and stays uncaptured; it is reported, never gated. Gates at this recording: 832 tests pass, conformance 1,957 passed / 1 FAILED / 223 unsupported / 165 no counterpart, and the one FAILED row is decision 2 (see M7-STATUS.md), not a regression.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 722263 -> 735419 bytes",
+        "core + parsed equivalent: source graph grew 714018 -> 727174 bytes"
+      ]
+    },
+    {
+      "reason": "M7 clause-12 follow-up: all three of Java's lookup-reachable requireWellFormed ingress sites (Locale override, localeResolver result, Requested locale) plus the Instance locale surface, and the once-normalized matcher input the new diff:lookup matcher ingress uncovered. 25/24 modules unchanged; the growth is requireJdkWellFormedLocale, LOCALE_INGRESS_DESCRIPTION and the docblocks recording the measurements.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 735419 -> 746467 bytes",
+        "core + parsed equivalent: source graph grew 727174 -> 738222 bytes"
+      ]
+    },
+    {
+      "reason": "M7 clause-12 follow-up: the runner's WRAPPED-vs-RETHROWN model. Source delta is comment-only in src/core/index.js (attemptedLocaleRefusal's stale 'no value of this constructor makes the row green' paragraph, re-measured and rewritten). Modules unchanged at 25/24.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 746467 -> 746939 bytes",
+        "core + parsed equivalent: source graph grew 738222 -> 738694 bytes"
+      ]
+    },
+    {
+      "reason": "M7 clause 12 close: all three of Java's lookup-reachable requireWellFormed sites, plus the runner's wrapped-vs-rethrown distinction. +8,249 bytes in BOTH graphs, 25/24 modules unchanged; the equal delta is the standing evidence that lokalized/negotiate and its 806-class IANA table remain unreachable from src/index.js. Cumulative against the pushed HEAD this clause moved src/core/index.js +24,084 (the attempted-locale chain refusals at their Java cause in the TranslationResult constructor, plus the per-call and ambient ingress validations Java runs BEFORE the walk), src/internal/locale-jdk-tag.js +12,142 (jdkLocaleWellFormed, modelling Locale.Builder#setLocale) and src/negotiate/index.js +2,018 (the matchFor-reachable third site) -- of which only the first two are in either graph. THE BEHAVIOURAL POINT, measured: with a fallbackPolicy and onFailure installed over catalogs {fr}, Java records calls=[] for en-x-lvariant-NY because the options are never built, where the port previously ran a whole walk Java never starts. All seven differentials now exit 0, including diff:lookup at 283,962 end-to-end lookups; conformance 1,960 passed / 0 FAILED / 221 unsupported, 849 tests.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 746939 -> 755188 bytes",
+        "core + parsed equivalent: source graph grew 738694 -> 746943 bytes"
       ]
     }
   ],

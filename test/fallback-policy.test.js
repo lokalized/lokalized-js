@@ -296,7 +296,21 @@ describe("what the policy is handed", () => {
       fallbackPolicy: /** @type {any} */ (() => null),
     });
 
-    assert.throws(() => strings.getResult("Absent"), /must return a boolean/);
+    assert.throws(() => strings.getResult("Absent"), /^TypeError: fallbackPolicy returned null$/);
+  });
+
+  // The OTHER arm of the same guard. Java's type system makes a non-boolean unreachable, so there is
+  // no Java wording to match here and this message is the port's own — which is exactly why the pair
+  // matters: one arm reproduces Java's shape, the other must NOT be pulled into it.
+  it("refuses a non-null, non-boolean policy return with its own wording", () => {
+    const strings = createStrings({
+      fallbackLocale: "en",
+      locale: "de",
+      strings: { en: { Present: "here" } },
+      fallbackPolicy: /** @type {any} */ (() => "yes"),
+    });
+
+    assert.throws(() => strings.getResult("Absent"), /must return a boolean; received "yes"/);
   });
 });
 
@@ -383,7 +397,13 @@ describe("createStrings({ onFailure })", () => {
   it("refuses a handler that returns nothing at all", () => {
     const strings = createStrings({ ...MISSING, onFailure: /** @type {any} */ (() => undefined) });
 
-    assert.throws(() => strings.getResult("Absent"), /must return a failure response object/);
+    assert.throws(() => strings.getResult("Absent"), /^TypeError: onFailure returned null$/);
+  });
+
+  it("refuses a non-null, non-object handler return with its own wording", () => {
+    const strings = createStrings({ ...MISSING, onFailure: /** @type {any} */ (() => 42) });
+
+    assert.throws(() => strings.getResult("Absent"), /must return a failure response object; received 42/);
   });
 });
 

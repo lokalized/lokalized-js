@@ -32,7 +32,12 @@ import {
 } from "../internal/expression.js";
 import { interpolateFailureKey, render } from "../internal/interpolate.js";
 import { canonicalLanguageTag, equivalentTags } from "../internal/locale-cldr.js";
-import { javaSplit } from "../internal/locale-jdk-tag.js";
+import {
+  javaSplit,
+  jdkLocaleWellFormed,
+  LOCALE_INGRESS_DESCRIPTION,
+  requireJdkWellFormedLocale,
+} from "../internal/locale-jdk-tag.js";
 import {
   candidateChain,
   compareTags,
@@ -43,7 +48,7 @@ import {
   resolveTiebreakers,
 } from "../internal/locale.js";
 import { incompleteLanguageFormReporter } from "../internal/parse-warnings.js";
-import { PLURAL_DATA_RUNTIME } from "../internal/plural.js";
+import { PLURAL_DATA_RUNTIME, UnsupportedLocaleError } from "../internal/plural.js";
 
 /** @typedef {import("../internal/catalog.js").Definition} Definition */
 /** @typedef {import("../internal/parse-warnings.js").LocalizedStringWarning} LocalizedStringWarning */
@@ -350,6 +355,93 @@ function placeholderRecord(placeholders) {
 }
 
 /**
+ * Java's `TranslationResult` CONSTRUCTOR validation of the accumulated attempted locales
+ * (`TranslationResult.java:114-126`), returned as a refusal rather than thrown.
+ *
+ * TWO REFUSALS, IN THIS ORDER, PER ELEMENT — and the order is observable, not cosmetic. Java runs
+ * `LocaleUtils.requireWellFormed` on each attempted locale and only then adds its lowercased
+ * `toLanguageTag()` to a `LinkedHashSet`, so an element that is BOTH ill-formed and a case-
+ * insensitive duplicate of an earlier one reports ill-formedness. The `ja-JP-x-lvariant-JP` chain is
+ * exactly that element: `ja-JP-u-ca-japanese-x-lvariant-jp` collides with candidate 0 and is
+ * unspellable as a `Locale`, and Java names the well-formedness failure.
+ *
+ * WHERE THIS IS CALLED IS THE WHOLE BEHAVIOUR. Java validates the list a RESULT is built from, never
+ * the chain, so the refusal bites only on the prefix the walk actually reached: with catalogs
+ * {en, fr} the same `en-US-x-lvariant-POSIX` request serves at `en` and never sees the colliding
+ * fourth candidate. A port that validated `candidateChain`'s output up front would refuse where Java
+ * answers, which is a NEW divergence in the opposite direction — `lvariant.early-serve.*` are the
+ * four corpus rows that catch it.
+ *
+ * RETURNED, NOT THROWN, because the two call sites dispose of it the two different ways Java's own
+ * code layout does. On the success path the construction sits INSIDE the `try` that wraps
+ * `getInternal`, so the exception becomes that candidate's `RESOLUTION_FAILURE` cause and the walk
+ * carries on; the port's `try` deliberately covers the render and nothing else (see the comment
+ * there), so routing the refusal by hand is what keeps both properties. On the failure path the
+ * construction is outside every `try` and the exception escapes to the caller — which is why a
+ * refusing lookup reports its failure to `onFailure` AND then throws, and why the escaping error is
+ * a SECOND object rather than the retained cause.
+ *
+ * `TypeError` on both, for want of a plan sentence: plan 2.2 scopes malformed-input refusal to the
+ * caller's own direct locale, and these locales are SYNTHESIZED by the chain. Java raises
+ * `IllegalArgumentException`, whose declared JS counterpart in this port is `TypeError`/`RangeError`
+ * (`tools/conformance.mjs`'s `ERROR_NAME`), and a wrong-kind value is a `TypeError` rather than a
+ * `RangeError`.
+ *
+ * `TypeError` IS NOW THE SATISFYING VALUE, AND THIS PARAGRAPH USED TO SAY NO VALUE WAS. It read:
+ * "`ERROR_NAME` (the `thrown` channel) permits `TypeError | RangeError`, `CAUSE_NAME` (the
+ * `failures[].causeType` channel) demands exactly `Error` … NO VALUE OF THIS CONSTRUCTOR MAKES THE
+ * ROW GREEN", over a measurement reporting 1,957 passed / 1 FAILED. That was a true statement about
+ * a runner that could not tell WHICH `IllegalArgumentException` it was naming, and it is stale now
+ * that the runner can: `causeNamesFor` recognizes that the failure's cause and the escaping throw
+ * come from the SAME construction site — same class, same message, and the corpus's new
+ * `thrown.identicalToRetainedCause` says they are nevertheless two objects — and lets `ERROR_NAME`
+ * name both. The two tables no longer disagree about this site.
+ *
+ * RE-MEASURED HERE, by swapping only the two constructors below and reading `$?` from a redirected
+ * `npm run conformance`:
+ *
+ *   raising `TypeError`  ->  1,960 passed / 0 FAILED / 221 unsupported, exit 0
+ *   raising `Error`      ->  1,957 passed / 3 FAILED, and all three `lvariant.exhausting-walk.*`
+ *                            rows fail on BOTH `.thrown.name` and `.failures[0].causeType`,
+ *                            each wanting `TypeError or RangeError` and getting `Error`
+ *
+ * So this constructor is load-bearing and gated, in both directions, on all three rows — not a
+ * choice made to satisfy an inconsistency. `TypeError` rather than `RangeError` for the reason the
+ * paragraph above gives: a wrong-kind value.
+ *
+ * The ill-formed message names the port's own normalized TAG where Java's names a `Locale#toString`
+ * (`ja_JP_jp_#u-ca-japanese`). That representation does not exist in this port and inventing it for
+ * one diagnostic would be worse than diverging; the two Java spellings are pinned EXACTLY against
+ * these two JS strings in `conformance.mjs`'s `DECLARED_MESSAGE_DIVERGENCES`, which fails the run
+ * STALE if the port ever starts reproducing Java verbatim. The duplicate message already does
+ * reproduce Java verbatim, because `toLanguageTag()` is what this port speaks, and it carries no
+ * entry.
+ *
+ * @param {readonly string[]} attemptedLocales
+ * @returns {TypeError | null} the refusal Java's constructor would raise, or null
+ */
+function attemptedLocaleRefusal(attemptedLocales) {
+  /** @type {Set<string>} */
+  const languageTags = new Set();
+
+  for (const attemptedLocale of attemptedLocales) {
+    if (!jdkLocaleWellFormed(attemptedLocale))
+      return new TypeError(`Attempted locale '${attemptedLocale}' is not a well-formed IETF BCP 47 locale`);
+
+    const normalizedLanguageTag = attemptedLocale.toLowerCase();
+
+    if (languageTags.has(normalizedLanguageTag))
+      return new TypeError(
+        `Attempted locales must not contain duplicate language tag '${attemptedLocale}'`,
+      );
+
+    languageTags.add(normalizedLanguageTag);
+  }
+
+  return null;
+}
+
+/**
  * `DefaultTranslationFailure` plus `TranslationFailure#getMessage`'s default method.
  *
  * The message is reproduced VERBATIM from Java, including the `MISSING_TRANSLATION` spelling of the
@@ -464,6 +556,26 @@ export function createStrings(options) {
   // catalog anything can be served from, and only the first is what the ambient locale defaults to.
   const configuredFallbackLocale = normalizeTag(options.fallbackLocale);
 
+  // THE FIRST OF THREE CONSTRUCTION INGRESS CHECKS — `LocaleUtils.requireWellFormed(fallbackLocale,
+  // "Fallback locale")`, which Java runs at BOTH `Strings.java:211` (the builder's entry point) and
+  // `DefaultStrings.java:248` (the constructor's first statement, before the
+  // `localizedStringSupplier` null check at `:250`). The port has one construction entry point, so
+  // the two Java sites collapse to one here and the ordering against the `strings` refusal below is
+  // preserved.
+  //
+  // MEASURED, not inferred, on pinned Corretto 21 against `lokalized-3.0.0.jar`: catalogs installed
+  // under `Locale.forLanguageTag("en-x-lvariant-NY")` (= `en__NY`) make Java refuse with
+  // `Fallback locale 'en__NY' is not a well-formed IETF BCP 47 locale`, while the port BUILT the
+  // instance and reported `getSupportedLocales() = ["en-x-lvariant-NY"]`. That is a servable catalog
+  // Java cannot construct — behaviour, not wording.
+  //
+  // THE CORPUS IS BLIND TO ALL THREE OF THESE SITES, measured: every locale spelled by every
+  // fixture — catalog keys, fallback locales, instance locales and tiebreaker lists — is
+  // `jdkLocaleWellFormed`, 0 exceptions across 2,346 cases. Adding these checks moves no conformance
+  // row in either direction. What gates them is `tools/lookup-diff/`'s `C` line (the `illformed-*`
+  // catalog sets, which exist for exactly this axis) and `test/construction-ingress.test.js`.
+  requireJdkWellFormedLocale(configuredFallbackLocale, LOCALE_INGRESS_DESCRIPTION.fallbackLocale);
+
   // `DefaultStrings.java:250` — the catalog SOURCE is absent. Java's counterpart is a null
   // `localizedStringSupplier`; the JS analogue is an absent `strings`, because `createStrings` takes
   // the catalog map itself rather than a supplier of one.
@@ -521,7 +633,19 @@ export function createStrings(options) {
   // `VectorOracle` ignores a fixture's `instanceLocale` whenever it installs a supplier
   // (`VectorOracle.java:268-276`). The exclusion above is what makes that unobservable rather than
   // merely unlikely.
-  const ambientLocale = normalizeTag(options.locale ?? options.fallbackLocale);
+  //
+  // THE RAW SPELLING IS WHAT TRAVELS, and its normalized twin is deliberately NOT kept. Two
+  // consumers want two different things: `lookupLocale` wants the NORMALIZED tag (the corpus row
+  // named above), and it computes it at the ingress; the SELECTION channel wants the raw one,
+  // because Java's `matchFor(Locale)` normalizes exactly once and this port's matcher kernel
+  // normalizes whatever it is handed. See `localeLookupFor`'s per-call arm for the measurement that
+  // separates them.
+  //
+  // `normalizeTag`'s RESULT is discarded here and its THROW is not: a malformed configured locale is
+  // still refused at construction rather than at the first lookup, which is unchanged behaviour and
+  // is what `owed-construct.*` records.
+  const ambientLocaleSource = options.locale ?? options.fallbackLocale;
+  normalizeTag(ambientLocaleSource);
 
   // A callback of the wrong SHAPE is a configuration mistake and is refused here; a callback that
   // misbehaves at runtime is not, and becomes the current candidate's resolution failure instead.
@@ -615,6 +739,15 @@ export function createStrings(options) {
       throw new TypeError("Null locale encountered in supplied localized strings");
 
     const locale = normalizeTag(tag);
+
+    // THE SECOND CONSTRUCTION INGRESS CHECK — `LocaleUtils.requireWellFormed(locale, "Localized
+    // strings locale")` (`DefaultStrings.java:276`). ORDER IS JAVA'S: after the null-key refusal at
+    // `:273` and BEFORE the duplicate-language-tag refusal at `:280`, so a catalog map that is both
+    // ill-formed and colliding answers the well-formedness refusal, as Java does. Measured on the
+    // pinned JDK: `{fr, en__NY}` gives `Localized strings locale 'en__NY' is not a well-formed IETF
+    // BCP 47 locale`, where the port BUILT and served both catalogs.
+    requireJdkWellFormedLocale(locale, LOCALE_INGRESS_DESCRIPTION.localizedStringsLocale);
+
     // `DefaultStrings.java:280`. One check for both collisions Java has one check for: two spellings
     // that normalize identically (`en` and `EN`), and two that normalize to tags differing only in
     // case (`en-US-POSIX` and `en-US-posix`).
@@ -881,8 +1014,31 @@ export function createStrings(options) {
       );
 
     if (perCallLocale != null) {
-      const lookupLocale = normalizeTag(perCallLocale);
-      return { lookupLocale, localeMatch: matchFor(lookupLocale, supported, fallbackLocale, tiebreakers) };
+      // `LocaleUtils.requireWellFormed(locale, "Locale override")` — BOTH of Java's copies,
+      // `TranslationOptions.java:73` (the constructor) and `:310` (the builder setter), which are
+      // one site to a JS caller because an options OBJECT has no separate builder.
+      //
+      // BEFORE THE WALK, and that is the observable half. Java refuses here, so `calls=[]`: no
+      // candidate is attempted, the `fallbackPolicy` is never consulted and `onFailure` never
+      // fires. Measured on the pinned JDK with catalogs {fr} and both callbacks installed,
+      // `en-x-lvariant-NY` gave Java `calls=[]` and this port
+      // `[policy:en-x-lvariant-NY, policy:en-x-lvariant, policy:en, policy:en-x-lvariant-ny,
+      // onFailure:en-x-lvariant-NY]` — a whole walk Java never starts. `attemptedLocaleRefusal`
+      // eventually refused the same input, so the OUTCOME agreed and the TRACE did not.
+      const lookupLocale = requireJdkWellFormedLocale(
+        normalizeTag(perCallLocale), LOCALE_INGRESS_DESCRIPTION.perCallLocale);
+      // THE CALLER'S OWN SPELLING GOES TO THE MATCHER, not `lookupLocale`. `DefaultStrings:2439`
+      // is `matchFor(requestedLocale)` on the RAW `Locale`, and `matchFor(Locale)` builds its range
+      // from `locale.toLanguageTag()` — ONE normalization. The kernel here normalizes its argument
+      // too, so handing it the already-normalized tag normalizes TWICE, and the two differ for one
+      // family: a non-lowercase `und` followed only by private use, where the second application
+      // drops the `und`. Measured against the pinned JDK for `UND-x-a`, catalogs {fr, nb, nn}: Java
+      // reports `requestedLanguageRanges [und-x-a]` and a double-normalizing port `[x-a]`.
+      // `lookupLocale` is unaffected and stays the normalized tag the corpus records.
+      return {
+        lookupLocale,
+        localeMatch: matchFor(perCallLocale, supported, fallbackLocale, tiebreakers),
+      };
     }
 
     if (perCallMatch != null) {
@@ -909,12 +1065,29 @@ export function createStrings(options) {
     // `normalizeTag` raises for the same class of input. The REQUESTED tag survives: a resolver that
     // answers `zh-TW` against catalogs holding only `zh`, `zh-Hant` and `en` still attempts `zh-TW`
     // first, which is exactly what separates this arm from the two match arms above.
-    const requested = localeResolver === null ? ambientLocale : localeResolver();
+    const requested = localeResolver === null ? ambientLocaleSource : localeResolver();
 
     if (requested == null) throw new TypeError("localeResolver returned null");
 
-    const lookupLocale = normalizeTag(requested);
-    return { lookupLocale, localeMatch: matchFor(lookupLocale, supported, fallbackLocale, tiebreakers) };
+    // The refusal `:2457` names, at the point `:2457` runs: after the resolver has answered and
+    // before `matchFor` or any candidate sees the tag.
+    //
+    // THE DESCRIPTION DEPENDS ON THE SOURCE because Java's does. A resolver answered it, so the
+    // resolver is named; a constant `createStrings({ locale })` is a port affordance Java has no
+    // setter for, and it gets its own phrase rather than borrowing a callback name nobody
+    // installed. See `LOCALE_INGRESS_DESCRIPTION`, which is where that reasoning lives.
+    const lookupLocale = requireJdkWellFormedLocale(
+      normalizeTag(requested),
+      localeResolver === null
+        ? LOCALE_INGRESS_DESCRIPTION.instanceLocale
+        : LOCALE_INGRESS_DESCRIPTION.localeResolverResult,
+    );
+    // `matchFor(suppliedLocale)` on the RAW value (`:2458`), for the reason recorded on the per-call
+    // arm above: the kernel normalizes what it is given, and Java normalizes exactly once.
+    return {
+      lookupLocale,
+      localeMatch: matchFor(requested, supported, fallbackLocale, tiebreakers),
+    };
   }
 
   /**
@@ -1084,6 +1257,20 @@ export function createStrings(options) {
         }
       }
 
+      // `TranslationResult`'s constructor runs INSIDE the `try` at `DefaultStrings.java:713-726`, so
+      // an attempted-locale refusal is caught as THIS candidate's `RESOLUTION_FAILURE` and the walk
+      // continues exactly as it would after a throwing render — same reason, same first-cause
+      // retention, same policy consultation. The port's own `try` covers the render alone, on
+      // purpose (see above), so the refusal is routed by hand rather than by widening that scope.
+      const attemptedRefusal = translation === null ? null : attemptedLocaleRefusal(attempted);
+
+      if (attemptedRefusal !== null) {
+        translation = null;
+        attemptFailureReason = "resolution-failure";
+        attemptCause = attemptedRefusal;
+        if (firstFailureCause === null) firstFailureCause = attemptedRefusal;
+      }
+
       if (translation !== null) {
         // ONE frozen list again, shared by the result and the event, on the same rule the failure
         // path states below for the failure and its result.
@@ -1163,10 +1350,18 @@ export function createStrings(options) {
       // `requireNonNull(..., "translationFallbackPolicy returned null")` (DefaultStrings.java:735).
       // Refused rather than coerced: a policy returning `undefined` is a caller mistake, and reading
       // it as "stop" would silently truncate every walk it governs. No corpus row reaches this — the
-      // oracle NOW HAS a return-null behavior (plan open question 7, closed at M7 close-out), so
-      // the corpus records what Java does here. Java's own message names the JAVA option
-      // `translationFallbackPolicy`; this one names the JS option, which is a DECLARED divergence
-      // pinned in conformance.mjs's DECLARED_MESSAGE_DIVERGENCES and gated stale if it ever matches.
+      // TWO ARMS, because Java only has something to say about one of them.
+      //
+      // Java's guard is `requireNonNull(..., "translationFallbackPolicy returned null")`
+      // (`DefaultStrings.java:735`), recorded by the oracle's return-null behavior. We reproduce its
+      // SHAPE with the JS option name, which is what `localeResolver`/`localeMatchResolver` already
+      // do at `:900`/`:914` — the port speaking one dialect rather than three. The remaining
+      // difference from Java is the identifier alone, declared in conformance.mjs's
+      // DECLARED_MESSAGE_DIVERGENCES and gated STALE if it ever stops differing.
+      if (shouldTryNextLocale == null) throw new TypeError("fallbackPolicy returned null");
+
+      // Java's type system makes a non-boolean unreachable, so there is no Java wording to match and
+      // nothing to declare: this arm is the port's own, and it stays informative.
       if (typeof shouldTryNextLocale !== "boolean")
         throw new TypeError(
           "The configured fallbackPolicy must return a boolean; received " +
@@ -1196,7 +1391,12 @@ export function createStrings(options) {
     // separate candidates for three distinct reasons.
     const response = onFailure(translationFailure);
 
-    if (response === null || typeof response !== "object")
+    // Two arms, for the reason given at the fallbackPolicy guard above: Java's
+    // `requireNonNull(..., "TranslationFailureHandler returned null")` speaks only to the null case,
+    // so that arm reproduces its shape with the JS option name and the rest stays the port's own.
+    if (response == null) throw new TypeError("onFailure returned null");
+
+    if (typeof response !== "object")
       throw new TypeError(
         "The configured onFailure handler must return a failure response object; received " +
           `${JSON.stringify(response) ?? String(response)}`,
@@ -1239,6 +1439,16 @@ export function createStrings(options) {
    * @param {string} translation
    */
   function failureResult(translationFailure, status, translation) {
+    // The SECOND run of `TranslationResult`'s constructor validation, and the one that escapes.
+    // `DefaultStrings.java:754/759` build the handler's result OUTSIDE every `try`, so a refusal the
+    // walk already reported to `onFailure` as a `RESOLUTION_FAILURE` cause now reaches the caller —
+    // and reaches it as a NEW error, because Java re-enters the constructor rather than rethrowing
+    // what it caught. `THROW_EXCEPTION` is deliberately not covered: `throwExceptionFor`
+    // (`DefaultStrings.java:3196-3213`) builds no result, so it rethrows the retained cause by
+    // identity, which `throwForFailure` already does.
+    const refusal = attemptedLocaleRefusal(translationFailure.attemptedLocales);
+    if (refusal !== null) throw refusal;
+
     return freeze({
       key: translationFailure.key,
       translation,
@@ -1265,13 +1475,82 @@ export function createStrings(options) {
    */
   const get = (key, placeholders, callOptions) => getResult(key, placeholders, callOptions).translation;
 
+  /**
+   * The exact-locale lookup both inspection members share, sorted the way Java's `TreeSet` sorts.
+   *
+   * A case-normalized spelling of the same serialized tag is accepted because `normalizeTag` folds
+   * it; an absent CLDR-EQUIVALENT tag is not, because `normalizeTag` performs JDK normalization and
+   * not CLDR aliasing — `mo` stays `mo` and does not find a loaded `ro`. Plan 3.3:773 names exactly
+   * that distinction.
+   */
+  const keysForExactLocale = (/** @type {string} */ locale, /** @type {string} */ description) => {
+    // THE INSPECTION INGRESS — `LocaleUtils.requireWellFormed` at `DefaultStrings.java:2713`
+    // ("Locale"), `:2735` ("Source locale") and `:2736` ("Target locale"). It is Java's FIRST
+    // statement in both members, before the support test, and the two questions are genuinely
+    // different: measured on pinned Corretto 21, `getKeysForLocale(en__NY)` answers `Locale 'en__NY'
+    // is not a well-formed IETF BCP 47 locale` while `getKeysForLocale(de)` — a well-formed locale
+    // that is simply absent — answers `Locale 'de' is not supported`.
+    //
+    // THE PORT ANSWERED THE SUPPORT QUESTION TO BOTH, which is a wrong-site refusal: an ill-formed
+    // locale came back as `UnsupportedLocaleError: Unsupported locale 'en-x-lvariant-NY' was
+    // provided`, reporting a catalog that is missing where Java reports a locale that cannot exist.
+    // The support half is unchanged and is deliberately NOT Java's wording — plan 3.3:771 names
+    // `UnsupportedLocaleError` and its sentence, and that decision is out of scope here.
+    //
+    // NOTHING ELSE GATES THIS: no differential drives inspection and no corpus row reaches it (the
+    // Java branches are `required` and still owe a case, because fixing the PORT closes no JAVA
+    // branch). `test/inspection.test.js` is its whole specification, and it carried no
+    // well-formedness assertion until this change.
+    const normalized = requireJdkWellFormedLocale(normalizeTag(locale), description);
+    const catalog = catalogs.get(normalized);
+    if (catalog === undefined) throw new UnsupportedLocaleError(normalized);
+    return [...catalog.keys()].sort();
+  };
+
   return freeze({
     get,
     t: get,
     getResult,
     getSupportedLocales: () => freeze([...supported]),
+    /**
+     * Plan 3.3:771. INSPECTION IS EXACT-LOCALE-ONLY: normalize, then look the tag up exactly. No
+     * equivalence, no negotiation, no fallback — which is what separates this from every other
+     * locale-taking member here.
+     *
+     * Two defects were measured against Java on 2026-09-06 and are fixed here. (1) An unsupported
+     * locale returned `[]`, where Java throws (`DefaultStrings.java:2718-2720`); the port refused
+     * nothing at all, so a caller inspecting a locale it had never loaded got silence instead of an
+     * answer. (2) Keys came back in catalog INSERTION order, where Java's `TreeSet` returns them
+     * sorted; `sort()` on UTF-16 code units is `String.compareTo`'s ordering, so the two agree.
+     *
+     * The thrown type follows PLAN 3.3, not Java: Java raises `IllegalArgumentException`, the plan
+     * names `UnsupportedLocaleError`, and this is a JS-facing inspection API. No corpus row exercises
+     * it, so nothing arbitrates between them today — deliberately NOT papered over by widening
+     * `conformance.mjs`'s shared `IllegalArgumentException` row, which would weaken 34 unrelated
+     * comparisons to settle one unmeasured case.
+     */
     getKeysForLocale: (/** @type {string} */ locale) =>
-      freeze([...(catalogs.get(normalizeTag(locale))?.keys() ?? [])]),
+      freeze(keysForExactLocale(locale, LOCALE_INGRESS_DESCRIPTION.inspectionLocale)),
+
+    /**
+     * Plan 3.3:773 — the same exact-locale rule applied INDEPENDENTLY to source and target, so an
+     * unsupported target is refused even when the source is fine. Java validates in that order too
+     * (`DefaultStrings.java:2735-2741`).
+     */
+    getMissingKeys: (/** @type {string} */ sourceLocale, /** @type {string} */ targetLocale) => {
+      // BOTH WELL-FORMEDNESS CHECKS RUN BEFORE EITHER SUPPORT CHECK, because that is Java's order
+      // (`:2735`, `:2736`, then `:2738` and `:2741`) and the difference is observable: with an
+      // unsupported source and an ill-formed target, Java answers `Target locale '…' is not a
+      // well-formed IETF BCP 47 locale` and a port that simply resolved source-then-target would
+      // answer that the SOURCE is unsupported. Validating inside `keysForExactLocale` alone would
+      // interleave the four checks and produce exactly that wrong answer.
+      requireJdkWellFormedLocale(normalizeTag(sourceLocale), LOCALE_INGRESS_DESCRIPTION.sourceLocale);
+      requireJdkWellFormedLocale(normalizeTag(targetLocale), LOCALE_INGRESS_DESCRIPTION.targetLocale);
+
+      const source = keysForExactLocale(sourceLocale, LOCALE_INGRESS_DESCRIPTION.sourceLocale);
+      const target = new Set(keysForExactLocale(targetLocale, LOCALE_INGRESS_DESCRIPTION.targetLocale));
+      return freeze(source.filter((key) => !target.has(key)));
+    },
     getLocaleConfiguration: () =>
       // `tiebreakers` is a RECORD here even when none were configured, per the `LocaleConfiguration`
       // declaration in plan 3.2, which types it `Readonly<Record<...>>` rather than nullable. Null
@@ -1287,12 +1566,36 @@ export function createStrings(options) {
     isCatalogComplete: () => true,
     getLoadVerification: () => null,
     getWarnings: () => freeze([...warnings]),
-    /** The narrow, side-effect-free observation of core's automatic direct-locale path. */
+    /**
+     * The narrow, side-effect-free observation of core's automatic direct-locale path.
+     *
+     * Plan 3.3 declares this the counterpart of `Strings#matchFor(Locale)`, so it carries that
+     * method's ingress check: `LocaleUtils.requireWellFormed(locale, "Requested locale")` at
+     * `LocaleMatcher.java:64`, the default interface method every `matchFor(Locale)` and
+     * `bestMatchFor(Locale)` call enters through. `src/negotiate/index.js` carries the same check
+     * on the same locale for the standalone negotiator's two locale doors.
+     *
+     * INVISIBLE FROM THE LOOKUP SITES ABOVE, which is why implementing only those would have been
+     * the probe-space trap: `localeLookupFor` validates first, so Java's `matchFor(requestedLocale)`
+     * at `DefaultStrings.java:2439` and `:2458` can never be the refusal a lookup observes. This
+     * site is only reachable when a caller asks the SELECTION channel directly, and the corpus
+     * already carries three controls that must keep ANSWERING it —
+     * `lvariant.exhausting-walk.{en-us-posix,ja-jp,th-th}.selection-channel-does-not-refuse`, whose
+     * locales denote `en_US_POSIX`, `ja_JP_JP` and `th_TH_TH`, all three of which
+     * `Locale.Builder#setLocale` accepts (the last two by explicit legacy special case).
+     */
     getDirectLocaleContext: (/** @type {string} */ locale) => {
-      const lookupLocale = normalizeTag(locale);
+      const lookupLocale = requireJdkWellFormedLocale(
+        normalizeTag(locale), LOCALE_INGRESS_DESCRIPTION.requestedLocale);
+      // The caller's own spelling into the matcher, `lookupLocale` out of the observation — the
+      // same split, for the same measured reason, as `localeLookupFor`'s two arms. This site is
+      // where the double normalization was CAUGHT: `diff:lookup`'s new matcher ingress reported 42
+      // rows where Java answered `requestedLanguageRanges [und-x-a]` and this port `[x-a]`, all of
+      // them a non-lowercase `und` followed only by private use, and none of them reachable through
+      // the two lookup ingresses the tool already drove.
       return freeze({
         lookupLocale,
-        localeMatch: freeze(matchFor(lookupLocale, supported, fallbackLocale, tiebreakers)),
+        localeMatch: freeze(matchFor(locale, supported, fallbackLocale, tiebreakers)),
       });
     },
   });
@@ -1416,15 +1719,20 @@ export function chooseLocaleForPreferredLanguages(configuration, languages) {
     // to abandon the preferences that follow it.
     if (typeof preference !== "string") continue;
 
-    /** @type {string} */
-    let normalized;
     try {
-      normalized = normalizeTag(preference);
+      normalizeTag(preference);
     } catch {
       continue;
     }
 
-    const match = matchFor(normalized, supported, fallbackLocale, tiebreakers);
+    // THE RAW PREFERENCE, not the normalized one, for the reason `localeLookupFor` records: the
+    // kernel normalizes its argument, so passing the normalized tag normalizes twice and the two
+    // disagree for a non-lowercase `und` followed only by private use. `normalizeTag` above is the
+    // MALFORMEDNESS test and nothing else — its result is discarded, which is why it is called for
+    // its throw. The chooser has no Java counterpart to diverge from, and it is aligned here anyway
+    // so that "which locale does this range select" has ONE answer across every matcher ingress in
+    // the port rather than an answer per door.
+    const match = matchFor(preference, supported, fallbackLocale, tiebreakers);
 
     // `locale` is non-null for every matched result the kernel can produce, and the guard is here so
     // the return type is a tag rather than a tag-or-null: reading `isMatch` alone and returning
@@ -1780,8 +2088,9 @@ function validateTiebreakers(supported, tiebreakers) {
 
     // Normalized before comparison because Java compares `Locale` instances and not the caller's
     // spelling: `en-us` and `en-US` are one locale to `Locale.forLanguageTag`, and an instance Java
-    // builds must not be refused here over a lowercase region. An ill-formed tag raises
-    // `normalizeTag`'s own error, where Java raises `requireWellFormed`'s.
+    // builds must not be refused here over a lowercase region. A tag `normalizeTag` cannot parse
+    // raises its error; one it parses into a `Locale` that `Locale.Builder` will not take back is
+    // refused just below, at the site and with the sentence Java refuses it with.
     /** @type {string[]} */
     const provided = [];
 
@@ -1797,6 +2106,21 @@ function validateTiebreakers(supported, tiebreakers) {
         );
 
       const validated = normalizeTag(locale);
+
+      // THE THIRD CONSTRUCTION INGRESS CHECK — `LocaleUtils.requireWellFormed(locale, "Tiebreaker
+      // locale")` (`DefaultStrings.java:347`). ORDER IS JAVA'S: after the null-entry refusal at
+      // `:343` and BEFORE the duplicate refusal at `:349`.
+      //
+      // IT IS REACHABLE ON ITS OWN, which is why it is a third check and not a consequence of the
+      // second: measured on the pinned JDK with WELL-FORMED catalogs `{fr, en, en-US}` and
+      // `tiebreakerLocalesByLanguageCode = {en: [en__NY, en]}`, Java answers `Tiebreaker locale
+      // 'en__NY' is not a well-formed IETF BCP 47 locale`. The port answered the unrelated
+      // missing-tiebreaker refusal instead, because an ill-formed tiebreaker simply failed to match
+      // any loaded catalog — a wrong-site refusal naming neither the offending locale nor the real
+      // mistake. The loop head's comment used to say an ill-formed tag "raises `normalizeTag`'s own
+      // error, where Java raises `requireWellFormed`'s"; that was true of a tag `normalizeTag`
+      // REFUSES and silently false of one it accepts, which is this entire class.
+      requireJdkWellFormedLocale(validated, LOCALE_INGRESS_DESCRIPTION.tiebreakerLocale);
 
       // `DefaultStrings.java:349`. A repeat is not a harmless spelling of the same preference: this
       // list IS the resolution order for an ambiguous language code, so a caller who wrote one
@@ -2243,11 +2567,37 @@ function resolvePluralData(supplied, catalogs) {
  * Java's two `instanceof` guards (`RuntimeException`, `Error`) have no JS counterpart and need
  * none: every JS value is throwable, so the checked-exception fallthrough they guard cannot arise.
  *
+ * THE THIRD ATTEMPTED-LOCALE VALIDATION SITE, and this docblock USED TO DENY IT EXISTED. It said
+ * `failureResult`'s sibling check was "deliberately not covered [here]: `throwExceptionFor` builds
+ * no result, so it rethrows the retained cause by identity". The first half is true and the
+ * conclusion does not follow — when there is NO cause to rethrow, `throwExceptionFor` constructs a
+ * `MissingTranslationException`, and THAT constructor
+ * (`MissingTranslationException.java:130-166`) runs the same `requireWellFormed` +
+ * duplicate-language-tag loop as `TranslationResult`'s. MEASURED on the pinned Corretto 21 against
+ * `lokalized-3.0.0.jar`, catalogs {fr, nb, nn}, fallback fr, a handler answering `THROW_EXCEPTION`,
+ * and a key NO catalog holds:
+ *
+ *   `en-US-x-lvariant-POSIX` -> java IllegalArgumentException `Attempted locales must not contain
+ *                                   duplicate language tag 'en-US-posix'`
+ *                              js   MissingTranslationError   `No match for 'Absent' was found …`
+ *
+ * It was invisible to `npm run conformance` (no corpus row pairs a throwing handler with an
+ * unanswerable key and an lvariant chain) and to every layer differential, and it needed all three
+ * of `tools/lookup-diff/`'s axes at once — a throwing handler, an exhausting catalog set, and a key
+ * present in no catalog. Reaching a branch is not discriminating it.
+ *
+ * ORDER IS LOAD-BEARING and copied from `:3200-3208`: the retained cause is rethrown FIRST, by
+ * identity, and the validation runs only on the cause-less arm. A port that validated first would
+ * replace the 25 corpus rows' rethrown-by-identity causes with a refusal.
+ *
  * @param {TranslationFailure} translationFailure
  * @returns {never}
  */
 function throwForFailure(translationFailure) {
   if (translationFailure.cause !== null) throw translationFailure.cause;
+
+  const refusal = attemptedLocaleRefusal(translationFailure.attemptedLocales);
+  if (refusal !== null) throw refusal;
 
   throw new MissingTranslationError(
     MISSING_TRANSLATION_TOKEN,

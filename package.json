@@ -71,7 +71,8 @@
     "diff:tokenizer": "node tools/tokenizer-diff/run.mjs",
     "diff:parse": "node tools/parse-diff/run.mjs",
     "diff:phonetic": "node tools/phonetic-diff/run.mjs",
-    "diff:interpolate": "node tools/interpolate-diff/run.mjs"
+    "diff:interpolate": "node tools/interpolate-diff/run.mjs",
+    "diff:lookup": "node tools/lookup-diff/run.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

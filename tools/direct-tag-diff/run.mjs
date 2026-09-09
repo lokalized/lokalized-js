@@ -123,7 +123,22 @@ function inputs() {
   // extension keys), the private-use tail, and a bare private-use tag.
   for (const tag of ["en-u-ca-buddhist", "en-US-u-ca-gregory-nu-latn", "en-US-u-nu-latn-ca-gregory",
     "ja-JP-u-ca-japanese", "th-TH-u-nu-thai", "en-US-u-va-posix", "en-t-jp", "en-US-t-en-latn",
-    "en-a-bbb-x-a-ccc", "en-x-private", "x-private", "en-US-x-a", "en-Latn-US-u-ca-gregory-x-a"])
+    "en-a-bbb-x-a-ccc", "en-x-private", "x-private", "en-US-x-a", "en-Latn-US-u-ca-gregory-x-a",
+    // `und` BESIDE PRIVATE USE, in every casing — ADDED after `tools/lookup-diff/` found a real
+    // `normalizeTag` defect in this family that THIS probe space could not reach.
+    // `InternalLocaleBuilder.setLanguageTag` compares the parsed primary language against the
+    // constant `"und"` with `equals`, NOT `equalsIgnoreCase`, so `und-x-a` is language-less and
+    // renders `x-a` while `UND-x-a` keeps `und` and renders `und-x-a`. Section (2)'s cartesian sweep
+    // carries `und` and never crosses it with private use; this section carried private use and
+    // never crossed it with `und`; and the distinction is invisible with any script, region or
+    // variant present, because `toLanguageTag` re-emits `und` regardless. Two complete probe spaces
+    // each missing one axis of the same product is exactly how the four IANA keys stayed hidden.
+    "und-x-a", "UND-x-a", "und-X-A", "UND-X-A", "Und-x-a", "uND-x-a", "und-x-private",
+    "UND-X-PRIVATE", "und-x-lvariant", "UND-X-LVARIANT", "und-x-lvariant-NY", "UND-X-LVARIANT-NY",
+    "und-x-lvariant-POSIX", "UND-X-LVARIANT-POSIX",
+    // The controls a fix must NOT move: with a script, a region or an extlang both spellings agree,
+    // and they agreed before this family was probed at all.
+    "und-Latn-x-a", "UND-LATN-X-A", "und-US-x-a", "UND-US-X-A", "zh-und", "zh-UND"])
     set.add(tag);
 
   // (4b) THE EDGES OF THE TWO REWRITES FIXED IN THIS SLICE. Section (3) and (4) probe the shapes the

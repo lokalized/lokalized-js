@@ -40,7 +40,8 @@
  *   | collapse `no-matching-alternative` into `missing-translation` | 30 /  1 |
  *
  * `npm run conformance` was ALSO measured under the FIRST of those — the observer entirely
- * unwired — and reports 1,917 passed / 0 FAILED / 221 unsupported / 165 no counterpart, exit 0:
+ * unwired — and reports 1,960 passed / 0 FAILED / 221 unsupported / 165 no counterpart, exit 0
+ * (re-measured; the figure read 1,917 while that was the runner's line):
  * exactly the numbers it reports with the feature present. That is the corpus blindness stated as a
  * measurement rather than as a claim, and it is why this file is written the way it is. (The last
  * row is the one exception — `no-matching-alternative` is corpus-visible through the fallback

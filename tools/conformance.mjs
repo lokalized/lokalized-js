@@ -123,23 +123,18 @@ const ERROR_NAME = {
   // two nulls at the same two points with a `TypeError`, so the counterpart is declared here rather
   // than left undeclared.
   //
-  // DECLARING IT IS THE STRONGER CHOICE AND IT COSTS FIVE RED ROWS, deliberately. Without the entry
-  // `thrownProjection`'s arm 3 reports the case `unsupported` BEFORE comparing anything, so the five
-  // `null-callbacks.*` rejection rows would verify nothing at all — not the policy's arguments, not
-  // the walk, not which of two null-answering callbacks is rejected first. With it they compare in
-  // full, and they agree with Java on every channel (`policyCalls` down to the RESOLUTION_FAILURE
-  // cause, `failures`, precedence, the two never-consulted controls) and differ ONLY in the composed
-  // message: Java says `translationFallbackPolicy returned null` / `TranslationFailureHandler
-  // returned null`, naming its own identifiers, and the port says `The configured fallbackPolicy must
-  // return a boolean; received null` / `The configured onFailure handler must return a failure
-  // response object; received null`, naming the JS options.
+  // DECLARING IT IS THE STRONGER CHOICE. Without the entry `thrownProjection`'s arm 3 reports the
+  // case `unsupported` BEFORE comparing anything, so the `null-callbacks.*` rejection rows would
+  // verify nothing at all — not the policy's arguments, not the walk, not which of two null-answering
+  // callbacks is rejected first. With it they compare in full, and all 9 `null-callbacks.*` rows pass.
   //
-  // NOT FIXED HERE, because the fix is not unambiguous and the port contradicts itself on it: for the
-  // two SUPPLIER callbacks it already answers `localeResolver returned null` (core/index.js:900,:914)
-  // — Java's shape with the JS name substituted — while these two use a different shape entirely.
-  // Which of the three wordings is the contract is the same open decision as the `LokalizedError`
-  // hierarchy (plan open question 4), so it is named and left to the user rather than settled by
-  // whichever spelling makes the gate green.
+  // IT COST FIVE RED ROWS WHEN IT WAS ADDED, AND NO LONGER DOES; this comment said so in the present
+  // tense for a batch after the reason had gone. The remaining difference from Java is the
+  // IDENTIFIER alone — Java names `translationFallbackPolicy` / `TranslationFailureHandler`, the JS
+  // options are `fallbackPolicy` / `onFailure` — and the maintainer's decision 1 settled the wording
+  // (Java's SHAPE with the JS name, matching `localeResolver` at `core/index.js:900/:914`). Those
+  // two strings are pinned EXACTLY in `DECLARED_MESSAGE_DIVERGENCES`, which fails the run STALE if
+  // the port ever reproduces Java verbatim.
   "java.lang.NullPointerException": ["TypeError"],
 };
 
@@ -460,6 +455,34 @@ const CAUSE_NAME = {
   "java.lang.IllegalArgumentException": "Error",
 };
 
+/**
+ * The milestone that owes a JS counterpart for a Java cause type `CAUSE_NAME` does not carry.
+ *
+ * THE SAME GATE `OWNER_MILESTONE` IS, FOR THE OTHER `unsupported(` CALL THAT COULD PRINT AN OWNERLESS
+ * REASON. `operationNotImplemented` throws when an operation reports unsupported without naming who
+ * owes the work, and `CLAUDE.md` records that throw as the structural fix for exactly this failure
+ * mode — but it covers OPERATIONS ONLY. `adaptCauseType` never consulted it, so the moment a corpus
+ * row recorded a cause type this table had never seen, the by-reason listing grew a line with no
+ * milestone in parentheses, standing beside four lines that all carry one. A reason nobody owns is a
+ * gap nobody has agreed to close, which is the one thing the unsupported list may not contain.
+ *
+ * DELIBERATELY EMPTY, AND THAT IS THE STRONGER STATE. It carried one entry —
+ * `java.util.IllformedLocaleException`, owed by "M7 decision 2" — on the premise that Java's
+ * escaping `IllegalArgumentException` for `ja-JP-x-lvariant-JP` wraps an `IllformedLocaleException`
+ * and that the port would have to raise a JS error of that name. THAT PREMISE WAS WRONG, and the
+ * entry was hiding the runner defect rather than owning a port gap: `IllformedLocaleException` is
+ * never the class of anything that ESCAPES, it is only the class the escaping error WRAPS, and it
+ * reached `adaptCauseType` at all only because `thrownProjection`'s arm 2 was reading
+ * `thrown.causeType` as if it named the escaping object. It does not. The wrapped cause is now
+ * compared on its own channel (`WRAPPED_CAUSE`) and the two rows PASS.
+ *
+ * The table stays because the GATE is the point: an empty one means any cause type `CAUSE_NAME` has
+ * never seen raises `AuthoringError` on the spot, which forces a decision instead of printing an
+ * ownerless line in the by-reason listing. An entry added here is a promise, so it should be rare
+ * and it should be deleted the moment the work lands — as this one was.
+ */
+const CAUSE_OWNER = {};
+
 /** The JS error name of whatever a candidate threw, in the shape `CAUSE_NAME` maps Java onto. */
 const causeNameOf = (cause) =>
   cause === null || cause === undefined ? null : cause instanceof Error ? cause.name : String(cause);
@@ -516,9 +539,11 @@ const supplierCalls = [];
  * would verify only that the runner's own `new Error` survived a function call, and mapping
  * `java.lang.IllegalStateException` into `ERROR_NAME` to do so would be worse than useless: that
  * type means two different things in this corpus, and a name table cannot tell them apart. With
- * `causeType` null it is this sentinel escaping verbatim; with `causeType` `IllegalStateException`
- * and a message beginning `Unable to resolve generated placeholder` it is the LIBRARY's error being
- * rethrown by identity. One table entry would accept either for either.
+ * `identicalToRetainedCause` false it is this sentinel escaping verbatim; with it true it is the
+ * LIBRARY's error being rethrown by identity. One table entry would accept either for either. (The
+ * distinction used to be drawn on `causeType` null-ness, which was a proxy: 34 sentinel rows and 22
+ * rethrown rows all carry `IllegalStateException`, and only the identity observation separates them
+ * without appealing to a message prefix.)
  *
  * So the sentinel arm asserts REFERENCE IDENTITY instead — `caught === sentinelThrows.at(-1)` —
  * which is strictly stronger than any name comparison and is what "propagates immediately" actually
@@ -1573,8 +1598,16 @@ function expectedResultProjection(expected) {
 /** A recorded Java cause class name, as the JS error name this port raises. @see CAUSE_NAME */
 function adaptCauseType(causeType) {
   if (causeType === null || causeType === undefined) return null;
-  if (!(causeType in CAUSE_NAME))
-    unsupported(`no JS counterpart declared for a resolution cause of type ${causeType}`);
+  if (!(causeType in CAUSE_NAME)) {
+    const owner = CAUSE_OWNER[causeType];
+    // The `operationNotImplemented` discipline, applied to the cause channel. See `CAUSE_OWNER`.
+    if (!owner)
+      throw new AuthoringError(
+        `a resolution cause of type ${causeType} reported unsupported with no entry in CAUSE_OWNER. ` +
+        `Every reason must name who owes the work; add an entry, or declare the type in CAUSE_NAME.`,
+      );
+    unsupported(`no JS counterpart declared for a resolution cause of type ${causeType} (${owner})`);
+  }
   return CAUSE_NAME[causeType];
 }
 
@@ -1601,8 +1634,8 @@ function adaptCauseType(causeType) {
  *
  * @param {unknown} resultMatch the result's own match object, or null when there is no result
  */
-function projectFailures(resultMatch) {
-  return failureCalls.map((failure) => ({
+function projectFailures(resultMatch, expected = null) {
+  return failureCalls.map((failure, index) => ({
     key: failure.key,
     reason: failure.reason,
     lookupLocale: failure.lookupLocale,
@@ -1611,7 +1644,17 @@ function projectFailures(resultMatch) {
     // Java sorts through a `TreeSet` over the placeholder keys; JS `Array#sort` is the same UTF-16
     // code-unit order. Sorted on BOTH sides by the oracle and by this line, never on one.
     placeholderNames: Object.keys(failure.placeholders).sort(),
-    causeType: causeNameOf(failure.cause),
+    // Mirrors the expected side's same-object rule: when this cause IS the row's constructed thrown
+    // exception, the THROWN table governs and any of its names is rendered identically, exactly as
+    // `thrownProjection`'s arm 3 does. Outside that shape this is `causeNameOf` unchanged.
+    causeType: (() => {
+      const actual = causeNameOf(failure.cause);
+      if (expected === null) return actual;
+      // Paired BY INDEX with the expected failure, because the actual record carries a live Error
+      // and the expected one carries a Java class name — the same pairing the comparison itself uses.
+      const names = causeNamesFor((expected.failures ?? [])[index] ?? null, expected);
+      return names !== null && names.includes(actual) ? names.join(" or ") : actual;
+    })(),
     localeMatchResult: projectMatch(failure.localeMatch ?? null),
     matchObjectIdenticalToResult: resultMatch === null ? null : failure.localeMatch === resultMatch,
   }));
@@ -1625,6 +1668,46 @@ function projectFailures(resultMatch) {
  * Java side — while the actual side is always the real recorded list, so a port that fires the
  * handler where Java never did compares non-empty against `[]` and FAILS.
  */
+/**
+ * ONE CONSTRUCTION SITE CANNOT HAVE TWO JS NAMES.
+ *
+ * `CAUSE_NAME` and `ERROR_NAME` were built independently and disagree for
+ * `java.lang.IllegalArgumentException`: as a recorded CAUSE it maps to `"Error"` (72 rows depend on
+ * that), and as a CONSTRUCTED THROW it maps to `["TypeError","RangeError"]` (34 rows depend on that).
+ * Both are right for the rows that motivated them, because in those rows the cause and the throw
+ * come from DIFFERENT sites — a render-path refusal against an ingress refusal — and the port
+ * legitimately raises a different error at each.
+ *
+ * The three `lvariant.exhausting-walk.*` rows are the ones where the two channels describe the same
+ * site. `TranslationResult`'s constructor validates the attempted-locale chain twice for one lookup:
+ * once at `DefaultStrings.java:716`, inside the walk's `try`, where the refusal is caught and
+ * retained as the failure's cause, and once at `:755`, outside every `try`, where the RETURN_KEY
+ * response rebuilds the result and the refusal escapes. Same site, same inputs, same class, same
+ * message — and two DISTINCT objects, which is why this helper is not the rethrow arm.
+ *
+ * The rule is structural, not a carve-out for an id: when a failure's cause and the row's throw come
+ * from the same site — same class, same message, and the corpus says the throw is NOT the retained
+ * object — the THROWN table governs, because the escaping error is the one whose name the port's
+ * public contract fixes and a port cannot name one site two ways.
+ *
+ * WHY THE PREDICATE MOVED. It read `thrown.causeType === null`, which was a proxy for "the throw was
+ * constructed" and is exactly the proxy `thrownProjection`'s arm 2 also had to give up: it excluded
+ * the two `ill-formed-attempted-locale` rows, whose constructed `IllegalArgumentException` WRAPS an
+ * `IllformedLocaleException`, for a reason that has nothing to do with which object escaped. The
+ * corpus now records the reference comparison, so the predicate asks for it. MEASURED over the whole
+ * corpus: three rows match this shape, and the 25 rows the rethrow arm exists for are excluded by
+ * `identicalToRetainedCause === true`, where both tables already agree or `ERROR_NAME` is silent.
+ */
+function causeNamesFor(failure, expected) {
+  const causeType = failure?.causeType ?? null;
+  const thrown = expected.thrown;
+  const sameSiteAsConstructedThrow =
+    thrown != null && causeType !== null && thrown.identicalToRetainedCause !== true &&
+    thrown.type === causeType && thrown.message === (failure?.causeMessage ?? null) &&
+    causeType in ERROR_NAME;
+  return sameSiteAsConstructedThrow ? ERROR_NAME[causeType] : null;
+}
+
 function expectedFailures(expected) {
   return (expected.failures ?? []).map((failure) => ({
     key: failure.key,
@@ -1633,7 +1716,7 @@ function expectedFailures(expected) {
     attemptedLocales: failure.attemptedLocales,
     message: failure.message,
     placeholderNames: failure.placeholderNames,
-    causeType: adaptCauseType(failure.causeType),
+    causeType: causeNamesFor(failure, expected)?.join(" or ") ?? adaptCauseType(failure.causeType),
     localeMatchResult: expectedMatchProjection(failure.localeMatchResult),
     matchObjectIdenticalToResult: failure.matchObjectIdenticalToResult,
   }));
@@ -1695,22 +1778,34 @@ const expectedPolicyCalls = (expected) =>
 
 /* --- the throw response ----------------------------------------------------------------------
  *
- * `expected.thrown` records THREE fields — `type`, `message`, `causeType` — and the three of them
- * together name which of three DIFFERENT things escaped the lookup. Collapsing them onto one error
- * table is the mistake this block exists to avoid. MEASURED, over the 116 `get`/`getResult` rows
- * that carry a `thrown` block, the corpus decomposes as:
+ * `expected.thrown` records FOUR fields — `type`, `message`, `causeType` and
+ * `identicalToRetainedCause` — and they name which of three DIFFERENT things escaped the lookup.
+ * Collapsing them onto one error table is the mistake this block exists to avoid, and reading
+ * `causeType` as if it named the escaping object is the mistake the fourth field exists to end.
  *
- *   causeType != null  (25)  the retained FIRST cause, rethrown unwrapped. `thrown.type` is the
- *                            cause's Java class, not `MissingTranslationException`: 22
- *                            `IllegalStateException`, 1 `IllegalArgumentException`, and 2
- *                            `ExpressionEvaluationException` — a type nothing else here produces.
+ * RE-MEASURED over the 127 `get`/`getResult` rows that carry a `thrown` block, the corpus
+ * decomposes as:
+ *
+ *   identicalToRetainedCause === true  (25)  the retained FIRST cause, rethrown unwrapped by
+ *                            `throwExceptionFor`. `thrown.type` is that object's own class: 22
+ *                            `IllegalStateException`, 2 `ExpressionEvaluationException` — a type
+ *                            nothing else here produces — and 1 `IllegalArgumentException`.
  *   causeType == null, `IllegalStateException`  (34)  THIS RUNNER's own sentinel, from a
  *                            `throw-in-handler` / `throw-in-policy` behavior. Nothing about it is
  *                            the port's.
- *   causeType == null, anything else  (57)  an error the port CONSTRUCTED: 23
- *                            `MissingTranslationException`, and 34 `IllegalArgumentException`
+ *   everything else  (68)  an error the port CONSTRUCTED: 23 `MissingTranslationException`, 5
+ *                            `NullPointerException`, and 40 `IllegalArgumentException`
  *                            ingress/operand refusals (31 of which are B3's supplied-match ingress
- *                            and stay attributed).
+ *                            and stay attributed). TWO of those 40 carry a non-null `causeType`
+ *                            (`java.util.IllformedLocaleException`): a constructed exception can
+ *                            WRAP, and `causeType` says what it wrapped, never what it is.
+ *
+ * THE OLD DECOMPOSITION SPLIT ON `causeType != null` AND GOT 25 RIGHT BY LUCK. Every one of those 25
+ * rethrows a CONTEXTUALIZED library error whose own cause is of its own class, so `type` and
+ * `causeType` coincided and the wrong reading produced the right name. The two
+ * `lvariant.exhausting-walk.*.ill-formed-attempted-locale` rows are the first where they do not, and
+ * under the old split they routed into the rethrow arm and reported `unsupported` for want of a JS
+ * counterpart to `IllformedLocaleException` — a class that never escapes anything.
  *
  * `java.lang.IllegalStateException` is therefore ABSENT from `ERROR_NAME` and must stay absent: it
  * appears in this corpus with both a null and a non-null `causeType`, meaning the sentinel in one
@@ -1777,14 +1872,81 @@ function caughtIdentity(caught) {
  */
 const DECLARED_MESSAGE_DIVERGENCES = {
   "TranslationFailureHandler returned null": {
-    js: "The configured onFailure handler must return a failure response object; received null",
-    why: "Java names its own `TranslationFailureHandler`; the JS option is `onFailure`.",
+    js: "onFailure returned null",
+    why: "Java's SHAPE with the JS option name, matching localeResolver/localeMatchResolver at src/core/index.js:900/:914. Java names its own `TranslationFailureHandler`; the JS option is `onFailure`, so the identifier is the only remaining difference.",
   },
   "translationFallbackPolicy returned null": {
-    js: "The configured fallbackPolicy must return a boolean; received null",
-    why: "Java names its own `translationFallbackPolicy`; the JS option is `fallbackPolicy`.",
+    js: "fallbackPolicy returned null",
+    why: "Java's SHAPE with the JS option name, matching localeResolver/localeMatchResolver at src/core/index.js:900/:914. Java names its own `translationFallbackPolicy`; the JS option is `fallbackPolicy`, so the identifier is the only remaining difference.",
+  },
+  // THE SAME SPELLING, OF A LOCALE THIS PORT HAS NO SPELLING FOR. `LocaleUtils.requireWellFormed`
+  // interpolates `Locale#toString` — an underscore-and-hash form (`ja_JP_jp_#u-ca-japanese`) that is
+  // not a language tag, is not round-trippable, and exists nowhere in this port. The port names the
+  // same candidate by the tag it actually synthesized. Every other channel of these two rows agrees
+  // with Java byte for byte, including the attempted-locale list that CONTAINS this candidate under
+  // its tag spelling, so the divergence is the representation and nothing else.
+  //
+  // Inventing `Locale#toString` for one diagnostic would mean carrying a second locale
+  // serialization for the sole purpose of reproducing a string; the tag spelling is the one a JS
+  // consumer can look up in the very list the same error reports.
+  "Attempted locale 'ja_JP_jp_#u-ca-japanese' is not a well-formed IETF BCP 47 locale": {
+    js: "Attempted locale 'ja-JP-u-ca-japanese-x-lvariant-jp' is not a well-formed IETF BCP 47 locale",
+    why: "Java interpolates Locale#toString (LocaleUtils.java:60-61); the port names the same synthesized candidate by its BCP 47 tag, which is the spelling its own attemptedLocales list carries.",
+  },
+  "Attempted locale 'th_TH_th_#u-nu-thai' is not a well-formed IETF BCP 47 locale": {
+    js: "Attempted locale 'th-TH-u-nu-thai-x-lvariant-th' is not a well-formed IETF BCP 47 locale",
+    why: "Java interpolates Locale#toString (LocaleUtils.java:60-61); the port names the same synthesized candidate by its BCP 47 tag, which is the spelling its own attemptedLocales list carries.",
   },
 };
+
+/**
+ * Java cause class -> the JS error NAME the port attaches as the constructed throw's own `cause`,
+ * or `null` where the port declares it attaches none.
+ *
+ * ARM 3's `wrappedCause` channel, and the reason `expected.thrown.causeType` is no longer read as a
+ * routing hint. On a CONSTRUCTED throw that field says what Java WRAPPED — `requireWellFormed` builds
+ * `new IllegalArgumentException(message, illformedLocaleException)` (LocaleUtils.java:60-61) — which
+ * is an observation about the error handed to the caller, not about which object escaped. Nothing
+ * read it once arm 2 stopped guarding on it, so it is compared here instead of dropped.
+ *
+ * A DECLARED `null` IS A CLAIM, NOT A SKIP, and it is gated in both directions: the wanted side says
+ * the port attaches no cause and the actual side reports whatever the port's error carries, so a
+ * port that starts attaching one turns these rows red and has to come back here to say so. An
+ * UNDECLARED Java cause class reports the case unsupported and names its owner, on the
+ * `operationNotImplemented` discipline that every other table in this file follows.
+ */
+const WRAPPED_CAUSE = {
+  "java.util.IllformedLocaleException": {
+    js: null,
+    why: "The JDK-only exception `Locale.Builder#build` raises. The port's well-formedness check is `jdkLocaleWellFormed`, a predicate that returns false rather than throwing, so there is no inner error to retain — and fabricating one would mean inventing a JS class named for a JDK type this port does not model. The refusal itself, its name and the whole surrounding walk are compared unchanged.",
+  },
+};
+
+/** The milestone that owes a JS counterpart for a wrapped Java cause `WRAPPED_CAUSE` does not carry. */
+const WRAPPED_CAUSE_OWNER = {};
+
+/** The JS `cause` a constructed throw carries, in the shape `WRAPPED_CAUSE` declares. */
+function wrappedCauseOf(caught) {
+  const cause = caught === NOTHING_THROWN || caught === null || typeof caught !== "object"
+    ? null : /** @type {any} */ (caught).cause;
+  if (cause === null || cause === undefined) return null;
+  return cause instanceof Error ? cause.name : `a ${typeof cause}`;
+}
+
+/** The declared JS counterpart of a Java cause class a constructed throw wraps. */
+function declaredWrappedCause(causeType) {
+  if (causeType === null || causeType === undefined) return null;
+  if (!(causeType in WRAPPED_CAUSE)) {
+    const owner = WRAPPED_CAUSE_OWNER[causeType];
+    if (!owner)
+      throw new AuthoringError(
+        `a constructed throw wraps a cause of type ${causeType} with no entry in WRAPPED_CAUSE. ` +
+        `Every reason must name who owes the work; add an entry, or declare the type in WRAPPED_CAUSE.`,
+      );
+    unsupported(`no JS counterpart declared for a wrapped cause of type ${causeType} (${owner})`);
+  }
+  return WRAPPED_CAUSE[causeType].js;
+}
 
 /** Declared-divergence rows whose JS message no longer differs, i.e. entries that must be deleted. */
 const staleMessageDivergences = [];
@@ -1802,9 +1964,30 @@ function thrownProjection(thrown, caught) {
   // ARM 2 — rethrow by identity. `CAUSE_NAME`, not `ERROR_NAME`: this is the same error the
   // `failures` channel already reports through `causeType`, so the two must agree on its name or
   // the same object would be described two ways in one comparison.
-  if (thrown.causeType !== null)
+  //
+  // GUARDED ON THE CORPUS'S OWN IDENTITY OBSERVATION, not on `thrown.causeType !== null`. That
+  // proxy stood here until the two `lvariant.exhausting-walk.*.ill-formed-attempted-locale` rows
+  // arrived, and it was wrong in both halves. A non-null `thrown.causeType` says only that the
+  // escaping throwable HAS a cause of its own — `LocaleUtils.requireWellFormed` builds
+  // `new IllegalArgumentException(message, illformedLocaleException)` — which is a statement about
+  // WRAPPING, not about rethrowing; and `thrown.causeType` was then read as the escaping object's
+  // own class, which it is not. Both mistakes were invisible for 25 rows because every one of them
+  // rethrows a CONTEXTUALIZED library error whose cause is of its own class, so `type` and
+  // `causeType` happened to coincide.
+  //
+  // No text field can separate the two. `throwExceptionFor` (DefaultStrings.java:3196-3213)
+  // rethrows the retained cause by identity, while a RETURN_KEY handler re-enters
+  // `TranslationResult`'s constructor (:755) and CONSTRUCTS a fresh exception at the same site from
+  // the same inputs — same class, same message. So the oracle now records the reference comparison
+  // itself (`identicalToRetainedCause`), and this arm asks for it. See the field's own comment in
+  // `VectorOracle.java` for the JVM measurement that forced it.
+  //
+  // The NAME comes from `thrown.type`, the escaping object's class. Byte-identical over the corpus
+  // to the old `thrown.causeType` read, because all 25 rows carry `type === causeType`; that
+  // agreement is the coincidence, not the rule.
+  if (thrown.identicalToRetainedCause === true)
     return {
-      wanted: { name: adaptCauseType(thrown.causeType), identity: RETHROWN_IDENTITY },
+      wanted: { name: adaptCauseType(thrown.type), identity: RETHROWN_IDENTITY },
       actual: { name: thrownNameOf(caught), identity: caughtIdentity(caught) },
       ratchetMessage: true,
     };
@@ -1819,11 +2002,20 @@ function thrownProjection(thrown, caught) {
   // A DECLARED divergence: the Java message selects the row and the JS message is pinned exactly, so
   // this narrows the comparison rather than dropping it. A row that starts matching Java verbatim is
   // recorded STALE and fails the run, because the entry has outlived its reason.
+  // WHAT THE CONSTRUCTED ERROR WRAPS, compared rather than dropped. `expected.thrown.causeType` is
+  // an observation about the error Java handed the caller; arm 2 used to consume it as a routing
+  // hint, and once that stopped it would otherwise be read by nothing. See `WRAPPED_CAUSE`.
+  const wrappedCause = { wanted: declaredWrappedCause(thrown.causeType), actual: wrappedCauseOf(caught) };
+
   const declared = DECLARED_MESSAGE_DIVERGENCES[thrown.message];
   if (declared && actualMessage === declared.js) {
     return {
-      wanted: { name: names.join(" or "), identity: CONSTRUCTED_IDENTITY },
-      actual: { name: names.includes(actualName) ? names.join(" or ") : actualName, identity: caughtIdentity(caught) },
+      wanted: { name: names.join(" or "), identity: CONSTRUCTED_IDENTITY, wrappedCause: wrappedCause.wanted },
+      actual: {
+        name: names.includes(actualName) ? names.join(" or ") : actualName,
+        identity: caughtIdentity(caught),
+        wrappedCause: wrappedCause.actual,
+      },
       ratchetMessage: true,
     };
   }
@@ -1831,11 +2023,12 @@ function thrownProjection(thrown, caught) {
     staleMessageDivergences.push(`${thrown.message} -- the port now reproduces Java verbatim; delete the entry`);
 
   return {
-    wanted: { name: names.join(" or "), identity: CONSTRUCTED_IDENTITY, message: thrown.message },
+    wanted: { name: names.join(" or "), identity: CONSTRUCTED_IDENTITY, message: thrown.message, wrappedCause: wrappedCause.wanted },
     actual: {
       name: names.includes(actualName) ? names.join(" or ") : actualName,
       identity: caughtIdentity(caught),
       message: actualMessage,
+      wrappedCause: wrappedCause.actual,
     },
   };
 }
@@ -1873,7 +2066,7 @@ function thrownCase(expected, run) {
   const actual = {
     thrown: projection.actual,
     resolverCalls: [...resolverCalls],
-    failures: projectFailures(null),
+    failures: projectFailures(null, expected),
     policyCalls: projectPolicyCalls(),
     supplierCalls: projectSupplierCalls(),
   };

@@ -46,6 +46,10 @@
 
 import { decode as decodeRangeEquivalents } from "../data/iana-range-equivalents.js";
 import { matchFor, matchForRanges, normalizeTag } from "../internal/locale.js";
+import {
+	LOCALE_INGRESS_DESCRIPTION,
+	requireJdkWellFormedLocale,
+} from "../internal/locale-jdk-tag.js";
 
 /**
  * The pinned IANA range-equivalence closure, 806 classes, probed out of the JDK oracle itself
@@ -816,6 +820,25 @@ export function createLocaleNegotiator(configuration) {
 	const { fallbackLocale, supportedLocales, tiebreakers } = applicableConfiguration(configuration);
 
 	/**
+	 * `LocaleUtils.requireWellFormed(locale, "Requested locale")` (`LocaleMatcher.java:64`).
+	 *
+	 * RETURNS THE CALLER'S OWN SPELLING, deliberately, and passing the normalized tag on instead
+	 * would be a silent behaviour change rather than a tidy-up: `matchFor` normalizes its argument
+	 * itself, so handing it `normalizeTag(locale)` would normalize TWICE, and the two disagree for
+	 * one family — a non-lowercase `und` followed only by private use, where the second application
+	 * drops the `und`. `tools/lookup-diff/run.mjs`'s `chainSeedOrNull` documents the same asymmetry
+	 * from the other side. The CHECK still sees the tag once-normalized, because that is the
+	 * `Locale` Java validates.
+	 *
+	 * @param {string} locale
+	 * @returns {string} `locale`
+	 */
+	const requestedLocale = (locale) => {
+		requireJdkWellFormedLocale(normalizeTag(locale), LOCALE_INGRESS_DESCRIPTION.requestedLocale);
+		return locale;
+	};
+
+	/**
 	 * `DefaultStrings#matchFor(List<LanguageRange>)`, over any number of members.
 	 *
 	 * @param {Iterable<unknown>} ranges
@@ -845,11 +868,26 @@ export function createLocaleNegotiator(configuration) {
 		 * The NORMALIZING ingress, unchanged and deliberately separate: a locale is a locale, and
 		 * Java builds its range from `toLanguageTag()`.
 		 *
+		 * `LocaleMatcher.java:64` — `requireWellFormed(locale, "Requested locale")` — is the FIRST
+		 * statement of the `matchFor(Locale)` default method, before the `LanguageRange` is built,
+		 * and `bestMatchFor(Locale)` reaches it through `matchFor` (`DefaultStrings.java:1532`), so
+		 * both doors carry it and neither is a wrapper around the other here. Measured on the pinned
+		 * JDK: `matchFor(Locale.forLanguageTag("en-x-lvariant-NY"))` throws
+		 * `Requested locale 'en__NY' is not a well-formed IETF BCP 47 locale` while
+		 * `en-US-x-lvariant-POSIX`, `ja-JP-x-lvariant-JP` and `th-TH-x-lvariant-TH` all ANSWER — the
+		 * three the corpus already keeps as controls against overcorrecting this at the tag layer.
+		 *
+		 * THE RANGE DOORS BELOW DO NOT GET THIS CHECK, and that is Java's line rather than an
+		 * omission: `matchFor(List<LanguageRange>)` takes ranges, never a `Locale`, and validates
+		 * only their count.
+		 *
 		 * @param {string} locale
 		 */
-		matchFor: (locale) => matchFor(locale, supportedLocales, fallbackLocale, tiebreakers),
+		matchFor: (locale) =>
+			matchFor(requestedLocale(locale), supportedLocales, fallbackLocale, tiebreakers),
 		/** @param {string} locale */
-		bestMatchFor: (locale) => matchFor(locale, supportedLocales, fallbackLocale, tiebreakers).locale
+		bestMatchFor: (locale) =>
+			matchFor(requestedLocale(locale), supportedLocales, fallbackLocale, tiebreakers).locale
 			?? fallbackLocale,
 		matchForLanguageRanges,
 		/** @param {Iterable<unknown>} ranges */
