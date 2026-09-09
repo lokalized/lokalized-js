@@ -107,13 +107,27 @@ function isolateInputs() {
   ];
 }
 
-/** Both branches of `localeUsesRightToLeftScript`, over RTL and LTR tags of each shape. */
+/**
+ * Both branches of `localeUsesRightToLeftScript`, over RTL and LTR tags of each shape.
+ *
+ * THE `Zzzz` ROW EXISTS BECAUSE THIS LIST DID NOT HAVE IT, and that omission is worth keeping
+ * visible. These 40 probes were green while the port isolated `ar-Zzzz` and Java did not: the two
+ * branches were both covered, and the input that decides WHICH branch is taken — a script subtag
+ * spelled with CLDR's unknown-script placeholder, which `Locale#getScript()` preserves and
+ * `CldrLocaleData.TagParts:577` elides — was in neither the corpus nor this list. It took
+ * `tools/likely-subtag-diff/`, whose probe space is the likely-subtag table's own key space, to
+ * reach it. A green differential is evidence about the probe space it carries and nothing else.
+ */
 function rtlInputs() {
   return [
     "ar", "ar-Latn", "ar-EG", "ar-Arab-EG", "he", "he-IL", "en", "en-Arab", "en-arab", "en-ARAB",
     "fa-IR", "ckb", "yi", "ur", "ps", "dv", "sd", "ug", "ku", "nqo", "syr", "am", "ti", "mt", "ha",
     "wo", "ks", "pa-Arab", "uz-Arab", "az-Arab", "bal", "rhg", "de", "ja", "zh-TW", "ru", "el", "hi",
     "und", "root",
+    // The placeholder family, with the controls beside it: the same languages WITHOUT `Zzzz` must
+    // still isolate, or "agrees with Java" and "isolates nothing" become the same measurement.
+    "ar-Zzzz", "ar-Zzzz-EG", "he-Zzzz", "fa-Zzzz", "und-Zzzz-IL", "en-Zzzz", "ar-ZZ", "ar-Zzzz-ZZ",
+    "ar-zzzz", "AR-ZZZZ", "de-Hebr",
   ];
 }
 

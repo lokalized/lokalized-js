@@ -58,7 +58,8 @@
     "check": "tsc --noEmit",
     "types": "tsc --emitDeclarationOnly",
     "test": "node --test",
-    "verify": "npm run check && npm run types && npm test && npm run size:graph && npm run conformance && npm run scenario:0a && npm run spike:placeholders",
+    "verify": "npm run check && npm run types && npm test && npm run size:graph && npm run likely-subtag-consumers && npm run conformance && npm run scenario:0a && npm run spike:placeholders",
+    "likely-subtag-consumers": "node tools/likely-subtag-consumers.mjs",
     "conformance": "node tools/conformance.mjs",
     "conformance:write": "node tools/conformance.mjs --write",
     "scenario:0a": "node --expose-gc tools/scenario-0a.mjs",
@@ -72,7 +73,8 @@
     "diff:parse": "node tools/parse-diff/run.mjs",
     "diff:phonetic": "node tools/phonetic-diff/run.mjs",
     "diff:interpolate": "node tools/interpolate-diff/run.mjs",
-    "diff:lookup": "node tools/lookup-diff/run.mjs"
+    "diff:lookup": "node tools/lookup-diff/run.mjs",
+    "diff:likely-subtag": "node tools/likely-subtag-diff/run.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

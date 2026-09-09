@@ -34,6 +34,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: lokalized/lokalized-spec
+          # THE REF IS LOAD-BEARING. `lokalized-spec`'s DEFAULT branch (`main`) holds two files,
+          # LICENSE and README — the 725 that matter, including the corpus, live on this branch.
+          # Checking out the default silently produced an EMPTY-looking spec, which is why the first
+          # attempt at this fix still skipped 44 tests. Override with the SPEC_REPO_REF repository
+          # variable, and delete this default once the spec's default branch carries the artifacts.
+          ref: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
           path: lokalized-spec
           # Shallow is fine here: nothing reads the spec's history, only its artifacts.
           fetch-depth: 1
@@ -41,6 +47,31 @@ jobs:
           # public; if it is ever made private, add a SPEC_REPO_TOKEN secret with read access and
           # this picks it up without another edit.
           token: ${{ secrets.SPEC_REPO_TOKEN || github.token }}
+      # Fail HERE, naming the cause, rather than 10 minutes later as 44 anonymous skips. A checkout
+      # that succeeds says the ref resolved, NOT that it carried what the gates read.
+      - name: Verify the corpus checkout carries what the gates read
+        run: |
+          missing=0
+          for required in \
+            generated/behavioral-vectors.json \
+            generated/iana-language-range-equivalents.json \
+            symbol-allowlist.json \
+            vendor/lokalized-java/src/build/resources/cldr/cldr-conformance-vectors.json \
+            vendor/lokalized-java/src/build/resources/cldr/cldr-locale-data.json
+          do
+            if [ ! -f "../lokalized-spec/$required" ]; then
+              echo "::error::lokalized-spec checked out but $required is missing"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "The checkout resolved but does not carry the artifacts. Almost certainly the REF:"
+            echo "  ref in use: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}"
+            echo "  set the SPEC_REPO_REF repository variable to the branch holding the corpus."
+            exit 1
+          fi
+          echo "corpus checkout OK"
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}

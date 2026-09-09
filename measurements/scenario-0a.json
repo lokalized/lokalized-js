@@ -9,19 +9,19 @@
     {
       "label": "root + raw-text catalog",
       "modules": 25,
-      "sourceBytes": 761288,
-      "importMs": 0.247,
-      "constructionMs": 0.1035,
-      "firstRenderMs": 0.3541,
-      "retainedBytes": 68816
+      "sourceBytes": 762706,
+      "importMs": 0.284,
+      "constructionMs": 0.1207,
+      "firstRenderMs": 0.3776,
+      "retainedBytes": 67856
     },
     {
       "label": "core + parsed equivalent",
       "modules": 24,
-      "sourceBytes": 753043,
-      "importMs": 0.555,
-      "constructionMs": 0.3761,
-      "firstRenderMs": 0.2728,
+      "sourceBytes": 754461,
+      "importMs": 0.607,
+      "constructionMs": 0.3923,
+      "firstRenderMs": 0.3332,
       "retainedBytes": 354536
     }
   ],
@@ -251,6 +251,13 @@
       "growth": [
         "root + raw-text catalog: source graph grew 756251 -> 761288 bytes",
         "core + parsed equivalent: source graph grew 748006 -> 753043 bytes"
+      ]
+    },
+    {
+      "reason": "M7 clause 2: the likely-subtag consumer inventory landed with a real port fix — bidi.js now reads the script through parseJdkTag (Locale#getScript()) instead of tagPartsFor, which elides the CLDR Zzzz placeholder, so ar-Zzzz no longer isolates where Java does not. Adds the locale-jdk-tag.js import edge to bidi.js (module count unchanged at 25/24) plus the finding's explanation.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 761288 -> 762706 bytes",
+        "core + parsed equivalent: source graph grew 753043 -> 754461 bytes"
       ]
     }
   ],

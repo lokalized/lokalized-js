@@ -33,7 +33,8 @@
  */
 
 import { decode as decodeRightToLeftScripts } from "../data/rtl.js";
-import { likelySubtagFor, tagPartsFor } from "./locale-cldr.js";
+import { likelySubtagFor } from "./locale-cldr.js";
+import { parseJdkTag } from "./locale-jdk-tag.js";
 
 const LEFT_TO_RIGHT_ISOLATE = "⁦";
 const RIGHT_TO_LEFT_ISOLATE = "⁧";
@@ -102,6 +103,23 @@ const MAXIMUM_MEMOIZED_TAGS = 512;
  * maximized through the pinned CLDR likely-subtags table. `ar` therefore isolates (likely `ar-Arab-EG`)
  * while `ar-Latn` does not, which is what `bidi-isolation.script.*` pins.
  *
+ * THE SCRIPT COMES FROM THE JDK LOCALE FIELD, NOT FROM `TagParts`, and the distinction is a real
+ * behavioural difference rather than a stylistic one. `CldrLocaleData.TagParts` ELIDES the CLDR
+ * placeholders — `:577` maps a `Zzzz` script to `""` and `:578` a `ZZ` region — but `BidiUtils.java:54`
+ * reads `locale.getScript()`, which preserves them. So an explicitly script-less-by-placeholder tag
+ * takes the FIRST branch in Java, not the second: `ar-Zzzz` carries the non-RTL script `Zzzz` and is
+ * NOT isolated, where `ar` maximizes to `ar-Arab-EG` and is. This module used `tagPartsFor` and
+ * therefore maximized `ar-Zzzz` too, isolating where Java does not — found by
+ * `tools/likely-subtag-diff/` over 84 cells (`ar-Zzzz`, `he-Zzzz`, `und-Zzzz-IL`, and every
+ * region/case spelling of them), invisible to all 2,346 corpus cases, which never spell `Zzzz`.
+ * `parseJdkTag(...).script` is exactly `Locale#getScript()`; `bidi-zzzz-script.test.js` pins both
+ * branches with `ar` and `ar-Latn` as the controls that must not move.
+ *
+ * The maximized script is read through the same parse, mirroring `BidiUtils.java:60`'s own
+ * `Locale.forLanguageTag(likelySubtag).getScript()`. No row of the pinned table targets `Zzzz`, so
+ * the two readings cannot differ there today — it is written this way so that a future CLDR pin
+ * cannot make them differ silently.
+ *
  * @param {string} tag a normalized BCP-47 tag
  * @returns {boolean}
  */
@@ -112,11 +130,11 @@ export function localeUsesRightToLeftScript(tag) {
   let script = "";
 
   try {
-    script = tagPartsFor(tag).script;
+    script = parseJdkTag(tag).script;
 
     if (script.length === 0) {
       const likelySubtag = likelySubtagFor(tag);
-      if (likelySubtag !== null) script = tagPartsFor(likelySubtag).script;
+      if (likelySubtag !== null) script = parseJdkTag(likelySubtag).script;
     }
   } catch {
     // A tag this module cannot parse cannot be classified either. Java would have been handed a
