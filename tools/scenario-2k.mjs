@@ -11,8 +11,26 @@
  * of realistic size cost to build, to render from, and to hold.
  *
  * WHAT IS AND IS NOT CLAIMED HERE.
- * This is a MEASUREMENT, not a gate. No threshold is asserted, nothing ratchets, and the process
- * exits 0 unless the harness itself fails. The plan's M7 acceptance row speaks of "budgets accepted";
+ * This is a MEASUREMENT, not a gate. No threshold is asserted and nothing about a TIMING ratchets.
+ *
+ * EXACTLY ONE THING CAN FAIL THIS RUN, and it is not a number anyone chose: if the catalog this
+ * tool builds no longer digests to what `measurements/scenario-2k.json` recorded, the medians in
+ * that artifact were measured on a DIFFERENT catalog and quoting them is simply false. The header
+ * below already staked the tool's claims on that digest — "a number that is quoted with a different
+ * digest beside it was not measured on this catalog" — so enforcing it asserts the tool's own stated
+ * rule rather than importing a threshold. It is deterministic and machine-independent, which is
+ * precisely what a timing is not.
+ *
+ * Source-graph movement is REPORTED STALE and deliberately NOT gated, on scenario 0a's reasoning for
+ * its browser half: the recorded timings describe the code as it stood, staleness is detectable by
+ * arithmetic rather than by remembering, and it is printed every run — but re-recording is a
+ * MEASUREMENT on a particular machine, so a gate demanding it would push machine-dependent numbers
+ * into the artifact from whatever host happened to go red. A reader is told; nobody is coerced.
+ *
+ * This is what M7 clause 19 was amended to rest on. The clause originally read that the budgets
+ * "are accepted", which asks an instrument to choose a number; as amended it reads that they are
+ * recorded, ratcheted where a ratchet exists, and reported where none does. "Recorded" then has to
+ * mean something a machine re-checks, or the clause rests on a JSON file somebody wrote once. The plan's M7 acceptance row speaks of "budgets accepted";
  * accepting a budget means choosing a number, which is not a thing a measuring instrument may do for
  * you. This tool exists so that whoever chooses has something real to choose from.
  *
@@ -50,6 +68,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { graphBytes } from "./graph-walk.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const gc = /** @type {undefined | (() => void)} */ (globalThis.gc);
@@ -315,10 +334,62 @@ if (KEYS < 500)
 if (rows[0].sample !== rows[1].sample)
   console.error(`\nWARNING: root and core rendered different strings; the two variants are not measuring the same content`);
 
+/**
+ * Does `measurements/scenario-2k.json` still describe THIS catalog and THESE source files?
+ *
+ * Split deliberately into a gate and a report, because the two questions have different answers.
+ * The catalog is derived with no RNG and no seed, so its digest is a fact about the code alone and a
+ * mismatch is never noise: it means the recorded medians belong to a catalog that no longer exists.
+ * The source graph is equally deterministic, but what goes stale WITH it is a set of timings that
+ * only a re-run on some particular machine can refresh — so that half is printed, never enforced.
+ */
+const GRAPH = Object.fromEntries(rows.map((r) => [r.entry, graphBytes(root, r.entry)]));
+const recordedPath = resolve(root, "measurements/scenario-2k.json");
+let recorded = null;
+try {
+  recorded = JSON.parse(readFileSync(recordedPath, "utf8"));
+} catch {
+  recorded = null;
+}
+
+let digestMismatch = null;
+if (recorded && !process.argv.includes("--write") && KEYS === recorded.catalog?.keys) {
+  console.log(`\nagainst measurements/scenario-2k.json:`);
+  if (recorded.catalog?.digest !== CATALOG_DIGEST) {
+    digestMismatch = `catalog digest ${recorded.catalog?.digest} -> ${CATALOG_DIGEST}`;
+  } else {
+    console.log(`  catalog        digest ${CATALOG_DIGEST} unchanged — the recorded medians describe THIS catalog`);
+  }
+
+  // A recorded artifact predating this check has no `graph` block. Say so rather than reading the
+  // absence as agreement: a freshness check that treats "no data" as "fresh" has stopped checking.
+  if (!recorded.graph) {
+    console.log(`  source graph   NOT RECORDED — this artifact predates the freshness check;`);
+    console.log(`                 re-run with --write to give the next run something to compare against`);
+  } else {
+    const moved = rows
+      .map((r) => ({ entry: r.entry, was: recorded.graph[r.entry], now: GRAPH[r.entry] }))
+      .filter((g) => !g.was || g.was.bytes !== g.now.bytes || g.was.modules !== g.now.modules);
+    if (moved.length === 0) {
+      console.log(`  source graph   unchanged in both variants — the recorded timings describe THIS source`);
+    } else {
+      console.log(`  source graph   STALE in ${moved.length} variant(s); the timings above were measured on different code:`);
+      for (const g of moved)
+        console.log(
+          `                 ${g.entry}  ${g.was ? `${g.was.bytes} B / ${g.was.modules} modules` : "not recorded"}` +
+            ` -> ${g.now.bytes} B / ${g.now.modules} modules`,
+        );
+      console.log(`                 REPORTED, NOT GATED (see the header): refresh with`);
+      console.log(`                 node --expose-gc tools/scenario-2k.mjs --write`);
+    }
+  }
+}
+
 console.log(`
 NO THRESHOLDS EXIST HERE, by the same decision that governs scenario 0a: M2/M7 sizing is tracked by
 engineering measurement and no go/no-go line was ever frozen. Nothing above ratchets and this run
-cannot fail on a number. Timings are machine- and load-dependent; the parenthesised range and ±
+cannot fail on a TIMING — the one thing that fails it is a catalog digest that no longer matches the
+recorded one, which is a staleness fact, not a budget. Timings are machine- and load-dependent; the parenthesised range and ±
 spread are how far this machine moved during THIS run, and are not a confidence interval.
 Node-only: it says nothing about a browser, where module fetch, parse and GC all differ.`);
 
@@ -339,6 +410,9 @@ if (process.argv.includes("--write")) {
       requestLocale: "en-AU (walks en-AU -> en-001 -> en); 'en' measured alongside as the direct-hit control",
     },
     iterations: ITERATIONS,
+    // Recorded so a later run can say whether these timings still describe the shipping source.
+    // Same arithmetic scenario 0a ratchets on, via the walker both tools now share.
+    graph: GRAPH,
     variants: rows.map((r) => ({
       label: r.label,
       entry: r.entry,
@@ -356,4 +430,15 @@ if (process.argv.includes("--write")) {
   console.log(`\nwritten to measurements/scenario-2k.json`);
 } else {
   console.log(`\n(run with --write to record measurements/scenario-2k.json)`);
+}
+
+if (digestMismatch) {
+  console.error(
+    `\nFAILED: the recorded measurement describes a different catalog (${digestMismatch}).\n` +
+      `Every median in measurements/scenario-2k.json was produced against the old one, so quoting\n` +
+      `them alongside today's catalog states something false. Re-record deliberately:\n` +
+      `  node --expose-gc tools/scenario-2k.mjs --write\n` +
+      `and say in the commit what changed the catalog, because every historical comparison breaks.`,
+  );
+  process.exit(1);
 }

@@ -122,6 +122,14 @@ jobs:
         run: npm run conformance
       - name: Scenario 0a static integration measurement
         run: npm run scenario:0a
+      # M7 clause 19 as amended: the 2,000-key budgets are RECORDED and the recording is re-checked,
+      # rather than being a JSON file somebody wrote once. This step cannot fail on a timing — the
+      # only thing that fails it is a catalog digest that no longer matches the recorded one, which
+      # would mean every median in the artifact was measured on a catalog that no longer exists.
+      # Source-graph movement is reported STALE here and deliberately not gated, so CI never demands
+      # that machine-dependent timings be re-recorded from whatever host happened to go red.
+      - name: Scenario 2k performance and memory measurement
+        run: npm run scenario:2k
       - name: Generated-placeholder spike
         run: npm run spike:placeholders
 

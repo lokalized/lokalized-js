@@ -58,7 +58,7 @@
     "check": "tsc --noEmit",
     "types": "tsc --emitDeclarationOnly",
     "test": "node --test",
-    "verify": "npm run check && npm run types && npm test && npm run size:graph && npm run likely-subtag-consumers && npm run conformance && npm run scenario:0a && npm run spike:placeholders",
+    "verify": "npm run check && npm run types && npm test && npm run size:graph && npm run likely-subtag-consumers && npm run conformance && npm run scenario:0a && npm run scenario:2k && npm run spike:placeholders",
     "likely-subtag-consumers": "node tools/likely-subtag-consumers.mjs",
     "conformance": "node tools/conformance.mjs",
     "conformance:write": "node tools/conformance.mjs --write",

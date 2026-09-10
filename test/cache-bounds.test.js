@@ -40,6 +40,18 @@
  * every use") true by construction rather than by discipline. The last test here is what would catch
  * a future instance-level cache that quietly extended itself to the resolver.
  *
+ * WHAT DECLINING IT COSTS, AND WHY THAT IS DEFERRED RATHER THAN UNKNOWN. Priced by ablation against
+ * a scratch copy of `src/` carrying that one memo — identical rendered output, identical catalog
+ * digest — and then re-derived independently by a second pass to within a percent: at 2,000 keys the
+ * full walk goes 81,575 -> 32,941 ns/lookup (-59.6%) and the direct hit 44,360 -> 24,128 (-45.6%).
+ * `tools/scenario-2k.mjs`'s header carries the same table from the first measurement.
+ *
+ * **DEFERRED TO M9 by the maintainer on 2026-09-09 — deferred, NOT declined.** It was offered at
+ * M7's close with the measurement attached and the answer was that a cache belongs with the
+ * server/edge packaging that would create pressure for it, not with the resolution core. So this
+ * comment is a standing price, not a standing verdict: if M9 takes the memo, the tests below are
+ * what have to keep passing, and the third one is aimed at exactly the way taking it could go wrong.
+ *
  * THE PROBE HAS A CONTROL THAT MUST EXCEED THE THRESHOLD. A memory assertion with no failing control
  * "passes" on any machine where the sweep is cheap for unrelated reasons, which is this project's
  * named `zh-123` shape. The same 200,000 tags are therefore also pushed into an ordinary unbounded

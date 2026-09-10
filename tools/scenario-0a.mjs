@@ -28,6 +28,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { graphBytes as walkGraph } from "./graph-walk.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const gc = /** @type {undefined | (() => void)} */ (globalThis.gc);
@@ -56,57 +57,15 @@ const CATALOG = {
 };
 const TIEBREAKERS = { en: ["en", "en-001"] };
 
-/** Transitive source bytes of the graph an entry point actually pulls in. */
 /**
- * Strips comments before the import walk below reads a file.
+ * Transitive source bytes of the graph an entry point actually pulls in.
  *
- * Two reasons, and the second is why this is not merely tidiness. (1) A JSDoc type import —
- * `@typedef {import("../internal/catalog.js").Definition}` — is erased at runtime and must NOT count
- * as a graph edge; `src/` is full of them. (2) Without stripping, the dynamic-import pattern below
- * could not be used at all, because every `import("...")` in this codebase today lives inside a
- * comment. Stripping lets the walk match real dynamic imports without inventing false edges.
- *
- * The `//` rule deliberately refuses to fire after `:`, a quote or a backslash, so a `https://` inside
- * a string literal does not truncate the rest of the line.
+ * The walk itself now lives in `tools/graph-walk.mjs`, because `tools/scenario-2k.mjs` needs the
+ * SAME arithmetic to say whether its recorded measurement still describes these source files.
+ * Nothing about the ratchet below changed with the move: root reads 25 modules / 777,757 bytes and
+ * core 24 / 769,512 either way, checked against a run of this tool taken immediately before it.
  */
-const withoutComments = (text) =>
-  text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'\\])\/\/[^\n]*/g, "$1");
-
-/**
- * Every shape of relative import that puts a module in the runtime graph.
- *
- * `from "…"` alone is NOT enough, and the gap was silent rather than theoretical. Measured: inserting
- * `import "../data/iana-range-equivalents.js";` at the top of `src/core/index.js` left this walk
- * reporting 25 root modules and `test/pinned-data-only.test.js` 4/4 GREEN, while the 23 KB 806-class
- * table was genuinely in the root graph at runtime — the containment claim these gates exist to make.
- * The same line written `import { decode } from "…"` was caught, which is the control that makes the
- * first measurement mean something. A dynamic `import("…")` had the identical hole.
- *
- * Adding the two patterns changes no measurement: root stays 25 modules / 690,207 bytes and core 24 /
- * 681,962, verified before landing them. They can only ever ADD an edge that was always really there.
- */
-const IMPORT_PATTERNS = [
-  /from\s+"(\.[^"]+)"/g,
-  /(?:^|[^.\w])import\s+"(\.[^"]+)"/gm,
-  /import\(\s*"(\.[^"]+)"/g,
-];
-
-function graphBytes(entry) {
-  const seen = new Set();
-  const queue = [resolve(root, entry)];
-  let bytes = 0;
-  while (queue.length) {
-    const file = queue.pop();
-    if (!file || seen.has(file)) continue;
-    seen.add(file);
-    const text = readFileSync(file, "utf8");
-    bytes += Buffer.byteLength(text);
-    const scannable = withoutComments(text);
-    for (const pattern of IMPORT_PATTERNS)
-      for (const m of scannable.matchAll(pattern)) queue.push(resolve(dirname(file), m[1]));
-  }
-  return { bytes, modules: seen.size };
-}
+const graphBytes = (entry) => walkGraph(root, entry);
 
 let bust = 0;
 async function timedImport(spec) {
