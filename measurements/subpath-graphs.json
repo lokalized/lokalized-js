@@ -4,6 +4,21 @@
   "history": [
     {
       "reason": "Initial baseline, recorded after M8 S2/S3 landed the directory loader. lokalized/load and lokalized/ssr are still export-{} scaffolds at 1 module each; lokalized/node is 27 modules because the loader composes the shipped parser rather than duplicating it."
+    },
+    {
+      "reason": "M8 S5: lokalized/load's type surface authored from the plan's own TypeScript blocks — CatalogIdentity, StringsManifestV1, FetchEntry, CatalogIdentityInputV1, StringsLoadCoverage, LoadedStrings and LoadFailure. Types only; no runtime, so the graph gains the subpath's own bytes and no new module."
+    },
+    {
+      "reason": "M8 S6: computeCatalogIdentity, plus the synchronous SHA-256 and the bounded RFC 8785 canonicalizer plan 6.1 gives the load graph so identity stays synchronous in a browser. lokalized/load 1 -> 4 modules; the ROOT graph is unchanged at 25 modules, which is the containment claim this ratchet exists to check."
+    },
+    {
+      "reason": "M8 S6b: parseStringsManifest, validateStringsManifest and localeConfigurationForManifest. The load graph gains the bounded JSON path, the CLDR tag data and the locale machinery it validates manifest tags against; the ROOT graph is unchanged."
+    },
+    {
+      "reason": "M8 S7: chain and fetchSet. One module, and the graph barely moves because the candidate sequence is REUSED from src/internal/locale.js rather than reimplemented for the manifest door."
+    },
+    {
+      "reason": "M8 S8: loadStrings and loadEntireManifest. The load graph gains src/parse and its catalog machinery, because a fetched body is parsed by the SAME bounded parser every other door uses rather than a second one."
     }
   ],
   "subpaths": {
@@ -20,8 +35,8 @@
       "bytes": 635450
     },
     "lokalized/load": {
-      "modules": 1,
-      "bytes": 269
+      "modules": 34,
+      "bytes": 691144
     },
     "lokalized/ssr": {
       "modules": 1,
@@ -36,8 +51,8 @@
       "bytes": 640633
     },
     "lokalized/data/ordinal": {
-      "modules": 28,
-      "bytes": 799679
+      "modules": 29,
+      "bytes": 799971
     },
     "lokalized/data/ranges": {
       "modules": 28,

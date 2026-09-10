@@ -29,6 +29,7 @@
  * merely by shape.
  */
 
+import { configurationError } from "../internal/configuration-error.js";
 import {
   ORDINALITY_ZERO,
   ORDINALITY_ONE,
@@ -102,22 +103,6 @@ const ORDINALITY_BY_COUNT = freeze({
 /** @type {readonly OrdinalityValue[]} */
 const NO_ORDINALITIES = freeze([]);
 
-/**
- * The library-owned failure for a module that cannot be paired with the root it was loaded beside.
- *
- * Plan section 3.7 calls this a construction-time `ConfigurationError`. The public catch-only error
- * hierarchy (`LokalizedError` and friends, each carrying `code`) is core's to land; until it does,
- * this carries the same `code` so the eventual swap is invisible to a consumer that checks it.
- *
- * @param {string} message
- * @returns {Error}
- */
-function configurationError(message) {
-  const error = /** @type {Error & { code: string }} */ (new Error(message));
-  error.name = "ConfigurationError";
-  error.code = "CONFIGURATION";
-  return error;
-}
 
 /**
  * Provenance is checked HERE, at module construction, not at the first lookup.

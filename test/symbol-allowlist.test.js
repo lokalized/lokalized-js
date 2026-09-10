@@ -116,6 +116,34 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     // is the raw door, and it returns parsed catalogs keyed by locale exactly as Java returns
     // `Map<Locale, Set<LocalizedString>>`.
     ["node", "readStringsFromDirectory", "directory loader"],
+    // Plan 6.1 names this function in words — "`computeCatalogIdentity` applies the JCS rules from
+    // `5.1` to exactly {formatVersion, catalogVersion, resolvedFallbackLocale, localeToSha256,
+    // tiebreakers}" — and gives it a signature in the same block as `validateStringsManifest` and
+    // `parseStringsManifest`, which is the category `load` declares. It is exported rather than kept
+    // internal because a publisher needs to compute the identity of a catalog it is about to ship,
+    // using the same projection a consumer will verify it with; two implementations of one
+    // fingerprint is the failure mode the shared function exists to prevent.
+    ["load", "computeCatalogIdentity", "manifest parse/validate/configuration/identity functions"],
+    // The other three functions plan 6.1 declares in that same block, under the same category:
+    // `parseStringsManifest(input, options): StringsManifestV1`,
+    // `validateStringsManifest(input, options): StringsManifestV1` and
+    // `localeConfigurationForManifest(manifest, options): LocaleConfiguration`. The category names
+    // all four together — "manifest parse/validate/configuration/identity functions" — and the four
+    // are one surface: a consumer that can parse a manifest but not validate a supplied object, or
+    // can validate but not derive its locale configuration, cannot complete any of the flows 6.2
+    // describes.
+    ["load", "parseStringsManifest", "manifest parse/validate/configuration/identity functions"],
+    ["load", "validateStringsManifest", "manifest parse/validate/configuration/identity functions"],
+    ["load", "localeConfigurationForManifest", "manifest parse/validate/configuration/identity functions"],
+    // Plan 6.2's two Fetch loaders, under `load`'s "subset/whole loaders" category: `loadStrings`
+    // takes a lookup locale and fetches only its planned subset, `loadEntireManifest` fetches all of
+    // it. Both are named with signatures in the plan's own block.
+    ["load", "loadStrings", "subset/whole loaders"],
+    ["load", "loadEntireManifest", "subset/whole loaders"],
+    // The declared failure those loaders raise once a valid plan exists, under "loading errors". It
+    // is exported because CATCHING it is the point: its `failures` are the per-file diagnosis, in
+    // fetch-plan order, and a consumer that cannot name the class can only match on a message.
+    ["load", "StringsLoadingError", "loading errors"],
   ]);
 
   /** @param {string} owner @returns {Set<string>} */
