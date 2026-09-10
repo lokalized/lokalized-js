@@ -1,0 +1,47 @@
+{
+  "note": "Per-subpath module graphs. Module count and source bytes ratchet; growth needs a reason.",
+  "generatedBy": "tools/subpath-graphs.mjs",
+  "history": [
+    {
+      "reason": "Initial baseline, recorded after M8 S2/S3 landed the directory loader. lokalized/load and lokalized/ssr are still export-{} scaffolds at 1 module each; lokalized/node is 27 modules because the loader composes the shipped parser rather than duplicating it."
+    }
+  ],
+  "subpaths": {
+    "lokalized": {
+      "modules": 25,
+      "bytes": 779126
+    },
+    "lokalized/core": {
+      "modules": 24,
+      "bytes": 770881
+    },
+    "lokalized/parse": {
+      "modules": 26,
+      "bytes": 635450
+    },
+    "lokalized/load": {
+      "modules": 1,
+      "bytes": 269
+    },
+    "lokalized/ssr": {
+      "modules": 1,
+      "bytes": 247
+    },
+    "lokalized/negotiate": {
+      "modules": 15,
+      "bytes": 391336
+    },
+    "lokalized/node": {
+      "modules": 27,
+      "bytes": 640633
+    },
+    "lokalized/data/ordinal": {
+      "modules": 28,
+      "bytes": 799679
+    },
+    "lokalized/data/ranges": {
+      "modules": 28,
+      "bytes": 803959
+    }
+  }
+}

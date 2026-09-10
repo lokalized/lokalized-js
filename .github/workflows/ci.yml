@@ -109,6 +109,13 @@ jobs:
       # authoring machine and nowhere else. If a step is added to `verify`, add it here.
       - name: Module graph classification and size
         run: npm run size:graph
+      # Per-subpath graphs. Two things nothing else here watches: the CONTAINMENT rule (a subpath the
+      # allowlist marks browser-reachable must not enter Node-only territory — caught even when the
+      # offending module imports no Node built-in and exports nothing, which is the case the
+      # package-shape scan cannot see), and the SIZE of `lokalized/{load,ssr,node}`, where M8 builds
+      # most of its remaining work and where 20 KB was previously invisible to every gate.
+      - name: Per-subpath module graphs and containment
+        run: npm run subpath:graphs
       # M7 clause 2's inventory half. It derives the likely-subtag consumer set from `src/` and fails
       # on a consumer with no entry, an entry nothing derives, or an alias carrying a gateway past
       # the boundary. It needs only `src/` and the corpus, so unlike the eight differentials — which

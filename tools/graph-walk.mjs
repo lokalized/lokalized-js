@@ -48,7 +48,7 @@ const IMPORT_PATTERNS = [
 /**
  * @param {string} root repository root, against which `entry` is resolved
  * @param {string} entry entry-point path relative to `root`, e.g. `src/index.js`
- * @returns {{ bytes: number, modules: number }}
+ * @returns {{ bytes: number, modules: number, files: string[] }}
  */
 export function graphBytes(root, entry) {
   const seen = new Set();
@@ -64,5 +64,7 @@ export function graphBytes(root, entry) {
     for (const pattern of IMPORT_PATTERNS)
       for (const m of scannable.matchAll(pattern)) queue.push(resolve(dirname(file), m[1]));
   }
-  return { bytes, modules: seen.size };
+  // The FILE LIST as well as the count, because `tools/subpath-graphs.mjs` needs to know WHICH
+  // modules a subpath reaches, not merely how many: its containment rule is about territory.
+  return { bytes, modules: seen.size, files: [...seen].sort() };
 }
