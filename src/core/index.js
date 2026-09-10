@@ -179,16 +179,28 @@ function isFallbackFor(localeMatch, lookupLocale, resolvedLocale) {
  * option at construction time would break the first; returning some default category would break
  * the second and silently mistranslate.
  *
- * The message is deliberately NOT Java's, which points at `Strings.Builder#phoneticResolver(...)`.
+ * JAVA'S SHAPE, WITH BOTH IDENTIFIERS SUBSTITUTED AND NOTHING ELSE ADDED. Java's default resolver
+ * raises `No PhoneticResolver was configured. Provide one via Strings.Builder#phoneticResolver(...)`
+ * (`DefaultStrings.java:76-79`). `PhoneticResolver` is a Java INTERFACE this port does not have —
+ * the JS surface is the `phoneticResolver` option — and `Strings.Builder` is a fluent builder the JS
+ * API replaced with an object literal, so both slots must be respelled; advice a JS caller cannot
+ * follow is worse than a divergence, which is the rule `createStrings({ tiebreakers })` follows too.
+ *
+ * NEITHER RESPELLING LICENSED THE TRAILING CLAUSE this used to append — `to classify the term
+ * supplied for locale '...'`. Java composes this message from a STATIC string with no locale in it
+ * at all, so that clause was the port diverging further than the two identifiers require, on top of
+ * a divergence it had to have. It is gone, and what remains is declared with exactly that argument
+ * in `DECLARED_CAUSE_MESSAGE_DIVERGENCES` (`tools/conformance.mjs`), which pins this string
+ * byte-for-byte and fails the run if it drifts.
  *
  * @param {string} term
  * @param {string} locale
  * @returns {never}
  */
+// eslint-disable-next-line no-unused-vars -- the PhoneticResolver signature, not this body's needs.
 function THROWING_PHONETIC_RESOLVER(term, locale) {
   throw new Error(
-    "No phoneticResolver was configured. Provide one via createStrings({ phoneticResolver }) to " +
-      `classify the term supplied for locale '${locale}'`,
+    "No phoneticResolver was configured. Provide one via createStrings({ phoneticResolver })",
   );
 }
 

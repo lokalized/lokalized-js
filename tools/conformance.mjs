@@ -1737,9 +1737,17 @@ function adaptCauseType(causeType) {
 /**
  * What the failure handler was handed, projected. `VectorOracle.describeObservedFailures`.
  *
- * `causeMessage` is the ONE recorded field this projection omits, and it is ratcheted rather than
- * gated because message wording is a declared JS-idiomatic decision in 35 places: gating on it here
- * would turn the ratchet into a gate by the side door and paint 35 known, reviewed divergences red.
+ * `causeMessage` is the ONE recorded field this projection omits. It is not dropped: it is compared
+ * downstream, against `DECLARED_CAUSE_MESSAGE_DIVERGENCES`, and an undeclared divergence FAILS the
+ * run.
+ *
+ * THIS COMMENT USED TO SAY THE OPPOSITE OF THE TRUTH, and the correction is the point of the slice
+ * that changed it. It read "a declared JS-idiomatic decision in 35 places ... 35 known, reviewed
+ * divergences", and 35 was the count of divergences NOBODY HAD EVER LOOKED AT — the declaration
+ * table held four entries covering seven rows. When they were finally enumerated and each tested
+ * against the Java source, the pinned JDK and the corpus, sixteen were simply unfixed and are now
+ * reproduced byte for byte; the rest are Java-only concepts and each carries its argument. A comment
+ * asserting a review that never happened is worse than no comment, because it retires the question.
  *
  * MEASURED, correcting an earlier version of this comment that argued the omission could narrow
  * nothing because the string is always the one `expected.result.failureCause.message` already
@@ -1973,10 +1981,14 @@ function caughtIdentity(caught) {
  * One recorded Java throw against what the port raised, as a jcs-comparable pair.
  *
  * `ratchetMessage` marks the arm whose message is the CAUSE's own diagnostic wording rather than a
- * library-composed string. Those go to `causeMessageMatchedIds` on exactly the terms the failure
- * channel's `causeMessage` already goes there — gating on them would turn 36 reviewed, declared
- * JS-idiomatic divergences red and make the ratchet a gate by the side door. Nothing is lost by it:
- * the identity assertion on that arm is strictly stronger than comparing the message would be.
+ * library-composed string. Those go to the diagnostic channel on exactly the terms the failure
+ * channel's `causeMessage` already goes there: banked when they match, and otherwise required to
+ * carry a `DECLARED_CAUSE_MESSAGE_DIVERGENCES` entry or fail the run. The identity assertion on
+ * that arm is strictly stronger than comparing the message would be, so the message is compared
+ * beside it rather than instead of it.
+ *
+ * (This sentence too used to name "36 reviewed, declared JS-idiomatic divergences" as a reason not
+ * to gate. Thirty-six was the count of the UNREVIEWED ones; see `projectFailures`.)
  */
 /**
  * Java messages whose JS counterpart is DECLARED to differ, with the exact counterpart pinned.
@@ -2021,6 +2033,223 @@ const DECLARED_MESSAGE_DIVERGENCES = {
     why: "Java interpolates Locale#toString (LocaleUtils.java:60-61); the port names the same synthesized candidate by its BCP 47 tag, which is the spelling its own attemptedLocales list carries.",
   },
 };
+
+/**
+ * The DIAGNOSTIC channel's declaration table, and the reason clause 13 is certifiable at all.
+ *
+ * `DECLARED_MESSAGE_DIVERGENCES` above pins WHOLE messages, which is right for the four library
+ * strings arm 3 compares. It is the wrong shape for the cause-message channel: a cause message is
+ * Java's own diagnostic wrapped in up to two layers of contextualization (`Unable to resolve
+ * generated placeholder 'x' (LanguageFormTranslation) for key 'k'; definition declared at k: ...`),
+ * so one divergence of six words recurs under a dozen different prefixes. Pinning whole messages
+ * there would mean a dozen near-identical entries per divergence, each of which rots independently
+ * -- the exact failure mode "known-gap lists rot" names.
+ *
+ * So a divergence is declared ONCE, as the SUBSTITUTION it is. Each entry names the Java fragment
+ * and the JS fragment that replaces it, plus the argument for why the port cannot say what Java
+ * says. `causeMessageDeclaration` applies every entry to the RECORDED JAVA MESSAGE and demands the
+ * result equal the port's message BYTE FOR BYTE. Nothing is widened: an entry cannot excuse any
+ * text outside its own fragment, so a port that drifts anywhere else in the same sentence still
+ * fails, and a port that drifts INSIDE the fragment fails too because the fragment is pinned
+ * exactly on both sides.
+ *
+ * AND THE TABLE CANNOT ROT. An entry that never participates in a declared divergence over a whole
+ * run is reported STALE and FAILS, so a divergence the port stops having is a red run until the
+ * entry is deleted -- the same discipline `staleMessageDivergences` applies one channel over.
+ *
+ * WHAT IS NOT IN HERE IS THE POINT. Every fragment below is a Java-only concept, argued from the
+ * JDK or from the corpus, not a wording preference. Eighteen divergences that had been carried as
+ * "JS-idiomatic" were simply unfixed and are now gone: the axis type name Java prints on the left of
+ * `must be a %s but was %s`, the `String` and `Boolean` on its right, Java's composed `must be a
+ * Number, PluralOperands, or Cardinality` sentence and the prefix the port used to paste in front of
+ * Java's unprefixed numeric refusals, the range arm's endpoint-naming wording, the depth
+ * diagnostic's list rendering, the clause the absent-resolver hint had grown, and -- this round --
+ * `BigDecimal` and `PluralOperands`.
+ *
+ * THOSE LAST TWO ARE WHY THIS PARAGRAPH IS WORTH RE-READING BEFORE ADDING AN ENTRY. They were
+ * declared here on a SECOND criterion that no rule anywhere stated: "a Java class name for a type
+ * this API does not expose". Their own `why` conceded the mapping was total and unambiguous, which
+ * is the whole test, and the criterion that overrode it is refuted by the port's own output in the
+ * SAME sentence -- `must be a Phonetic or CharSequence`, plus `Gender`, `Cardinality`, `Ordinality`,
+ * `Definiteness`, `Clusivity` and `Formality`, none of them a JS type either. That is FIX 2's
+ * internal-consistency argument verbatim, one row over, and it is the same shape as `value-false`'s
+ * deleted reason in `tools/phonetic-diff/run.mjs`. The rule is one question and stays one question:
+ * does the JS value determine the Java class TOTALLY AND UNAMBIGUOUSLY?
+ *
+ * WHAT SURVIVES IS EXACTLY THE FOUR NUMERIC CARRIERS, and each collision now has corpus rows rather
+ * than a comment: `Integer`/`Double` (one JS `number`, and `placeholderValue` decodes both tags
+ * through `Number(...)`) and `Long`/`BigInteger` (one JS `bigint`). Plus the resolver-advice string,
+ * which names a Java interface and a fluent builder, and one entry marked `kind: "configuration"`.
+ *
+ * `kind` SEPARATES TWO DIFFERENT KINDS OF CLAIM. Absent, an entry is a WORDING divergence: the two
+ * sides ran the same configuration and the port cannot say what Java said. `kind: "configuration"`
+ * means the two sides ran DIFFERENT configurations and the message difference is the shadow of a
+ * capability gap -- reported apart from the wording count so a milestone reader is not handed one
+ * number and left to assume it is all wording.
+ */
+const DECLARED_CAUSE_MESSAGE_DIVERGENCES = [
+  {
+    java: "No PhoneticResolver was configured. Provide one via Strings.Builder#phoneticResolver(...)",
+    js: "No phoneticResolver was configured. Provide one via createStrings({ phoneticResolver })",
+    why:
+      "TWO IDENTIFIERS, AND NOTHING ELSE. Java's default resolver (DefaultStrings.java:76-79) names " +
+      "`PhoneticResolver`, an INTERFACE this port does not have -- the JS surface is the " +
+      "`phoneticResolver` option -- and `Strings.Builder#phoneticResolver(...)`, a fluent builder the " +
+      "JS API replaced with an object literal. Advice a JS caller cannot follow is worse than a " +
+      "divergence. The port's message used to append `to classify the term supplied for locale '..'` " +
+      "as well; that clause was the port diverging further than these two identifiers require and it " +
+      "is gone.",
+  },
+  {
+    java: "but was Integer",
+    js: "but was number",
+    why:
+      "NO TOTAL MAPPING EXISTS. Java prints `value.getClass().getSimpleName()`; `Integer`, `Double` " +
+      "and `Float` all arrive in JS as one `number`, so there is no function from the JS value to " +
+      "the Java class name and any spelling would be a coin flip that reads as fact. The corpus " +
+      "records both halves: `phonetic-resolver.input.integer` passes a bare `5` and " +
+      "`phonetic-resolver.input.double` passes `{$lokalized:'double', value:'1.5'}`. THOSE TWO ROWS " +
+      "ARE SEPARABLE AND THE ENTRY DOES NOT REST ON THEM BEING OTHERWISE -- an earlier version of " +
+      "this text said they 'differ ONLY in the Java class, from the same JS value', which " +
+      "`Number.isInteger` refutes in one line and which invited a reader to delete the entry. What " +
+      "makes the mapping non-total is the decoder: `placeholderValue` sends BOTH tags through " +
+      "`Number(value.value)`, so a Java `Double` of `2.0` is the JS number `2` and is " +
+      "indistinguishable from a Java `Integer` 2. The collision is real wherever the Double is " +
+      "integral; these two rows merely happen not to be that pair. Contrast `String`, `Boolean`, " +
+      "`BigDecimal`, `PluralOperands` and the tagged language forms, which the port now reproduces " +
+      "exactly because each JS value determines its Java class unambiguously.",
+  },
+  {
+    java: "but was Double",
+    js: "but was number",
+    why: "The other half of the `Integer`/`Double` collision above; same argument, opposite row.",
+  },
+  {
+    java: "but was Long",
+    js: "but was bigint",
+    why:
+      "THE SAME COLLISION, ON THE OTHER NUMERIC CARRIER, AND NOW MEASURED RATHER THAN ASSERTED. A " +
+      "JS `bigint` is the exact carrier for BOTH `java.lang.Long` and `java.math.BigInteger` -- " +
+      "`placeholderValue` decodes the `long` and `bigint` tags to `BigInt(value.value)` alike -- so " +
+      "no total mapping exists here either. Until this slice the claim lived ONLY in a comment in " +
+      "`javaSimpleNameOf` with no row to fire on, which is precisely the shape the declaration " +
+      "table exists to end: a table that claims to enumerate what the port cannot name, enumerating " +
+      "four of five. `m3b-form-diagnostics-value-types.clusivity.wrong-value-type-long` and " +
+      "`.wrong-value-type-bigint` are the same key and the same numeric value, differing only in " +
+      "the Java class, so the collision is now in the corpus.",
+  },
+  {
+    java: "but was BigInteger",
+    js: "but was bigint",
+    why: "The other half of the `Long`/`BigInteger` collision above; same argument, opposite row.",
+  },
+  {
+    java: "Placeholder compact exponent 10 exceeds the configured maximum of 3",
+    js: "Missing Ordinality translation for OTHER",
+    kind: "configuration",
+    why:
+      "NOT A WORDING DIVERGENCE AT ALL -- THE TWO SIDES RAN DIFFERENT CONFIGURATIONS, and this entry " +
+      "exists to stop that reading as prose. The fixture " +
+      "`m3b-form-diagnostics-lowered-compact-exponent` carries `runtimeLimits: " +
+      "{maximumCompactExponent: 3}`; `createStrings` REFUSES `runtimeLimits` by design (plan 4.6, " +
+      "src/core/index.js), so the port builds at the fixed v1 ceiling of 64 where a compactExponent " +
+      "of 10 is legal, classifies OTHER, and meets a sparse catalog. MEASURED on the pinned JDK " +
+      "(Corretto 21 + lokalized-3.0.0.jar), one instance per limit, same catalog and same input: at " +
+      "the DEFAULT ceiling Java answers `Missing Ordinality translation for OTHER` -- the port's " +
+      "string, byte for byte, with causeType IllegalStateException -- and at the lowered ceiling it " +
+      "answers the recorded message with causeType IllegalArgumentException. That control is what " +
+      "makes this a configuration difference rather than a guess. Note what the gated channels " +
+      "cannot see: CAUSE_NAME maps BOTH Java exceptions to `Error`, so the causeType flip is " +
+      "invisible there and this message is the only place the swap shows at all. The row moves when " +
+      "`runtimeLimits` gets a JS route, not when a message is rewritten. " +
+      "WHERE THIS BELONGS, FOR THE RECORD: `classifyFailure`'s rule 0 owns the same root cause " +
+      "everywhere it is reachable as a mismatch, and charges it to the by-design " +
+      "`runtime-limit overrides are not implemented` reason (43 rows). This row never reaches rule " +
+      "0 -- rule 0 is post-hoc and every GATED channel still agrees, so the case is `passed`, not " +
+      "`unsupported`, and it is NOT one of those 43. It surfaces here only because this slice made " +
+      "`causeMessage` a gating channel. Marked `kind: \"configuration\"` so it is counted apart " +
+      "from the wording divergences; the standing suggestion for a future slice is to have " +
+      "`causeMessageDeclaration` consult rule 0 first, so a capability gap can never be recorded as " +
+      "a wording decision at all.",
+  },
+];
+
+/** Declared cause-message substitutions that fired at least once this run. */
+const usedCauseMessageDivergences = new Set();
+
+/**
+ * The declared substitutions that turn Java's recorded cause message into the port's, or null.
+ *
+ * SUBSTITUTIONS ARE APPLIED TO THE ORIGINAL JAVA TEXT, NEVER CHAINED. An earlier version rewrote
+ * the ACCUMULATED string, which has two silent failure modes the moment the table grows: an entry
+ * whose `java` fragment matches text a PRIOR entry's `js` output introduced would substitute into
+ * the port's own words, and an entry whose `java` is a substring of another's would shadow it
+ * depending on array order. Neither is live -- every `js` output was checked against every `java`
+ * fragment -- but "not live today" is exactly the guarantee a growing table stops offering, and the
+ * byte-exact final comparison only catches these when the chain happens to land somewhere else.
+ *
+ * So: each entry is matched independently against `java`, the match spans are collected, and two
+ * entries whose spans OVERLAP throw rather than quietly picking one. The spans are then spliced
+ * once, left to right, so the result is a function of the table and not of its order.
+ *
+ * The WHOLE-message table is consulted first so the library strings arm 3 already pins are declared
+ * in exactly one place rather than twice. NOTE THE ASYMMETRY IT LEAVES: that arm returns without
+ * recording usage, so a whole-message entry reached ONLY through the cause channel would be
+ * reported stale by neither gate -- `staleMessageDivergences` fires when the port starts
+ * REPRODUCING Java on the THROWN path, not when an entry stops being needed. Not live either: all
+ * seven whole-message-declared rows carry an `expected.thrown` block, so the thrown-path gate
+ * covers every one of them. The next entry added to that table might not, which is why this
+ * sentence is here.
+ *
+ * @param {string} java the cause message the corpus recorded
+ * @param {string} js the message the port produced
+ * @returns {string[] | null} the `java` fragments that were applied, or null if undeclared
+ */
+function causeMessageDeclaration(java, js) {
+  if (DECLARED_MESSAGE_DIVERGENCES[java]?.js === js) return [java];
+
+  /** @type {{ start: number, end: number, entry: typeof DECLARED_CAUSE_MESSAGE_DIVERGENCES[number] }[]} */
+  const spans = [];
+
+  for (const entry of DECLARED_CAUSE_MESSAGE_DIVERGENCES) {
+    let from = 0;
+    for (;;) {
+      const start = java.indexOf(entry.java, from);
+      if (start < 0) break;
+      spans.push({ start, end: start + entry.java.length, entry });
+      from = start + entry.java.length;
+    }
+  }
+
+  spans.sort((a, b) => a.start - b.start || a.end - b.end);
+
+  for (let i = 1; i < spans.length; i += 1) {
+    if (spans[i].start >= spans[i - 1].end) continue;
+    throw new Error(
+      "two DECLARED_CAUSE_MESSAGE_DIVERGENCES entries match overlapping text in one Java message, " +
+        "so which one applies would depend on table order: " +
+        `${JSON.stringify(spans[i - 1].entry.java)} and ${JSON.stringify(spans[i].entry.java)} in ` +
+        `${JSON.stringify(java)}. Split or narrow the fragments.`,
+    );
+  }
+
+  /** @type {string[]} */
+  const applied = [];
+  let rewritten = "";
+  let cursor = 0;
+
+  for (const span of spans) {
+    rewritten += java.slice(cursor, span.start) + span.entry.js;
+    cursor = span.end;
+    applied.push(span.entry.java);
+  }
+
+  rewritten += java.slice(cursor);
+
+  if (rewritten !== js) return null;
+  for (const fragment of applied) usedCauseMessageDivergences.add(fragment);
+  return applied;
+}
 
 /**
  * Java cause class -> the JS error NAME the port attaches as the constructed throw's own `cause`,
@@ -2393,13 +2622,16 @@ function runCase(testCase, fixture) {
         supplierCalls: expectedSupplierCalls(expected),
       };
 
-      // The recorded Java DIAGNOSTIC, carried out separately from the projection above. It is
-      // deliberately not part of pass/fail: message wording is a JS-idiomatic decision in several
-      // places (a hint that names `Strings.Builder#phoneticResolver(...)` would be wrong advice in
-      // a JavaScript library), so making it a failure would gate on prose the port must not copy.
-      // It is ratcheted instead — see `causeMessageMatchedIds` — so a message that matches Java
-      // today can never silently stop matching, which is the property the M6 gate's "errors match
-      // Java cases" clause actually needs.
+      // The recorded Java DIAGNOSTIC, carried out separately from the projection above so it can be
+      // judged on its own terms: banked in `causeMessageMatchedIds` when it reproduces Java, and
+      // otherwise required to name a `DECLARED_CAUSE_MESSAGE_DIVERGENCES` entry or FAIL THE RUN.
+      //
+      // The old note here said making it a failure "would gate on prose the port must not copy",
+      // giving the absent-resolver hint as the example. The example was right and the conclusion
+      // did not follow: a hint pointing at `Strings.Builder#phoneticResolver(...)` is indeed wrong
+      // advice in a JavaScript library, which is an argument for DECLARING that one substitution —
+      // not for leaving every divergence in the channel unexamined. It hid sixteen that were simply
+      // unfixed.
       const causeMessages = [
         ...(expected.result.failureCause == null
           ? []
@@ -3109,8 +3341,10 @@ const nonportable = [];
 const nonportableReasons = new Map();
 /** Cases whose recorded Java cause message this implementation reproduces exactly. */
 const causeMessageMatched = [];
-/** Cases whose cause message differs, with both sides, for the report. */
-const causeMessageDiverged = [];
+/** Cases whose cause message differs UNDER A DECLARATION, with the fragments that declared it. */
+const causeMessageDeclared = [];
+/** Cases whose cause message differs with NO declaration. Gated: any entry here fails the run. */
+const causeMessageUndeclared = [];
 
 for (const testCase of cases) {
   const fixture = corpus.fixtures[testCase.fixture];
@@ -3120,11 +3354,42 @@ for (const testCase of cases) {
     // does not is meaningless, and ratcheting one would pin the wording of a path that is still
     // being built.
     if (outcome.ok && outcome.causeMessages?.length) {
-      // A case is banked as matching only when EVERY message it records matches, and the first
-      // divergence is the one reported, so a case cannot half-match its way into the ratchet.
-      const diverged = outcome.causeMessages.find((pair) => pair.wanted !== pair.actual);
-      if (!diverged) causeMessageMatched.push(testCase.id);
-      else causeMessageDiverged.push({ id: testCase.id, wanted: diverged.wanted, actual: diverged.actual });
+      // A case is banked as matching only when EVERY message it records matches, so a case cannot
+      // half-match its way into the ratchet.
+      //
+      // AND EVERY DIVERGING PAIR IS JUDGED, not just the first. This used to `find` one pair and
+      // stop, so a case recording two messages could hide an undeclared divergence behind a
+      // declared one -- the same shape as a gate that reports the first failure and exits.
+      //
+      // PROPHYLACTIC, AND SAID SO RATHER THAN CLAIMED AS A FIX. MEASURED over the whole corpus: 237
+      // cases record more than one cause-message pair and in ALL 237 the pairs are byte-identical
+      // (222 both-matching, 15 both-diverging, zero mixed), so NO CASE EXERCISES THE DIFFERENCE
+      // today and ablating this back to `find` loses nothing. It is kept because it is correct and
+      // free, not because it closed an observed hole -- this project's own "reaching a branch is
+      // not discriminating it" lesson, applied to the gate's own hardening.
+      const diverged = outcome.causeMessages.filter((pair) => pair.wanted !== pair.actual);
+
+      if (!diverged.length) {
+        causeMessageMatched.push(testCase.id);
+      } else {
+        const declarations = diverged.map((pair) => ({
+          pair,
+          applied: causeMessageDeclaration(pair.wanted, pair.actual),
+        }));
+        const undeclared = declarations.find((d) => d.applied === null);
+
+        if (undeclared)
+          causeMessageUndeclared.push({
+            id: testCase.id,
+            wanted: undeclared.pair.wanted,
+            actual: undeclared.pair.actual,
+          });
+        else
+          causeMessageDeclared.push({
+            id: testCase.id,
+            applied: [...new Set(declarations.flatMap((d) => d.applied ?? []))],
+          });
+      }
     }
     if (outcome.ok) {
       passed.push(testCase.id);
@@ -3310,27 +3575,90 @@ console.log(`  unsupported    ${String(skipped.length).padStart(5)}   not implem
 if (nonportable.length)
   console.log(`  no counterpart ${String(nonportable.length).padStart(5)}   JVM-only by design; these can never move`);
 
-// Diagnostics. PRECISELY: the divergence COUNT is not gated — a row that never reproduced Java's
-// cause message may keep diverging, and a newly-compared row may join them without failing the run.
-// But the channel is NOT ungated: `causeMessageRegressions` (an id in the baseline's
-// `causeMessageMatchedIds` that has stopped matching) IS a term of the exit expression below, so a
-// message that once matched Java and then drifts FAILS. Said the loose way — "ratcheted, not gated"
-// — this reads as though nothing here can turn the run red, which is wrong in the direction that
-// matters. See `causeMessageMatchedIds`.
-const causeMessageTotal = causeMessageMatched.length + causeMessageDiverged.length;
+// Diagnostics, and THE CHANNEL IS NOW GATED IN BOTH DIRECTIONS. Three terms, all of them in the
+// exit expression below:
+//
+//   - `causeMessageRegressions` — an id in the baseline's `causeMessageMatchedIds` that has stopped
+//     matching. The ratchet: a message that once reproduced Java can never silently drift.
+//   - `causeMessageUndeclared` — a case whose message diverges with NO entry saying why. THE NEW
+//     ONE, and the reason M7 clause 13 is certifiable at all: before it a divergence could appear
+//     on a path that had never matched and nothing objected, so "Java-equivalent" could not be
+//     claimed off a channel that merely counted.
+//   - `staleCauseMessageDivergences` — a declared divergence no case has any more. A declaration
+//     that has outlived its reason FAILS, so the table cannot rot into a list of excuses.
+//
+// The COUNT of declared divergences is deliberately still not a gate; the DECLARATION is. A new row
+// that diverges for an argued, Java-only reason should cost an entry and a review, not a red run —
+// and losing the reason should cost a red run, which is what stale does.
+const causeMessageTotal =
+  causeMessageMatched.length + causeMessageDeclared.length + causeMessageUndeclared.length;
+// A DECLARED DIVERGENCE IS NOT ALWAYS A WORDING DECISION, and one line reporting them together
+// invites the milestone reader to count them all as wording. An entry marked `kind: "configuration"`
+// is a CAPABILITY GAP that surfaces here because the two sides ran different configurations -- see
+// `classifyFailure`'s rule 0, which owns the same root cause everywhere it is reachable as a
+// mismatch, and the compact-exponent entry, which routes here only because every GATED channel still
+// agrees. Counted apart so "N wording divergences remain" is a statement a reader can trust.
+const configurationFragments = new Set(
+  DECLARED_CAUSE_MESSAGE_DIVERGENCES.filter((e) => e.kind === "configuration").map((e) => e.java),
+);
+const declaredByKind = (kind) =>
+  causeMessageDeclared.filter((d) =>
+    kind === "configuration"
+      ? d.applied.some((f) => configurationFragments.has(f))
+      : !d.applied.some((f) => configurationFragments.has(f)),
+  );
+const declaredWording = declaredByKind("wording");
+const declaredConfiguration = declaredByKind("configuration");
 if (causeMessageTotal)
   console.log(
     `\nJava cause messages reproduced: ${causeMessageMatched.length}/${causeMessageTotal}` +
-      ` (${causeMessageDiverged.length} JS-idiomatic divergence(s); the count is not gated, a REGRESSION is)`,
+      ` (${declaredWording.length} declared Java-only wording divergence(s), ` +
+      `${declaredConfiguration.length} declared configuration difference(s), ` +
+      `${causeMessageUndeclared.length} UNDECLARED)`,
   );
 
-if (verbose && causeMessageDiverged.length) {
-  console.log(`\nCAUSE MESSAGE DIVERGENCES (${causeMessageDiverged.length}):`);
-  for (const d of causeMessageDiverged) {
+if (verbose && causeMessageDeclared.length) {
+  console.log(`\nDECLARED CAUSE MESSAGE DIVERGENCES (${causeMessageDeclared.length}):`);
+  for (const d of causeMessageDeclared)
+    console.log(`  ${d.id}\n    ${d.applied.map((f) => JSON.stringify(f)).join("\n    ")}`);
+}
+
+// NEVER behind `--verbose`: this is a gate, and a gate that hides its evidence behind a flag makes
+// the next reader guess which case failed.
+if (causeMessageUndeclared.length) {
+  console.log(
+    `\nUNDECLARED CAUSE MESSAGE DIVERGENCES (${causeMessageUndeclared.length}) — the port's` +
+      ` diagnostic differs from Java's with nothing saying why:`,
+  );
+  for (const d of causeMessageUndeclared) {
     console.log(`\n  ${d.id}`);
     console.log(`    java ${JSON.stringify(d.wanted)}`);
     console.log(`    js   ${JSON.stringify(d.actual)}`);
   }
+  console.log(
+    `\nEither make the port say what Java says, or add an entry to` +
+      ` DECLARED_CAUSE_MESSAGE_DIVERGENCES\nnaming the Java fragment, the JS fragment, and the` +
+      ` argument for why it cannot be reproduced.`,
+  );
+}
+
+// A declaration that no longer declares anything. Suppressed under `--family`, which runs a subset
+// of the corpus and would report every entry that subset happens not to reach.
+const staleCauseMessageDivergences = familyFilter
+  ? []
+  : DECLARED_CAUSE_MESSAGE_DIVERGENCES.filter((e) => !usedCauseMessageDivergences.has(e.java));
+// PRINTED, not just commented. `--family` is the invocation an implementer reaches for while
+// iterating, so it is the one run that cannot report a rotting declaration -- and a suppression
+// documented only in source is a suppression nobody at the terminal knows about.
+if (familyFilter && causeMessageTotal)
+  console.log("  (stale cause-message declaration check suppressed under --family)");
+if (staleCauseMessageDivergences.length) {
+  console.log(
+    `\nSTALE CAUSE MESSAGE DIVERGENCE (${staleCauseMessageDivergences.length}) — declared, but no` +
+      ` case diverges this way any more:`,
+  );
+  for (const e of staleCauseMessageDivergences) console.log(`  ${JSON.stringify(e.java)}`);
+  console.log(`Delete the entry; the port has stopped needing it.`);
 }
 
 if (skipped.length) {
@@ -3437,6 +3765,7 @@ if (staleDrops.length) {
 
 process.exit(
   failed.length === 0 && regressions.length === 0 && causeMessageRegressions.length === 0 &&
+  causeMessageUndeclared.length === 0 && staleCauseMessageDivergences.length === 0 &&
   staleNonportabilityClaims.length === 0 && staleAdaptations.length === 0 &&
   staleDrops.length === 0 && staleMessageDivergences.length === 0 ? 0 : 1,
 );

@@ -676,28 +676,107 @@ function axisTypeName(axis) {
 }
 
 /**
- * The Java class name `getClass().getSimpleName()` would print for a caller-supplied value, when the
- * port can know it — which is exactly when the value is a TAGGED LANGUAGE FORM.
+ * The Java class name `getClass().getSimpleName()` would print for a caller-supplied value, on the
+ * values where the port can name it without guessing.
  *
- * Java's "but was X" diagnostics print the runtime class, and most of that is genuinely
- * untranslatable: one JS `number` is both `Integer` and `Double`, and calling a JS tagged decimal a
- * `BigDecimal` would be advice about a type the caller does not have. A language form is the one
- * case where nothing is lost — the tagged value carries its own axis, and `AXIS_TYPE_NAMES` already
- * maps that axis onto the very class whose simple name Java prints. `Gender` here IS Java's
- * `Gender`, named from the port's own data rather than guessed from the JVM.
+ * Java's "but was X" diagnostics print the runtime class. THE TEST IS ONE QUESTION, NOT TWO: does
+ * the JS value determine that class TOTALLY AND UNAMBIGUOUSLY? If it does, the port prints it.
  *
- * Returns null when the value is not a tagged language form, so callers fall back to the
- * JS-idiomatic description.
+ * THE SECOND CRITERION THIS DOC USED TO CARRY — "and is the name one a JS caller can find in their
+ * own program" — WAS REFUTED BY THE PORT'S OWN OUTPUT, in the same sentence it governs. That
+ * sentence reads `must be a Phonetic or CharSequence but was X`, and `Phonetic`, `CharSequence`,
+ * `Gender`, `Cardinality`, `Ordinality`, `Definiteness`, `Clusivity` and `Formality` are all Java
+ * class names with no JS type behind them. Applying the extra criterion to `BigDecimal` and
+ * `PluralOperands` while the left half of the very same sentence ignored it was the inconsistency
+ * the `String`/`Boolean` fix was made to remove, one row over — so those two are reproduced now and
+ * their declaration entries are deleted. The maintainer's standing rule decides it: match Java as
+ * closely as we can.
+ *
+ *   - A TAGGED LANGUAGE FORM passes: it carries its own axis, and `AXIS_TYPE_NAMES` maps that axis
+ *     onto the very class whose simple name Java prints. `Gender` here IS Java's `Gender`, named
+ *     from the port's own data rather than guessed from the JVM. Measured, not argued —
+ *     `phonetic-resolver.input.tagged-gender` and `.tagged-cardinality` reproduce `... but was
+ *     Gender` / `... but was Cardinality` byte for byte against the corpus.
+ *   - A `string` and a `boolean` pass too, and the claim that they did not was never tested. Each
+ *     maps onto exactly one Java class in every direction, so nothing is invented and nothing is
+ *     lost.
+ *   - A tagged `decimal(...)` is always a `BigDecimal` and a `pluralOperands(...)` is always a
+ *     `PluralOperands`. Total in both directions, so both are printed. Verified against the corpus:
+ *     `phonetic-resolver.input.decimal` and `.plural-operands` reproduce Java byte for byte.
+ *   - A `number` FAILS the test and is the only shape that does: `Integer`, `Double` and `Float`
+ *     all arrive as one JS `number` and the corpus records rows for each, so no total mapping
+ *     exists. A `bigint` fails it the same way, carrying both `Long` and `BigInteger` — and that
+ *     collision is no longer an argument in a comment: `m3b-form-diagnostics.clusivity.
+ *     wrong-value-type-long` and `.wrong-value-type-bigint` record the two Java classes arriving
+ *     from the one JS carrier, so the gate sees the collision rather than taking this doc's word.
+ *
+ * The four that fail — `Integer`, `Double`, `Long`, `BigInteger`, the four numeric carriers — keep
+ * the JS-idiomatic description and are DECLARED, with that argument, in `tools/conformance.mjs`.
+ *
+ * Returns null when the port cannot name the class, so callers fall back to `describeValue`.
  *
  * @param {unknown} value
  * @returns {string | null}
  */
 function javaSimpleNameOf(value) {
-  if (taggedKindOf(value) !== "language-form") return null;
+  if (typeof value === "string") return "String";
+  if (typeof value === "boolean") return "Boolean";
+  const tag = taggedKindOf(value);
+  if (tag === "decimal") return "BigDecimal";
+  if (tag === "plural-operands") return "PluralOperands";
+  if (tag !== "language-form") return null;
   const axis = /** @type {{ axis?: unknown }} */ (value).axis;
   return typeof axis === "string" && Object.hasOwn(AXIS_TYPE_NAMES, axis)
     ? AXIS_TYPE_NAMES[/** @type {import("./catalog.js").LanguageFormAxis} */ (axis)]
     : null;
+}
+
+/**
+ * Java's composed plural accept-set refusal, DESCRIPTION SLOT AND ALL.
+ *
+ * `cardinalityForValue` / `ordinalityForValue` take a `description` parameter and interpolate it
+ * FIRST (`DefaultStrings.java:1459-1462` / `:1487-1490`, `"%s '%s' in key '%s' must be a %s, %s, or
+ * %s but was %s"`). Its three call sites pass three different strings: `"Placeholder"` from the
+ * non-range arm (`:970`), and `"Range start placeholder"` / `"Range end placeholder"` from the
+ * range arm (`:948-951`). The port composed the sentence inline in the non-range arm only, so the
+ * range arm had no accept-set test at all and fell through to the numeric classifier's own wording
+ * — which loses the description, the accept set and the Java class name in one go. Hoisting the
+ * composition here is what makes the description a PARAMETER rather than a constant, which is the
+ * whole shape of Java's own function.
+ *
+ * @param {string} description Java's `description` argument, verbatim
+ * @param {string} valueName the placeholder name the value was read from
+ * @param {string} key
+ * @param {string} typeName the axis enum's simple name — `Cardinality` or `Ordinality`
+ * @param {unknown} value
+ * @returns {never}
+ */
+function refusePluralValue(description, valueName, key, typeName, value) {
+  throw new Error(
+    `${description} '${valueName}' in key '${key}' must be a Number, PluralOperands, or ` +
+      `${typeName} but was ${javaSimpleNameOf(value) ?? describeValue(value)}`,
+  );
+}
+
+/**
+ * Java's accept-set for a plural selector, tested BEFORE classification.
+ *
+ * `cardinalityForValue` accepts exactly three shapes — an instance of the axis enum, a
+ * `PluralOperands`, or a `Number` — and refuses everything else in one composed sentence. The JS
+ * counterparts are the tagged language form of that axis, a `pluralOperands(...)` record, and the
+ * three carriers of a Java `Number`: `number`, `bigint` and a `decimal(...)` record (Java's
+ * `BigDecimal`). Nothing here classifies; a value that passes may still be refused by the numeric
+ * validator, with the validator's own wording, exactly as in Java.
+ *
+ * @param {unknown} value
+ * @param {"cardinality" | "ordinality"} axis
+ * @returns {boolean}
+ */
+function classifiableAsPlural(value, axis) {
+  if (typeof value === "number" || typeof value === "bigint") return true;
+  const tag = taggedKindOf(value);
+  if (tag === "decimal" || tag === "plural-operands") return true;
+  return taggedLanguageFormName(value, axis) !== null;
 }
 
 /**
@@ -775,21 +854,27 @@ function phoneticNameForValue(value, valueName, context) {
 
   if (typeof value !== "string")
     throw new Error(
-      // Java verbatim, INCLUDING the trailing class name where the port can know it. A verbatim copy
-      // that then drops a vaguer noun into the one slot it could have filled is half a port: the
-      // corpus records `... but was Gender` and `... but was Cardinality`, and both are recoverable
-      // from the tagged value's own axis. `Integer` and `Double` are not, and stay described the
-      // JS way.
+      // Java verbatim, INCLUDING the trailing class name wherever the port can name it. A verbatim
+      // copy that then drops a vaguer noun into the one slot it could have filled is half a port —
+      // and this site read `must be a Phonetic or CharSequence but was string`, Java class names on
+      // the left and `typeof` on the right, for a whole milestone. `javaSimpleNameOf` carries the
+      // test; `Integer`, `Double`, `BigDecimal` and `PluralOperands` are the four that fail it and
+      // are declared in `tools/conformance.mjs`.
       `Placeholder '${valueName}' in key '${key}' must be a Phonetic or CharSequence but was ` +
         `${javaSimpleNameOf(value) ?? describeValue(value)}`,
     );
 
   const resolver = context.phoneticResolver;
 
+  // ONE ABSENT-RESOLVER SENTENCE IN THE PORT, NOT TWO. `createStrings` always installs
+  // `THROWING_PHONETIC_RESOLVER` (src/core/index.js), so this guard fires only when the renderer is
+  // driven directly — but it used to carry the LONGER form (`... to classify placeholder 'x' in key
+  // 'k'`) that FIX 6 removed from core precisely because Java composes its message from a static
+  // string with no key in it. A second, ungated spelling of a declared message is a divergence
+  // waiting for the day the guard becomes reachable, so it is the declared string verbatim.
   if (resolver === undefined)
     throw new Error(
-      "No phoneticResolver was configured. Provide one via createStrings({ phoneticResolver }) to " +
-        `classify placeholder '${valueName}' in key '${key}'`,
+      "No phoneticResolver was configured. Provide one via createStrings({ phoneticResolver })",
     );
 
   // `CharSequenceUtils.toString`, whose bound is checked BEFORE the resolver runs — which is what
@@ -836,6 +921,8 @@ function selectLanguageForm(definition, lookup, context) {
   let formName;
   /** @type {string} */
   let selectionDescription;
+  /** @type {string | null} the range arm's own absent-translation wording, when it applies */
+  let missingFormMessage = null;
 
   if (definition.range !== null) {
     // Range-driven cardinality. The parser has already rejected a range on any other axis.
@@ -848,6 +935,18 @@ function selectLanguageForm(definition, lookup, context) {
 
     if (endValue === null || endValue === undefined)
       throw new Error(`Missing range end placeholder '${end}' for key '${key}'`);
+
+    // JAVA'S ACCEPT-SET TEST, ON BOTH ENDPOINTS, WITH JAVA'S OWN DESCRIPTION STRINGS.
+    // `DefaultStrings.java:948-951` calls `cardinalityForValue` twice with `"Range start
+    // placeholder"` and `"Range end placeholder"`, so a bad endpoint is refused by the SAME
+    // composed sentence the non-range arm produces, differing only in that first word. The port ran
+    // neither test here and let a raw string fall through to the numeric classifier, which answered
+    // with the classifier's unprefixed wording and never named the endpoint at all.
+    if (!classifiableAsPlural(startValue, "cardinality"))
+      refusePluralValue("Range start placeholder", start, key, typeName, startValue);
+
+    if (!classifiableAsPlural(endValue, "cardinality"))
+      refusePluralValue("Range end placeholder", end, key, typeName, endValue);
 
     const startName = cardinalityNameForValue(startValue, evaluationLocale);
     const endName = cardinalityNameForValue(endValue, evaluationLocale);
@@ -863,6 +962,13 @@ function selectLanguageForm(definition, lookup, context) {
     selectionDescription =
       `${typeName}.${renderNameFor(formName)} range ` +
       `(start ${renderNameFor(startName)}, end ${renderNameFor(endName)})`;
+    // The RANGE arm has its own absent-translation wording (DefaultStrings.java:955-957), naming the
+    // two endpoint categories the combined one was derived from. The port fell through to the plain
+    // `Missing %s translation for %s` below and lost both, which is the half of the diagnostic a
+    // caller staring at a sparse range table actually needs.
+    missingFormMessage =
+      `Missing ${typeName} translation for range cardinality ${renderNameFor(formName)} ` +
+      `(start was ${renderNameFor(startName)}, end was ${renderNameFor(endName)})`;
   } else {
     const valueName = definition.value;
 
@@ -876,26 +982,23 @@ function selectLanguageForm(definition, lookup, context) {
     if (value === null || value === undefined)
       throw new Error(`Missing value for placeholder '${valueName}' in key '${key}'`);
 
-    if (definition.axis === "cardinality") {
-      try {
-        formName = cardinalityNameForValue(value, evaluationLocale);
-      } catch (cause) {
-        throw new Error(
-          `Placeholder '${valueName}' in key '${key}': ` +
-            `${cause instanceof Error ? cause.message : String(cause)}`,
-          { cause },
-        );
-      }
-    } else if (definition.axis === "ordinality") {
-      try {
-        formName = ordinalityNameForValue(value, context);
-      } catch (cause) {
-        throw new Error(
-          `Placeholder '${valueName}' in key '${key}': ` +
-            `${cause instanceof Error ? cause.message : String(cause)}`,
-          { cause },
-        );
-      }
+    if (definition.axis === "cardinality" || definition.axis === "ordinality") {
+      // JAVA'S ORDER, NOT A WRAPPER. `cardinalityForValue` / `ordinalityForValue`
+      // (DefaultStrings.java:1438-1462 / :1466-1490) test the accepted shapes FIRST and compose the
+      // whole refusal themselves — `Placeholder 'x' in key 'k' must be a Number, PluralOperands, or
+      // Cardinality but was String` — and everything that gets PAST that test then fails with the
+      // numeric validator's own unprefixed wording (`Number scale -1025 exceeds ...`,
+      // PluralOperands.java:163). The port used to invert both halves: it classified first and
+      // pasted `Placeholder 'x' in key 'k': ` in front of whatever came back, which turned Java's
+      // one composed sentence into a paraphrase and gave Java's bare limit refusals a prefix Java
+      // never writes. Two separate divergences, one cause.
+      if (!classifiableAsPlural(value, definition.axis))
+        refusePluralValue("Placeholder", valueName, key, typeName, value);
+
+      formName =
+        definition.axis === "cardinality"
+          ? cardinalityNameForValue(value, evaluationLocale)
+          : ordinalityNameForValue(value, context);
     } else if (definition.axis === "phonetic") {
       formName = phoneticNameForValue(value, valueName, context);
     } else {
@@ -905,8 +1008,14 @@ function selectLanguageForm(definition, lookup, context) {
 
       if (explicit === null)
         throw new Error(
-          `Placeholder '${valueName}' in key '${key}' must be a tagged ${definition.axis} language ` +
-            `form but was ${describeValue(value)}`,
+          // Java's wording verbatim (`DefaultStrings.java:1008/1029/1050/1071/1092/1113/1134`, one
+          // arm per nominal axis, all seven spelling `must be a %s but was %s`). The LEFT slot is
+          // `Gender.class.getSimpleName()` and the port has had that exact spelling in
+          // `AXIS_TYPE_NAMES` all along — `typeName` is bound thirteen lines above and already
+          // prints in `Missing ${typeName} translation for ...` below, so the axis paraphrase this
+          // used to write was a divergence the port chose rather than one it was forced into.
+          `Placeholder '${valueName}' in key '${key}' must be a ${typeName} but was ` +
+            `${javaSimpleNameOf(value) ?? describeValue(value)}`,
         );
 
       formName = explicit;
@@ -918,7 +1027,9 @@ function selectLanguageForm(definition, lookup, context) {
   const translation = definition.translations.get(formName);
 
   if (translation === undefined)
-    throw new Error(`Missing ${typeName} translation for ${renderNameFor(formName)}`);
+    throw new Error(
+      missingFormMessage ?? `Missing ${typeName} translation for ${renderNameFor(formName)}`,
+    );
 
   return { translation, selectionDescription };
 }
@@ -1094,8 +1205,13 @@ function interpolateTemplate(
 ) {
   if (depth > maximumDepth)
     throw new Error(
+      // `[q1, q2, q3]`, NOT `q1 -> q2 -> q3`. Java interpolates the path LIST here
+      // (DefaultStrings.java:1322-1324, `%s` against a `List<String>`), so the separator is
+      // `AbstractCollection.toString`'s. The arrow form belongs to the CYCLE diagnostic forty lines
+      // below, which joins explicitly (:1341-1342) — the port had copied the cycle's spelling onto
+      // both, which is a plain list rendering and reproducible, not a JS-idiomatic choice.
       `Generated placeholder nesting for key '${context.key}' exceeds the maximum depth of ` +
-        `${maximumDepth}: ${path.join(" -> ")}`,
+        `${maximumDepth}: [${path.join(", ")}]`,
     );
 
   /** @type {Map<string, unknown>} */

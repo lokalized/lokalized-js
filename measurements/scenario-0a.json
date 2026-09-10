@@ -9,20 +9,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 25,
-      "sourceBytes": 768011,
-      "importMs": 0.42,
-      "constructionMs": 0.1423,
-      "firstRenderMs": 0.3638,
+      "sourceBytes": 777757,
+      "importMs": 0.337,
+      "constructionMs": 0.1204,
+      "firstRenderMs": 0.3798,
       "retainedBytes": 67856
     },
     {
       "label": "core + parsed equivalent",
       "modules": 24,
-      "sourceBytes": 759766,
-      "importMs": 0.751,
-      "constructionMs": 0.4747,
-      "firstRenderMs": 0.3345,
-      "retainedBytes": 364360
+      "sourceBytes": 769512,
+      "importMs": 0.573,
+      "constructionMs": 0.3491,
+      "firstRenderMs": 0.2949,
+      "retainedBytes": 366520
     }
   ],
   "rebaselines": [
@@ -273,6 +273,13 @@
         "root + raw-text catalog: source graph grew 765422 -> 768011 bytes",
         "core + parsed equivalent: source graph grew 757177 -> 759766 bytes"
       ]
+    },
+    {
+      "reason": "M7 clause 13 (Java-equivalent automatic direct diagnostics) and its repair round. +9,746 B on both graphs, module count UNCHANGED at 25/24. Decomposed by file against the last baseline: src/internal/interpolate.js +8,659 B and src/core/index.js +1,087 B, which is the whole delta exactly. The interpolate half is the diagnostic port itself plus its argument -- Java's composed plural accept-set sentence hoisted into refusePluralValue(description, ...) so the RANGE arm can pass Java's own 'Range start placeholder' / 'Range end placeholder' descriptions (DefaultStrings.java:948-951 -> :1459-1462), javaSimpleNameOf reproducing BigDecimal and PluralOperands, the range arm's endpoint-naming absent-translation wording, the accept-set test reordered ahead of the optional ordinal module, the second absent-resolver sentence aligned onto the declared one, and the doc comments carrying why each is Java's shape rather than a paraphrase. The core half is the validator-wrapped createStrings refusal and the null-callback messages taking Java's shape with the JS option name. No new module, no new import edge; every byte is inside two files the graph already had.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 768011 -> 777757 bytes",
+        "core + parsed equivalent: source graph grew 759766 -> 769512 bytes"
+      ]
     }
   ],
   "browser": {
@@ -284,23 +291,23 @@
       {
         "label": "root + raw-text catalog",
         "resources": 25,
-        "encodedBytes": 761288,
-        "decodedBytes": 761288,
-        "coldImportMs": 34.3,
-        "importMs": 2.2,
-        "constructionMs": 0.9,
-        "firstRenderMs": 2.4,
+        "encodedBytes": 777757,
+        "decodedBytes": 777757,
+        "coldImportMs": 32,
+        "importMs": 1.9,
+        "constructionMs": 0.5,
+        "firstRenderMs": 1.3,
         "firstRender": "I read 3 books"
       },
       {
         "label": "core + parsed equivalent",
         "resources": 24,
-        "encodedBytes": 753043,
-        "decodedBytes": 753043,
-        "coldImportMs": 24,
-        "importMs": 2.6,
-        "constructionMs": 1.4,
-        "firstRenderMs": 1.3,
+        "encodedBytes": 769512,
+        "decodedBytes": 769512,
+        "coldImportMs": 27.2,
+        "importMs": 2.5,
+        "constructionMs": 1.1,
+        "firstRenderMs": 0.8,
         "firstRender": "I read 3 books"
       }
     ]

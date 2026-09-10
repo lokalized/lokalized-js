@@ -231,11 +231,26 @@ for (const [name, fallback, request, loaded] of [
  */
 const KNOWN_DIVERGENCES = {
   // Java prints `value.getClass().getSimpleName()`. One JS `number` is both `Integer` and `Double`,
-  // so there is no honest single answer; `boolean` is spelled the JS way for the same reason.
-  // A tagged LANGUAGE FORM is the case the port can answer and does — see `javaSimpleNameOf`.
+  // so there is no honest single answer and these two rows stay divergent.
+  //
+  // `value-false` USED TO SIT HERE, on the reason "Java prints the boxed type name Boolean; JS
+  // reports the primitive type" — which was a preference wearing a measurement's clothes. A JS
+  // `boolean` determines its Java class totally and unambiguously, and `Boolean` is a real JS global
+  // naming exactly that type, so nothing was untranslatable about it; the same held for `String`.
+  // The port now prints both, this table's STALE gate reported the entry the moment it stopped
+  // diverging, and deleting it is the record of the win. `javaSimpleNameOf` carries the test, and
+  // the survivors are the four NUMERIC CARRIERS — `Integer`/`Double` from one JS `number`,
+  // `Long`/`BigInteger` from one JS `bigint`.
+  //
+  // ONLY TWO OF THE FOUR ARE DECLARED HERE, and the reason is worth saying rather than leaving a
+  // reader to hunt: this differential's probe space has no long, bigint, decimal or plural-operands
+  // scenario at all, so `Long` and `BigInteger` never arise on this path and are declared in
+  // `tools/conformance.mjs` instead. That a table can name four survivors while its own probe space
+  // can only reach two is the tell — a differential is evidence about what it probes and nothing
+  // else. `BigDecimal` and `PluralOperands` used to be declared over there too and are now
+  // REPRODUCED, which needed no edit here for exactly the same reason.
   "value-int": "Java prints Integer; one JS number is both Integer and Double",
   "value-double": "Java prints Double; one JS number is both Integer and Double",
-  "value-false": "Java prints the boxed type name Boolean; JS reports the primitive type",
   // Java's advice names `Strings.Builder#phoneticResolver(...)`, which does not exist here. Copying
   // it would send a JavaScript caller to a Java API. The structural half of every other phonetic
   // diagnostic IS copied verbatim; only the configuration advice is reworded.

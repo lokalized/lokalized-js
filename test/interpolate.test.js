@@ -525,6 +525,28 @@ describe("render dispatch", () => {
     return definition;
   };
 
+  /**
+   * The message the placeholder resolver itself composed, unwrapped.
+   *
+   * `render` CONTEXTUALIZES a placeholder failure (`Unable to resolve generated placeholder 'x'
+   * (LanguageFormTranslation) for key 'k'; definition declared at k: ...`) and retains the original
+   * as `cause`, exactly as `DefaultStrings` does. Java's own composed sentence is the CAUSE, so
+   * these assertions read the cause and pin it end to end — a substring match on the wrapper would
+   * pass for a port that composed only half the sentence.
+   *
+   * @param {() => unknown} run
+   * @returns {string}
+   */
+  const refusalCause = (run) => {
+    try {
+      run();
+    } catch (error) {
+      const cause = /** @type {{ cause?: unknown }} */ (error).cause;
+      return /** @type {Error} */ (cause ?? error).message;
+    }
+    return assert.fail("expected a refusal");
+  };
+
   const booksCatalog = {
     "Books": {
       translation: "I read {{bookCount}} {{books}}",
@@ -564,7 +586,7 @@ describe("render dispatch", () => {
 
     assert.throws(
       () => render(definition, { bookCount: "1" }, { key: "Books", evaluationLocale: "en" }),
-      /must be a number, bigint, decimal, plural-operands/,
+      /must be a Number, PluralOperands, or Cardinality but was String/,
     );
 
     const genderCatalog = {
@@ -587,7 +609,7 @@ describe("render dispatch", () => {
           { gender: "GENDER_FEMININE" },
           { key: "Actor", evaluationLocale: "en" },
         ),
-      /must be a tagged gender language form but was string/,
+      /must be a Gender but was String/,
     );
     assert.equal(
       render(
@@ -625,7 +647,7 @@ describe("render dispatch", () => {
           { gender: { $lokalized: "language-form", axis: "formality", name: "FORMALITY_FORMAL" } },
           { key: "Actor", evaluationLocale: "en" },
         ),
-      /must be a tagged gender language form/,
+      /must be a Gender but was Formality/,
     );
 
     // ...and the same value is still rejected when the selector is cardinality, which would
@@ -643,8 +665,160 @@ describe("render dispatch", () => {
           },
           { key: "Books", evaluationLocale: "en" },
         ),
-      /must be a number, bigint, decimal, plural-operands, or an exact tagged language form/,
+      /must be a Number, PluralOperands, or Cardinality but was Ordinality/,
     );
+  });
+
+  it("composes the range arm's refusal with Java's own description strings", () => {
+    // `DefaultStrings.java:948-951` calls `cardinalityForValue` with `"Range start placeholder"` and
+    // `"Range end placeholder"` where the non-range arm passes `"Placeholder"`, and that first word
+    // is the ONLY difference between the three sentences. The port ran no accept-set test on the
+    // range path at all until this slice, so a bad endpoint fell through to the numeric classifier
+    // and answered with the classifier's own unprefixed wording — naming neither the endpoint, the
+    // accept set, nor the Java class.
+    //
+    // The corpus rows `m3b-form-diagnostics-value-types.range.start-wrong-type-string` and
+    // `.end-wrong-type-gender` gate this against Java. These assertions gate it HERE, where a
+    // re-partitioned corpus row cannot take the wording's only enforcement with it.
+    const rangeCatalog = {
+      "Range.Books": {
+        translation: "I read {{books}}",
+        placeholders: {
+          books: {
+            range: { start: "low", end: "high" },
+            translations: { CARDINALITY_ONE: "one book", CARDINALITY_OTHER: "books" },
+          },
+        },
+      },
+    };
+    const definition = definitionFor(rangeCatalog, "Range.Books");
+    const context = contextFor("Range.Books", "en");
+
+    const accepts = " must be a Number, PluralOperands, or Cardinality but was ";
+    assert.equal(
+      refusalCause(() => render(definition, { low: "lo", high: 5 }, context)),
+      `Range start placeholder 'low' in key 'Range.Books'${accepts}String`,
+    );
+    assert.equal(
+      refusalCause(() => render(definition, { low: 1, high: true }, context)),
+      `Range end placeholder 'high' in key 'Range.Books'${accepts}Boolean`,
+    );
+    assert.equal(
+      refusalCause(() =>
+        render(
+          definition,
+          { low: 1, high: { $lokalized: "language-form", axis: "gender", name: "GENDER_FEMININE" } },
+          context,
+        ),
+      ),
+      `Range end placeholder 'high' in key 'Range.Books'${accepts}Gender`,
+    );
+
+    // THE CONTROL THAT SEPARATES THE GUARD FROM AN OVER-STRICT ONE. Java's accept set is three
+    // shapes, not one: a guard spelled `typeof value === "number"` passes every assertion above and
+    // turns these two legal endpoints into refusals.
+    assert.equal(
+      render(definition, { low: { $lokalized: "plural-operands", value: "1" }, high: 5 }, context),
+      "I read books",
+    );
+    assert.equal(
+      render(definition, { low: { $lokalized: "decimal", value: "1" }, high: 5n }, context),
+      "I read books",
+    );
+  });
+
+  it("names the endpoint categories when a range's computed form is absent", () => {
+    // `DefaultStrings.java:955-957`, the RANGE arm's own absent-translation wording. The port used
+    // to fall through to the plain `Missing %s translation for %s` and lose both endpoint
+    // categories — the half of the diagnostic a caller staring at a sparse range table needs. One
+    // corpus row (`m3b-form-diagnostics.range.computed-form-absent`) was its only enforcement.
+    const sparse = {
+      "Range.Sparse": {
+        translation: "I read {{books}}",
+        placeholders: {
+          books: {
+            range: { start: "low", end: "high" },
+            translations: { CARDINALITY_ONE: "one book" },
+          },
+        },
+      },
+    };
+
+    assert.equal(
+      refusalCause(() =>
+        render(definitionFor(sparse, "Range.Sparse"), { low: 1, high: 5 }, contextFor("Range.Sparse", "en")),
+      ),
+      "Missing Cardinality translation for range cardinality OTHER (start was ONE, end was OTHER)",
+    );
+  });
+
+  it("tests the plural accept set BEFORE consulting the optional ordinal module", () => {
+    // JAVA'S ORDER. `ordinalityForValue` refuses an unacceptable value at
+    // `DefaultStrings.java:1487-1490` before anything classifies, so the diagnostic a caller sees is
+    // Java's composed sentence whether or not ordinal data is present. The port classified first,
+    // which meant an instance WITHOUT `lokalized/data/ordinal` answered a bad value with the
+    // module-missing advice instead — right complaint, wrong question. Rendered here with a context
+    // carrying NO `ordinalityNameFor` at all, which is the state that used to hide it.
+    const ordinalCatalog = {
+      "Ordinal.Finish": {
+        translation: "You finished {{position}}.",
+        placeholders: {
+          position: {
+            value: "rank",
+            translations: { ORDINALITY_ONE: "1st", ORDINALITY_OTHER: "th" },
+          },
+        },
+      },
+    };
+    const definition = definitionFor(ordinalCatalog, "Ordinal.Finish");
+    const withoutOrdinalData = { key: "Ordinal.Finish", evaluationLocale: "en" };
+
+    assert.equal(
+      refusalCause(() => render(definition, { rank: "1" }, withoutOrdinalData)),
+      "Placeholder 'rank' in key 'Ordinal.Finish' must be a Number, PluralOperands, or Ordinality but was String",
+    );
+    // The control: a value that PASSES the accept set still reaches the absent-module complaint, so
+    // the reorder moved the accept-set test and did not swallow the module check.
+    assert.match(
+      refusalCause(() => render(definition, { rank: 1 }, withoutOrdinalData)),
+      /requires the optional 'lokalized\/data\/ordinal' module/,
+    );
+  });
+
+  it("names the Java class of every value whose class a JS value determines", () => {
+    // `javaSimpleNameOf`'s whole test, asserted rather than argued. `BigDecimal` and
+    // `PluralOperands` were carried as declared divergences on a SECOND criterion — "a Java class
+    // name for a type this API does not expose" — that the same sentence's left half already
+    // ignores. The four numeric carriers are the only shapes that genuinely fail the test, and they
+    // fail it because two Java classes share one JS carrier.
+    const genderCatalog = {
+      "Gender.Actor": {
+        translation: "{{who}}",
+        placeholders: {
+          who: { value: "gender", translations: { GENDER_MASCULINE: "He", GENDER_FEMININE: "She" } },
+        },
+      },
+    };
+    const definition = definitionFor(genderCatalog, "Gender.Actor");
+    const context = { key: "Gender.Actor", evaluationLocale: "en" };
+    /** @param {unknown} value */
+    const refusal = (value) => refusalCause(() => render(definition, { gender: value }, context));
+
+    const prefix = "Placeholder 'gender' in key 'Gender.Actor' must be a Gender but was ";
+    assert.equal(refusal("x"), `${prefix}String`);
+    assert.equal(refusal(true), `${prefix}Boolean`);
+    assert.equal(refusal({ $lokalized: "decimal", value: "1.5" }), `${prefix}BigDecimal`);
+    assert.equal(refusal({ $lokalized: "plural-operands", value: "1" }), `${prefix}PluralOperands`);
+    assert.equal(
+      refusal({ $lokalized: "language-form", axis: "cardinality", name: "CARDINALITY_ONE" }),
+      `${prefix}Cardinality`,
+    );
+
+    // THE FOUR THAT CANNOT BE NAMED, and the reason: `Integer`/`Double` share one JS `number` and
+    // `Long`/`BigInteger` share one JS `bigint`, so the port describes the carrier. Both halves of
+    // each collision are recorded in the corpus and declared in `tools/conformance.mjs`.
+    assert.equal(refusal(5), `${prefix}number`);
+    assert.equal(refusal(5n), `${prefix}bigint`);
   });
 
   it("renders a tagged language form in a plain slot as its bare constant name", () => {
