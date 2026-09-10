@@ -204,14 +204,11 @@ const NO_JS_COUNTERPART = {
  * specific capability each one still needs.
  */
 const OWNER_MILESTONE = {
-  parse: "M5a",
   load: "M8",
-  matchFor: "M7",
   // Plan v7 section 3.5 puts bestMatchForAcceptLanguage on LocaleNegotiator with Java's fail-soft
   // contract, returning a LocaleTag -- so the oracle's emitted tag IS the JS return value and this
   // switch needs one new arm, not an adaptation layer. Naming the owner here is the difference
   // between 21 cases reporting a reason and 21 reporting a bare "not implemented".
-  acceptLanguage: "M7",
   // `define` is NOT the acceptLanguage shape, and the difference is worth stating because it changes
   // what "not implemented" means here. Half of the observation already ships: the operation builds a
   // LocalizedString programmatically, and `defineLocalizedString` is an allowlisted `lokalized/parse`
@@ -2566,9 +2563,90 @@ function callOptionsFor(input, strings) {
   return Object.keys(options).length ? options : undefined;
 }
 
+/**
+ * WHICH FIELDS OF A CASE'S `expected` BLOCK THE RUNNER ACTUALLY READ — DERIVED FROM EXECUTION.
+ *
+ * WHY THIS EXISTS. Nothing here checked that an arm compares everything the corpus recorded, and the
+ * hole is not theoretical: MEASURED in a shadow copy, a `case "load"` arm whose whole body is
+ * `return { ok: true }` scores 145 new passes at EXIT 0. The passing-ID ratchet fails only on ids
+ * LEAVING `passedIds` (`baseline.passedIds.filter(id => !nowPassing.has(id))`) and the exit
+ * expression has no term for arrivals and none for `unsupported`, so a whole operation can be
+ * "converted" by an arm that asserts nothing. A weaker version costs nothing to write by accident:
+ * `expected.load` carries SIX fields where `expected.parse` carries five, and an arm that compares
+ * only `failed` reports ~145 passes with nothing objecting.
+ *
+ * WHY IT IS DERIVED AND NOT DECLARED. A table saying "this arm compares these fields" is a CLAIM,
+ * and this project has now found three separate texts asserting the exact inverse of what they
+ * described — `conformance.mjs`'s own "35 known, reviewed" comment over 36 unreviewed divergences,
+ * the wrong `equivalentTags` citation, and a corpus fixture named `-decomposed` whose filename is
+ * byte-identical to its precomposed twin. So the reads are OBSERVED through a proxy instead: the
+ * only way to be recorded as comparing a field is to actually read it while comparing.
+ *
+ * IT IS DORMANT UNTIL AN OPERATION IS ACTUALLY COMPARED, and that is the point rather than a
+ * weakness. Reads are committed only when `runCase` RETURNS — a case that throws `Unsupported`
+ * commits nothing — so `load`, whose 145 cases are all unsupported today, is judged by nothing now
+ * and demands all six of its fields the moment M8's arm compares one of them. The gate arms itself.
+ *
+ * TWO LEVELS, deliberately: top-level keys of `expected` (which is where `getResult` keeps `match`
+ * and `result`) plus, when `expected[operation]` is a plain object, that block's own keys. That is
+ * the granularity the trap lives at. Going deeper would drown in per-locale key maps and warning
+ * arrays without gating anything the outer level misses.
+ */
+const recordedExpectedFields = new Map();
+const comparedExpectedFields = new Map();
+const comparedOperations = new Set();
+let currentCaseFieldReads = new Set();
+
+const fieldsFor = (map, operation) => {
+  let set = map.get(operation);
+  if (!set) map.set(operation, (set = new Set()));
+  return set;
+};
+
+/** Wraps `expected` so that every field the arm reads while comparing is observed. */
+function recordingExpected(expected, operation) {
+  if (!expected || typeof expected !== "object") return expected;
+  const reads = currentCaseFieldReads;
+  const wrapBlock = (block, prefix) =>
+    new Proxy(block, {
+      get(target, property) {
+        if (typeof property === "string") reads.add(`${prefix}${property}`);
+        return target[property];
+      },
+    });
+  return new Proxy(expected, {
+    get(target, property) {
+      if (typeof property !== "string") return target[property];
+      reads.add(property);
+      const value = target[property];
+      return property === operation && value && typeof value === "object" && !Array.isArray(value)
+        ? wrapBlock(value, `${property}.`)
+        : value;
+    },
+  });
+}
+
+/**
+ * Called ONLY when `runCase` returned, i.e. the case really was compared.
+ *
+ * `comparedOperations` is tracked SEPARATELY from the field set, and the distinction is the whole
+ * gate. An arm whose body is `return { ok: true }` reads NO fields, so keying dormancy on "this
+ * operation has a non-empty read set" would skip precisely the vacuous arm the gate exists to
+ * catch — the guard would re-open the hole it was written to close. Membership here says a case ran
+ * to a verdict; the read set says what that verdict looked at. An operation that reached a verdict
+ * having looked at nothing is the loudest thing this gate can report, not the quietest.
+ */
+const commitFieldReads = (operation) => {
+  comparedOperations.add(operation);
+  const set = fieldsFor(comparedExpectedFields, operation);
+  for (const field of currentCaseFieldReads) set.add(field);
+};
+
 /** Execute one case. Returns {ok} or {ok:false, actual, wanted}; throws Unsupported to skip. */
 function runCase(testCase, fixture) {
-  const { operation, input, expected } = testCase;
+  const { operation, input } = testCase;
+  currentCaseFieldReads = new Set();
+  const expected = recordingExpected(testCase.expected, operation);
 
   // Per case, exactly as the oracle clears its own channels per case. A fresh `Strings` is built for
   // every case, so nothing survives here except what this case's lookup did.
@@ -3195,8 +3273,11 @@ function matchForCase(fixture, input, ranges) {
  * @param {string} operation
  * @returns {never}
  */
+const attributedOperations = new Set();
+
 function operationNotImplemented(operation) {
   const owner = OWNER_MILESTONE[operation];
+  attributedOperations.add(operation);
   // AN UNSUPPORTED REASON MUST NAME AN OWNER, and nothing used to enforce it. The ternary below
   // silently degraded to a bare `operation 'x' is not implemented` for any operation missing from
   // the table -- which is precisely the one thing `OWNER_MILESTONE`'s own header says the unsupported
@@ -3348,8 +3429,22 @@ const causeMessageUndeclared = [];
 
 for (const testCase of cases) {
   const fixture = corpus.fixtures[testCase.fixture];
+
+  // The RECORDED side of the field-coverage gate, taken from the corpus rather than from the runner,
+  // so the two sides of the comparison have independent origins.
+  if (testCase.expected && typeof testCase.expected === "object") {
+    const recorded = fieldsFor(recordedExpectedFields, testCase.operation);
+    for (const key of Object.keys(testCase.expected)) recorded.add(key);
+    const block = testCase.expected[testCase.operation];
+    if (block && typeof block === "object" && !Array.isArray(block))
+      for (const key of Object.keys(block)) recorded.add(`${testCase.operation}.${key}`);
+  }
+
   try {
     const outcome = runCase(testCase, fixture);
+    // AFTER the call, deliberately: a case that threw `Unsupported` never compared anything, so its
+    // partial reads must not count as coverage for the operation.
+    commitFieldReads(testCase.operation);
     // Only for a case that PASSES. Asking whether the diagnostic matches on a case whose RESULT
     // does not is meaningless, and ratcheting one would pin the wording of a path that is still
     // being built.
@@ -3763,9 +3858,147 @@ if (staleDrops.length) {
     `\nearned it back, or delete the entry. An open drop that passes is a contradiction, not history.`);
 }
 
+/**
+ * FIELDS THE CORPUS RECORDS THAT NO COMPARISON READS, EACH WITH A REASON AND A LIVE RE-CHECK.
+ *
+ * A declaration, not a relaxation — the same contract `DECLARED_CAUSE_MESSAGE_DIVERGENCES` carries.
+ * An entry here does NOT say "ignore this field". It says "this field carries no information the
+ * runner is not already comparing through another path", and it names a `stillRedundant` predicate
+ * that RE-DERIVES that claim from the corpus on every run over the cases actually compared. When the
+ * claim stops holding, the entry fails the run instead of quietly continuing to excuse the field.
+ *
+ * Without the predicate this table would be the thing this project keeps finding and regretting: a
+ * sentence asserting a review, outliving the fact it described.
+ */
+const DECLARED_UNCOMPARED_FIELDS = [
+  {
+    operation: "getResult",
+    field: "match",
+    why:
+      "`getResult` records the SELECTION channel twice: once at `expected.match` and once at " +
+      "`expected.result.localeMatchResult`, which `expectedResultProjection` compares field for " +
+      "field. MEASURED over the corpus: of 1,082 `getResult` cases carrying both, 1,079 are " +
+      "identical on `match`'s own key set, and the 3 that differ are exactly the per-call-" +
+      "override-order rows (`ingress-matrix-java.zh-tw.per-call-ranges-displace-per-call-locale`, " +
+      "`per-call-override-order.zh-tw.locale-then-ranges-on-zh-hant-only-key`, " +
+      "`supplied-match.ingress.per-call-ranges-clear-an-earlier-per-call-locale`) — the rows a JS " +
+      "object literal cannot express at all, which are reported as NO COUNTERPART and never " +
+      "compared. So reading `expected.match` here would add no discrimination TODAY. That is a " +
+      "measurement about today's corpus, which is why `stillRedundant` re-checks it every run: " +
+      "selection and resolution are separate channels and are known to disagree, so one new case " +
+      "where they diverge and the runner IS blind to it.",
+    /**
+     * Re-derives the redundancy over the cases that were actually compared this run.
+     * Returns the ids that break the claim; a non-empty list fails the run.
+     */
+    stillRedundant: (comparedIds) =>
+      cases
+        .filter((c) => c.operation === "getResult" && comparedIds.has(c.id))
+        .filter((c) => {
+          const recorded = c.expected?.match;
+          const viaResult = c.expected?.result?.localeMatchResult;
+          if (!recorded) return false;
+          if (!viaResult) return true;
+          return Object.keys(recorded).some((k) => jcs(recorded[k]) !== jcs(viaResult[k]));
+        })
+        .map((c) => c.id),
+  },
+];
+
+/**
+ * THE OTHER HALF OF `OWNER_MILESTONE`'S CONTRACT: an entry nothing can reach.
+ *
+ * `operationNotImplemented` already THROWS when an operation reports unsupported with no entry, so a
+ * reason cannot print without an owner. Nothing checked the mirror, and its own header said why that
+ * mattered: "Deleting an entry for an operation that gained an arm is safe; deleting one that can
+ * still be REACHED was indistinguishable from it until now." The consequence is dated rather than
+ * hypothetical — `load: "M8"` becomes unreachable on M8's FIRST slice, and without this the table
+ * would keep asserting that M8 owes work it had just delivered.
+ *
+ * MEASURED when this gate was written: `parse: "M5a"`, `matchFor: "M7"` and `acceptLanguage: "M7"`
+ * were already dead — all three operations have arms and can never reach the `default` branch that
+ * consults this table. Removing all three left the whole conformance report BYTE-IDENTICAL, which is
+ * how they were proven dead rather than argued dead. Every other declaration table here fails on a
+ * stale entry; this one now does too.
+ */
+const staleOwnerMilestones = Object.keys(OWNER_MILESTONE).filter((op) => !attributedOperations.has(op));
+
+if (staleOwnerMilestones.length) {
+  console.log(`\nSTALE OWNER_MILESTONE ENTRIES (${staleOwnerMilestones.length}) — nothing reached them:`);
+  for (const operation of staleOwnerMilestones)
+    console.log(`  ${operation}: "${OWNER_MILESTONE[operation]}" — no case reported it unsupported`);
+  console.log(`An operation that gained an arm no longer owes anyone work. Delete the entry; that` +
+    `\ndeletion IS the record of the milestone landing, the way a deleted coverage disposition is.`);
+}
+
+/**
+ * THE FIELD-COVERAGE GATE. A field the corpus recorded that no comparison ever read is a field the
+ * runner is not checking, however many cases the operation reports as passed.
+ *
+ * Judged only for operations that were actually compared at least once — see the machinery's header.
+ */
+const comparedCaseIds = new Set([...passed, ...failed.map((entry) => entry.id)]);
+const declaredUncompared = new Set(DECLARED_UNCOMPARED_FIELDS.map((d) => `${d.operation}.${d.field}`));
+
+const uncomparedExpectedFields = [];
+for (const [operation, recorded] of recordedExpectedFields) {
+  if (!comparedOperations.has(operation)) continue;
+  const read = comparedExpectedFields.get(operation) ?? new Set();
+  const missing = [...recorded]
+    .filter((field) => !read.has(field) && !declaredUncompared.has(`${operation}.${field}`))
+    .sort();
+  if (missing.length) uncomparedExpectedFields.push({ operation, missing });
+}
+
+// The other direction: a declaration whose redundancy claim has stopped being true, and a
+// declaration for a field that is now read anyway (which makes the entry itself stale).
+const staleUncomparedDeclarations = [];
+for (const declaration of DECLARED_UNCOMPARED_FIELDS) {
+  if (!comparedOperations.has(declaration.operation)) continue;
+  const read = comparedExpectedFields.get(declaration.operation);
+  if (read?.has(declaration.field))
+    staleUncomparedDeclarations.push({
+      declaration,
+      why: `\`${declaration.operation}\` now READS \`${declaration.field}\`; the declaration excuses nothing`,
+      ids: [],
+    });
+  else {
+    const broken = declaration.stillRedundant(comparedCaseIds);
+    if (broken.length)
+      staleUncomparedDeclarations.push({
+        declaration,
+        why: `the redundancy this entry rests on no longer holds for ${broken.length} COMPARED case(s)`,
+        ids: broken,
+      });
+  }
+}
+
+if (staleUncomparedDeclarations.length) {
+  console.log(`\nSTALE UNCOMPARED-FIELD DECLARATIONS (${staleUncomparedDeclarations.length}):`);
+  for (const { declaration, why, ids } of staleUncomparedDeclarations) {
+    console.log(`  ${declaration.operation}.${declaration.field} — ${why}`);
+    for (const id of ids.slice(0, 5)) console.log(`      ${id}`);
+    if (ids.length > 5) console.log(`      ... and ${ids.length - 5} more`);
+  }
+  console.log(`Compare the field, or restate the declaration against what is true now. An excuse that` +
+    `\nhas outlived its reason is exactly what this table exists not to become.`);
+}
+
+if (uncomparedExpectedFields.length) {
+  console.log(`\nUNCOMPARED EXPECTED FIELDS (${uncomparedExpectedFields.length}) — the corpus records` +
+    `\nthese, the runner compared cases of this operation, and nothing ever read them:`);
+  for (const { operation, missing } of uncomparedExpectedFields)
+    console.log(`  ${operation}: ${missing.join(", ")}`);
+  console.log(`A case that passes without its recorded fields being read is not evidence about them.` +
+    `\nCompare the field, or -- if it genuinely has no JS counterpart -- make that a declared` +
+    `\nunsupported/no-counterpart reason so it is visible, never a field quietly left unread.`);
+}
+
 process.exit(
   failed.length === 0 && regressions.length === 0 && causeMessageRegressions.length === 0 &&
   causeMessageUndeclared.length === 0 && staleCauseMessageDivergences.length === 0 &&
   staleNonportabilityClaims.length === 0 && staleAdaptations.length === 0 &&
-  staleDrops.length === 0 && staleMessageDivergences.length === 0 ? 0 : 1,
+  staleDrops.length === 0 && staleMessageDivergences.length === 0 &&
+  uncomparedExpectedFields.length === 0 && staleUncomparedDeclarations.length === 0 &&
+  staleOwnerMilestones.length === 0 ? 0 : 1,
 );
