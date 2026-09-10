@@ -1017,9 +1017,132 @@ function degenerateCatalogFor(catalogSource, fixture) {
       const [key, definition] = definitions[0];
       return { strings: { en: [{ key, ...definition }, { key, ...definition }] } };
     }
+    // A PROGRAMMATIC catalog, and the only arm whose outcome the VALUE does not decide: what
+    // `createStrings` does with it depends on the model the fixture wrote. The oracle hands
+    // `Strings.Builder.localizedStringSupplier` LocalizedString graphs built by `define`'s decoder,
+    // which is what reaches `DefaultStrings:297` -> `LocalizedStringValidator` with no
+    // `LocalizedStringLoader` check in front of it; plan 3.2's counterpart of an
+    // `Iterable<LocalizedString>` is `LocalizedStringInput[]`, so that is the JS shape, keyed at the
+    // fixture's fallback locale exactly as the oracle keys it.
+    //
+    // NOT routed through `defineLocalizedString`. That export validates EAGERLY, so every refusal in
+    // this family would come from the definition call and none from `createStrings` -- a different
+    // site than the one the oracle recorded. Java's `LocalizedString.Builder.build()` validates
+    // nothing either; both sides therefore build an inert graph and let the CONSTRUCTOR refuse it.
+    case "defined": {
+      const model = fixture.constructionOverrides?.definedCatalog;
+      if (!Array.isArray(model) || model.length === 0)
+        throw new AuthoringError(`catalogSource 'defined' needs a non-empty definedCatalog`);
+      return { strings: { [fixture.fallbackLocale]: model.map((node) => definedNode(node, true)) } };
+    }
     default:
       throw new AuthoringError(`unknown constructionOverrides.catalogSource '${catalogSource}'`);
   }
+}
+
+/**
+ * One node of a `definedCatalog` model, in `LocalizedStringInput` shape.
+ *
+ * The model vocabulary is the STRINGS-FILE vocabulary, because that is what `VectorOracle`'s
+ * `localizedStringFrom` decodes: alternatives are `{ "<expression>": <body> }` objects and a
+ * placeholder is `{ value | range, translations }` or `{ translation, alternatives }`. Plan 3.2's
+ * `LocalizedStringInput` spells the same model differently -- the expression is a MEMBER, and a
+ * placeholder declares its `kind` -- so this is a shape transform and nothing else. Every unknown
+ * member throws an `AuthoringError`, matching the oracle's decoder member for member: a mistyped
+ * model must stop the run, never become a plausible refusal.
+ *
+ * @param {any} node
+ * @param {boolean} root whether a literal `key` member is expected (true only at the top level)
+ * @returns {object}
+ */
+function definedNode(node, root) {
+  if (node === null || typeof node !== "object" || Array.isArray(node))
+    throw new AuthoringError(`a definedCatalog node must be an object; got ${JSON.stringify(node)}`);
+  for (const member of Object.keys(node))
+    if (!["key", "translation", "commentary", "placeholders", "alternatives"].includes(member))
+      throw new AuthoringError(`unknown definedCatalog node member '${member}'`);
+  if (root && typeof node.key !== "string")
+    throw new AuthoringError(`a top-level definedCatalog node needs a string 'key'`);
+
+  /** @type {Record<string, unknown>} */
+  const out = {};
+  if (root) out.key = node.key;
+  if ("translation" in node) out.translation = node.translation;
+  if ("commentary" in node) out.commentary = node.commentary;
+  if (node.placeholders !== undefined && node.placeholders !== null) {
+    /** @type {Record<string, unknown>} */
+    const placeholders = {};
+    for (const [name, definition] of Object.entries(node.placeholders))
+      placeholders[name] = definedPlaceholder(name, definition);
+    out.placeholders = placeholders;
+  }
+  if (node.alternatives !== undefined && node.alternatives !== null) {
+    if (!Array.isArray(node.alternatives))
+      throw new AuthoringError(`a definedCatalog 'alternatives' member must be an array`);
+    out.alternatives = node.alternatives.map((element) => {
+      if (element === null || typeof element !== "object" || Object.keys(element).length !== 1)
+        throw new AuthoringError(
+          `each definedCatalog alternative must be an object with exactly one expression`,
+        );
+      const [expression] = Object.keys(element);
+      return { expression, ...definedNode(element[expression], false) };
+    });
+  }
+  return out;
+}
+
+/**
+ * One placeholder of a `definedCatalog` model.
+ *
+ * @param {string} name
+ * @param {any} definition
+ * @returns {object}
+ */
+function definedPlaceholder(name, definition) {
+  if (definition === null || typeof definition !== "object")
+    throw new AuthoringError(`definedCatalog placeholder '${name}' must be an object`);
+  for (const member of Object.keys(definition))
+    if (!["value", "range", "translations", "translation", "alternatives"].includes(member))
+      throw new AuthoringError(`unknown definedCatalog placeholder member '${member}' on '${name}'`);
+
+  const languageForm = ["value", "range", "translations"].some((m) => m in definition);
+  const template = ["translation", "alternatives"].some((m) => m in definition);
+  // The oracle's own rule, restated: a mixed placeholder describes an object no catalog can hold.
+  if (languageForm === template)
+    throw new AuthoringError(
+      `definedCatalog placeholder '${name}' must use language-form members [value, range, ` +
+        `translations] or template members [translation, alternatives], not both or neither`,
+    );
+
+  if (template) {
+    const alternatives = definition.alternatives;
+    return {
+      kind: "expression",
+      translation: definition.translation,
+      // PRESENCE, not truthiness: an empty list is the input that reaches Java's
+      // `ExpressionTranslation:871`, and dropping it would quietly build a valid object instead.
+      ...(alternatives === undefined
+        ? {}
+        : {
+            alternatives: (Array.isArray(alternatives) ? alternatives : []).map((element) => {
+              if (element === null || typeof element !== "object" || Object.keys(element).length !== 1)
+                throw new AuthoringError(
+                  `each definedCatalog fragment alternative on '${name}' must be an object with ` +
+                    `exactly one expression`,
+                );
+              const [expression] = Object.keys(element);
+              return { expression, translation: element[expression] };
+            }),
+          }),
+    };
+  }
+
+  return {
+    kind: "language-form",
+    ...("value" in definition ? { value: definition.value } : {}),
+    ...("range" in definition ? { range: definition.range } : {}),
+    translations: definition.translations,
+  };
 }
 
 /**

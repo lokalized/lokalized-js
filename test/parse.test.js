@@ -348,13 +348,21 @@ test("a bad FRAGMENT expression beats a structural error in a later alternative"
   );
 });
 
-test("only the parse hook adds the loader's wording; createStrings keeps the evaluator's", () => {
-  // The structural walk in `catalog.js` is shared, and validates NOTHING on its own: the wording
-  // below comes from whoever supplied the hook. `lokalized/parse` supplies one that reproduces
-  // `LocalizedStringLoader.validateWholeMessageAlternativeExpression`; `createStrings` compiles in
-  // its own pass and surfaces the evaluator's message unwrapped. Both still reject the catalog —
-  // an unreachable branch does not excuse an unparseable predicate — and the two messages must not
-  // drift into each other, because the corpus pins the loader half exactly.
+test("each door reproduces JAVA's wording for that door, and the two do not drift", () => {
+  // MEASURED on the pinned Corretto 21, driving a programmatic `LocalizedString` into
+  // `Strings.Builder.localizedStringSupplier` — the true analogue of `createStrings`, since neither
+  // path parses JSON. Java wraps at CONSTRUCTION through `LocalizedStringValidator`:
+  //
+  //   IllegalArgumentException
+  //   "Invalid localized string 'A' for locale 'en': Invalid alternative expression 'count ==': …"
+  //   cause: ExpressionEvaluationException
+  //
+  // This test previously asserted the OPPOSITE — that `createStrings` "surfaces the evaluator's
+  // message unwrapped" — which left a construction failure with no key, no locale and no cause, and
+  // broke `catalog.js`'s own stated contract that one authoring mistake produces one diagnostic
+  // whichever door it came through. The rest of that contract stands and is still pinned here: the
+  // two doors must NOT drift into each other, because Java's own two wordings differ and the corpus
+  // pins the loader half exactly.
   const catalog = { A: { translation: "t", alternatives: [{ "count ==": { translation: "y" } }] } };
 
   assert.throws(
@@ -362,10 +370,75 @@ test("only the parse hook adds the loader's wording; createStrings keeps the eva
     // of"), and without it this assertion would be satisfied by THAT refusal instead of the
     // expression one it is written to pin — an earlier guard answering for a later check.
     () => createStrings({ fallbackLocale: "en", locale: "en", strings: { en: catalog } }),
-    { message: /^Invalid expression 'count ==': / },
+    {
+      message:
+        "Invalid localized string 'A' for locale 'en': Invalid alternative expression 'count ==': " +
+        "Invalid expression 'count ==': Insufficient arguments provided for operator '=='",
+    },
   );
   assert.throws(
     () => parseStrings(JSON.stringify(catalog), { locale: "en", source: "o" }),
     { message: /^o: unable to parse whole-message alternative expression 'count =='/ },
+  );
+});
+
+test("the construction door retains the evaluator's error as the CAUSE, as Java retains it", () => {
+  // Java's validator passes the `ExpressionEvaluationException` to `invalid()` at
+  // `LocalizedStringValidator.java:326`, so the original survives on the wrapper. A wrapper that
+  // merely quotes the message reads identically and loses the thing a caller can inspect — which is
+  // why this is asserted separately from the wording above.
+  const catalog = { A: { translation: "t", alternatives: [{ "count ==": { translation: "y" } }] } };
+
+  try {
+    createStrings({ fallbackLocale: "en", locale: "en", strings: { en: catalog } });
+    assert.fail("expected a refusal");
+  } catch (error) {
+    assert.ok(error instanceof Error);
+    assert.ok(error.cause instanceof Error, "the evaluator's error must survive as `cause`");
+    assert.match(
+      /** @type {Error} */ (error.cause).message,
+      /^Invalid expression 'count ==': /,
+      "the cause is the evaluator's own message, unwrapped",
+    );
+  }
+});
+
+test("the FRAGMENT shape gets Java's other construction sentence, not the whole-message one", () => {
+  // Java has two sentences and picks by shape (`LocalizedStringValidator.java:159` vs the
+  // generated-placeholder one). Measured, both wrapped by `invalid()`'s outer clause. Asserting only
+  // the whole-message shape would let a port that used one sentence for everything pass.
+  const catalog = {
+    A: { translation: "t {{f}}", placeholders: { f: { translation: "frag", alternatives: [{ "count ==": "alt" }] } } },
+  };
+
+  assert.throws(
+    () => createStrings({ fallbackLocale: "en", locale: "en", strings: { en: catalog } }),
+    {
+      message:
+        "Invalid localized string 'A' for locale 'en': Invalid expression alternative 0 for " +
+        "generated placeholder 'f', expression 'count ==': " +
+        "Invalid expression 'count ==': Insufficient arguments provided for operator '=='",
+    },
+  );
+});
+
+test("a NESTED alternative reports the ROOT key, not a path — measured against Java", () => {
+  // Java's message for a bad expression two alternatives deep is byte-identical to the depth-1 one:
+  // the validator names the ROOT key and the offending expression, and carries no path. A port that
+  // threaded a path would look more helpful and would not be Java.
+  const nested = {
+    A: {
+      translation: "t",
+      alternatives: [{ "count == 1": { translation: "y", alternatives: [{ "count ==": { translation: "z" } }] } }],
+    },
+  };
+
+  assert.throws(
+    () => createStrings({ fallbackLocale: "en", locale: "en", strings: { en: nested } }),
+    {
+      message:
+        "Invalid localized string 'A' for locale 'en': Invalid alternative expression 'count ==': " +
+        "Invalid expression 'count ==': Insufficient arguments provided for operator '=='",
+    },
   );
 });

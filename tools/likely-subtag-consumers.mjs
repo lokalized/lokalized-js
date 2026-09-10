@@ -37,9 +37,39 @@
  *
  * WHAT KEEPS THE BOUNDARY FROM LEAKING. A consumer one step further out is by construction
  * downstream of an inventoried consumer — except along an ALIAS, which would carry a gateway across
- * the boundary invisibly. Both alias shapes JavaScript has are gated below: `export … from` and
- * `export const y = <gateway>`. Everything else that reaches the table reaches it through a call
- * site this file names.
+ * the boundary invisibly.
+ *
+ * THIS PARAGRAPH USED TO SAY "both alias shapes JavaScript has are gated below: `export … from` and
+ * `export const y = <gateway>`", AND THAT SENTENCE WAS FALSE — measured, not argued. A reviewer
+ * appended each shape below to a real module in a scratch copy and ran this tool: SIX of them exited
+ * 0 with a live, uninventoried consumer sitting in `src/`. All six are gated now, and the count is
+ * written out rather than summarised so the next claim of completeness is checkable:
+ *
+ *   1. `export * from "<reader>"`      — an ExportDeclaration with NO exportClause, which the
+ *                                        boundary loop skipped entirely. (`export { g } from …`,
+ *                                        the named form, WAS gated; the star form was not.)
+ *   2. `export { g };` with no module specifier — a bare re-export of an IMPORTED gateway. Not a
+ *                                        hypothetical shape: `src/parse/index.js:45` and
+ *                                        `src/internal/expression.js:70` already use this idiom.
+ *   3. `export default <gateway>`      — an ExportAssignment, which was never parsed at all.
+ *   4. `import * as ns from "<reader>"` — a namespace import was stored as `{module, name: "*"}`,
+ *                                        never matched a gateway key, and `referencesIn` collapses
+ *                                        `ns.likelySubtagFor` to `ns`. It is REFUSED rather than
+ *                                        followed: resolving the property access would be the
+ *                                        better fix, and refusing is the one that cannot be
+ *                                        silently incomplete.
+ *   5. a CLASS METHOD                  — `parseModule` collected only FunctionDeclaration and
+ *                                        VariableStatement bindings, so a consumer inside a class
+ *                                        was invisible. `src/` declares at least ten top-level
+ *                                        classes (`MissingTranslationError`, `ResolutionFailure`,
+ *                                        `LoadingSession`, `NodeBudget`, `JsonReader`, …), so this
+ *                                        is an idiom here, not a corner.
+ *   6. a TOP-LEVEL STATEMENT that is not a declaration — `globalThis.__leak = likelySubtagFor("ar")`
+ *                                        binds nothing, so it was collected nowhere. Such statements
+ *                                        are now gathered under the synthetic binding
+ *                                        `<module scope>`.
+ *
+ * Everything else that reaches the table reaches it through a call site this file names.
  *
  * HOW IT FAILS. Symmetrically, which is the half a document cannot do:
  *
@@ -304,9 +334,20 @@ const INVENTORY = {
     evidence: ["diff:lookup", "corpus:evaluation-locale", "corpus:resolution"],
   },
   "src/core/index.js::createStrings::equivalentTags": {
-    what: "Construction-time duplicate detection across supplied catalog tags: two spellings of " +
-      "one locale are refused as a duplicate. `DefaultStrings.java:277-282`.",
-    evidence: ["corpus:owed-construct", "corpus:ingress-matrix", "test:construct-refusals.test.js"],
+    // CORRECTED 2026-09-09. This entry used to read "Construction-time duplicate detection across
+    // supplied catalog tags … `DefaultStrings.java:277-282`", and it described a DIFFERENT CALL
+    // than the one it is keyed to. The only `equivalentTags` inside `createStrings` is
+    // `src/core/index.js:819`; duplicate detection is done 50 lines earlier by `normalizeTag` plus a
+    // catalog-map key collision (`DefaultStrings.java:280`) and consults `equivalentTags` nowhere.
+    // Nothing here can catch that: the key resolved, the citations resolved, and the gate was green
+    // over a wrong sentence. An entry's `what` is read by people, so it is the half a machine cannot
+    // hold — which is the reason to state the failure rather than to quietly repair it.
+    what: "Resolves the configured fallback locale to a supplied catalog by CANONICAL EQUIVALENCE, " +
+      "and refuses construction when nothing matches — the fallback would otherwise name no loaded " +
+      "catalog and every exhausted walk would be served by whichever catalog happened to be there. " +
+      "`DefaultStrings.java:304-314`. Same decision `chooseLocaleForPreferredLanguages` makes at " +
+      "`:1742`, one entry below.",
+    evidence: ["corpus:owed-init", "test:construct-refusals.test.js", "test:construction-ingress.test.js"],
   },
   "src/core/index.js::chooseLocaleForPreferredLanguages::equivalentTags": {
     what: "Resolves the configured fallback locale to a supported catalog inside the browser " +
@@ -380,6 +421,16 @@ function referencesIn(node, sourceFile) {
       visit(child.initializer);
       return;
     }
+    // A class MEMBER's own name is a declaration, not a read — same rule as a property name above,
+    // and it matters now that class declarations are collected: a method spelled like a gateway
+    // would otherwise invent a consumer that does not exist.
+    if ((ts.isMethodDeclaration(child) || ts.isPropertyDeclaration(child) ||
+      ts.isGetAccessorDeclaration(child) || ts.isSetAccessorDeclaration(child)) && child.name) {
+      child.forEachChild((grandchild) => {
+        if (grandchild !== child.name) visit(grandchild);
+      });
+      return;
+    }
     if (ts.isIdentifier(child)) {
       references.push({ name: child.text, line: sourceFile.getLineAndCharacterOfPosition(child.getStart(sourceFile)).line + 1 });
       return;
@@ -390,6 +441,9 @@ function referencesIn(node, sourceFile) {
   return references;
 }
 
+/** The synthetic binding that carries top-level statements which declare nothing. */
+const MODULE_SCOPE = "<module scope>";
+
 /** @param {string} file */
 function parseModule(file) {
   const text = readFileSync(file, "utf8");
@@ -399,10 +453,22 @@ function parseModule(file) {
   const imports = new Map();
   /** @type {Map<string, {module: string, name: string}>} */
   const reexports = new Map();
-  /** @type {Map<string, {kind: "function" | "variable", exported: boolean, line: number, references: {name: string, line: number}[], aliasOf: string | null}>} */
+  /** @type {Map<string, {kind: "function" | "variable" | "class" | "module scope", exported: boolean, line: number, references: {name: string, line: number}[], aliasOf: string | null}>} */
   const bindings = new Map();
   /** @type {Map<string, string>} */
   const localExports = new Map();
+  /** Modules namespace-imported by this one (`import * as ns from "./x.js"`) -> local name. */
+  /** @type {Map<string, string>} */
+  const namespaceImports = new Map();
+  /** `export *` re-export targets, which carry EVERY export of the target and name none of them. */
+  /** @type {string[]} */
+  const starReexports = [];
+  /** `export default <identifier>` — the source identifier, or null when it is an expression. */
+  /** @type {{name: string | null, line: number}[]} */
+  const defaultExports = [];
+  /** Top-level statements that declare nothing; folded into the synthetic `<module scope>` binding. */
+  /** @type {{name: string, line: number}[]} */
+  const moduleScopeReferences = [];
 
   const lineOf = (node) => sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
   const isExported = (node) =>
@@ -417,7 +483,10 @@ function parseModule(file) {
       if (named && ts.isNamedImports(named))
         for (const element of named.elements)
           imports.set(element.name.text, { module, name: (element.propertyName ?? element.name).text });
-      if (named && ts.isNamespaceImport(named)) imports.set(named.name.text, { module, name: "*" });
+      if (named && ts.isNamespaceImport(named)) {
+        imports.set(named.name.text, { module, name: "*" });
+        namespaceImports.set(module, named.name.text);
+      }
       if (statement.importClause?.name) imports.set(statement.importClause.name.text, { module, name: "default" });
       continue;
     }
@@ -431,7 +500,36 @@ function parseModule(file) {
             reexports.set(element.name.text, { module: relative(root, resolve(dirname(file), specifier)), name: source });
           else localExports.set(element.name.text, source);
         }
+      } else if (!statement.exportClause && typeof specifier === "string" && specifier.startsWith(".")) {
+        // `export * from "./x.js"`. It has no exportClause at all, so the named-export branch above
+        // never sees it — the shape that made the docblock's "both alias shapes" claim false.
+        starReexports.push(relative(root, resolve(dirname(file), specifier)));
       }
+      continue;
+    }
+
+    // `export default <thing>`. Never parsed before, so a gateway could leave through it unnamed.
+    if (ts.isExportAssignment(statement)) {
+      if (ts.isIdentifier(statement.expression))
+        defaultExports.push({ name: statement.expression.text, line: lineOf(statement) });
+      else {
+        defaultExports.push({ name: null, line: lineOf(statement) });
+        moduleScopeReferences.push(...referencesIn(statement, sourceFile));
+      }
+      continue;
+    }
+
+    // A class is a binding whose METHODS are call sites. `src/` has at least ten top-level classes,
+    // so omitting this made an entire idiom invisible to the derivation.
+    if (ts.isClassDeclaration(statement) && statement.name) {
+      bindings.set(statement.name.text, {
+        kind: "class",
+        exported: isExported(statement),
+        line: lineOf(statement),
+        references: referencesIn(statement, sourceFile),
+        aliasOf: null,
+      });
+      if (isExported(statement)) localExports.set(statement.name.text, statement.name.text);
       continue;
     }
 
@@ -462,10 +560,33 @@ function parseModule(file) {
         });
         if (isExported(statement)) localExports.set(declaration.name.text, declaration.name.text);
       }
+      continue;
     }
+
+    // Everything else at module scope declares nothing — `globalThis.x = gateway(...)`, a top-level
+    // `if`, a bare call. It was collected NOWHERE, so a consumer written this way was invisible.
+    moduleScopeReferences.push(...referencesIn(statement, sourceFile));
   }
 
-  return { file: relative(root, file), imports, reexports, bindings, localExports };
+  if (moduleScopeReferences.length > 0)
+    bindings.set(MODULE_SCOPE, {
+      kind: "module scope",
+      exported: false,
+      line: moduleScopeReferences[0]?.line ?? 1,
+      references: moduleScopeReferences,
+      aliasOf: null,
+    });
+
+  return {
+    file: relative(root, file),
+    imports,
+    reexports,
+    bindings,
+    localExports,
+    namespaceImports,
+    starReexports,
+    defaultExports,
+  };
 }
 
 const modules = new Map(jsFilesUnder(srcRoot).map((file) => {
@@ -606,6 +727,50 @@ for (const module of modules.values()) {
       failures.push(
         `${module.file} exports \`${name}\` as a bare alias of the gateway \`${binding.aliasOf}\`. ` +
           "Same problem as a re-export: it moves the boundary without moving the inventory.",
+      );
+
+  // SHAPE 1 — `export * from "<reader module>"`. No exportClause, so the named-export loop above
+  // never sees it, and it carries EVERY gateway that module exports.
+  for (const target of module.starReexports)
+    for (const key of gateways.keys())
+      if (key.startsWith(`${target}|`)) {
+        failures.push(
+          `${module.file} re-exports \`${key.split("|")[1]}\` through \`export * from "${target}"\`. ` +
+            "A star re-export names nothing, so it carries every gateway of that module past this " +
+            "inventory's boundary with no call site and no export name to enumerate. Replace it " +
+            "with an explicit list, or extend the derivation to follow it.",
+        );
+        break;
+      }
+
+  // SHAPE 2 — `export { g };` with NO module specifier, where `g` is an imported gateway. Already
+  // an idiom here (`src/parse/index.js:45`, `src/internal/expression.js:70`), so it is the alias
+  // shape most likely to be written next.
+  for (const [exportName, source] of module.localExports)
+    if (gatewayLocals.has(source))
+      failures.push(
+        `${module.file} exports the imported gateway \`${source}\`${exportName === source ? "" : ` as \`${exportName}\``} ` +
+          "through a bare `export { … }` with no module specifier. Same problem as a re-export: it " +
+          "moves the boundary without moving the inventory.",
+      );
+
+  // SHAPE 3 — `export default <gateway>`. An ExportAssignment, which was not parsed at all.
+  for (const { name } of module.defaultExports)
+    if (name !== null && gatewayLocals.has(name))
+      failures.push(
+        `${module.file} exports the gateway \`${name}\` as its DEFAULT export. A default export has ` +
+          "no name for the inventory to key on, which makes it the quietest of the alias shapes.",
+      );
+
+  // SHAPE 4 — `import * as ns from "<reader module>"`. REFUSED rather than followed: `referencesIn`
+  // collapses `ns.likelySubtagFor` to `ns`, so following it means resolving the property access,
+  // and a derivation that half-follows a namespace is worse than one that refuses it outright.
+  for (const [target, local] of module.namespaceImports)
+    if ([...gateways.keys()].some((key) => key.startsWith(`${target}|`)))
+      failures.push(
+        `${module.file} namespace-imports \`${target}\` as \`${local}\`. That module exports ` +
+          "likely-subtag gateways, and a namespace import reaches every one of them under a name " +
+          "this derivation cannot resolve. Import the specific gateways by name instead.",
       );
 }
 

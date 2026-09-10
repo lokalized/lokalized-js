@@ -57,9 +57,22 @@ describe("getMissingKeys", () => {
     assert.deepEqual(strings().getMissingKeys("ro", "en"), []);
   });
 
-  it("applies the support rule INDEPENDENTLY to source and target", () => {
-    assert.throws(() => strings().getMissingKeys("fr", "en"), /Unsupported locale 'fr'/);
-    assert.throws(() => strings().getMissingKeys("en", "fr"), /Unsupported locale 'fr'/);
+  it("applies the support rule INDEPENDENTLY to source and target, and NAMES WHICH", () => {
+    // The ROLE, and these two assertions are the reason it exists. Until 2026-09-09 both of them
+    // read `/Unsupported locale 'fr'/` — the same sentence for two different arguments — so a
+    // caller who passed two tags was told only that one of them was wrong, and this file could not
+    // tell a port that refused the source from one that refused the target. Java draws the
+    // distinction at `DefaultStrings.java:2738` and `:2741`; the well-formedness half of the same
+    // ingress already drew it here (see the RangeError assertions below). Exact messages, not
+    // regexps: a regexp for the source sentence matches the target one under `/Unsupported/`.
+    assert.throws(() => strings().getMissingKeys("fr", "en"), {
+      name: "UnsupportedLocaleError",
+      message: "Unsupported source locale 'fr' was provided",
+    });
+    assert.throws(() => strings().getMissingKeys("en", "fr"), {
+      name: "UnsupportedLocaleError",
+      message: "Unsupported target locale 'fr' was provided",
+    });
     // Control: both supported still answers.
     assert.deepEqual(strings().getMissingKeys("en", "en-GB"), ["Beta", "Gamma"]);
   });
@@ -149,7 +162,7 @@ describe("the inspection ingress — well-formedness is checked BEFORE support",
     // answers.
     assert.throws(() => strings().getMissingKeys("de", "en"), {
       name: "UnsupportedLocaleError",
-      message: "Unsupported locale 'de' was provided",
+      message: "Unsupported source locale 'de' was provided",
     });
   });
 

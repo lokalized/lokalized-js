@@ -90,6 +90,13 @@ if (!existsSync(join(CLASSES, "com/lokalized/CldrLocaleData.class"))) {
  * `LIKELY_SUBTAGS_BY_TAG`, or moves one of the two, this tool's column list stops being the consumer
  * surface and every "agrees" below becomes a statement about a smaller surface than the one that
  * exists. A count alone would not catch a MOVE, so the enclosing method is checked too.
+ *
+ * ONE LIMIT OF THIS GUARD, stated because it is invisible from the assertion itself: it reads the
+ * Java SOURCE (`src/main/java/com/lokalized/CldrLocaleData.java`) while the oracle below compiles
+ * and runs against `target/classes`. A stale `target/classes` would therefore satisfy this
+ * assertion while every comparison ran against different bytecode. Harmless while the reference
+ * implementation is pinned at 3.0.0 and rebuilt from that source — which is the project's standing
+ * arrangement — but it is an assumption, not something this file checks.
  */
 function assertJavaTableReads() {
   const file = join(javaDir, "src/main/java/com/lokalized/CldrLocaleData.java");

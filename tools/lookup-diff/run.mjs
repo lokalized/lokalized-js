@@ -783,28 +783,31 @@ const KNOWN_DIVERGENCES = [
       "\n\n  WHAT THIS RULE DOES NOT RELAX. The QUOTED LOCALE must be byte-identical on both " +
       "sides: Java's three messages quote `Locale#toLanguageTag`, not `Locale#toString`, so there " +
       "is no spelling difference here to forgive and none is forgiven — a port naming a different " +
-      "locale than Java is unexplained, and that is what discriminates the ROLE — but by PROXY, " +
-      "not directly, and the distinction is worth stating exactly because an earlier draft of this " +
-      "paragraph overclaimed it. Java says `Source locale` or `Target locale` where the argument's " +
-      "position matters; `matches` below compares only the QUOTED LOCALE, so what the rule requires " +
-      "is that both sides refused about the SAME QUOTED LOCALE. In the `missingInto` shape the " +
-      "source is the constant `de` and the target is the probe tag, so the two locales differ and a " +
-      "port that answered about the source where Java answered about the target is unexplained — " +
-      "EXCEPT on the single row where the probe tag IS `de`, where both roles name one locale and a " +
-      "role swap would be absorbed. One row out of the shape's sweep; named rather than papered " +
-      "over. What the rule forgives is exactly the class and the sentence the plan chose." +
-      "\n\n  A KNOWN LOSS, recorded rather than hidden: the port's sentence does not say WHICH " +
-      "of `getMissingKeys`'s two arguments was unsupported, where Java's does. That is a property " +
-      "of the plan's single-argument `UnsupportedLocaleError`, is unchanged by this batch, and is " +
-      "worth a maintainer's attention on its own.",
+      "locale than Java is unexplained. Neither is the ROLE, as of 2026-09-09, and that is a " +
+      "CHANGE: this paragraph used to end by recording 'a known loss ... the port's sentence does " +
+      "not say WHICH of `getMissingKeys`'s two arguments was unsupported', with the rule comparing " +
+      "only the quoted locale — which discriminated the role by PROXY (the `missingInto` shape " +
+      "holds the source at the constant `de`, so the two locales differ) and absorbed a role swap " +
+      "outright on the single row where the probe tag IS `de`. The loss is closed: " +
+      "`UnsupportedLocaleError` now takes an optional `role`, `getMissingKeys` passes `source` and " +
+      "`target`, and `matches` below compares Java's role word against the port's directly. That " +
+      "one absorbed row is gone with it. What the rule forgives is exactly the class and the " +
+      "sentence the plan chose — and nothing else." +
+      "\n\n  `getKeysForLocale` still carries NO role on either side, deliberately: Java's " +
+      "`:2718` says plain `Locale` because it has one argument to name, so a port that invented a " +
+      "role there would be adding a distinction Java does not draw.",
     matches: (row) => {
       if (row.java[0] !== "THROWN" || row.js[0] !== "THROWN") return false;
       if (row.java[1] !== "java.lang.IllegalArgumentException") return false;
       if (row.js[1] !== "UnsupportedLocaleError") return false;
 
-      const java = /^(?:Locale|Source locale|Target locale) '(.*)' is not supported$/.exec(row.java[2]);
-      const js = /^Unsupported locale '(.*)' was provided$/.exec(row.js[2]);
-      return java !== null && js !== null && java[1] === js[1];
+      const java = /^(Locale|Source locale|Target locale) '(.*)' is not supported$/.exec(row.java[2]);
+      const js = /^Unsupported (?:(source|target) )?locale '(.*)' was provided$/.exec(row.js[2]);
+      if (java === null || js === null) return false;
+
+      // The ROLE, compared directly rather than through the locale it happens to quote.
+      const JAVA_ROLE = { Locale: undefined, "Source locale": "source", "Target locale": "target" };
+      return JAVA_ROLE[java[1]] === js[1] && java[2] === js[2];
     },
   },
 ];

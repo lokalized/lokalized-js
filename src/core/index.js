@@ -27,6 +27,7 @@ import {
   parseModelCatalog,
 } from "../internal/catalog.js";
 import {
+  ExpressionEvaluationError,
   compile as compileExpression,
   evaluate as evaluateCompiledExpression,
 } from "../internal/expression.js";
@@ -863,8 +864,9 @@ export function createStrings(options) {
   /** @type {Map<object, ReturnType<typeof compileExpression>>} */
   const compiledExpressions = new Map();
 
-  for (const definitions of catalogs.values())
-    for (const definition of definitions.values()) compileDefinitionExpressions(definition, compiledExpressions);
+  for (const [catalogLocale, definitions] of catalogs)
+    for (const [rootKey, definition] of definitions)
+      compileDefinitionExpressions(definition, compiledExpressions, new Set(), rootKey, catalogLocale);
 
   /**
    * The services `render` cannot import for itself.
@@ -1491,7 +1493,11 @@ export function createStrings(options) {
    * not CLDR aliasing — `mo` stays `mo` and does not find a loaded `ro`. Plan 3.3:773 names exactly
    * that distinction.
    */
-  const keysForExactLocale = (/** @type {string} */ locale, /** @type {string} */ description) => {
+  const keysForExactLocale = (
+    /** @type {string} */ locale,
+    /** @type {string} */ description,
+    /** @type {"source" | "target" | undefined} */ role,
+  ) => {
     // THE INSPECTION INGRESS — `LocaleUtils.requireWellFormed` at `DefaultStrings.java:2713`
     // ("Locale"), `:2735` ("Source locale") and `:2736` ("Target locale"). It is Java's FIRST
     // statement in both members, before the support test, and the two questions are genuinely
@@ -1521,7 +1527,14 @@ export function createStrings(options) {
     // only authority.
     const normalized = requireJdkWellFormedLocale(normalizeTag(locale), description);
     const catalog = catalogs.get(normalized);
-    if (catalog === undefined) throw new UnsupportedLocaleError(normalized);
+    // THE ROLE, and it is Java's distinction rather than a decoration. `:2738` and `:2741` refuse
+    // `getMissingKeys`' two arguments with DIFFERENT sentences; this port answered one sentence to
+    // both until 2026-09-09, so a caller who passed two tags learned only that one of them was
+    // wrong. The well-formedness refusal one line above ALREADY named the role — `description` is
+    // threaded here for exactly that — so the two halves of the same ingress disagreed with each
+    // other, which is what makes this a repair and not a widening. `getKeysForLocale` passes no role
+    // because Java's `:2718` names none: it has one argument, and there is nothing to disambiguate.
+    if (catalog === undefined) throw new UnsupportedLocaleError(normalized, role);
     return [...catalog.keys()].sort();
   };
 
@@ -1561,7 +1574,7 @@ export function createStrings(options) {
      * comparisons to settle one unmeasured case.
      */
     getKeysForLocale: (/** @type {string} */ locale) =>
-      freeze(keysForExactLocale(locale, LOCALE_INGRESS_DESCRIPTION.inspectionLocale)),
+      freeze(keysForExactLocale(locale, LOCALE_INGRESS_DESCRIPTION.inspectionLocale, undefined)),
 
     /**
      * Plan 3.3:773 — the same exact-locale rule applied INDEPENDENTLY to source and target, so an
@@ -1578,8 +1591,10 @@ export function createStrings(options) {
       requireJdkWellFormedLocale(normalizeTag(sourceLocale), LOCALE_INGRESS_DESCRIPTION.sourceLocale);
       requireJdkWellFormedLocale(normalizeTag(targetLocale), LOCALE_INGRESS_DESCRIPTION.targetLocale);
 
-      const source = keysForExactLocale(sourceLocale, LOCALE_INGRESS_DESCRIPTION.sourceLocale);
-      const target = new Set(keysForExactLocale(targetLocale, LOCALE_INGRESS_DESCRIPTION.targetLocale));
+      const source = keysForExactLocale(sourceLocale, LOCALE_INGRESS_DESCRIPTION.sourceLocale, "source");
+      const target = new Set(
+        keysForExactLocale(targetLocale, LOCALE_INGRESS_DESCRIPTION.targetLocale, "target"),
+      );
       return freeze(source.filter((key) => !target.has(key)));
     },
     getLocaleConfiguration: () =>
@@ -2420,7 +2435,54 @@ function parseCatalogInput(raw, locale, source, session, options, warnings) {
  * @param {Map<object, ReturnType<typeof compileExpression>>} compiled
  * @returns {void}
  */
-function compileDefinitionExpressions(definition, compiled, visited = new Set()) {
+function compileDefinitionExpressions(definition, compiled, visited = new Set(), rootKey = "", locale = "") {
+  /**
+   * Java's construction-path wording, MEASURED on the pinned Corretto 21 rather than read.
+   *
+   * `LocalizedStringValidator` — not `DefaultStrings.compileExpressions` — is what fires for every
+   * shape here, and it wraps twice: `invalid()` at `:326` adds
+   * `Invalid localized string '<key>' for locale '<tag>': ` around a per-shape sentence, retaining
+   * the `ExpressionEvaluationException` as the cause. The two sentences are `:159`'s
+   * `Invalid alternative expression '<expr>'` and the generated-placeholder one. A nested
+   * alternative reports the ROOT key, not a path — measured: depth 2 produces a message byte-identical
+   * to depth 1.
+   *
+   * This is deliberately NOT the loader's wording. `lokalized/parse` reproduces
+   * `LocalizedStringLoader`'s sentences because that is the door it is; construction has its own, and
+   * Java's two differ. The port previously threw the evaluator's error BARE here — no key, no locale,
+   * no cause — which broke `catalog.js`'s own stated contract that one authoring mistake produces one
+   * diagnostic whichever door it came through.
+   *
+   * The TYPE stays `ExpressionEvaluationError` where Java raises `IllegalArgumentException`: the
+   * class is the port's idiomatic analogue and consumers catch it, so this follows the established
+   * rule of Java's SHAPE with the JS name — the message and the retained cause are Java's.
+   *
+   * @param {string} sentence the per-shape half, already formatted
+   * @param {unknown} cause the evaluator's own error, retained by reference as Java retains it
+   */
+  const invalid = (sentence, cause) => {
+    const error = new ExpressionEvaluationError(
+      `Invalid localized string '${rootKey}' for locale '${locale}': ${sentence}`,
+      { cause },
+    );
+    return error;
+  };
+
+  /**
+   * @template T
+   * @param {() => T} compileOne
+   * @param {(reason: string) => string} sentenceFor
+   * @returns {T}
+   */
+  const wrapping = (compileOne, sentenceFor) => {
+    try {
+      return compileOne();
+    } catch (error) {
+      if (!(error instanceof ExpressionEvaluationError)) throw error;
+      throw invalid(sentenceFor(error.message), error);
+    }
+  };
+
   // Guarded by node IDENTITY, because a programmatically supplied catalog is an object graph rather
   // than a tree: plan 3.6 permits a shared alternative subtree, and `parseModelCatalog` preserves
   // the sharing instead of expanding it. Re-walking a diamond is exponential in its depth, so a
@@ -2429,17 +2491,39 @@ function compileDefinitionExpressions(definition, compiled, visited = new Set())
   if (visited.has(definition)) return;
   visited.add(definition);
 
-  for (const placeholder of definition.placeholders.values()) {
+  for (const [placeholderName, placeholder] of definition.placeholders) {
     if (placeholder.kind !== "expression") continue;
 
-    for (const alternative of placeholder.alternatives)
-      if (!compiled.has(alternative)) compiled.set(alternative, compileExpression(alternative.expression));
+    let index = 0;
+
+    for (const alternative of placeholder.alternatives) {
+      const at = index++;
+
+      if (!compiled.has(alternative))
+        compiled.set(
+          alternative,
+          wrapping(
+            () => compileExpression(alternative.expression),
+            (reason) =>
+              `Invalid expression alternative ${at} for generated placeholder '${placeholderName}', ` +
+              `expression '${alternative.expression}': ${reason}`,
+          ),
+        );
+    }
   }
 
   for (const alternative of definition.alternatives) {
-    if (!compiled.has(alternative)) compiled.set(alternative, compileExpression(alternative.expression));
+    if (!compiled.has(alternative))
+      compiled.set(
+        alternative,
+        wrapping(
+          () => compileExpression(alternative.expression),
+          (reason) => `Invalid alternative expression '${alternative.expression}': ${reason}`,
+        ),
+      );
 
-    compileDefinitionExpressions(alternative.definition, compiled, visited);
+    // The ROOT key and locale travel down unchanged: Java reports the root, not a path.
+    compileDefinitionExpressions(alternative.definition, compiled, visited, rootKey, locale);
   }
 }
 

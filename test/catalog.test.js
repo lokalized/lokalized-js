@@ -23,7 +23,7 @@ import { EXPRESSION_LIMIT_CEILINGS, compile } from "../src/internal/expression.j
 const compileExpressionAtLoad = (/** @type {string} */ expression) =>
   compile(expression, { limits: EXPRESSION_LIMIT_CEILINGS });
 
-import { parseCatalog } from "../src/internal/catalog.js";
+import { parseCatalog, parseCatalogSource } from "../src/internal/catalog.js";
 
 /**
  * The sibling spec checkout, guarded.
@@ -92,8 +92,10 @@ function parseCasesByFile() {
 
 /** @returns {Set<string>} `${fixture}::${file}` for every load-time failure attributed to a file */
 function loadFailuresByFile() {
-  /** @type {Set<string>} */
-  const failures = new Set();
+  // A MAP, not a Set: the failure MESSAGE is what tells a raw-door rejection from a model one, and
+  // `RAW_ONLY_FAILURE` needs it. `.has()` reads identically on both, so no call site changes.
+  /** @type {Map<string, string>} */
+  const failures = new Map();
 
   for (const testCase of corpus.cases) {
     if (!testCase.operation.startsWith("load")) continue;
@@ -104,7 +106,8 @@ function loadFailuresByFile() {
 
     const match = /\/([^/\s]+)\/([^/\s:]+):/.exec(expected.failureMessage ?? "");
 
-    if (match && match[1] === testCase.fixture) failures.add(`${testCase.fixture}::${match[2]}`);
+    if (match && match[1] === testCase.fixture)
+      failures.set(`${testCase.fixture}::${match[2]}`, expected.failureMessage ?? "");
   }
 
   return failures;
@@ -127,6 +130,23 @@ function limitsFor(fixture) {
   return { limits };
 }
 
+/**
+ * Rejections that belong to the RAW door and must NOT be reproduced by the decoded one.
+ *
+ * `maximumJsonNestingDepth` is a property of parsing JSON TEXT. Java enforces it at exactly one
+ * place, `LocalizedStringLoader.java:2759`, inside its parser, and applies NO such bound on a
+ * programmatic path — measured on the pinned Corretto 21: a programmatic catalog constructs at
+ * alternative depth 128 and is refused at 129 by the MODEL limit. Plan v7:1493-1498 says the same.
+ * `parseCatalog` therefore stops charging it, and a fixture Java rejected only for that reason is
+ * expected to be ACCEPTED here.
+ *
+ * DERIVED from the recorded failure message, not from a fixture name: one of the corpus's 254
+ * recorded failures carries this signature today, and a future one is handled without an edit —
+ * while a rejection for any OTHER reason is still expected, so this cannot quietly excuse a real
+ * regression.
+ */
+const RAW_ONLY_FAILURE = /JSON nesting depth exceeds|input bytes exceed|reader characters exceed/;
+
 describe("parseCatalog against every corpus fixture", { skip: corpusSkip }, () => {
   const parseCases = parseCasesByFile();
   const loadFailures = loadFailuresByFile();
@@ -146,6 +166,10 @@ describe("parseCatalog against every corpus fixture", { skip: corpusSkip }, () =
         let expectedFailure = parseCase
           ? parseCase.expected.parse.failed
           : loadFailures.has(identity) || OPTION_VALIDATION_FAILURES.has(identity);
+
+        // A raw-door rejection is not the decoded door's to reproduce. See RAW_ONLY_FAILURE.
+        const recordedMessage = parseCase?.expected?.parse?.failureMessage ?? loadFailures.get(identity) ?? "";
+        if (expectedFailure && RAW_ONLY_FAILURE.test(String(recordedMessage))) expectedFailure = false;
 
         if (KNOWN_M2_GAPS.has(identity)) expectedFailure = false;
 
@@ -366,16 +390,22 @@ describe("parseCatalog bounds", { skip: corpusSkip }, () => {
     );
   });
 
-  it("admits a flat catalog but not a nested one at depth 1", () => {
-    assert.ok(
-      parseCatalog({ "Key.A": "a" }, { source: "t", limits: { maximumJsonNestingDepth: 1 } }),
-    );
+  it("charges the JSON-nesting limit on the RAW door and NOT on the decoded one", () => {
+    // Java enforces `maximumJsonNestingDepth` at exactly one place — inside its JSON parser,
+    // `LocalizedStringLoader.java:2759` — and applies no such bound programmatically. Plan
+    // v7:1493-1498: raw limits are "enforceable only where the original string/bytes or stream is
+    // observed". This test used to assert the OPPOSITE of that on the decoded door.
+    const nested = { "Key.A": { translation: "a" } };
+    const limits = { maximumJsonNestingDepth: 1 };
+
+    // The decoded door: no raw limit, whatever the option says.
+    assert.ok(parseCatalog({ "Key.A": "a" }, { source: "t", limits }));
+    assert.ok(parseCatalog(nested, { source: "t", limits }));
+
+    // The raw door: still charged, because it really does observe the text. Both halves matter —
+    // without this one the change above would read as "the limit was deleted".
     assert.throws(
-      () =>
-        parseCatalog(
-          { "Key.A": { translation: "a" } },
-          { source: "t", limits: { maximumJsonNestingDepth: 1 } },
-        ),
+      () => parseCatalogSource(JSON.stringify(nested), { source: "t", limits }),
       /JSON nesting depth exceeds the maximum of 1/,
     );
   });
@@ -391,10 +421,13 @@ describe("parseCatalog bounds", { skip: corpusSkip }, () => {
     );
   });
 
-  it("admits the deepest alternative nesting the JSON-depth ceiling allows", () => {
-    // The two limits interact exactly as the corpus notes: each alternative level costs three JSON
-    // containers, so with the option's own ceiling of 128 the alternative-depth cap of 128 is
-    // unreachable from a file and 42 levels is the deepest catalog Java accepts.
+  it("bounds alternative nesting where each door actually bounds it", () => {
+    // MEASURED on the pinned Corretto 21 through the programmatic path: Java constructs at
+    // alternative depth 128 and refuses at 129 with `Alternative nesting exceeds the maximum depth
+    // of 128` (LocalizedStringValidator.java:121). From a FILE the JSON-depth ceiling binds first —
+    // each alternative level costs three JSON containers, so 42 levels is the deepest Java accepts
+    // and the model cap is unreachable there. Both facts are true; they belong to different doors,
+    // and this test used to attach the file one to the decoded door.
     /** @param {number} depth */
     const nest = (depth) => {
       /** @type {any} */
@@ -406,9 +439,18 @@ describe("parseCatalog bounds", { skip: corpusSkip }, () => {
       return { "Nested.Alternatives": node };
     };
 
-    assert.ok(parseCatalog(nest(42), { source: "t", limits: { maximumJsonNestingDepth: 128 } }));
+    // The decoded door reaches Java's real boundary.
+    assert.ok(parseCatalog(nest(128), { source: "t" }));
     assert.throws(
-      () => parseCatalog(nest(43), { source: "t", limits: { maximumJsonNestingDepth: 128 } }),
+      () => parseCatalog(nest(129), { source: "t" }),
+      /alternative nesting exceeds the maximum depth of 128/i,
+    );
+
+    // The raw door still stops at the JSON ceiling, which is what a file hits.
+    const limits = { maximumJsonNestingDepth: 128 };
+    assert.ok(parseCatalogSource(JSON.stringify(nest(42)), { source: "t", limits }));
+    assert.throws(
+      () => parseCatalogSource(JSON.stringify(nest(43)), { source: "t", limits }),
       /JSON nesting depth exceeds the maximum of 128/,
     );
   });

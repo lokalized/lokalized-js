@@ -336,6 +336,121 @@ export const CONSTRUCT_REFUSAL_ADAPTATIONS = [
       "diagnostic at once, which is a decision for whoever owns that surface, not something to " +
       "settle inside a construct-refusal table. Flagged, not fixed.",
   },
+
+  // ---------------------------------------------------------------------------------------------
+  // LocalizedStringValidator, reached through a PROGRAMMATIC catalog (owed-validator family).
+  //
+  // These six are the only entries whose Java site is not in `DefaultStrings`. `DefaultStrings:297`
+  // hands every supplied `LocalizedString` to `LocalizedStringValidator`, so a catalog built in
+  // code -- not loaded from a file -- runs a validator with no `LocalizedStringLoader` check in
+  // front of it. That matters for the WORDING, which is the whole reason the branches were owed:
+  // Java carries TWO diagnostic dialects for the same six rules, the loader's on the file path and
+  // the validator's here, and no loaded input can ever produce the second.
+  //
+  // THE PORT DELIBERATELY CARRIES ONE. `src/internal/catalog.js` says so in as many words -- it
+  // "does NOT re-implement validation", it walks the input graph and hands each leaf to the very
+  // functions the file path uses, "so one authoring mistake produces one diagnostic no matter which
+  // door it came through". So each entry below maps a Java VALIDATOR message onto the port's LOADER
+  // message. That is a declared collapse of a Java-internal split, not a relaxation: the six JS
+  // messages are pinned verbatim and are pairwise distinct, so a port that answered one diagnostic
+  // for all six -- the failure this family exists to catch -- fails five of these rows. And the
+  // coverage disposition for `validateIdentifier:314` had already recorded the same conclusion from
+  // the other side: Java's two reserved-name lists have an EMPTY symmetric difference today, and
+  // "the port should be held to building one list, not two".
+  //
+  // `jsType` is a bare `Error` for all six, on the precedent set two entries above: these are
+  // CATALOG-CONTENT refusals, not option-shape ones, and the parse-session helper that raises every
+  // catalog diagnostic in this port raises `Error`. Re-typing them is a decision about that whole
+  // surface, not one to take inside this table.
+  // ---------------------------------------------------------------------------------------------
+  {
+    site: "LocalizedStringValidator.java:212",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage:
+      "Invalid localized string 'Greeting' for locale 'en': Generated placeholder 'itemCount' " +
+      "must define translations",
+    jsType: "Error",
+    jsMessage: "catalog:en: placeholder translations are required. Key is 'Greeting'",
+    why:
+      "An EMPTY translations map. Java's loader refuses the same emptiness at " +
+      "`LocalizedStringLoader:2645` with the sentence on the JS side, which is exactly why this " +
+      "validator arm had never been observed: no loaded file reaches it. The JS message names the " +
+      "KEY and not the placeholder because the loader's does; that asymmetry is Java's.",
+  },
+  {
+    site: "LocalizedStringValidator.java:230",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage:
+      "Invalid localized string 'Greeting' for locale 'en': Generated placeholder 'itemCount' " +
+      "may not mix language-form types",
+    jsType: "Error",
+    jsMessage:
+      "catalog:en: you cannot mix-and-match language forms in placeholder translations. " +
+      "Placeholder is 'itemCount' for key 'Greeting'",
+    why:
+      "Two axes in one translations map; `LocalizedStringLoader:2653` is the loader half. Java's " +
+      "own src/test/resources/strings-invalid-mixed/en exercises only that half.",
+  },
+  {
+    site: "LocalizedStringValidator.java:233",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage:
+      "Invalid localized string 'Greeting' for locale 'en': Range-driven placeholder 'itemCount' " +
+      "only supports cardinality",
+    jsType: "Error",
+    jsMessage:
+      "catalog:en: range-based translations only support Cardinality. Placeholder is 'itemCount' " +
+      "for key 'Greeting'",
+    why:
+      "A range whose forms are not cardinal. The fixture carries ONE non-cardinal form on purpose: " +
+      "two would be refused a line earlier by :230 and the row would pin the wrong rule.",
+  },
+  {
+    site: "LocalizedStringValidator.java:312",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage: "Invalid localized string 'Greeting' for locale 'en': Invalid generated placeholder 'not a name'",
+    jsType: "Error",
+    jsMessage:
+      "catalog:en: invalid placeholder 'not a name'. Placeholder names must start with a Unicode " +
+      "letter or underscore and contain only Unicode letters, Unicode numbers, Unicode combining " +
+      "marks, underscores, or hyphens. Key is 'Greeting'",
+    why:
+      "A generated-placeholder NAME that is not a valid identifier. Java's message is the bare " +
+      "'Invalid <description> <value>' form; the port's states the rule, which is the loader " +
+      "wording it shares with every other identifier rejection. Read against the :314 entry: the " +
+      "two must not collapse into one sentence on either side.",
+  },
+  {
+    site: "LocalizedStringValidator.java:314",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage:
+      "Invalid localized string 'Greeting' for locale 'en': Invalid generated placeholder " +
+      "'CARDINALITY_ONE': language-form constants are reserved",
+    jsType: "Error",
+    jsMessage:
+      "catalog:en: invalid placeholder 'CARDINALITY_ONE'. Placeholder names may not use reserved " +
+      "expression constants. Key is 'Greeting'",
+    why:
+      "A name that IS a valid identifier but is a reserved language-form constant. Both sides keep " +
+      "this distinct from :312, which is the property that matters: a port with one identifier " +
+      "rejection where Java has two differs on exactly one of the two rows.",
+  },
+  {
+    site: "LocalizedStringValidator.java:302 (validateTemplate)",
+    javaType: "java.lang.IllegalArgumentException",
+    javaMessage:
+      "Invalid localized string 'Greeting' for locale 'en': Invalid placeholder reference in " +
+      "translation: Unclosed placeholder starting at index 6",
+    jsType: "Error",
+    jsMessage:
+      "catalog:en: invalid placeholder reference in translation for key 'Greeting': Unclosed " +
+      "placeholder starting at index 6",
+    why:
+      "A malformed reference inside the root translation, and the ONE refusal in this family that " +
+      "Java raises with a CAUSE retained -- `invalid():327`'s caused arm, which every other row " +
+      "here leaves at its cause-less spelling. The inner detail ('Unclosed placeholder starting at " +
+      "index 6') is byte-identical on both sides; only the contextual frame differs.",
+  },
 ];
 
 /** Entries actually consulted by a run, so an entry that matches nothing can be reported as stale. */

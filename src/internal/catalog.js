@@ -240,40 +240,6 @@ function has(object, member) {
   return Object.hasOwn(object, member);
 }
 
-/**
- * Bounded, iterative container-depth scan.
- *
- * `LocalizedStringLoader.validateJsonNestingDepth` counts every `{`/`[` in the file text before the
- * document is parsed, so the catalog object itself is depth 1. The walk here is the structural
- * equivalent over an already-decoded value and bails as soon as the limit is passed.
- *
- * @param {unknown} root
- * @param {number} maximum
- * @param {string} source
- * @returns {void}
- */
-function validateNestingDepth(root, maximum, source) {
-  /** @type {{ value: unknown, depth: number }[]} */
-  const stack = [{ value: root, depth: 0 }];
-
-  while (stack.length > 0) {
-    const frame = /** @type {{ value: unknown, depth: number }} */ (stack.pop());
-    const { value } = frame;
-
-    if (!Array.isArray(value) && !isObject(value)) continue;
-
-    const depth = frame.depth + 1;
-
-    if (depth > maximum)
-      throw new Error(`${source}: JSON nesting depth exceeds the maximum of ${maximum}`);
-
-    if (Array.isArray(value)) {
-      for (const element of value) stack.push({ value: element, depth });
-    } else {
-      for (const key of Object.keys(value)) stack.push({ value: value[key], depth });
-    }
-  }
-}
 
 /**
  * `LocalizedStringLoadingOptions.Builder`'s validation, which Java performs when the options are
@@ -1116,7 +1082,16 @@ export function parseCatalog(raw, context) {
   if (!isObject(raw))
     throw new Error(`${source}: a localized strings file must be comprised of a single JSON object`);
 
-  validateNestingDepth(raw, session.limits.maximumJsonNestingDepth, source);
+  // NO JSON-NESTING CHARGE HERE. Measured on the pinned Corretto 21 through the programmatic
+  // path: Java constructs at depth 128 and refuses at 129 with `Alternative nesting exceeds the
+  // maximum depth of 128` (LocalizedStringValidator.java:121). `maximumJsonNestingDepth` is a
+  // LocalizedStringLoadingOptions field enforced at exactly one place, LocalizedStringLoader
+  // .java:2759, INSIDE the JSON parser — there is no such check off a JSON path because there
+  // is no JSON. Plan v7:1493-1498 says the same, and this function's own docblock above says a
+  // decoded object `is not a raw strings-file input` — and then charged it anyway, refusing a
+  // record-form catalog at 21 alternative levels where Java accepts 128. The raw doors keep
+  // their bound: `parseCatalogSource` charges it over the TEXT via json-parse.js's
+  // `validateJsonNestingDepth`, which is the true analogue of Java's site.
 
   const keys = Object.keys(raw);
 

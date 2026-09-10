@@ -108,7 +108,143 @@ const SUBJECTS = {
       locale: "und-bokmal",
       strings: { "und-bokmal": CATALOG, "und-nynorsk": CATALOG },
     }),
+
+  // The `owed-validator` half: `DefaultStrings:297` hands every supplied definition to
+  // `LocalizedStringValidator`, so a catalog written in code -- plan 3.2's `LocalizedStringInput[]`,
+  // never a file -- reaches six validations no loaded input can, because the loader refuses each of
+  // them first with its own wording. Each subject below differs from CONTROL_MODEL in exactly one
+  // member, which is what makes its refusal attributable to that member and nothing else.
+  //
+  // NOT routed through `defineLocalizedString`: that export validates eagerly, so every refusal
+  // would come from the definition call rather than from `createStrings`, which is the site the
+  // corpus recorded. Java's `LocalizedString.Builder.build()` validates nothing either.
+  // :212 -- an EMPTY translations map.
+  "LocalizedStringValidator.java:212": () =>
+    createStrings({
+      ...BASE,
+      strings: {
+        en: [
+          {
+            key: "Greeting",
+            translation: "Hello {{itemCount}}",
+            placeholders: { itemCount: { kind: "language-form", value: "count", translations: {} } },
+          },
+        ],
+      },
+    }),
+  // :230 -- forms from TWO axes in one map.
+  "LocalizedStringValidator.java:230": () =>
+    createStrings({
+      ...BASE,
+      strings: {
+        en: [
+          {
+            key: "Greeting",
+            translation: "Hello {{itemCount}}",
+            placeholders: {
+              itemCount: {
+                kind: "language-form",
+                value: "count",
+                translations: { CARDINALITY_ONE: "one", GENDER_MASCULINE: "masc" },
+              },
+            },
+          },
+        ],
+      },
+    }),
+  // :233 -- a RANGE whose forms are not cardinal. ONE non-cardinal form, because two would be
+  // refused by :230 a line earlier and this subject would assert a rule it never reached.
+  "LocalizedStringValidator.java:233": () =>
+    createStrings({
+      ...BASE,
+      strings: {
+        en: [
+          {
+            key: "Greeting",
+            translation: "Hello {{itemCount}}",
+            placeholders: {
+              itemCount: {
+                kind: "language-form",
+                range: { start: "first", end: "last" },
+                translations: { GENDER_MASCULINE: "masc" },
+              },
+            },
+          },
+        ],
+      },
+    }),
+  // :312 -- a generated-placeholder NAME that is not a valid identifier. Its definition is the
+  // control's, so only the name can be the reason.
+  "LocalizedStringValidator.java:312": () =>
+    createStrings({
+      ...BASE,
+      strings: {
+        en: [
+          {
+            key: "Greeting",
+            translation: "Hello",
+            placeholders: {
+              "not a name": {
+                kind: "language-form",
+                value: "count",
+                translations: { CARDINALITY_ONE: "one", CARDINALITY_OTHER: "other" },
+              },
+            },
+          },
+        ],
+      },
+    }),
+  // :314 -- a name that IS a valid identifier and IS a reserved language-form constant.
+  "LocalizedStringValidator.java:314": () =>
+    createStrings({
+      ...BASE,
+      strings: {
+        en: [
+          {
+            key: "Greeting",
+            translation: "Hello",
+            placeholders: {
+              CARDINALITY_ONE: {
+                kind: "language-form",
+                value: "count",
+                translations: { CARDINALITY_ONE: "one", CARDINALITY_OTHER: "other" },
+              },
+            },
+          },
+        ],
+      },
+    }),
+  // validateTemplate -- a malformed placeholder REFERENCE in the root translation, the one refusal
+  // of the six that Java raises with a cause retained (`invalid():327`'s caused arm).
+  "LocalizedStringValidator.java:302 (validateTemplate)": () =>
+    createStrings({
+      ...BASE,
+      strings: { en: [{ key: "Greeting", translation: "Hello {{" }] },
+    }),
 };
+
+/**
+ * The accepting neighbour of the six validator subjects above, asserted below.
+ *
+ * A family of refusals proves only that something was refused; this proves the SHAPES they degenerate
+ * are otherwise accepted, so each refusal is attributable to its one degeneracy. It is the same
+ * `definedCatalog` the corpus fixture `owed-validator-base` carries.
+ */
+const CONTROL_MODEL = [
+  { key: "Greeting", translation: "Hello" },
+  {
+    key: "Items",
+    translation: "{{itemCount}} items",
+    placeholders: {
+      itemCount: {
+        kind: "language-form",
+        value: "count",
+        translations: { CARDINALITY_ONE: "one", CARDINALITY_OTHER: "other" },
+      },
+    },
+  },
+  { key: "Alt", translation: "Fallback", alternatives: [{ expression: "count == 1", translation: "One" }] },
+];
 
 test("the construct-refusal table's JS half is what createStrings actually raises", async (t) => {
   for (const entry of CONSTRUCT_REFUSAL_ADAPTATIONS) {
@@ -136,6 +272,11 @@ test("the construct-refusal table's JS half is what createStrings actually raise
 test("every declared adaptation has an input here, and every input a declaration", () => {
   const declared = CONSTRUCT_REFUSAL_ADAPTATIONS.map((entry) => entry.site).sort();
   assert.deepEqual(Object.keys(SUBJECTS).sort(), declared);
+});
+
+test("the programmatic control constructs, so each validator refusal names its one degeneracy", () => {
+  const strings = createStrings({ ...BASE, strings: { en: CONTROL_MODEL } });
+  assert.equal(strings.get("Greeting"), "Hello");
 });
 
 test("the control constructs and ANSWERS, which is what makes the refusals readable", () => {

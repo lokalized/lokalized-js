@@ -74,14 +74,46 @@ import { jdkLanguageTag, parseJdkTag } from "./locale-jdk-tag.js";
  */
 export const PLURAL_DATA_RUNTIME = Symbol.for("lokalized.plural-data-runtime.v1");
 
-/** Thrown when no CLDR cardinal rules exist for the requested locale. */
+/**
+ * Thrown when no CLDR cardinal rules exist for the requested locale, and — with a `role` — when an
+ * inspection argument names a locale the instance does not support.
+ *
+ * `role` NAMES WHICH ARGUMENT, and it exists because the omission was a measured loss rather than a
+ * style question. `DefaultStrings.java` refuses the two `getMissingKeys` arguments with DIFFERENT
+ * sentences, `Source locale '%s' is not supported` (`:2738`) and `Target locale '%s' is not
+ * supported` (`:2741`); the port answered one sentence to both, so a caller who passed two tags was
+ * told only that one of them was wrong. `tools/lookup-diff/run.mjs` had recorded exactly that as "a
+ * known loss ... worth a maintainer's attention on its own", and its rule could only compare the
+ * QUOTED LOCALE, which discriminates the role by proxy and absorbs a role swap outright on the one
+ * row where both arguments name the same tag.
+ *
+ * The role is OPTIONAL and absent by default, which keeps the sentence byte-identical at the three
+ * plural-data sites (`plural.js:1092`, `data/ordinal.js:230`/`:304`, `data/ranges.js:390`) and at
+ * `getKeysForLocale`, whose Java counterpart (`:2718`) likewise names no role because it has only
+ * one argument to name. So this widens the diagnostic exactly where Java's is wider and nowhere
+ * else.
+ *
+ * The sentence stays the port's own rather than becoming Java's: plan 3.3:771 names
+ * `UnsupportedLocaleError` and its wording for this surface, and that is a recorded maintainer
+ * decision (M7 decision 3) — what was owed here is the ROLE, not Java's spelling of it.
+ */
 export class UnsupportedLocaleError extends Error {
-  /** @param {string} localeTag */
-  constructor(localeTag) {
-    super(`Unsupported locale '${localeTag}' was provided`);
+  /**
+   * @param {string} localeTag
+   * @param {"source" | "target"} [role] which argument the tag came from, when the caller passed more
+   *   than one and the sentence would otherwise be ambiguous
+   */
+  constructor(localeTag, role) {
+    super(
+      role === undefined
+        ? `Unsupported locale '${localeTag}' was provided`
+        : `Unsupported ${role} locale '${localeTag}' was provided`,
+    );
     this.name = "UnsupportedLocaleError";
     /** @type {string} */
     this.localeTag = localeTag;
+    /** @type {"source" | "target" | undefined} */
+    this.role = role;
   }
 }
 

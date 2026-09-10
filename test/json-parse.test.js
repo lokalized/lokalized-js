@@ -307,11 +307,16 @@ describe("the raw-source parser against every corpus parse case", { skip: corpus
     );
   });
 
+  /** Refusals that belong to the RAW door alone — see the comment at the divergence check below. */
+  const RAW_ONLY_REFUSAL = /JSON nesting depth exceeds|input bytes exceed|reader characters exceed/;
+
   it("agrees with the decoded-object entry point on every fixture catalog in the corpus", () => {
     // The two doors into the model must not drift. Every fixture catalog is pushed through both:
     // `parseCatalog` over the decoded object, and `parseCatalogSource` over its serialized bytes.
     /** @type {string[]} */
     const differences = [];
+    /** @type {string[]} */
+    const rawOnly = [];
     let checked = 0;
 
     for (const fixture of Object.values(/** @type {Record<string, any>} */ (corpus.fixtures))) {
@@ -339,13 +344,36 @@ describe("the raw-source parser against every corpus parse case", { skip: corpus
         }
 
         ++checked;
-        if (viaObject !== viaSource)
-          differences.push(`${fixture.id ?? "?"}::${file}\n    object ${viaObject}\n    source ${viaSource}`);
+        if (viaObject === viaSource) continue;
+
+        // THE ONE DIVERGENCE THE DOORS ARE SUPPOSED TO HAVE, and it is not a weakening of this test.
+        // `maximumJsonNestingDepth` is a property of parsing JSON TEXT: Java enforces it inside its
+        // parser (`LocalizedStringLoader.java:2759`) and applies NO such bound programmatically —
+        // measured, a programmatic catalog constructs at alternative depth 128 and is refused at 129
+        // by the MODEL limit. Plan v7:1493-1498 says raw limits are "enforceable only where the
+        // original string/bytes or stream is observed". So the SOURCE door refusing where the OBJECT
+        // door accepts is correct HERE and nowhere else: every other kind of disagreement, and both
+        // doors' agreement on the model, file, node and warning limits, is still gated below.
+        if (RAW_ONLY_REFUSAL.test(viaSource) && !viaObject.startsWith("threw:")) {
+          rawOnly.push(`${fixture.id ?? "?"}::${file}`);
+          continue;
+        }
+
+        differences.push(`${fixture.id ?? "?"}::${file}\n    object ${viaObject}\n    source ${viaSource}`);
       }
     }
 
     assert.deepEqual(differences, [], "catalogs the two entry points disagree about");
     assert.ok(checked > 1_700, `expected the whole corpus to be exercised, saw ${checked}`);
+
+    // AND THE DIVERGENCE MUST EXIST. Without this the exemption above would silently tolerate the
+    // charge coming back: the doors would agree again, `rawOnly` would empty, and this test would go
+    // green over the very defect it was narrowed for.
+    assert.ok(
+      rawOnly.length >= 1,
+      "expected at least one catalog the SOURCE door refuses on a raw limit and the OBJECT door " +
+        "accepts; none means `parseCatalog` is charging a raw limit again",
+    );
   });
 });
 

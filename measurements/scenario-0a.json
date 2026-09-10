@@ -9,20 +9,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 25,
-      "sourceBytes": 762706,
-      "importMs": 0.284,
-      "constructionMs": 0.1207,
-      "firstRenderMs": 0.3776,
+      "sourceBytes": 768011,
+      "importMs": 0.42,
+      "constructionMs": 0.1423,
+      "firstRenderMs": 0.3638,
       "retainedBytes": 67856
     },
     {
       "label": "core + parsed equivalent",
       "modules": 24,
-      "sourceBytes": 754461,
-      "importMs": 0.607,
-      "constructionMs": 0.3923,
-      "firstRenderMs": 0.3332,
-      "retainedBytes": 354536
+      "sourceBytes": 759766,
+      "importMs": 0.751,
+      "constructionMs": 0.4747,
+      "firstRenderMs": 0.3345,
+      "retainedBytes": 364360
     }
   ],
   "rebaselines": [
@@ -258,6 +258,20 @@
       "growth": [
         "root + raw-text catalog: source graph grew 761288 -> 762706 bytes",
         "core + parsed equivalent: source graph grew 753043 -> 754461 bytes"
+      ]
+    },
+    {
+      "reason": "M3b re-derivation slice: UnsupportedLocaleError gains an optional role so getMissingKeys names WHICH argument was unsupported (DefaultStrings.java:2738/:2741), closing the loss tools/lookup-diff/run.mjs had recorded as 'worth a maintainer's attention on its own'; the differential's rule now compares the role directly instead of by proxy. Source-only growth in src/internal/plural.js and src/core/index.js; modules unchanged at 25/24.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 762706 -> 765422 bytes",
+        "core + parsed equivalent: source graph grew 754461 -> 757177 bytes"
+      ]
+    },
+    {
+      "reason": "M7 defects 1 and 2, both fixed to match Java, both measured on the pinned Corretto 21 rather than read. +2,589 bytes in BOTH graphs, 25/24 modules unchanged; the equal delta is the standing evidence that lokalized/negotiate and its IANA table stay unreachable from src/index.js. DEFECT 1: createStrings threw the evaluator's ExpressionEvaluationError BARE -- no key, no locale, no cause -- where Java's LocalizedStringValidator wraps it (invalid() at :326 adding \"Invalid localized string '<key>' for locale '<tag>': \" around a per-shape sentence, retaining the ExpressionEvaluationException as cause). The port now reproduces Java's message BYTE-FOR-BYTE on all three shapes measured -- whole-message alternative, nested alternative (which reports the ROOT key and no path, byte-identical to depth 1), and generated-placeholder alternative (Java's OTHER sentence) -- with the cause retained by reference. The TYPE stays ExpressionEvaluationError where Java raises IllegalArgumentException, following the established rule of Java's SHAPE with the JS name. DEFECT 2: parseCatalog charged the JSON-nesting budget to an already-DECODED object; Java enforces that limit at exactly one place inside its JSON parser and applies none programmatically, so the decoded door now reaches Java's real boundary (128 constructs, 129 refuses) while the raw door keeps its bound. Ablation: the pre-fix sources turn exactly the 4 and 5 relevant tests red and nothing else. Conformance 1,967 passed / 0 FAILED; 897 tests.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 765422 -> 768011 bytes",
+        "core + parsed equivalent: source graph grew 757177 -> 759766 bytes"
       ]
     }
   ],

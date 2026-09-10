@@ -101,6 +101,20 @@ jobs:
             echo "::error::${skipped} test(s) skipped. With lokalized-spec checked out nothing may skip."
             exit 1
           fi
+      # THE STEPS BELOW MIRROR `npm run verify`, IN ITS ORDER, AND THE LIST IS LOAD-BEARING. This job
+      # deliberately does NOT call `npm run verify`, because the unit-test step above adds the
+      # skipped-count assertion that `verify` has no way to make — so the two lists have to be kept
+      # in step by hand, and they DRIFTED: `size:graph`, `likely-subtag-consumers` and
+      # `spike:placeholders` were all in `verify` and in none of these steps, so they executed on the
+      # authoring machine and nowhere else. If a step is added to `verify`, add it here.
+      - name: Module graph classification and size
+        run: npm run size:graph
+      # M7 clause 2's inventory half. It derives the likely-subtag consumer set from `src/` and fails
+      # on a consumer with no entry, an entry nothing derives, or an alias carrying a gateway past
+      # the boundary. It needs only `src/` and the corpus, so unlike the eight differentials — which
+      # need a JDK and a built `lokalized-java` — it can run here.
+      - name: Likely-subtag consumer inventory
+        run: npm run likely-subtag-consumers
       # M2 is tracked by engineering measurement rather than frozen thresholds, so these ARE the
       # gate. Conformance enforces zero failures plus a ratchet on the passing-ID set; 0a ratchets
       # the deterministic size/module figures and reports the noisy timings without gating them.
@@ -108,6 +122,8 @@ jobs:
         run: npm run conformance
       - name: Scenario 0a static integration measurement
         run: npm run scenario:0a
+      - name: Generated-placeholder spike
+        run: npm run spike:placeholders
 
   packed:
     runs-on: ubuntu-latest

@@ -182,10 +182,15 @@ test("model limits are charged across every catalog form, not just the raw ones"
   );
 });
 
-test("loadingLimits reaches the decoded-object form's JSON nesting check", () => {
-  // Nesting depth is checked over decoded objects too, and it was checked against the DEFAULT
-  // rather than the caller's number: `alternatives-structure.depth.41-levels` is a corpus case that
-  // Java accepts under a raised ceiling and this rejected with "exceeds the maximum of 64".
+test("loadingLimits' JSON nesting depth reaches the RAW form, and no longer the decoded one", () => {
+  // This test's original point stands and is kept: the caller's `maximumJsonNestingDepth` must be
+  // honoured rather than the DEFAULT — `alternatives-structure.depth.41-levels` is a corpus case
+  // Java accepts under a raised ceiling and an earlier port rejected with "exceeds the maximum of
+  // 64". What changed is WHICH DOOR it applies to. Java enforces that limit at exactly one place,
+  // inside its JSON parser (`LocalizedStringLoader.java:2759`), and applies none programmatically:
+  // measured, a programmatic catalog constructs at alternative depth 128 and is refused at 129 by
+  // the MODEL limit. Plan v7:1493-1498 says raw limits are "enforceable only where the original
+  // string/bytes or stream is observed", and a decoded object is not that.
   const nest = (depth) => {
     let node = { translation: "leaf" };
     for (let i = 0; i < depth; i++) node = { translation: "m", alternatives: [{ "count == 1": node }] };
@@ -193,12 +198,24 @@ test("loadingLimits reaches the decoded-object form's JSON nesting check", () =>
   };
 
   const deep = nest(25);
-  assert.throws(() => createStrings({ fallbackLocale: "en", locale: "en", strings: { en: deep } }), /nesting depth/);
+
+  // THE DECODED FORM: not charged at all, whatever the option says.
+  assert.equal(
+    createStrings({ fallbackLocale: "en", locale: "en", strings: { en: deep } }).get("Deep", { count: 2 }),
+    "m",
+  );
+
+  // THE RAW FORM: charged, and against the CALLER's number rather than the default — which is the
+  // regression this test was written for. Both halves are asserted, so neither can drift alone.
+  assert.throws(
+    () => createStrings({ fallbackLocale: "en", locale: "en", strings: { en: JSON.stringify(deep) } }),
+    /nesting depth/,
+  );
   assert.equal(
     createStrings({
       fallbackLocale: "en",
       locale: "en",
-      strings: { en: deep },
+      strings: { en: JSON.stringify(deep) },
       loadingLimits: { maximumJsonNestingDepth: 128 },
     }).get("Deep", { count: 2 }),
     "m",
