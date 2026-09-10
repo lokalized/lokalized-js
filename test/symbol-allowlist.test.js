@@ -106,6 +106,16 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     // that split, and `bestMatchForAcceptLanguage` on the negotiator would be the only door left --
     // which is the fail-soft one, and answers the fallback where the recorded behavior throws.
     ["negotiate", "parseLanguageRanges", "range parser/factory/option helpers"],
+    // M8's port of `LocalizedStringLoader.loadFromFilesystem`, under the `node` owner's declared
+    // "directory loader" category. It is deliberately NOT the plan's `loadStringsFromDirectory`,
+    // and the two are different functions rather than two names for one: the plan's is
+    // manifest-mediated, returns `LoadedStrings` ready for `createStrings`, and requires a fallback
+    // locale — a concept Java's raw filesystem load does not have at all. Six corpus cases load a
+    // set that OMITS the fixture's fallback locale and two load nothing while still recording
+    // `failed: false`, so the manifest-mediated door cannot express what the oracle recorded. This
+    // is the raw door, and it returns parsed catalogs keyed by locale exactly as Java returns
+    // `Map<Locale, Set<LocalizedString>>`.
+    ["node", "readStringsFromDirectory", "directory loader"],
   ]);
 
   /** @param {string} owner @returns {Set<string>} */

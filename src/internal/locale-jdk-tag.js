@@ -625,10 +625,24 @@ export function jdkLanguageSubtag(tag) {
  * @param {string} tag
  * @returns {boolean}
  */
-export function jdkLocaleWellFormed(tag) {
-	const parts = parseJdkTag(tag);
-	// `BaseLocale`'s fields, derived exactly as `renderJdkTag` derives them: the first extlang
-	// replaces the primary language, a lowercase primary `und` becomes empty (see
+/**
+ * The `BaseLocale` fields a `Locale` actually stores, plus the extensions that ride alongside it.
+ *
+ * EXTRACTED from `jdkLocaleWellFormed` for M8's directory loader, which needs LOCALE IDENTITY rather
+ * than a rendered tag. The two are not the same question and the loader asks both: Java refuses a
+ * second file whose locale is EQUAL to one already loaded ("Duplicate localized strings file for
+ * locale '…'"), and then refuses, after the walk, two DIFFERENT locales that RENDER to the same tag
+ * ("Duplicate locale key rendering as language tag '…'"). Both arms have corpus cases, so collapsing
+ * them onto the rendered tag would produce the wrong diagnostic for one of them.
+ *
+ * The private-use subtags consumed by an `x-lvariant-` prefix are moved into `variants` and are NOT
+ * repeated in `privateuse`, which is what makes `en-US-x-lvariant-POSIX` and `en-US-POSIX` compare
+ * EQUAL — as they do in Java, where both are `Locale(en, US, POSIX)`.
+ *
+ * @param {JdkTagParts} parts
+ */
+export function jdkBaseLocale(parts) {
+	// The first extlang replaces the primary language, a lowercase primary `und` becomes empty (see
 	// `JdkTagParts.undetermined` — the JDK's comparison is case-sensitive), and the superseded codes
 	// are what a `Locale` stores.
 	let language = parts.extlangs.length > 0
@@ -641,12 +655,31 @@ export function jdkLocaleWellFormed(tag) {
 	else if (language === "yi") language = "ji";
 	else if (language === "id") language = "in";
 
-	const script = parts.script;
-	const region = parts.region.toUpperCase();
 	/** @type {string[]} */
 	const variants = [...parts.variants];
 	const prefixIndex = privateUseVariantIndex(parts.privateuse);
+	const privateuse = prefixIndex >= 0 ? parts.privateuse.slice(0, prefixIndex) : [...parts.privateuse];
 	if (prefixIndex >= 0) variants.push(...parts.privateuse.slice(prefixIndex + 1));
+
+	return {
+		language,
+		script: parts.script,
+		region: parts.region.toUpperCase(),
+		variants,
+		extensions: parts.extensions,
+		privateuse,
+	};
+}
+
+/**
+ * Whether a tag reaches a `Locale` through `InternalLocaleBuilder.setLocale`'s predicates.
+ *
+ * @param {string} tag
+ * @returns {boolean}
+ */
+export function jdkLocaleWellFormed(tag) {
+	const parts = parseJdkTag(tag);
+	const { language, script, region, variants } = jdkBaseLocale(parts);
 
 	if (language.length > 0 && !isLanguageSubtag(language)) return false;
 	if (script.length > 0 && !isScriptSubtag(script)) return false;

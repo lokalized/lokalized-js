@@ -21,6 +21,12 @@
  */
 
 import { LoadingSession, parseCatalogSource, parseModelCatalog } from "../internal/catalog.js";
+import {
+  DEFAULT_SOURCE,
+  parseStringsWithSession,
+  projectNode,
+  validateExpressionAtLoad,
+} from "../internal/parse-file.js";
 import { EXPRESSION_LIMIT_CEILINGS, compile as compileExpression } from "../internal/expression.js";
 
 /**
@@ -36,7 +42,6 @@ import { EXPRESSION_LIMIT_CEILINGS, compile as compileExpression } from "../inte
  *
  * @param {string} expression
  */
-const validateExpressionAtLoad = (expression) => compileExpression(expression, { limits: EXPRESSION_LIMIT_CEILINGS });
 import { normalizeTag } from "../internal/locale.js";
 import { StringsParseError, rethrowAsParseError } from "../internal/parse-diagnostics.js";
 import { incompleteLanguageFormReporter } from "../internal/parse-warnings.js";
@@ -47,7 +52,6 @@ export { StringsParseError };
 const freeze = Object.freeze;
 
 /** The default source label, per plan section 4.1. */
-const DEFAULT_SOURCE = "<input>";
 
 /** @typedef {import("../internal/catalog.js").Definition} Definition */
 /** @typedef {import("../internal/catalog.js").ParseLimits} StringsLoadingLimits */
@@ -100,94 +104,6 @@ const DEFAULT_SOURCE = "<input>";
  * } PlaceholderDefinitionInput
  */
 
-/**
- * The internal model, projected onto the public `LocalizedStringInput` shape.
- *
- * Every keyed record is a FROZEN NULL-PROTOTYPE object, per plan section 4.3: the property names
- * come from the catalog, so `__proto__` must land as an ordinary own property rather than reaching
- * an inherited setter, and a caller must not be able to mutate a parsed file into a different one.
- *
- * MEMOIZED by node identity. A parsed file is a tree and never hits the memo; a programmatically
- * supplied graph may share one subtree between two alternatives, and `parseModelCatalog` preserves
- * that sharing rather than expanding it. Projecting a shared diamond without the memo is
- * exponential in its depth — the input passes validation and then the projection hangs.
- *
- * @param {Definition} node
- * @param {Map<Definition, Omit<WholeMessageAlternativeInput, "expression">>} [memo]
- * @returns {Omit<WholeMessageAlternativeInput, "expression">}
- */
-function projectNode(node, memo = new Map()) {
-  const projected = memo.get(node);
-  if (projected !== undefined) return projected;
-  /** @type {Record<string, PlaceholderDefinitionInput>} */
-  const placeholders = Object.create(null);
-  let hasPlaceholders = false;
-
-  for (const [name, placeholder] of node.placeholders) {
-    hasPlaceholders = true;
-
-    if (placeholder.kind === "language-form") {
-      /** @type {Record<string, string>} */
-      const translations = Object.create(null);
-      for (const [form, text] of placeholder.translations) translations[form] = text;
-
-      placeholders[name] = freeze({
-        kind: /** @type {const} */ ("language-form"),
-        ...(placeholder.value === null ? {} : { value: placeholder.value }),
-        ...(placeholder.range === null ? {} : { range: freeze({ ...placeholder.range }) }),
-        translations: freeze(translations),
-      });
-    } else {
-      placeholders[name] = freeze({
-        kind: /** @type {const} */ ("expression"),
-        translation: placeholder.translation,
-        ...(placeholder.alternatives.length === 0
-          ? {}
-          : { alternatives: freeze(placeholder.alternatives.map((a) => freeze({ ...a }))) }),
-      });
-    }
-  }
-
-  const result = {
-    ...(node.translation === null ? {} : { translation: node.translation }),
-    ...(node.commentary === null ? {} : { commentary: node.commentary }),
-    ...(hasPlaceholders ? { placeholders: freeze(placeholders) } : {}),
-    ...(node.alternatives.length === 0
-      ? {}
-      : {
-          alternatives: freeze(
-            node.alternatives.map((alternative) =>
-              freeze({ expression: alternative.expression, ...projectNode(alternative.definition, memo) }),
-            ),
-          ),
-        }),
-  };
-
-  memo.set(node, result);
-  return result;
-}
-
-/**
- * Pull the ordinal support probe off a `lokalized/data/ordinal` carrier, if one was supplied.
- *
- * Deliberately tolerant of a carrier without the probe, and silent about a value that is not a
- * carrier at all: `createStrings` owns the diagnosis of a misconfigured `pluralData`, and repeating
- * it here would give one mistake two different messages depending on which entry point saw it first.
- *
- * @param {unknown} carrier
- * @returns {((locale: string) => readonly string[]) | null}
- */
-function ordinalitySupportProbe(carrier) {
-  if (typeof carrier !== "object" || carrier === null) return null;
-
-  const runtime = /** @type {Record<symbol, unknown>} */ (/** @type {unknown} */ (carrier))[PLURAL_DATA_RUNTIME];
-  if (typeof runtime !== "object" || runtime === null) return null;
-
-  const probe = /** @type {Record<string, unknown>} */ (runtime)["supportedOrdinalityNamesFor"];
-  return typeof probe === "function"
-    ? /** @type {(locale: string) => readonly string[]} */ (probe)
-    : null;
-}
 
 /**
  * Parse one localized strings resource.
@@ -200,68 +116,10 @@ function ordinalitySupportProbe(carrier) {
  * @throws {StringsParseError} if the resource cannot be read, decoded, parsed, or validated
  */
 export function parseStrings(input, options) {
-  const source = options.source ?? DEFAULT_SOURCE;
-  const locale = normalizeTag(options.locale);
-
-  // Limit validation FIRST, and as a `RangeError` rather than a parse failure. The split is Java's:
-  // a limit outside its band is an `IllegalArgumentException` from the options, raised before any
-  // resource is looked at, and the corpus records exactly that for `maximumLocalizedStringsFiles` 0.
-  const session = new LoadingSession(options.limits);
-
-  /** @type {LocalizedStringWarning[]} */
-  const warnings = [];
-
-  const reportIncompleteLanguageForms = incompleteLanguageFormReporter({
-    source,
-    locale,
-    supportedOrdinalityNamesFor: ordinalitySupportProbe(options.pluralData?.ordinal),
-    // Through the session, so the warning budget REFUSES the over-limit warning instead of
-    // retaining it and reporting afterwards: `session.warn` compares before it increments, and the
-    // handler that appends only runs once the budget has admitted it.
-    emit: (warning) => {
-      session.warn(warning, (admitted) => {
-        warnings.push(/** @type {LocalizedStringWarning} */ (admitted));
-        options.onWarning?.(/** @type {LocalizedStringWarning} */ (admitted));
-      });
-    },
-  });
-
-  /** @type {Map<string, Definition>} */
-  let definitions;
-  try {
-    // Both hooks run INSIDE the structural walk, which is where Java runs them, and the placement is
-    // observable three ways: an early key's bad expression beats a later key's structural error, an
-    // early key's warning is delivered before a later key fails, and a warning budget busted by an
-    // early key is what the file fails on even when a later key is also malformed.
-    definitions = parseCatalogSource(input, {
-      source,
-      locale,
-      session,
-      validateExpression: validateExpressionAtLoad,
-      onRootParsed: reportIncompleteLanguageForms,
-    });
-  } catch (error) {
-    rethrowAsParseError(error, source);
-  }
-
-  /** @type {LocalizedStringInput[]} */
-  const strings = [];
-  /** @type {Record<string, readonly string[]>} */
-  const originsByKey = Object.create(null);
-
-  for (const [key, definition] of definitions) {
-    strings.push(freeze({ key, ...projectNode(definition) }));
-    originsByKey[key] = freeze([source]);
-  }
-
-  return freeze({
-    $lokalized: /** @type {const} */ ("parsed-strings-file"),
-    locale,
-    sources: freeze([source]),
-    strings: freeze(strings),
-    originsByKey: freeze(originsByKey),
-    warnings: freeze(warnings),
-  });
+  // A FRESH session per call: this door parses exactly one resource, so every aggregate budget is
+  // that resource's alone. `lokalized/node`'s directory loader threads ONE session across a whole
+  // directory instead, which is what the shared body exists for.
+  return parseStringsWithSession(input, options, new LoadingSession(options.limits));
 }
 
 /**
@@ -331,3 +189,4 @@ export function defineCatalog(inputs) {
     [...definitions].map(([key, definition]) => freeze({ key, ...projectNode(definition, memo) })),
   );
 }
+

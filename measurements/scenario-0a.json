@@ -9,20 +9,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 25,
-      "sourceBytes": 777757,
-      "importMs": 0.337,
-      "constructionMs": 0.1204,
-      "firstRenderMs": 0.3798,
-      "retainedBytes": 67856
+      "sourceBytes": 779126,
+      "importMs": 0.332,
+      "constructionMs": 0.1362,
+      "firstRenderMs": 0.4457,
+      "retainedBytes": 71960
     },
     {
       "label": "core + parsed equivalent",
       "modules": 24,
-      "sourceBytes": 769512,
-      "importMs": 0.573,
-      "constructionMs": 0.3491,
-      "firstRenderMs": 0.2949,
-      "retainedBytes": 366520
+      "sourceBytes": 770881,
+      "importMs": 0.59,
+      "constructionMs": 0.3568,
+      "firstRenderMs": 0.2952,
+      "retainedBytes": 368432
     }
   ],
   "rebaselines": [
@@ -279,6 +279,13 @@
       "growth": [
         "root + raw-text catalog: source graph grew 768011 -> 777757 bytes",
         "core + parsed equivalent: source graph grew 759766 -> 769512 bytes"
+      ]
+    },
+    {
+      "reason": "M8 S2: the shared parse body moved to src/internal/parse-file.js so lokalized/node's directory loader can thread ONE LoadingSession across a directory, as Java does. The root graph grows by that module's header; no new runtime work is reachable from src/index.js.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 777757 -> 779126 bytes",
+        "core + parsed equivalent: source graph grew 769512 -> 770881 bytes"
       ]
     }
   ],

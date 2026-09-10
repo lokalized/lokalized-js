@@ -74,9 +74,11 @@
     "diff:phonetic": "node tools/phonetic-diff/run.mjs",
     "diff:interpolate": "node tools/interpolate-diff/run.mjs",
     "diff:lookup": "node tools/lookup-diff/run.mjs",
-    "diff:likely-subtag": "node tools/likely-subtag-diff/run.mjs"
+    "diff:likely-subtag": "node tools/likely-subtag-diff/run.mjs",
+    "diff:load": "node tools/load-diff/run.mjs"
   },
   "devDependencies": {
+    "@types/node": "22.10.2",
     "typescript": "^5.6.0"
   },
   "repository": {

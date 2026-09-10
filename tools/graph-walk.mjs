@@ -23,7 +23,7 @@ import { dirname, resolve } from "node:path";
  * The `//` rule deliberately refuses to fire after `:`, a quote or a backslash, so a `https://` inside
  * a string literal does not truncate the rest of the line.
  */
-const withoutComments = (text) =>
+export const withoutComments = (text) =>
   text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'\\])\/\/[^\n]*/g, "$1");
 
 /**

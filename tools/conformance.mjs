@@ -35,7 +35,8 @@
  *   node tools/conformance.mjs [--verbose] [--family <prefix>] [--json <path>] [--write]
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -204,7 +205,6 @@ const NO_JS_COUNTERPART = {
  * specific capability each one still needs.
  */
 const OWNER_MILESTONE = {
-  load: "M8",
   // Plan v7 section 3.5 puts bestMatchForAcceptLanguage on LocaleNegotiator with Java's fail-soft
   // contract, returning a LocaleTag -- so the oracle's emitted tag IS the JS return value and this
   // switch needs one new arm, not an adaptation layer. Naming the owner here is the difference
@@ -379,6 +379,12 @@ const ordinalApi = await optionalSubpath("src/data/ordinal.js");
 // `lokalized/parse`. Its entry point takes raw text or bytes, so the `parse` cases below hand it a
 // file rather than a decoded object — that is the whole point of the operation.
 const parseApi = await optionalSubpath("src/parse/index.js");
+
+// `lokalized/node`. The ONLY door to the directory loader the 145 `load` cases replay: Java's
+// `LocalizedStringLoader.loadFromFilesystem` walks a real directory, so no in-memory parse door can
+// stand in for it. The subpath exists as a scaffold today, so this is a module with no exports
+// rather than a missing file, and the arm below reports its absence as M8's work.
+const nodeApi = await optionalSubpath("src/node/index.js");
 
 // `lokalized/negotiate`, also outside the root graph by design, and the only door to
 // `matchFor(List)`: a runner that only imported `src/index.js` could never reach the RFC 4647 range
@@ -1482,6 +1488,164 @@ function parseLimitsFor(loadingOptions) {
     else if (!DISCOVERY_ONLY_LIMITS.has(name)) unsupported(`loading option '${name}' has no parse counterpart`);
   }
   return Object.keys(limits).length ? limits : undefined;
+}
+
+
+/**
+ * `load` cases whose RECORDED ANSWER DEPENDS ON THE ORACLE HOST'S DIRECTORY ENUMERATION ORDER.
+ *
+ * Not a port defect and not unimplemented work. Java's `Files.newDirectoryStream` imposes no order;
+ * on the oracle's macOS/APFS host it is the raw readdir hash order, and the loader is EAGER and
+ * single-pass — it validates each name, checks the duplicate and parses the file as it reaches it —
+ * so in a directory with MORE THAN ONE fault, whichever the walk reaches first decides which file
+ * the message names. No JS runtime can reproduce that order: libuv's scandir sorts, so Node already
+ * diverges from Java before this port makes any choice of its own.
+ *
+ * MEASURED, and the measurement is why these five and no others are here. Sorting ascending by UTF-8
+ * bytes leaves exactly these five red; sorting DESCENDING fixes two of them and breaks a sixth that
+ * ascending passes (`classpath-filenames.duplicate.case-collision-filesystem`), which is the proof
+ * that Java's order is a hash and not any sort — the port cannot match it by choosing a better
+ * comparator. **All five are `informationalIds`. Every one of the 133 `requiredPortableIds` passes**,
+ * so this costs the release nothing; the corpus authors had already partitioned them.
+ *
+ * Each entry is CHECKED, not merely believed: the case is compared anyway, and an entry whose case
+ * would now PASS fails the run as stale. So if a future change makes the port agree — or the corpus
+ * is re-recorded on a host whose order matches — the excuse disappears instead of accumulating.
+ */
+const HOST_ENUMERATION_ORDER_DEPENDENT = new Map([
+  ["classpath-filenames.warn.two-invalid-json-filesystem",
+    "two invalidly-named .json files; the walk refuses at whichever it reaches first (Java: zz.json, sorted: notes.json)"],
+  ["loading-limits.files.manifest-of-257-exceeds-the-default",
+    "257 files against a 256 limit; the message names whichever file is reached 257th (Java: afu, sorted: amh)"],
+  ["loading-limits.files.one-rejects-a-second-file",
+    "{en, fr} at a file limit of 1; the message names whichever is reached second (Java: en, sorted: fr)"],
+  ["manifest-loads.load.file-limit-exceeded-aborts-whole-load",
+    "{en, fr} at a file limit of 1, same shape as above (Java: en, sorted: fr)"],
+  ["manifest-loads.load.two-filename-spellings-of-one-locale-collide",
+    "{en, en.json} collide on one locale; the duplicate message names whichever is reached second (Java: en, sorted: en.json)"],
+]);
+
+/**
+ * Java failure types a DIRECTORY LOAD can record, and the JS classes that count as their counterpart.
+ *
+ * A SEPARATE table from `ERROR_NAME` on purpose. That one is consulted by 34 rows through the
+ * `thrown` channel and 72 through `causeType`, and the standing rule is that a mismatch is never
+ * settled by widening it — a wider mapping costs unrelated cases their discrimination. Java reuses
+ * `LocalizedStringLoadingException` for both a single-resource parse failure and a directory-level
+ * refusal, but the port does not have to reuse one JS class for both, so the two doors get two
+ * tables rather than one table with an exception in a comment.
+ *
+ * CORRECTED when the loader landed, which is why the previous note said the table was unexercised.
+ * It seeded `StringsLoadingError` from the plan's load-stage error family; the corpus says otherwise.
+ * Java raises ONE type for both doors, and the port's `StringsParseError` already composes the exact
+ * `<source>: ` prefixed wording these 145 cases record — a prototype routing through the internal
+ * `parseError` factory scored 140/145 where one raising a bare `Error` scored 114/145 with 20
+ * required reds. So the door reuses the class rather than inventing a second one.
+ */
+const DIRECTORY_ERROR_NAME = {
+  "com.lokalized.LocalizedStringLoadingException": ["StringsParseError"],
+  "java.lang.IllegalArgumentException": ["RangeError", "TypeError"],
+};
+
+/**
+ * A fixture's files, written to a real directory, because `load` replays a real directory walk.
+ *
+ * THE LAYOUT IS NOT ARBITRARY — it reproduces the oracle's, and that is what makes the recorded
+ * diagnostics comparable at all. `VectorOracle.withoutTemporaryPaths` scrubs any path matching
+ * `.../lokalized-vectors-<x>/fixtures/` down to `<fixtures>/`, and the recorded messages show what
+ * survives: a warning source reads `<fixtures>/loader-smoke-incomplete-cardinality/ru`, i.e.
+ * `<fixtures>/` + the fixture id + the file name. So the runner materializes into
+ * `<tmp>/lokalized-vectors-conformance-<n>/fixtures/<fixtureId>/` and applies THE SAME TWO REGEXES,
+ * rather than inventing an inverse transform that would have to be kept in step by hand.
+ *
+ * A consequence worth stating because it is easy to mistake for rigour: this scrub erases the
+ * resolved/unresolved path distinction on BOTH sides. On macOS `/tmp` is a symlink to `/private/tmp`,
+ * so a `toRealPath()` label and a raw label both end in `/fixtures/` and both become `<fixtures>/`.
+ * The corpus therefore CANNOT arbitrate whether the port resolves symlinks — the comparison is blind
+ * to it, and any claim that the port matches Java there rests on something else.
+ *
+ * Bytes come from `parseResourceFor`, the same three-source ladder the `parse` cases use
+ * (byte-exact base64, verbatim raw text, else the declared catalog re-serialized), so a file means
+ * the same thing through both doors. File NAMES are taken verbatim: the corpus carries `readme.txt`,
+ * `.de`, `de.Json`, `日本語.json` and `not a tag`, and every one of them is an input under test.
+ */
+const TEMPORARY_PATH_PATTERNS = [
+  /file:\/[^\s'"]*\/lokalized-vectors-[^/\s'"]*\/fixtures\//g,
+  /\/[^\s'"]*\/lokalized-vectors-[^/\s'"]*\/fixtures\//g,
+];
+/** The oracle's own scrub, applied to the port's diagnostics so the two are comparable. */
+const withoutTemporaryPaths = (message) =>
+  message == null
+    ? null
+    : TEMPORARY_PATH_PATTERNS.reduce((text, pattern) => text.replace(pattern, "<fixtures>/"), message);
+
+let fixtureRunRoot = null;
+let materializedCount = 0;
+const materializedDirectories = new Map();
+
+function materializeFixtureDirectory(fixture, fixtureId) {
+  const cached = materializedDirectories.get(fixtureId);
+  if (cached) return cached;
+
+  if (fixtureRunRoot === null) {
+    // `mkdtempSync` supplies the unique segment; the `lokalized-vectors-` prefix is what makes the
+    // oracle's scrub regex match. A run-unique root also means two cases cannot see each other's
+    // files, which matters because 76 of these fixtures are shared with other operations.
+    fixtureRunRoot = join(mkdtempSync(join(tmpdir(), "lokalized-vectors-conformance-")), "fixtures");
+    mkdirSync(fixtureRunRoot, { recursive: true });
+  }
+
+  const directory = join(fixtureRunRoot, fixtureId);
+  mkdirSync(directory, { recursive: true });
+  const names = new Set([
+    ...Object.keys(fixture.rawFilesBase64 ?? {}),
+    ...Object.keys(fixture.rawFiles ?? {}),
+    ...Object.keys(declaredFilesFor(fixtureId, fixture)),
+  ]);
+  for (const name of names) writeFileSync(join(directory, name), parseResourceFor(fixture, fixtureId, name));
+  materializedCount += names.size;
+  materializedDirectories.set(fixtureId, directory);
+  return directory;
+}
+
+/**
+ * The loading limits a DIRECTORY load takes — deliberately NOT `parseLimitsFor`.
+ *
+ * `parseLimitsFor` drops `maximumDiscoveryEntries` on the stated ground that "a single-resource
+ * parse never performs discovery", which is true of the parse door and false of this one. Reusing it
+ * here would silently drop the very knob seven `requiredPortableIds` cases exist to exercise, and
+ * three of those seven expect SUCCESS — so they would pass VACUOUSLY, reporting green while the
+ * budget was never applied. That is the precise shape of a defect this project has already shipped
+ * once (a passing case running a different configuration than Java), which is why the two doors get
+ * two tables instead of one shared one with a comment explaining the exception.
+ *
+ * `maximumDiscoveryEntries` rides on the Node loader's OWN options rather than inside `limits`,
+ * per the 2026-09-10 decision (planning/M8-STATUS.md, D2): plan 4.5's `StringsLoadingLimits` is the
+ * portable parser's seven-field contract and says in words that discovery controls are not part of
+ * it, while a filesystem directory walk is exactly the Node concern that sentence describes.
+ */
+const DIRECTORY_LIMITS = new Set([
+  "maximumInputBytes",
+  "maximumReaderCharacters",
+  "maximumJsonNestingDepth",
+  "maximumTotalInputBytes",
+  "maximumLocalizedStringsFiles",
+  "maximumTranslationNodes",
+  "maximumWarnings",
+]);
+const DIRECTORY_OPTIONS = new Set(["maximumDiscoveryEntries"]);
+
+function directoryLoadOptionsFor(loadingOptions) {
+  const limits = {};
+  const options = {};
+  for (const [name, value] of Object.entries(loadingOptions ?? {})) {
+    if (DIRECTORY_LIMITS.has(name)) limits[name] = value;
+    else if (DIRECTORY_OPTIONS.has(name)) options[name] = value;
+    else if (name !== "exhaustiveClasspathSearch")
+      unsupported(`loading option '${name}' has no directory-load counterpart`);
+  }
+  if (Object.keys(limits).length) options.limits = limits;
+  return options;
 }
 
 /**
@@ -2658,6 +2822,115 @@ function runCase(testCase, fixture) {
   sentinelThrows.length = 0;
 
   switch (operation) {
+    case "load": {
+      // Java's `LocalizedStringLoader.loadFromFilesystem(Path, handler, LoadingOptions)`, replayed
+      // over a REAL directory. There is no in-memory stand-in: enumeration order, the discovery
+      // budget, filename-to-locale identity and the duplicate rules are all properties of a walk.
+      //
+      // The arm exists BEFORE the loader does, deliberately. A `case "load"` that compares nothing
+      // scores 145 new passes at exit 0 — measured — because the passing-ID ratchet fails only on
+      // ids LEAVING `passedIds` and the exit expression has no `unsupported` term. Writing the
+      // comparison first means the block converts from "unimplemented" to "measurably wrong", which
+      // is the only state progress is visible from. The field-coverage gate holds it to that: every
+      // one of the six recorded fields is read below, and deleting any of those reads fails the run.
+      // A HARD failure, not an attributed one, and the history is worth keeping. While the loader
+      // was still unwritten this routed through `operationNotImplemented("load")` so the 145 rows
+      // kept naming M8 as their owner — and the first version DIDN'T, which took the cases off the
+      // `default` branch, made `load: "M8"` unreachable and had all 145 reporting work nobody owed.
+      // The OWNER_MILESTONE staleness gate caught that. Now that the loader ships, that same gate
+      // required the entry's DELETION, and the door's absence stops being unfinished work: it is a
+      // broken build, and says so rather than reporting 145 plausible attributed lines.
+      if (!nodeApi?.readStringsFromDirectory)
+        throw new AuthoringError(
+          "lokalized/node does not export readStringsFromDirectory. M8's directory loader has " +
+          "shipped, so its absence is a build problem, not unimplemented work.",
+        );
+
+      const wantedLoad = expected.load;
+      const javaType = wantedLoad.failureType;
+      if (javaType && !(javaType in DIRECTORY_ERROR_NAME))
+        unsupported(`no JS counterpart declared for ${javaType}`);
+      const wantedNames = javaType ? DIRECTORY_ERROR_NAME[javaType] : null;
+
+      const directory = materializeFixtureDirectory(fixture, testCase.fixture);
+      const options = directoryLoadOptionsFor(fixture.loadingOptions);
+
+      // Sources and messages carry absolute paths on both sides; `withoutTemporaryPaths` is the
+      // ORACLE'S OWN scrub, applied here so the two spellings meet in the same place.
+      const scrubWarning = (warning) =>
+        projectWarning({ ...warning, source: withoutTemporaryPaths(warning.source), message: withoutTemporaryPaths(warning.message) });
+
+      // COLLECTED THROUGH THE CALLBACK, not read off the return value, because a refused load still
+      // records the warnings it had already delivered. Java streams them: `session.warn` compares
+      // the budget BEFORE incrementing and the handler runs only once admitted, so the warning that
+      // busts the budget never arrives while every earlier one already has, and none is rolled back.
+      // Reading `loaded.warnings` alone reports an empty list for exactly those cases.
+      const delivered = [];
+      let actual;
+      try {
+        const loaded = nodeApi.readStringsFromDirectory(directory, {
+          ...options,
+          onWarning: (warning) => delivered.push(warning),
+          // Java's loader has `Ordinality` on its classpath unconditionally and warns about
+          // incomplete ordinal form sets, exactly as the `parse` arm supplies it for the same reason.
+          ...(ordinalApi?.ordinalData ? { pluralData: { ordinal: ordinalApi.ordinalData } } : {}),
+        });
+        const tags = Object.keys(loaded.catalogs).sort();
+        actual = {
+          failed: false,
+          failureType: null,
+          failureMessage: null,
+          // Java's observation is built from a TreeMap of locale to a Set of LocalizedString, so
+          // both the tag list and each key list are sorted, and neither order is an observable.
+          // Warning ORDER is, and it is compared in sequence below.
+          locales: tags,
+          keysByLocale: Object.fromEntries(
+            tags.map((tag) => [tag, loaded.catalogs[tag].strings.map((string) => string.key).sort()]),
+          ),
+          warnings: loaded.warnings.map(scrubWarning),
+        };
+      } catch (error) {
+        if (error instanceof Unsupported || error instanceof NoCounterpart) throw error;
+        const name = error instanceof Error ? error.name : String(error);
+        actual = {
+          failed: true,
+          failureType: wantedNames?.includes(name) ? wantedNames.join(" or ") : name,
+          failureMessage: withoutTemporaryPaths(messageOf(error)),
+          // A refused load records neither locales nor keys — but it DOES record every warning it
+          // had already delivered, which is why these come from the callback rather than from a
+          // return value that no longer exists.
+          locales: [],
+          keysByLocale: {},
+          warnings: delivered.map(scrubWarning),
+        };
+      }
+
+      const wanted = {
+        failed: wantedLoad.failed,
+        failureType: wantedNames ? wantedNames.join(" or ") : null,
+        failureMessage: wantedLoad.failureMessage,
+        locales: [...wantedLoad.locales].sort(),
+        keysByLocale: Object.fromEntries(
+          Object.entries(wantedLoad.keysByLocale).map(([tag, keys]) => [tag, [...keys].sort()]),
+        ),
+        warnings: wantedLoad.warnings.map(expectedWarning),
+      };
+
+      const agrees = jcs(actual) === jcs(wanted);
+      const orderReason = HOST_ENUMERATION_ORDER_DEPENDENT.get(testCase.id);
+      if (orderReason) {
+        // Compared FIRST and only then excused, so the declaration cannot quietly outlive its reason.
+        if (agrees)
+          throw new AuthoringError(
+            `${testCase.id} is declared host-enumeration-order dependent but now MATCHES Java. ` +
+            `Delete the entry; an excuse that has stopped excusing anything is the thing this ` +
+            `project's known-gap lists keep rotting into.`,
+          );
+        noCounterpart(`the recorded answer depends on the oracle host's directory enumeration order: ${orderReason}`);
+      }
+      return agrees ? { ok: true } : { ok: false, actual, wanted };
+    }
+
     case "getResult": {
       const strings = stringsFor(fixture);
       // AFTER `stringsFor`, deliberately. 31 of the 34 `IllegalArgumentException` rows here are
