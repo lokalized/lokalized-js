@@ -8,21 +8,21 @@
   "node": [
     {
       "label": "root + raw-text catalog",
-      "modules": 28,
-      "sourceBytes": 788580,
-      "importMs": 0.294,
-      "constructionMs": 0.1241,
-      "firstRenderMs": 0.3824,
-      "retainedBytes": 67856
+      "modules": 29,
+      "sourceBytes": 803490,
+      "importMs": 0.319,
+      "constructionMs": 0.1302,
+      "firstRenderMs": 0.3545,
+      "retainedBytes": 69288
     },
     {
       "label": "core + parsed equivalent",
-      "modules": 27,
-      "sourceBytes": 780335,
-      "importMs": 0.597,
-      "constructionMs": 0.3711,
-      "firstRenderMs": 0.3116,
-      "retainedBytes": 369240
+      "modules": 28,
+      "sourceBytes": 795245,
+      "importMs": 0.759,
+      "constructionMs": 0.4442,
+      "firstRenderMs": 0.379,
+      "retainedBytes": 383800
     }
   ],
   "rebaselines": [
@@ -295,6 +295,15 @@
         "root + raw-text catalog: module count grew 25 -> 28",
         "core + parsed equivalent: source graph grew 770881 -> 780335 bytes",
         "core + parsed equivalent: module count grew 24 -> 27"
+      ]
+    },
+    {
+      "reason": "M8 S10: +src/internal/runtime-metadata.js in the root and core graphs — this build's producer/IANA/corpus identity. Plan 6.4 requires an SSR stamp's producer/data/mode fields to come from the RENDERING instance, never from the SSR helper's own constants, which is only possible if the renderer is the party holding them. Seven strings, no table; gated against package.json and the two lokalized-spec locks by test/runtime-metadata.test.js.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 788580 -> 803490 bytes",
+        "root + raw-text catalog: module count grew 28 -> 29",
+        "core + parsed equivalent: source graph grew 780335 -> 795245 bytes",
+        "core + parsed equivalent: module count grew 27 -> 28"
       ]
     }
   ],

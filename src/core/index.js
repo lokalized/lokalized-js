@@ -15,6 +15,7 @@
  * that holds the key. Collapsing them is the single most tempting simplification here and it is
  * wrong.
  */
+import { configurationError } from "../internal/configuration-error.js";
 import { optionsFromLoadedStrings } from "../internal/loaded-input.js";
 import {
   DEFAULT_BIDI_ISOLATION,
@@ -73,6 +74,10 @@ import { PLURAL_DATA_RUNTIME, UnsupportedLocaleError } from "../internal/plural.
  *   catalogs".
  * @property {undefined} [runtimeLimits] plan 4.6: v1 exposes no runtime-limit customization, and a
  *   non-undefined value is refused at construction rather than silently ignored.
+ * @property {CatalogIdentity | null} [catalogIdentity] plan 3.4:635's build-produced identity for a
+ *   DIRECT construction. Core validates its shape, not its truth, and reports it from
+ *   `getCatalogIdentity()`; it does not make the instance stampable, because plan 6.4 requires a
+ *   verified `LoadedStrings` and a shape-valid identity is exactly what that rule exists to refuse.
  * @property {(warning: LocalizedStringWarning) => void} [onWarning] observer for the incomplete
  *   language-form warnings this construction raises, called as each is admitted by the warning
  *   budget. A throwing handler aborts construction.
@@ -137,6 +142,30 @@ import { PLURAL_DATA_RUNTIME, UnsupportedLocaleError } from "../internal/plural.
  *   fallbackPolicy?: BuiltinFallbackPolicy | FallbackPolicy | null,
  *   onFailure?: FailureHandler | null,
  *   onFallback?: FallbackObserver | null }} TranslationCallOptions
+ */
+
+/**
+ * The three loading types core itself names, transcribed from plan 2.2's declaration block (:465-496).
+ *
+ * THEY ARE DECLARED HERE AND NOT IMPORTED FROM `lokalized/load` ON PURPOSE. Core must not import that
+ * subpath — it is a ~690 KB delivery graph and the root module-count ratchet exists to keep it out —
+ * and plan 3.4:713 states the reason a shared nominal type would be wrong anyway: the record "is
+ * STRUCTURAL rather than branded, so a `Strings` value created by one installed copy or direct-browser
+ * entry remains usable by `lokalized/ssr` from another copy". Two structurally identical declarations
+ * in two subpaths is the intended shape, not duplication to be tidied away.
+ *
+ * @typedef {Readonly<{ catalogVersion: string, catalogFingerprint: string }>} CatalogIdentity
+ * @typedef {Readonly<{ kind: "lookup", lookupLocale: string }>
+ *   | Readonly<{ kind: "entire-manifest" }>} StringsLoadCoverage
+ * @typedef {Readonly<{ fallbackLocale: string, supportedLocales: readonly string[],
+ *   tiebreakers: Readonly<Record<string, readonly string[]>> }>} LocaleConfiguration
+ * @typedef {Readonly<{ source: "verified-manifest-v1", producerImplementation: "lokalized-js",
+ *   producerVersion: string, manifestLocaleConfiguration: LocaleConfiguration,
+ *   catalogIdentity: CatalogIdentity, cldrVersion: string, dataFingerprint: string,
+ *   ianaRegistryDate: string, ianaDataFingerprint: string, behavioralVectorsVersion: string,
+ *   localeDataMode: "pinned", cardinalityMode: "exact", coverage: StringsLoadCoverage,
+ *   plannedLocales: readonly string[], coveredLocales: readonly string[],
+ *   complete: boolean }>} StringsLoadVerification
  */
 
 const freeze = Object.freeze;
@@ -568,10 +597,38 @@ export function createStrings(options) {
   // construction path, so locale validation, duplicate rejection, model validation and expression
   // compilation stay in exactly one place. Everything the loader result has to prove is proved
   // before this line; nothing below it knows which branch it came from.
-  if (/** @type {any} */ (options).loaded !== undefined)
-    options = /** @type {CreateStringsOptions} */ (
-      /** @type {unknown} */ (optionsFromLoadedStrings(/** @type {any} */ (options)))
-    );
+  //
+  // The one thing that must survive the normalization is the PROOF: `getLoadVerification()` reports
+  // what was established here, and plan 3.4:711 makes that record the channel an SSR helper from a
+  // different installed copy reads the renderer's identity through. `null` for a direct instance is
+  // the load-bearing half — it is what makes direct construction ineligible for a stamp.
+  /** @type {Readonly<StringsLoadVerification> | null} */
+  let loadVerification = null;
+  if (/** @type {any} */ (options).loaded !== undefined) {
+    const normalized = optionsFromLoadedStrings(/** @type {any} */ (options));
+    options = /** @type {CreateStringsOptions} */ (/** @type {unknown} */ (normalized.options));
+    loadVerification = /** @type {any} */ (normalized.verification);
+  }
+
+  // Plan 3.4:635 — "`getCatalogIdentity()` returns null unless the caller supplies a build-produced
+  // `catalogIdentity`; core validates its SHAPE, NOT ITS TRUTH." A build pipeline that knows what it
+  // published can hand core the identity for application diagnostics, and nothing here can tell a
+  // real one from an invented one. That is precisely why plan 6.4 makes SSR key on
+  // `getLoadVerification()` instead: a shape-valid identity is the adversarial input, not the proof.
+  /** @type {Readonly<CatalogIdentity> | null} */
+  let suppliedIdentity = null;
+  const identityOption = /** @type {any} */ (options).catalogIdentity;
+  if (identityOption !== undefined && identityOption !== null) {
+    if (typeof identityOption !== "object"
+      || typeof identityOption.catalogVersion !== "string"
+      || typeof identityOption.catalogFingerprint !== "string")
+      throw configurationError(
+        "`catalogIdentity` must carry a string catalogVersion and catalogFingerprint");
+    suppliedIdentity = freeze({
+      catalogVersion: identityOption.catalogVersion,
+      catalogFingerprint: identityOption.catalogFingerprint,
+    });
+  }
 
   // The tag the CALLER wrote, normalized but not yet resolved against the loaded catalogs. Java
   // keeps the same two values apart: the constructor parameter, and `this.fallbackLocale`, which is
@@ -1633,9 +1690,20 @@ export function createStrings(options) {
         supportedLocales: freeze([...supported].sort(compareTags)),
         tiebreakers: tiebreakers ?? EMPTY_TIEBREAKERS,
       }),
-    getCatalogIdentity: () => null,
-    isCatalogComplete: () => true,
-    getLoadVerification: () => null,
+    /**
+     * Plan 3.3's three loading seams, and all three answer for the DIRECT branch too.
+     *
+     * `isCatalogComplete()` is `true` for a directly constructed instance and that is not a
+     * placeholder: a caller who handed core its catalogs handed it all of them, so there is nothing
+     * partial about the set. Completeness is a statement about a LOAD, and a direct instance's load
+     * is the argument list. The identity and the verification record are `null` for the same reason
+     * in reverse — neither exists unless a verified manifest loader produced one, and plan 6.4 makes
+     * that absence the thing `createSsrStamp` refuses on.
+     */
+    getCatalogIdentity: () =>
+      (loadVerification === null ? suppliedIdentity : loadVerification.catalogIdentity),
+    isCatalogComplete: () => (loadVerification === null ? true : loadVerification.complete),
+    getLoadVerification: () => loadVerification,
     getWarnings: () => freeze([...warnings]),
     /**
      * The narrow, side-effect-free observation of core's automatic direct-locale path.

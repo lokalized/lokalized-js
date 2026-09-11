@@ -152,7 +152,15 @@ test("the root graph carries no optional plural data", () => {
   // carry the pinned `cldrVersion`/`dataFingerprint`, and threading them in from a caller would
   // let the caller defeat the check it exists to make. 469 bytes of two strings; the 806-class
   // tables this gate was written for are still absent, which is the property it is really pinning.
-  assert.equal(reached.size, 28, "the root module graph changed size");
+  //
+  // 28 -> 29 at M8 S10, and the one module is `src/internal/runtime-metadata.js` (~3.4 KB, of which
+  // the literals are under 200 bytes). Same trade as `provenance.js` one paragraph up, for the same
+  // structural reason and a sharper one: plan 6.4 requires an SSR stamp's producer/data/mode fields
+  // to come from the RENDERING instance "never from the SSR module's own constants", which only
+  // works if the renderer is the party that holds the identity. It carries no table — seven strings
+  // — and `test/runtime-metadata.test.js` pins every one of them to `package.json` or a
+  // `lokalized-spec` lock, so it cannot drift into being a second source of truth.
+  assert.equal(reached.size, 29, "the root module graph changed size");
 
   // The exact set of generated tables the root pulls in. `scenario:0a`'s byte ratchet is a PROXY for
   // this invariant, and a weak one: it is re-recorded whenever hand-written code legitimately grows,

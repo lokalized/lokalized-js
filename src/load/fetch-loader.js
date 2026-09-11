@@ -2,36 +2,36 @@
 /**
  * `loadStrings` and `loadEntireManifest` — plan section 6.2's Fetch loaders.
  *
- * THE ORDERING RULES ARE THE HARD PART, and they are all of the form "not completion order". Plan
- * 6.2: failures are "ordered by fetch-plan order, not completion order", and warnings by "fetch-plan
- * order and then depth-first declaration order, independent of request completion timing". With eight
- * requests in flight, a loader that appends results as they arrive produces output that depends on
- * the network — reproducible on a fast local stub, different in production, and different again on a
- * retry. So every result is written into a SLOT indexed by plan position and the output is assembled
- * from the slots, never from an arrival log.
+ * WHAT IS LEFT HERE AFTER S11a: the FETCH TRANSPORT and the two entry points. Every rule that is not
+ * about HTTP — plan order, the concurrency cap, the partial-failure policy, abort, digest-before-parse
+ * and the result shape — moved to `./run-plan.js`, which `lokalized/node`'s file loaders drive with a
+ * different transport. Those rules are a specification neither door states on its own, and a second
+ * copy of them is the drift this project keeps finding.
  *
- * WHAT A DETERMINISTIC STUB CANNOT TEST, said here because it is what this slice's tests are for: an
- * injected fetch that resolves in order makes the paragraph above unfalsifiable. `test/fetch-loader.
+ * WHAT A DETERMINISTIC STUB CANNOT TEST, said here because it is what this door's tests are for: an
+ * injected fetch that resolves in order makes the ordering rules unfalsifiable. `test/fetch-loader.
  * test.js` therefore injects a fetch that MISBEHAVES on purpose — resolves out of order, streams past
  * the limit, aborts mid-flight, and returns a body whose digest is wrong. This project already shipped
  * one instrument that passed because its stub was too well behaved.
  *
  * DIGEST BEFORE PARSE, and the scope is exact: SHA-256 covers "the bytes exposed by the response body,
- * after HTTP content coding but before UTF-8 decoding or BOM removal". Verifying after decoding would
- * hash a different representation than the publisher did, and the comparison would fail for every file
- * carrying a BOM while looking like a corruption alarm.
+ * after HTTP content coding but before UTF-8 decoding or BOM removal". `SubtleCrypto.digest` is not
+ * streaming, so the plan's own accommodation applies here: count chunks against the cap, retain one
+ * bounded body, then digest it. The Node door hashes incrementally instead, which is why the digest
+ * belongs to the transport rather than to the runner.
  */
 import { configurationError } from "../internal/configuration-error.js";
-import { resolveLimits } from "../internal/catalog.js";
-import { parseStrings } from "../parse/index.js";
+import { normalizeTag } from "../internal/locale.js";
 import { fetchSet } from "./planning.js";
 import { validateStringsManifest } from "./manifest.js";
+import { hex, readBoundedStream, runPlan, wholeManifestPlan } from "./run-plan.js";
 
 /** @typedef {import("./index.js").StringsManifestV1} StringsManifestV1 */
 /** @typedef {import("./index.js").FetchEntry} FetchEntry */
 
-const MAXIMUM_ACTIVE_READS = 8;
 const DEFAULT_REQUEST = Object.freeze({ mode: "cors", credentials: "same-origin" });
+
+export { StringsLoadingError } from "./run-plan.js";
 
 /** Plan 6.2: the loader fails CLOSED when WebCrypto is absent, before any catalog I/O. */
 function digestUnavailable() {
@@ -46,211 +46,78 @@ function digestUnavailable() {
 }
 
 /**
- * The declared failure for a load that got past planning.
+ * A response body as an async iterable, cancelled if the consumer walks away.
  *
- * Its `failures` are in FETCH-PLAN order. A consumer diagnosing a broken deployment reads them
- * against the manifest, and completion order would reshuffle that list on every run.
- */
-export class StringsLoadingError extends Error {
-  /** @param {string} message @param {readonly any[]} failures */
-  constructor(message, failures) {
-    super(message);
-    this.name = "StringsLoadingError";
-    /** @type {string} */
-    this.code = "STRINGS_LOADING";
-    /** @type {readonly any[]} */
-    this.failures = Object.freeze([...failures]);
-  }
-}
-
-/** @param {ArrayBuffer} buffer */
-const hex = (buffer) =>
-  [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-
-/**
- * Read a response body with the byte boundaries enforced WHILE STREAMING.
+ * The `finally` is what keeps the never-ending-body test honest: when `readBoundedStream` throws on
+ * the limit, the `for await` calls this generator's `return()`, which reaches the cancel. A plain
+ * loop would leave the reader open.
  *
- * The cap is checked as chunks arrive rather than after `arrayBuffer()`, because a body that never
- * ends must fail on the limit instead of exhausting memory first — and an injected fetch in the tests
- * does exactly that. `SubtleCrypto.digest` is not streaming, so the plan's own accommodation applies:
- * count chunks against the cap, retain one bounded body, then digest it.
- *
- * @param {Response} response @param {FetchEntry} entry @param {{maximumInputBytes: number}} limits
+ * @param {Response} response
  */
-// eslint-disable-next-line
-async function readBounded(response, entry, limits) {
-  const body = response.body;
-  if (!body) {
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.length > limits.maximumInputBytes)
-      throw { stage: "limit", cause: new RangeError(`${entry.locale}: body exceeds the maximum of ${limits.maximumInputBytes} bytes`) };
-    return bytes;
-  }
-
-  const reader = body.getReader();
-  /** @type {Uint8Array[]} */
-  const chunks = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.length;
-    if (total > limits.maximumInputBytes) {
-      await reader.cancel().catch(() => {});
-      throw { stage: "limit", cause: new RangeError(`${entry.locale}: body exceeds the maximum of ${limits.maximumInputBytes} bytes`) };
-    }
-    // Checked as it grows, not at the end: an over-long body is refused at the byte that crosses the
-    // declared size rather than after the whole thing has been accepted.
-    if (entry.expectedDecodedBytes !== undefined && total > entry.expectedDecodedBytes)
-      throw { stage: "limit", cause: new RangeError(`${entry.locale}: body is longer than the declared ${entry.expectedDecodedBytes} bytes`) };
-    chunks.push(value);
-  }
-  if (entry.expectedDecodedBytes !== undefined && total !== entry.expectedDecodedBytes)
-    throw { stage: "limit", cause: new RangeError(`${entry.locale}: body is ${total} bytes, not the declared ${entry.expectedDecodedBytes}`) };
-
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-  return bytes;
-}
-
-/** One planned file, start to finish. Throws `{stage, cause}` so the caller can build a LoadFailure. */
-/**
- * @param {FetchEntry} entry @param {any} options
- * @param {any} limits @param {SubtleCrypto} subtle
- */
-async function loadOne(entry, options, limits, subtle) {
-  let response;
+async function* responseChunks(response) {
+  const reader = /** @type {ReadableStream<Uint8Array>} */ (response.body).getReader();
   try {
-    response = await options.fetchImpl(entry.url, {
-      ...DEFAULT_REQUEST,
-      ...(options.request ?? {}),
-      ...(options.signal ? { signal: options.signal } : {}),
-    });
-  } catch (cause) {
-    throw { stage: "fetch", cause };
-  }
-  if (!response.ok) throw { stage: "fetch", cause: new Error(`${entry.url} responded ${response.status}`) };
-
-  const bytes = await readBounded(response, entry, limits);
-
-  // BEFORE decoding. The publisher hashed this same representation.
-  const actual = hex(await subtle.digest("SHA-256", bytes));
-  if (actual !== entry.sha256)
-    throw { stage: "digest", cause: new Error(`${entry.locale}: digest ${actual} does not match the manifest's ${entry.sha256}`) };
-
-  try {
-    return parseStrings(bytes, { locale: entry.locale, source: entry.url, limits });
-  } catch (cause) {
-    // The parser owns the decode/parse/validate distinction; a fatal UTF-8 failure surfaces from it
-    // as a parse error too, so the stage is reported as `parse` rather than guessed apart.
-    throw { stage: "parse", cause };
-  }
-}
-
-/** @param {StringsManifestV1} manifest @param {readonly FetchEntry[]} plan @param {any} options */
-async function runPlan(manifest, plan, options) {
-  const validated = validateStringsManifest(manifest, options);
-  const limits = resolveLimits(options.limits);
-
-  const subtle = globalThis.crypto?.subtle;
-  // PREFLIGHTED BEFORE ANY CATALOG I/O, so a runtime without WebCrypto never issues a request whose
-  // body it could not have checked.
-  if (!subtle || typeof subtle.digest !== "function") throw digestUnavailable();
-  if (options.signal?.aborted) throw options.signal.reason ?? new Error("aborted");
-
-  const fetchImpl = options.fetch ?? globalThis.fetch;
-  if (typeof fetchImpl !== "function")
-    throw configurationError("No fetch implementation is available; pass one as `options.fetch`");
-
-  /** Slots, NOT an arrival log — see the module header. */
-  const results = new Array(plan.length).fill(null);
-  let next = 0;
-  const worker = async () => {
     for (;;) {
-      const index = next++;
-      if (index >= plan.length) return;
-      const entry = /** @type {FetchEntry} */ (plan[index]);
-      try {
-        results[index] = { ok: true, entry, parsed: await loadOne(entry, { ...options, fetchImpl }, limits, subtle) };
-      } catch (thrown) {
-        const failure = /** @type {{ stage?: string, cause?: unknown }} */ (thrown ?? {});
-        if (options.signal?.aborted) throw options.signal.reason ?? new Error("aborted");
-        results[index] = {
-          ok: false,
-          entry,
-          failure: Object.freeze({ locale: entry.locale, url: entry.url, stage: failure?.stage ?? "fetch", cause: failure?.cause ?? failure }),
-        };
-      }
+      const { done, value } = await reader.read();
+      if (done) return;
+      yield /** @type {Uint8Array} */ (value);
     }
-  };
-
-  // Queued work retains fetch-plan order because each worker takes the next unclaimed index.
-  await Promise.all(Array.from({ length: Math.min(MAXIMUM_ACTIVE_READS, plan.length) }, worker));
-  // Abort is never converted into partial success: it cancels outstanding work and rejects.
-  if (options.signal?.aborted) throw options.signal.reason ?? new Error("aborted");
-
-  const failures = results.filter((row) => row && !row.ok).map((row) => row.failure);
-  const allowPartial = options.partialFailure === "allow-partial";
-  const fallbackRow = results.find((row) => row && row.entry.locale === validated.fallbackLocale);
-  const fallbackLoaded = fallbackRow ? fallbackRow.ok : false;
-
-  if (failures.length > 0 && (!allowPartial || !fallbackLoaded))
-    throw new StringsLoadingError(
-      `${failures.length} catalog file(s) failed to load` +
-      (allowPartial && !fallbackLoaded ? "; the resolved fallback-locale file is among them, so a partial result is not offered" : ""),
-      failures,
-    );
-
-  /** @type {Record<string, unknown>} */
-  const catalogs = Object.create(null);
-  /** @type {unknown[]} */
-  const warnings = [];
-  for (const row of results) {
-    if (!row || !row.ok) continue;
-    catalogs[row.entry.locale] = row.parsed;
-    // Plan-order, then the parser's own depth-first declaration order within a file.
-    warnings.push(...row.parsed.warnings);
+  } finally {
+    await reader.cancel().catch(() => {});
   }
-
-  return Object.freeze({
-    catalogs: Object.freeze(catalogs),
-    tiebreakers: validated.tiebreakers,
-    fallbackLocale: validated.fallbackLocale,
-    catalogIdentity: Object.freeze({
-      catalogVersion: validated.catalogVersion,
-      catalogFingerprint: validated.catalogFingerprint,
-    }),
-    cldrVersion: validated.cldrVersion,
-    dataFingerprint: validated.dataFingerprint,
-    loadingLimits: Object.freeze({ ...limits }),
-    requestedFiles: Object.freeze([...plan]),
-    failures: Object.freeze(failures),
-    warnings: Object.freeze(warnings),
-    complete: failures.length === 0,
-  });
 }
+
+/** @type {import("./run-plan.js").LoadTransport} */
+const FETCH_TRANSPORT = {
+  defaultStage: "fetch",
+  preflight(options) {
+    const subtle = globalThis.crypto?.subtle;
+    if (!subtle || typeof subtle.digest !== "function") throw digestUnavailable();
+    if (typeof (options.fetch ?? globalThis.fetch) !== "function")
+      throw configurationError("No fetch implementation is available; pass one as `options.fetch`");
+  },
+  async read(entry, options, limits) {
+    const fetchImpl = options.fetch ?? globalThis.fetch;
+    let response;
+    try {
+      response = await fetchImpl(entry.url, {
+        ...DEFAULT_REQUEST,
+        ...(options.request ?? {}),
+        ...(options.signal ? { signal: options.signal } : {}),
+      });
+    } catch (cause) {
+      throw { stage: "fetch", cause };
+    }
+    if (!response.ok) throw { stage: "fetch", cause: new Error(`${entry.url} responded ${response.status}`) };
+
+    const bytes = response.body
+      ? await readBoundedStream(responseChunks(response), entry, limits)
+      : await readBoundedStream(
+          (async function* () { yield new Uint8Array(await response.arrayBuffer()); })(), entry, limits);
+
+    return { bytes, digest: hex(await globalThis.crypto.subtle.digest("SHA-256", bytes)) };
+  },
+};
 
 /**
  * @param {StringsManifestV1} manifest @param {string} lookupLocale @param {any} [options]
  */
 export async function loadStrings(manifest, lookupLocale, options = {}) {
   const plan = fetchSet(manifest, lookupLocale, options);
-  const loaded = await runPlan(manifest, plan, options);
-  return Object.freeze({ ...loaded, coverage: Object.freeze({ kind: "lookup", lookupLocale }) });
+  const loaded = await runPlan(manifest, plan, options, FETCH_TRANSPORT);
+  // NORMALIZED, per plan 6.1's "both functions use and record the normalized serialized value" and
+  // plan 2.2's own comment on the field ("Normalized planning input"). It is the tag plan 6.4 then
+  // compares a rendering context against, so recording the caller's spelling would make coverage
+  // depend on how the load was typed.
+  return Object.freeze({
+    ...loaded,
+    coverage: Object.freeze({ kind: "lookup", lookupLocale: normalizeTag(lookupLocale) }),
+  });
 }
 
 /** @param {StringsManifestV1} manifest @param {any} [options] */
 export async function loadEntireManifest(manifest, options = {}) {
   const validated = validateStringsManifest(manifest, options);
-  const base = new URL(validated.baseUrl);
-  const plan = Object.freeze(Object.entries(validated.files).map(([locale, file]) =>
-    Object.freeze({
-      locale,
-      url: new URL(file.url, base).href,
-      sha256: file.sha256,
-      ...(file.decodedBytes === undefined ? {} : { expectedDecodedBytes: file.decodedBytes }),
-    })));
-  const loaded = await runPlan(manifest, plan, options);
+  const loaded = await runPlan(manifest, wholeManifestPlan(validated), options, FETCH_TRANSPORT);
   return Object.freeze({ ...loaded, coverage: Object.freeze({ kind: "entire-manifest" }) });
 }

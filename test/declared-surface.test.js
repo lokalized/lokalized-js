@@ -60,30 +60,30 @@ const OWED = /** @type {Record<string, { owner: string, why: string }>} */ ({
   // milestone is reopened for them or a later one adopts them is the maintainer's call. What this
   // table does is stop them being invisible, which they were until this test existed.
   "core:CardinalRangeData": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
-  "core:CatalogIdentity": { owner: "UNASSIGNED", why: "declared by lokalized/load since M8 S5, but core may not re-export it from there" },
   "core:DataProvenance": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
   "core:DirectLocaleContext": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
   "core:LanguageRange": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
   "core:OrdinalData": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
   "core:SourceDataProvenance": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
   "core:Strings": { owner: "UNASSIGNED", why: "the central instance type; core is closed and ships it unnamed" },
-  "core:StringsLoadCoverage": { owner: "UNASSIGNED", why: "declared by lokalized/load since M8 S5; core's own copy is separate" },
-  "core:StringsLoadVerification": { owner: "M8", why: "the loaded-branch verification type (slice S9)" },
   "parse:mergeParsedStringsFiles": { owner: "UNASSIGNED", why: "allowlisted with ZERO implementation anywhere in src/" },
   "negotiate:LanguageRange": { owner: "UNASSIGNED", why: "re-export of core's type; that milestone is closed" },
   "negotiate:LocaleMatcher": { owner: "UNASSIGNED", why: "negotiate type; that milestone is closed" },
   "negotiate:LocaleNegotiator": { owner: "M9", why: "plan 3.5 puts the negotiator in M9" },
   // --- M8's own remaining to-build list ---------------------------------------------------------
-  // The six `load` TYPES landed in S5 and `chain`/`fetchSet` in S7; their entries are deleted, which
-  // is the record of it. Both functions were deliberately KEPT here through S5 rather than declared
-  // as empty signatures, because a signature with no implementation satisfies this gate while
-  // delivering nothing — and the gate would then have gone quiet on the very thing it was watching.
-  "ssr:createSsrStamp": { owner: "M8", why: "SSR stamp (slice S10)" },
-  "ssr:validateSsrStamp": { owner: "M8", why: "SSR stamp (slice S10)" },
+  // The six `load` TYPES landed in S5, `chain`/`fetchSet` in S7, and the two SSR functions in S10;
+  // their entries are deleted, which is the record of it. Both planning functions were deliberately
+  // KEPT here through S5 rather than declared as empty signatures, because a signature with no
+  // implementation satisfies this gate while delivering nothing — and the gate would then have gone
+  // quiet on the very thing it was watching.
+  //
+  // **THREE `core` ENTRIES WENT WITH THEM IN S10, and that is a report rather than a reassignment.**
+  // `StringsLoadVerification` was M8's to build. `CatalogIdentity` and `StringsLoadCoverage` were
+  // recorded UNASSIGNED against a closed milestone and are now declared in `src/core/index.js`
+  // because the verification record's own type needs them — so they are delivered, incidentally, by
+  // a milestone that never adopted them. The thirteen found on 2026-09-10 are therefore ten.
   "node:DirectoryManifestOptions": { owner: "M8", why: "the manifest-mediated Node loader (slice S11)" },
   "node:LoadStringsFromDirectoryOptions": { owner: "M8", why: "the manifest-mediated Node loader (slice S11)" },
-  "node:LoadStringsFromFilesOptions": { owner: "M8", why: "the file loaders (slice S11)" },
-  "node:readStringsManifest": { owner: "M8", why: "the manifest reader (slice S11)" },
 });
 
 /** Names delivered somewhere an owner may live — runtime exports and exported declarations alike. */

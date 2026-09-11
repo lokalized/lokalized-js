@@ -116,6 +116,14 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     // is the raw door, and it returns parsed catalogs keyed by locale exactly as Java returns
     // `Map<Locale, Set<LocalizedString>>`.
     ["node", "readStringsFromDirectory", "directory loader"],
+    // Plan 6.2 names both functions and gives them signatures in its own type block; they are the
+    // "file/whole-manifest loaders" category in one phrase. They are the SAME loader as
+    // `lokalized/load`'s `loadStrings`/`loadEntireManifest` driven by a different transport — plan
+    // order, the concurrency cap, the partial-failure policy, abort and digest-before-parse all come
+    // from `src/load/run-plan.js` — so what these two names add is where the bytes come from and how
+    // they are hashed, not a second loader.
+    ["node", "loadStringsFromFiles", "file/whole-manifest loaders"],
+    ["node", "loadEntireManifestFromFiles", "file/whole-manifest loaders"],
     // Plan 6.1 names this function in words — "`computeCatalogIdentity` applies the JCS rules from
     // `5.1` to exactly {formatVersion, catalogVersion, resolvedFallbackLocale, localeToSha256,
     // tiebreakers}" — and gives it a signature in the same block as `validateStringsManifest` and

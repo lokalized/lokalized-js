@@ -31,6 +31,10 @@ function loadedStrings(overrides = {}) {
     dataFingerprint: pinned.dataFingerprint,
     loadingLimits: {},
     coverage: { kind: "lookup", lookupLocale: "fr" },
+    // THE MANIFEST'S UNIVERSE, which is what the plan is recomputed against. Every fixture below that
+    // moves `requestedFiles` has to move this too, and that is the point: a plan is only checkable
+    // against the locale set it was planned over.
+    manifestLocaleConfiguration: { fallbackLocale: "en", supportedLocales: ["en", "fr"], tiebreakers: {} },
     requestedFiles: [{ locale: "fr" }, { locale: "en" }],
     failures: [],
     warnings: [],
@@ -75,23 +79,62 @@ test("REJECTS a covered set carrying a tag the plan never requested", () => {
 });
 
 test("REJECTS a complete:true plan whose file never arrived", () => {
-  // Mode 2. `de` was planned, no catalog for it exists, and the result still claims completeness.
+  // Mode 2. `de` was genuinely planned — it is the lookup, and the manifest publishes it — no catalog
+  // for it exists, and the result still claims completeness. The plan has to be one this core would
+  // itself compute, or mode 1 or 3 would fire first and this assertion would be about a different
+  // rejection than the one it names: the `zh-123` shape, inside a fixture.
+  const partial = {
+    catalogs: { en },
+    coverage: { kind: "lookup", lookupLocale: "de" },
+    manifestLocaleConfiguration: {
+      fallbackLocale: "en", supportedLocales: ["de", "en", "fr"], tiebreakers: {},
+    },
+    requestedFiles: [{ locale: "de" }, { locale: "en" }],
+  };
   assert.throws(
-    () => createStrings({
-      loaded: loadedStrings({ requestedFiles: [{ locale: "fr" }, { locale: "en" }, { locale: "de" }] }),
-      locale: "fr",
-    }),
+    () => createStrings({ loaded: loadedStrings(partial), locale: "en" }),
     /claims complete: true, but no catalog for it arrived/);
 
   // The control: the SAME shortfall with `complete: false` is a legitimate partial load and must be
   // accepted, which is what makes the assertion above about the CLAIM rather than about the gap.
+  assert.doesNotThrow(
+    () => createStrings({ loaded: loadedStrings({ ...partial, complete: false }), locale: "en" }));
+});
+
+test("REJECTS completeness claimed over recorded failures", () => {
+  // The other half of plan 3.4:730 — "every planned tag must be covered AND no load failure may
+  // remain". Separately falsifiable from the covered-tag half above: this result covers every tag it
+  // planned, so an implementation that checked only coverage accepts it.
+  assert.throws(
+    () => createStrings({
+      loaded: loadedStrings({ failures: [{ locale: "de", url: "x", stage: "fetch", cause: null }] }),
+      locale: "fr",
+    }),
+    /claims complete: true while recording 1 load failure/);
   assert.doesNotThrow(() => createStrings({
     loaded: loadedStrings({
-      requestedFiles: [{ locale: "fr" }, { locale: "en" }, { locale: "de" }],
+      failures: [{ locale: "de", url: "x", stage: "fetch", cause: null }],
       complete: false,
     }),
     locale: "fr",
   }));
+});
+
+test("REJECTS a result with no manifest configuration to recompute the plan against", () => {
+  assert.throws(
+    () => createStrings({ loaded: loadedStrings({ manifestLocaleConfiguration: undefined }), locale: "fr" }),
+    /cannot be recomputed, only believed/);
+});
+
+test("REJECTS a result whose two fallback records disagree", () => {
+  assert.throws(
+    () => createStrings({
+      loaded: loadedStrings({
+        manifestLocaleConfiguration: { fallbackLocale: "fr", supportedLocales: ["en", "fr"], tiebreakers: {} },
+      }),
+      locale: "fr",
+    }),
+    /resolves fallback 'en' while its manifest configuration resolves 'fr'/);
 });
 
 test("REJECTS a catalog filed under a name it does not claim", () => {
@@ -103,7 +146,7 @@ test("REJECTS a catalog filed under a name it does not claim", () => {
 test("REJECTS `loaded` alongside any direct input it would duplicate", () => {
   // Plan 3.4 lists them as alternatives. Merging would make the instance depend on which source
   // construction read first.
-  for (const conflicting of ["strings", "fallbackLocale", "tiebreakers", "limits"])
+  for (const conflicting of ["strings", "fallbackLocale", "tiebreakers", "limits", "catalogIdentity"])
     assert.throws(
       () => createStrings({ loaded: loadedStrings(), locale: "fr", [conflicting]: {} }),
       /already carries/, `${conflicting} must not be accepted alongside loaded`);
@@ -129,10 +172,16 @@ test("the loader's own limits are reused, not the defaults", () => {
   }));
 });
 
-test("entire-manifest coverage does not order-check, and says so", () => {
-  // The order of a whole-manifest plan is the manifest's own iteration order and is not recomputable
-  // from a LoadedStrings, so mode 1 is deliberately not applied. Pinned so that a later reader does
-  // not mistake a green whole-manifest load for an order check.
+test("entire-manifest coverage IS order-checked, in normalized-tag order", () => {
+  // **THIS REVERSES WHAT S9 RECORDED HERE, and the reversal is the finding.** S9 left whole-manifest
+  // plans unchecked on the grounds that their order is the manifest's own iteration order and is not
+  // recomputable. That was true of what S9 had: a `LoadedStrings` without its manifest configuration.
+  // Plan 3.4:727 names the order outright — "normalized-tag order for entire-manifest coverage" — and
+  // with the configuration preserved it is recomputable, so mode 1 applies to both kinds.
+  //
+  // It was also not merely a missing check. `loadEntireManifest` planned in `Object.entries` order,
+  // so a manifest whose JSON keys are not sorted produced a result this core now recomputes
+  // differently — the loader and the loaded branch disagreed, and nothing compared them.
   assert.doesNotThrow(() => createStrings({
     loaded: loadedStrings({
       coverage: { kind: "entire-manifest" },
@@ -140,4 +189,21 @@ test("entire-manifest coverage does not order-check, and says so", () => {
     }),
     locale: "fr",
   }));
+  assert.throws(
+    () => createStrings({
+      loaded: loadedStrings({
+        coverage: { kind: "entire-manifest" },
+        requestedFiles: [{ locale: "fr" }, { locale: "en" }],
+      }),
+      locale: "fr",
+    }),
+    /is not the plan this core computes for the whole manifest/);
+});
+
+test("an unknown coverage kind is REFUSED rather than treated as unchecked", () => {
+  // A third `kind` must not fall through the two recomputations into acceptance — which is exactly
+  // what a two-arm `if` would do, and what the S9 shape did for `entire-manifest`.
+  assert.throws(
+    () => createStrings({ loaded: loadedStrings({ coverage: { kind: "everything" } }), locale: "fr" }),
+    /must be 'lookup' or 'entire-manifest'/);
 });

@@ -36,11 +36,21 @@ function manifest(tags, { fallbackLocale = "en", decoded = false } = {}) {
   return /** @type {any} */ (draft);
 }
 
-/** A response whose body streams the given chunks, or never ends. */
+/**
+ * A response whose body streams the given chunks, or never ends.
+ *
+ * `cancelled` is observable on purpose. A body that never ends must be CANCELLED when the loader
+ * walks away from it, and a no-op `cancel` makes that unfalsifiable: the limit refusal looks
+ * identical whether the reader was released or left open forever. Measured gap — the assertion below
+ * was added when S11a moved this read loop behind an async generator, where the release depends on a
+ * `finally` that nothing had ever checked.
+ */
 function streamed(chunks, { neverEnds = false } = {}) {
   let index = 0;
+  const state = { cancelled: 0 };
   return {
     ok: true, status: 200,
+    cancelState: state,
     body: {
       getReader: () => ({
         read: async () => {
@@ -48,7 +58,7 @@ function streamed(chunks, { neverEnds = false } = {}) {
           if (index >= chunks.length) return { done: true, value: undefined };
           return { done: false, value: chunks[index++] };
         },
-        cancel: async () => {},
+        cancel: async () => { ++state.cancelled; },
       }),
     },
   };
@@ -108,13 +118,17 @@ test("failures are in FETCH-PLAN order even when responses arrive backwards", as
 test("a body that never ends fails on the byte LIMIT rather than exhausting memory", async () => {
   const m = manifest(["en"]);
   const chunk = new Uint8Array(64 * 1024).fill(0x20);
-  const fetchImpl = injectedFetch({ respond: () => streamed([chunk], { neverEnds: true }) });
+  let response = null;
+  const fetchImpl = injectedFetch({ respond: () => (response = streamed([chunk], { neverEnds: true })) });
   const error = await loadStrings(m, "en", {
     fetch: fetchImpl.impl,
     limits: { maximumInputBytes: 256 * 1024 },
   }).then(() => null, (e) => e);
   assert.ok(error instanceof StringsLoadingError);
   assert.equal(error.failures[0].stage, "limit");
+  // AND THE READER IS RELEASED. Without this the test passes over a loader that abandoned an
+  // infinite stream still open, which on a real connection is a socket that is never returned.
+  assert.equal(/** @type {any} */ (response).cancelState.cancelled, 1);
 });
 
 test("a wrong digest fails at DIGEST, before the body is parsed", async () => {

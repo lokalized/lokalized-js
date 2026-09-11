@@ -25,44 +25,50 @@
     },
     {
       "reason": "M8 S9: the loaded branch reaches core and therefore every published subpath that re-exports it."
+    },
+    {
+      "reason": "M8 S10: the SSR stamp ships (lokalized/ssr 1 -> 2 modules), and core gains src/internal/runtime-metadata.js — the producer/IANA/corpus identity a stamp must take from the RENDERER, which only works if the renderer holds it. Root/core +1 module; the load subpath grows only by fetch-loader emitting manifestLocaleConfiguration."
+    },
+    {
+      "reason": "M8 S11a: lokalized/node gains the manifest-mediated file loaders, so it now reaches the whole lokalized/load graph (manifest validation, planning, identity, SHA-256, JCS) — 27 -> 37 modules. lokalized/load gains src/load/run-plan.js, the plan runner both doors share: plan order, the concurrency cap, the partial-failure policy, abort and digest-before-parse live in ONE place and the door supplies only a transport."
     }
   ],
   "subpaths": {
     "lokalized": {
-      "modules": 28,
-      "bytes": 788580
+      "modules": 29,
+      "bytes": 803490
     },
     "lokalized/core": {
-      "modules": 27,
-      "bytes": 780335
+      "modules": 28,
+      "bytes": 795245
     },
     "lokalized/parse": {
       "modules": 26,
       "bytes": 635450
     },
     "lokalized/load": {
-      "modules": 35,
-      "bytes": 692884
+      "modules": 36,
+      "bytes": 698586
     },
     "lokalized/ssr": {
-      "modules": 1,
-      "bytes": 247
+      "modules": 2,
+      "bytes": 20279
     },
     "lokalized/negotiate": {
       "modules": 15,
       "bytes": 391336
     },
     "lokalized/node": {
-      "modules": 27,
-      "bytes": 640633
+      "modules": 37,
+      "bytes": 710439
     },
     "lokalized/data/ordinal": {
-      "modules": 30,
-      "bytes": 808075
+      "modules": 31,
+      "bytes": 822985
     },
     "lokalized/data/ranges": {
-      "modules": 30,
-      "bytes": 812944
+      "modules": 31,
+      "bytes": 827854
     }
   }
 }
