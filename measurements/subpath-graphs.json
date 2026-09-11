@@ -19,6 +19,9 @@
     },
     {
       "reason": "M8 S8: loadStrings and loadEntireManifest. The load graph gains src/parse and its catalog machinery, because a fetched body is parsed by the SAME bounded parser every other door uses rather than a second one."
+    },
+    {
+      "reason": "M8 S9a: the runtime CLDR/data compatibility check plan :1893 requires before catalog I/O. lokalized/load gains src/data/provenance.js — ONE module — which slice S6b had wrongly declared unreachable."
     }
   ],
   "subpaths": {
@@ -35,8 +38,8 @@
       "bytes": 635450
     },
     "lokalized/load": {
-      "modules": 34,
-      "bytes": 691144
+      "modules": 35,
+      "bytes": 692884
     },
     "lokalized/ssr": {
       "modules": 1,

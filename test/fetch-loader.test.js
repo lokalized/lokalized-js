@@ -15,6 +15,7 @@ import { test } from "node:test";
 
 import { computeCatalogIdentity } from "../src/load/index.js";
 import { catalogIdentityInputFor } from "../src/load/identity.js";
+import { decode as pinnedProvenance } from "../src/data/provenance.js";
 import { loadEntireManifest, loadStrings, StringsLoadingError } from "../src/load/fetch-loader.js";
 import { sha256Hex } from "../src/internal/sha256.js";
 
@@ -28,7 +29,7 @@ function manifest(tags, { fallbackLocale = "en", decoded = false } = {}) {
   }));
   const draft = {
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
-    cldrVersion: "46", dataFingerprint: "1".repeat(64),
+    cldrVersion: pinnedProvenance().cldrVersion, dataFingerprint: pinnedProvenance().dataFingerprint,
     fallbackLocale, baseUrl: "https://cdn.example/v1/", files, tiebreakers: {},
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;

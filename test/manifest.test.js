@@ -10,6 +10,7 @@ import { test } from "node:test";
 
 import { computeCatalogIdentity } from "../src/load/index.js";
 import { catalogIdentityInputFor } from "../src/load/identity.js";
+import { decode as pinnedProvenance } from "../src/data/provenance.js";
 import {
   localeConfigurationForManifest,
   parseStringsManifest,
@@ -22,8 +23,11 @@ function manifest(overrides = {}) {
     formatVersion: 1,
     catalogVersion: "v1",
     catalogFingerprint: "0".repeat(64),
-    cldrVersion: "46",
-    dataFingerprint: "1".repeat(64),
+    // FROM THE PINNED DATA, not literals: plan :1893 makes a manifest built against different
+    // CLDR data a ConfigurationError, so a hard-coded version turns every fixture red the day
+    // the pinned data moves — and hides the check it was meant to pass through.
+    cldrVersion: pinnedProvenance().cldrVersion,
+    dataFingerprint: pinnedProvenance().dataFingerprint,
     fallbackLocale: "en",
     baseUrl: "https://cdn.example/v1/",
     files: {
@@ -146,4 +150,22 @@ test("a syntactically broken manifest fails as a parse error, not a configuratio
   // reach different catch blocks in a consumer, so conflating them is observable.
   assert.throws(() => parseStringsManifest("{ not json"), (error) => error.name === "StringsParseError");
   assert.throws(() => validateStringsManifest({ formatVersion: 2 }), (error) => error.name === "ConfigurationError");
+});
+
+test("a manifest published against different pinned CLDR data is refused", () => {
+  // Plan :1893 — parsing, validation, planning and loading all "check runtime cldrVersion/
+  // dataFingerprint compatibility before catalog I/O". A catalog published against CLDR 47 renders
+  // differently through a CLDR 48 core while looking entirely well-formed, so matching file plans are
+  // not evidence of compatibility.
+  const other = manifest();
+  other.cldrVersion = "1.0";
+  assert.throws(() => validateStringsManifest(other), /this build carries CLDR/);
+
+  const otherFingerprint = manifest();
+  otherFingerprint.dataFingerprint = "e".repeat(64);
+  assert.throws(() => validateStringsManifest(otherFingerprint), /this build carries CLDR/);
+
+  // The control: the SAME manifest at the build's own pinned values validates, so the assertions
+  // above are about the mismatch rather than about the fields being read at all.
+  assert.doesNotThrow(() => validateStringsManifest(manifest()));
 });

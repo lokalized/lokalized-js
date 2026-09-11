@@ -27,6 +27,7 @@
  * validator that narrowed here would make a manifest un-shareable between them.
  */
 import { resolveLimits } from "../internal/catalog.js";
+import { decode as decodePinnedProvenance } from "../data/provenance.js";
 import { configurationError } from "../internal/configuration-error.js";
 import {
   normalizeCatalogText,
@@ -81,14 +82,22 @@ function requireManifestTag(tag, where) {
 }
 
 /**
- * Runtime CLDR/data compatibility — DECLARED AND NOT IMPLEMENTED, deliberately.
+ * Runtime CLDR/data compatibility — plan :1893, "before catalog I/O".
  *
- * Plan :1893 requires this check before catalog I/O, and it cannot be written honestly yet: the port
- * exposes its pinned `cldrVersion`/`dataFingerprint` only on the OPTIONAL `lokalized/data/ordinal`
- * module, which `lokalized/load` must not import (it is outside the root graph by design and the
- * subpath ratchet enforces it), and core publishes no provenance of its own. Guessing a value to
- * compare against would produce a check that always passes, which is worse than none: it would read
- * as coverage. Recorded as owed by the slice that lands core's `DataProvenance`.
+ * **THIS WAS DECLARED OWED IN SLICE S6b ON A FALSE PREMISE, and the correction is recorded here
+ * rather than quietly made.** That note said the port "exposes its pinned cldrVersion/dataFingerprint
+ * only on the OPTIONAL lokalized/data/ordinal module" and that core "publishes no provenance of its
+ * own". The first half was right about REACHABILITY and wrong about existence: `src/data/provenance.js`
+ * carries both constants, generated from `cldr-data-lock`, and was simply imported by nothing outside
+ * the optional data modules. Importing it costs ONE module in the load graph.
+ *
+ * The lesson is the one this project keeps relearning one subsystem at a time: "there is no X" is the
+ * easiest claim to get wrong, because a search for the wrong name returns nothing just as convincingly
+ * as an absence does. An owed entry resting on an absence deserves the same scepticism as a gate.
+ *
+ * A manifest built against different pinned data fails EVEN IF its file plan happens to match, which
+ * is the whole point — plural rules and locale identity come from that data, so a catalog published
+ * against CLDR 47 renders differently through a CLDR 48 core while looking entirely well-formed.
  *
  * @param {Record<string, unknown>} manifest
  */
@@ -98,6 +107,16 @@ function assertRuntimeCompatible(manifest) {
     throw configurationError(`A manifest's cldrVersion must be a CLDR version; received ${JSON.stringify(manifest.cldrVersion)}`);
   if (typeof manifest.dataFingerprint !== "string" || !HEX_64.test(manifest.dataFingerprint))
     throw configurationError("A manifest's dataFingerprint must be a full lowercase hexadecimal SHA-256");
+
+  const pinned = decodePinnedProvenance();
+  if (manifest.cldrVersion !== pinned.cldrVersion || manifest.dataFingerprint !== pinned.dataFingerprint)
+    throw configurationError(
+      `This manifest was published against CLDR ${manifest.cldrVersion} / ` +
+      `${String(manifest.dataFingerprint).slice(0, 12)}…, and this build carries CLDR ` +
+      `${pinned.cldrVersion} / ${pinned.dataFingerprint.slice(0, 12)}…. Plural rules and locale ` +
+      `identity come from that data, so the catalogs would render differently even though the file ` +
+      `plan matches.`,
+    );
 }
 
 /**

@@ -20,6 +20,7 @@ import { test } from "node:test";
 
 import { chain, computeCatalogIdentity, fetchSet } from "../src/load/index.js";
 import { catalogIdentityInputFor } from "../src/load/identity.js";
+import { decode as pinnedProvenance } from "../src/data/provenance.js";
 
 /** @param {Record<string, {url: string, sha256: string, decodedBytes?: number}>} files */
 function manifest(files, { tiebreakers = {}, fallbackLocale = "en", baseUrl = "https://cdn.example/v1/" } = {}) {
@@ -27,8 +28,11 @@ function manifest(files, { tiebreakers = {}, fallbackLocale = "en", baseUrl = "h
     formatVersion: 1,
     catalogVersion: "v1",
     catalogFingerprint: "0".repeat(64),
-    cldrVersion: "46",
-    dataFingerprint: "1".repeat(64),
+    // FROM THE PINNED DATA, not literals: plan :1893 makes a manifest built against different
+    // CLDR data a ConfigurationError, so a hard-coded version turns every fixture red the day
+    // the pinned data moves — and hides the check it was meant to pass through.
+    cldrVersion: pinnedProvenance().cldrVersion,
+    dataFingerprint: pinnedProvenance().dataFingerprint,
     fallbackLocale,
     baseUrl,
     files,
