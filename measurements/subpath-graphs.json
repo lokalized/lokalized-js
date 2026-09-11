@@ -31,6 +31,12 @@
     },
     {
       "reason": "M8 S11a: lokalized/node gains the manifest-mediated file loaders, so it now reaches the whole lokalized/load graph (manifest validation, planning, identity, SHA-256, JCS) — 27 -> 37 modules. lokalized/load gains src/load/run-plan.js, the plan runner both doors share: plan order, the concurrency cap, the partial-failure policy, abort and digest-before-parse live in ONE place and the door supplies only a transport."
+    },
+    {
+      "reason": "M8 S11b: the directory walk EXTRACTED to src/node/discovery.js so both Node doors drive one enumeration, plus createStringsManifestFromDirectory. lokalized/node 37 -> 39 modules — discovery.js and manifest-directory.js — and no other subpath moves, because the generator reuses the load graph's identity, SHA-256 and manifest validation rather than duplicating them. (Reason text reconstructed 2026-09-11 after a review session reverted this file by accident; the measured numbers are re-derived from the same source.)"
+    },
+    {
+      "reason": "M8 S11b review fixes: normalizedTiebreakers plus the per-file manifest-tag check in the generator, and manifest.js refusing a Map where every read is Object.entries."
     }
   ],
   "subpaths": {
@@ -48,7 +54,7 @@
     },
     "lokalized/load": {
       "modules": 36,
-      "bytes": 698586
+      "bytes": 699140
     },
     "lokalized/ssr": {
       "modules": 2,
@@ -59,8 +65,8 @@
       "bytes": 391336
     },
     "lokalized/node": {
-      "modules": 37,
-      "bytes": 710439
+      "modules": 39,
+      "bytes": 734780
     },
     "lokalized/data/ordinal": {
       "modules": 31,

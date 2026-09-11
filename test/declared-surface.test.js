@@ -82,8 +82,6 @@ const OWED = /** @type {Record<string, { owner: string, why: string }>} */ ({
   // recorded UNASSIGNED against a closed milestone and are now declared in `src/core/index.js`
   // because the verification record's own type needs them — so they are delivered, incidentally, by
   // a milestone that never adopted them. The thirteen found on 2026-09-10 are therefore ten.
-  "node:DirectoryManifestOptions": { owner: "M8", why: "the manifest-mediated Node loader (slice S11)" },
-  "node:LoadStringsFromDirectoryOptions": { owner: "M8", why: "the manifest-mediated Node loader (slice S11)" },
 });
 
 /** Names delivered somewhere an owner may live — runtime exports and exported declarations alike. */

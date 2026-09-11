@@ -34,6 +34,7 @@ import { resolveLimits } from "../internal/catalog.js";
 import { fetchSet } from "../load/planning.js";
 import { parseStringsManifest, validateStringsManifest } from "../load/manifest.js";
 import { readBoundedStream, runPlan, wholeManifestPlan } from "../load/run-plan.js";
+import { createStringsManifestFromDirectory, directoryPath } from "./manifest-directory.js";
 
 /** @typedef {import("../load/index.js").StringsManifestV1} StringsManifestV1 */
 /** @typedef {import("../load/index.js").FetchEntry} FetchEntry */
@@ -171,4 +172,55 @@ export async function loadEntireManifestFromFiles(manifest, options = {}) {
   const validated = validateStringsManifest(manifest, options);
   const loaded = await runPlan(manifest, wholeManifestPlan(validated), options, FILE_TRANSPORT);
   return Object.freeze({ ...loaded, coverage: Object.freeze({ kind: "entire-manifest" }) });
+}
+
+/**
+ * Plan 6.2's `LoadStringsFromDirectoryOptions` — the generator's options without a publication URL,
+ * intersected with the file loaders' without their own `limits`.
+ *
+ * @typedef {object} LoadStringsFromDirectoryOptions
+ * @property {string} catalogVersion
+ * @property {string} fallbackLocale
+ * @property {Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]>} [tiebreakers]
+ * @property {import("../internal/catalog.js").ParseLimits} [limits]
+ * @property {number} [maximumDiscoveryEntries]
+ * @property {(url: string, signal?: AbortSignal) => Promise<Uint8Array | AsyncIterable<Uint8Array>>} [readFile]
+ * @property {AbortSignal} [signal]
+ * @property {"all-or-nothing" | "allow-partial"} [partialFailure]
+ */
+
+/**
+ * Plan 6.2's `loadStringsFromDirectory`: "generates an internal manifest against the directory's
+ * `file:` URL and whole-loads it".
+ *
+ * **IT HAS NO PUBLICATION URL OPTION, and one supplied is REFUSED rather than dropped.** Plan 6.2
+ * states the absence at the type level only; refusing at runtime follows S11a's decision about
+ * `fetch` and `request` for the same reason — a caller who passed a publication base believes the
+ * manifest they get back is publishable, and this one is internal to a local load.
+ *
+ * **EVERY FILE IS READ TWICE, DELIBERATELY.** The generation half hashes the bytes on disk; the load
+ * half reads them again and verifies that digest. Caching the first read into the second would halve
+ * the I/O and make the digest a TAUTOLOGY — it would be checking bytes against a hash taken from
+ * those same bytes, in the same call. Re-reading is what makes the check real: it catches a catalog
+ * that changes between the scan and the load, which is exactly the race a directory-based publish
+ * runs. `test/node-directory-manifest.test.js` pins it with a file that changes between the two
+ * halves.
+ *
+ * An injected `readFile` therefore serves the LOAD half only. The generation half is a directory
+ * scan — it stats and enumerates entries, which no per-URL reader can express — so routing it
+ * through the hook would mean an injected reader saw some files and not others.
+ *
+ * @param {string | URL} directory
+ * @param {LoadStringsFromDirectoryOptions} options
+ */
+export async function loadStringsFromDirectory(directory, options) {
+  if (/** @type {any} */ (options)?.publicationBaseUrl !== undefined)
+    throw configurationError(
+      "`publicationBaseUrl` is not an option of loadStringsFromDirectory; it generates an internal " +
+      "manifest against the directory's own `file:` URL. Use createStringsManifestFromDirectory to " +
+      "produce a manifest for publication");
+
+  const path = directoryPath(directory);
+  const manifest = await createStringsManifestFromDirectory(path, options);
+  return loadEntireManifestFromFiles(manifest, options);
 }

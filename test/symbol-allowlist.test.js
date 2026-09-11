@@ -124,6 +124,12 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     // they are hashed, not a second loader.
     ["node", "loadStringsFromFiles", "file/whole-manifest loaders"],
     ["node", "loadEntireManifestFromFiles", "file/whole-manifest loaders"],
+    // Plan 6.2 names both in its own type block and in the prose after it; the allowlist's two
+    // remaining `node` categories are these two functions in one phrase each. `loadStringsFromDirectory`
+    // is NOT a second spelling of `readStringsFromDirectory` — it generates an internal manifest and
+    // whole-loads it, so it answers plan 6.2's design where the other answers Java's loader.
+    ["node", "createStringsManifestFromDirectory", "directory-to-manifest generator"],
+    ["node", "loadStringsFromDirectory", "file/whole-manifest loaders"],
     // Plan 6.1 names this function in words — "`computeCatalogIdentity` applies the JCS rules from
     // `5.1` to exactly {formatVersion, catalogVersion, resolvedFallbackLocale, localeToSha256,
     // tiebreakers}" — and gives it a signature in the same block as `validateStringsManifest` and

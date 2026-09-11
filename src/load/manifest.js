@@ -50,7 +50,13 @@ const DEFAULT_SOURCE = "<manifest>";
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 const isPlainRecord = (value) =>
-  value !== null && typeof value === "object" && !Array.isArray(value);
+  value !== null && typeof value === "object" && !Array.isArray(value)
+  // A `Map` IS REFUSED, not quietly emptied. It passes the two tests above, and every read below
+  // goes through `Object.entries`, which answers `[]` for one — so a manifest carrying a `Map` of
+  // tiebreakers validated cleanly and lost every order it declared, with a fingerprint identical to
+  // declaring none. Found by review during S11b; no JSON can produce a `Map`, so the only way to
+  // reach it is programmatically, which is exactly the caller who would never see the loss.
+  && !(value instanceof Map) && !(value instanceof Set);
 
 /**
  * A manifest file tag: well-formed AND known to the pinned CLDR data.
@@ -62,7 +68,7 @@ const isPlainRecord = (value) =>
  *
  * @param {unknown} tag @param {string} where
  */
-function requireManifestTag(tag, where) {
+export function requireManifestTag(tag, where) {
   if (typeof tag !== "string" || tag.length === 0)
     throw configurationError(`${where} must be a non-empty locale tag`);
   // The normalization is inside the guard, not after it. `jdkLocaleWellFormed` and

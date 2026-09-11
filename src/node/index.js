@@ -23,11 +23,15 @@
  * invisible to a consumer and to `test/declared-surface.test.js` alike.
  *
  * @typedef {import("./file-loader.js").LoadStringsFromFilesOptions} LoadStringsFromFilesOptions
+ * @typedef {import("./file-loader.js").LoadStringsFromDirectoryOptions} LoadStringsFromDirectoryOptions
+ * @typedef {import("./manifest-directory.js").DirectoryManifestOptions} DirectoryManifestOptions
  */
 
 export { readStringsFromDirectory } from "./directory.js";
 export {
   loadEntireManifestFromFiles,
+  loadStringsFromDirectory,
   loadStringsFromFiles,
   readStringsManifest,
 } from "./file-loader.js";
+export { createStringsManifestFromDirectory } from "./manifest-directory.js";
