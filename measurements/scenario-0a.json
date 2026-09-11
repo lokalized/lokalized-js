@@ -9,20 +9,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 29,
-      "sourceBytes": 803490,
-      "importMs": 0.319,
-      "constructionMs": 0.1302,
-      "firstRenderMs": 0.3545,
-      "retainedBytes": 69288
+      "sourceBytes": 809651,
+      "importMs": 0.265,
+      "constructionMs": 0.1183,
+      "firstRenderMs": 0.346,
+      "retainedBytes": 69376
     },
     {
       "label": "core + parsed equivalent",
       "modules": 28,
-      "sourceBytes": 795245,
-      "importMs": 0.759,
-      "constructionMs": 0.4442,
-      "firstRenderMs": 0.379,
-      "retainedBytes": 383800
+      "sourceBytes": 801406,
+      "importMs": 0.657,
+      "constructionMs": 0.3764,
+      "firstRenderMs": 0.3423,
+      "retainedBytes": 396496
     }
   ],
   "rebaselines": [
@@ -304,6 +304,13 @@
         "root + raw-text catalog: module count grew 28 -> 29",
         "core + parsed equivalent: source graph grew 780335 -> 795245 bytes",
         "core + parsed equivalent: module count grew 27 -> 28"
+      ]
+    },
+    {
+      "reason": "M8 S9-owed: the applicable-configuration split and the per-use lookup-coverage check land in core. +6,161 B of source, no new module — the diagnostic reads the manifest configuration the loaded branch already retained, and the walk is unchanged.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 803490 -> 809651 bytes",
+        "core + parsed equivalent: source graph grew 795245 -> 801406 bytes"
       ]
     }
   ],

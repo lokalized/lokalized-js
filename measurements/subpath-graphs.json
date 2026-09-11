@@ -37,16 +37,19 @@
     },
     {
       "reason": "M8 S11b review fixes: normalizedTiebreakers plus the per-file manifest-tag check in the generator, and manifest.js refusing a Map where every read is Object.entries."
+    },
+    {
+      "reason": "M8 S9-owed: core gains the applicable-configuration split (the selection channel reads the full manifest, the resolution channel the loaded catalogs) and the per-use lookup-coverage check. No new module — source only."
     }
   ],
   "subpaths": {
     "lokalized": {
       "modules": 29,
-      "bytes": 803490
+      "bytes": 809651
     },
     "lokalized/core": {
       "modules": 28,
-      "bytes": 795245
+      "bytes": 801406
     },
     "lokalized/parse": {
       "modules": 26,
@@ -70,11 +73,11 @@
     },
     "lokalized/data/ordinal": {
       "modules": 31,
-      "bytes": 822985
+      "bytes": 829146
     },
     "lokalized/data/ranges": {
       "modules": 31,
-      "bytes": 827854
+      "bytes": 834015
     }
   }
 }

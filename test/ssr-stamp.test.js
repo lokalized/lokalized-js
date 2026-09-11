@@ -110,9 +110,14 @@ test("clause 39: an INCOMPLETE load is refused, and the partial load itself is l
     requestedFiles: [{ locale: "de" }, { locale: "en" }],
     complete: false,
   });
-  const instance = createStrings({ loaded: partial, locale: "en" });
+  // **RENDERED THROUGH THE COVERED TAG, and the first draft of this fixture was not.** It requested
+  // `en` on an instance planned from `de`, which plan 3.4:619-621 forbids — "the effective lookup
+  // tag must match the coverage record on every use" — and nothing enforced it until that rule
+  // landed. `de` falls through to the `en` catalog, so the assertion is unchanged in substance: the
+  // partial load builds and renders, and still cannot be stamped.
+  const instance = createStrings({ loaded: partial, locale: "de" });
   assert.equal(instance.get("Hi"), "hello");
-  assert.throws(() => createSsrStamp(instance, { kind: "locale", locale: "en" }), /incomplete/);
+  assert.throws(() => createSsrStamp(instance, { kind: "locale", locale: "de" }), /incomplete/);
 });
 
 test("clause 39: each cross-check against the instance is separately falsifiable", () => {

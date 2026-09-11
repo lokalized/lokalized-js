@@ -925,6 +925,71 @@ export function createStrings(options) {
     tiebreakers,
   );
 
+  // THE APPLICABLE CONFIGURATION — the selection channel's world, which for a manifest-backed
+  // instance is WIDER than the catalogs it holds.
+  //
+  // **SELECTION AND RESOLUTION ARE SEPARATE CHANNELS, and this is that invariant one layer up.**
+  // Plan 3.4:597 runs the direct-locale match "over the applicable full locale configuration", and
+  // :834-837 defines it: "`consideredLocales` is the applicable configuration: the full manifest for
+  // a manifest-backed instance or the operational loaded set for direct construction. Automatic
+  // direct-locale diagnostics use that same rule, INCLUDING declared manifest locales whose catalog
+  // failed under an explicitly partial whole-manifest load." Plan 6.2:2106-2110 states the other
+  // half: "candidate resolution uses only successful catalogs and filtered runtime tiebreakers".
+  //
+  // So a partial whole-manifest load can SELECT `de` — a locale it declared and failed to fetch —
+  // while per-key fallback never visits it, because the diagnostic never redirects the lookup
+  // (:598-600: "the match's selected locale never replaces the direct lookup locale. Thus `fr-BE`
+  // may report a selected `fr-FR` match while per-key fallback still begins at `fr-BE`"). An
+  // external negotiator then sees the same set the subset was planned from, which is the point.
+  //
+  // For direct construction both are the loaded set and nothing below can tell the difference —
+  // which is why all 2,112 corpus cases and all nine differentials are structurally blind to this
+  // change, and why `test/applicable-configuration.test.js` is its entire enforcement.
+  const manifestConfiguration = loadVerification === null
+    ? null
+    : loadVerification.manifestLocaleConfiguration;
+  const applicableSupported = manifestConfiguration === null
+    ? supported
+    : [...manifestConfiguration.supportedLocales];
+  const applicableTiebreakers = manifestConfiguration === null
+    ? tiebreakers
+    : safeTiebreakers(/** @type {any} */ (manifestConfiguration.tiebreakers));
+
+  /**
+   * Plan 3.4:619-623's lookup-coverage rule, applied to the tag that ACTUALLY STARTS per-key
+   * fallback: "For lookup-subset `LoadedStrings`, the effective lookup tag must match the coverage
+   * record on every use. For a direct locale that means the normalized requested tag; for a supplied
+   * match it means the selected tag or resolved fallback."
+   *
+   * **IT IS NOT THE SELECTION, and that distinction is the entire clause.** A `fr-BE` request
+   * against a subset planned from `fr-BE` selects `fr-FR` diagnostically; the two readings —
+   * "the request must match" and "the selection must match" — give opposite answers on that one
+   * call, and only the first is the plan's. So a direct request for `fr-FR` itself is REFUSED by an
+   * instance that holds every catalog it would need, because that instance was never planned from
+   * `fr-FR` and its next `fr-FR` load would plan differently.
+   *
+   * Three things this deliberately does NOT do. It does not fire for `entire-manifest` coverage
+   * (:622, "Whole-manifest coverage permits either source"). It does not fire for direct
+   * construction, which has no coverage record at all — keying it on "has a verification record"
+   * rather than on the coverage KIND is the cheapest possible regression and would turn every
+   * corpus case red at once. And it does not fire in `getDirectLocaleContext`, which starts no
+   * per-key fallback and is documented side-effect-free (:702-705); S10's stamp consumes that
+   * method as its oracle, so a throw there would change the SSR path for exactly the lookup-subset
+   * instances SSR exists for.
+   *
+   * @param {string} lookupLocale the normalized tag per-key fallback is about to start from
+   */
+  function requireCoveredLookup(lookupLocale) {
+    const coverage = loadVerification?.coverage;
+    if (coverage?.kind !== "lookup") return;
+    if (coverage.lookupLocale !== lookupLocale)
+      throw configurationError(
+        `This Strings was loaded for lookup '${coverage.lookupLocale}' only, and this lookup starts ` +
+        `from '${lookupLocale}'. The loaded subset was planned from that one tag, so another tag's ` +
+        `candidate chain is not the chain these catalogs were chosen for`,
+      );
+  }
+
   // Eager, construction-time: what the catalogs actually ask for, and whether the caller supplied
   // it. Plan section 3.7 is explicit that missing optional data is a construction failure "not a
   // late lookup surprise", and the difference is observable — a lazy check would let an application
@@ -1048,8 +1113,13 @@ export function createStrings(options) {
           : `get({ localeMatch }) supplied a result for a different fallback locale`,
       );
 
+    // AGAINST THE APPLICABLE CONFIGURATION, not the loaded catalogs. Plan 3.4:845-847: "Every
+    // manifest-backed instance preserves the full manifest configuration: the match's fallback and
+    // considered-locale set must equal it; caller ordering is preserved and is not part of set
+    // validation." For direct construction this is the loaded set and nothing changes.
     const considered = new Set(match.consideredLocales.map(normalizeTag));
-    const sameSet = considered.size === supported.length && supported.every((tag) => considered.has(tag));
+    const sameSet = considered.size === applicableSupported.length
+      && applicableSupported.every((tag) => considered.has(tag));
 
     if (!sameSet)
       throw new RangeError(
@@ -1126,7 +1196,7 @@ export function createStrings(options) {
       // `lookupLocale` is unaffected and stays the normalized tag the corpus records.
       return {
         lookupLocale,
-        localeMatch: matchFor(perCallLocale, supported, fallbackLocale, tiebreakers),
+        localeMatch: matchFor(perCallLocale, applicableSupported, fallbackLocale, applicableTiebreakers),
       };
     }
 
@@ -1175,7 +1245,7 @@ export function createStrings(options) {
     // arm above: the kernel normalizes what it is given, and Java normalizes exactly once.
     return {
       lookupLocale,
-      localeMatch: matchFor(requested, supported, fallbackLocale, tiebreakers),
+      localeMatch: matchFor(requested, applicableSupported, fallbackLocale, applicableTiebreakers),
     };
   }
 
@@ -1239,6 +1309,17 @@ export function createStrings(options) {
     const lookup = localeLookupFor(callOptions);
     const lookupLocale = lookup.lookupLocale;
     const localeMatch = freeze(lookup.localeMatch);
+
+    // COVERAGE, CHECKED HERE AND ON EVERY CALL. This is the one place all four locale ingresses have
+    // already collapsed into the single tag per-key fallback starts from, which is exactly what plan
+    // 3.4:619-621 makes the rule about — so the per-call locale, the instance constant, a supplied
+    // match and a resolver are all covered by one check rather than four. It sits AFTER the locale
+    // ingress (so a malformed tag is still reported as malformed, in Java's order) and BEFORE the
+    // walk, so no observer, policy or failure handler can see a half-walk that was never allowed.
+    //
+    // "On every use" is load-bearing and not free: a resolver may answer differently on each call,
+    // so validating once at construction would gate the first answer and trust every later one.
+    requireCoveredLookup(lookupLocale);
 
     // A NULL PLACEHOLDER NAME (`DefaultStrings.java:690`), refused AFTER the locale ingress and
     // before the walk, which is Java's own order and is observable: a call that also carries a bad
@@ -1684,11 +1765,18 @@ export function createStrings(options) {
       // map it is about to iterate.
       freeze({
         fallbackLocale,
-        // Sorted for the same reason `getSupportedLocales` above is: plan 3.3:765 says a directly
-        // constructed instance's configuration "likewise contains that loaded set", and :759 sorts
-        // it. The two accessors were the only places the port reported the raw insertion order.
-        supportedLocales: freeze([...supported].sort(compareTags)),
-        tiebreakers: tiebreakers ?? EMPTY_TIEBREAKERS,
+        // **THE APPLICABLE CONFIGURATION, WHICH IS NOT `getSupportedLocales()`.** Plan 3.3:764-769
+        // states the split in as many words: "`getSupportedLocales()` and both key-inspection
+        // methods describe catalogs actually loaded. For direct construction,
+        // `getLocaleConfiguration()` likewise contains that loaded set. For manifest-backed
+        // construction it instead returns the preserved full `manifestLocaleConfiguration` … so an
+        // external negotiator sees the same set used before subset loading. The distinction is
+        // deliberate and is named in the API documentation."
+        //
+        // Sorted for the same reason `getSupportedLocales` above is: :759 sorts supported locales,
+        // and the two accessors were the only places the port reported raw insertion order.
+        supportedLocales: freeze([...applicableSupported].sort(compareTags)),
+        tiebreakers: applicableTiebreakers ?? EMPTY_TIEBREAKERS,
       }),
     /**
      * Plan 3.3's three loading seams, and all three answer for the DIRECT branch too.
@@ -1734,7 +1822,7 @@ export function createStrings(options) {
       // the two lookup ingresses the tool already drove.
       return freeze({
         lookupLocale,
-        localeMatch: freeze(matchFor(locale, supported, fallbackLocale, tiebreakers)),
+        localeMatch: freeze(matchFor(locale, applicableSupported, fallbackLocale, applicableTiebreakers)),
       });
     },
   });
