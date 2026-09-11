@@ -22,16 +22,19 @@
     },
     {
       "reason": "M8 S9a: the runtime CLDR/data compatibility check plan :1893 requires before catalog I/O. lokalized/load gains src/data/provenance.js — ONE module — which slice S6b had wrongly declared unreachable."
+    },
+    {
+      "reason": "M8 S9: the loaded branch reaches core and therefore every published subpath that re-exports it."
     }
   ],
   "subpaths": {
     "lokalized": {
-      "modules": 25,
-      "bytes": 779126
+      "modules": 28,
+      "bytes": 788580
     },
     "lokalized/core": {
-      "modules": 24,
-      "bytes": 770881
+      "modules": 27,
+      "bytes": 780335
     },
     "lokalized/parse": {
       "modules": 26,
@@ -54,12 +57,12 @@
       "bytes": 640633
     },
     "lokalized/data/ordinal": {
-      "modules": 29,
-      "bytes": 799971
+      "modules": 30,
+      "bytes": 808075
     },
     "lokalized/data/ranges": {
-      "modules": 28,
-      "bytes": 803959
+      "modules": 30,
+      "bytes": 812944
     }
   }
 }

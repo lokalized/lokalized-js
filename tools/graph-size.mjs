@@ -270,6 +270,13 @@ const PURPOSE = {
   "src/internal/expression-tokenizer.js": ["expression lexer (M6)", "conditional: catalogs with no alternatives never evaluate one"],
   "src/internal/plural.js": ["exact numeric conversion, CLDR operands, cardinal rule engine (M4)", "always: cardinal classification is a root export"],
   "src/internal/locale.js": ["tag parsing/canonicalization, fallback chain, matcher, tiebreakers", "always"],
+  // M8 S9. All three arrive with `createStrings({ loaded })` and none is reachable from a direct
+  // construction, so a consumer that never loads from a manifest carries 8.8 KB it does not execute.
+  // Splitting them out would mean a second construction entry point, which is the drift this branch
+  // was normalized to avoid — recorded here rather than left for a size review to rediscover.
+  "src/internal/loaded-input.js": ["validates a LoadedStrings before construction accepts it", "loaded branch only"],
+  "src/internal/configuration-error.js": ["the shared ConfigurationError factory", "always"],
+  "src/data/provenance.js": ["the pinned CLDR version and data fingerprint core compares against", "loaded branch only"],
   "src/internal/locale-cldr.js": ["CLDR canonicalization and alias application", "always"],
   "src/internal/locale-jdk-tag.js": ["JDK-compatible tag parse/render", "always"],
   "src/internal/bidi.js": ["Unicode bidi isolation of caller-supplied values, plus the bounded-output limit", "always: the mode keys off the EVALUATION locale, so every render consults it, and `interpolate.js` imports `outputLimitExceeded` from here on every message"],

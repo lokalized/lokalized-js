@@ -15,6 +15,7 @@
  * that holds the key. Collapsing them is the single most tempting simplification here and it is
  * wrong.
  */
+import { optionsFromLoadedStrings } from "../internal/loaded-input.js";
 import {
   DEFAULT_BIDI_ISOLATION,
   shouldApplyBidiIsolation,
@@ -563,6 +564,15 @@ class ResolutionFailure extends Error {
  * @param {CreateStringsOptions} options
  */
 export function createStrings(options) {
+  // The `loaded` branch is NORMALIZED into the direct branch's inputs rather than given a second
+  // construction path, so locale validation, duplicate rejection, model validation and expression
+  // compilation stay in exactly one place. Everything the loader result has to prove is proved
+  // before this line; nothing below it knows which branch it came from.
+  if (/** @type {any} */ (options).loaded !== undefined)
+    options = /** @type {CreateStringsOptions} */ (
+      /** @type {unknown} */ (optionsFromLoadedStrings(/** @type {any} */ (options)))
+    );
+
   // The tag the CALLER wrote, normalized but not yet resolved against the loaded catalogs. Java
   // keeps the same two values apart: the constructor parameter, and `this.fallbackLocale`, which is
   // the loaded catalog the parameter names (`DefaultStrings.java:446-470`). Only the second is a

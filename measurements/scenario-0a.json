@@ -8,21 +8,21 @@
   "node": [
     {
       "label": "root + raw-text catalog",
-      "modules": 25,
-      "sourceBytes": 779126,
-      "importMs": 0.332,
-      "constructionMs": 0.1362,
-      "firstRenderMs": 0.4457,
-      "retainedBytes": 71960
+      "modules": 28,
+      "sourceBytes": 788580,
+      "importMs": 0.294,
+      "constructionMs": 0.1241,
+      "firstRenderMs": 0.3824,
+      "retainedBytes": 67856
     },
     {
       "label": "core + parsed equivalent",
-      "modules": 24,
-      "sourceBytes": 770881,
-      "importMs": 0.59,
-      "constructionMs": 0.3568,
-      "firstRenderMs": 0.2952,
-      "retainedBytes": 368432
+      "modules": 27,
+      "sourceBytes": 780335,
+      "importMs": 0.597,
+      "constructionMs": 0.3711,
+      "firstRenderMs": 0.3116,
+      "retainedBytes": 369240
     }
   ],
   "rebaselines": [
@@ -286,6 +286,15 @@
       "growth": [
         "root + raw-text catalog: source graph grew 777757 -> 779126 bytes",
         "core + parsed equivalent: source graph grew 769512 -> 770881 bytes"
+      ]
+    },
+    {
+      "reason": "M8 S9: createStrings' loaded branch. Root 25 -> 28 modules (+9.2 KB): loaded-input.js, the shared configuration-error factory, and data/provenance.js at 469 B, which plan 3.4 requires core to carry so a loader result can be checked against the rendering core's OWN pinned constants rather than ones a caller supplied.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 779126 -> 788580 bytes",
+        "root + raw-text catalog: module count grew 25 -> 28",
+        "core + parsed equivalent: source graph grew 770881 -> 780335 bytes",
+        "core + parsed equivalent: module count grew 24 -> 27"
       ]
     }
   ],

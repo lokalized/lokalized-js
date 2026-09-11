@@ -141,7 +141,18 @@ test("the root graph carries no optional plural data", () => {
   // milestone's substance, and the assertions that actually protect the root are the ones above and
   // below: no optional plural data is reachable, and the set of GENERATED tables is exactly the list
   // named here.
-  assert.equal(reached.size, 25, "the root module graph changed size");
+  // 25 -> 28 at M8 S9, and the three are named so a later reader can judge the trade rather than
+  // just the number: `src/internal/loaded-input.js` (createStrings' loaded branch),
+  // `src/internal/configuration-error.js` (881 B, shared with lokalized/data/ordinal so the two
+  // cannot answer with different `name`/`code`), and `src/data/provenance.js` (469 B).
+  //
+  // THE LAST ONE IS THE ONE THAT NEEDS JUSTIFYING, because this gate exists to keep DATA out of the
+  // root. Plan 3.4 requires the loaded branch to compare a loader result against "the rendering
+  // core's own constants" and to fail with a ConfigurationError when they differ — so core must
+  // carry the pinned `cldrVersion`/`dataFingerprint`, and threading them in from a caller would
+  // let the caller defeat the check it exists to make. 469 bytes of two strings; the 806-class
+  // tables this gate was written for are still absent, which is the property it is really pinning.
+  assert.equal(reached.size, 28, "the root module graph changed size");
 
   // The exact set of generated tables the root pulls in. `scenario:0a`'s byte ratchet is a PROXY for
   // this invariant, and a weak one: it is re-recorded whenever hand-written code legitimately grows,
@@ -161,6 +172,12 @@ test("the root graph carries no optional plural data", () => {
       "data/cardinal.js",
       "data/likely-subtags.js",
       "data/parents.js",
+      // ADDED AT M8 S9, and it is not a table: 469 bytes carrying the pinned `cldrVersion` and
+      // `dataFingerprint`. Plan 3.4 makes `createStrings({loaded})` reject a loader result built
+      // against different pinned data by comparing it against "the rendering core's own constants" —
+      // so core has to hold them, and threading them in from a caller would let the caller defeat
+      // the check it exists to make.
+      "data/provenance.js",
       "data/rtl.js",
       "data/valid-languages.js",
       "data/valid-regions.js",
