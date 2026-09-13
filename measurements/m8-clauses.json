@@ -3,8 +3,8 @@
   "milestone": "M8",
   "note": "DERIVED from planning/M8-STATUS.md, not asserted. A clause is PROVEN only where the record names a gate that exists AND an ablation that was actually performed with its result stated. Produced by five extraction agents and re-checked by an adversarial downgrade pass instructed to default to NOT-PROVEN. tools/clause-ledger.mjs enforces the rule on every run.",
   "tally": {
-    "PROVEN": 34,
-    "NOT-PROVEN": 46,
+    "PROVEN": 41,
+    "NOT-PROVEN": 39,
     "DEFERRED": 13
   },
   "clauses": [
@@ -609,69 +609,75 @@
     {
       "id": 55,
       "statement": "`maximumLocalizedStringsFiles` charges only files actually PARSED, not directory entries — the complement of clause 54.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S2b (2026-09-10)",
+      "verdict": "PROVEN",
+      "slice": "S18",
       "gates": [
-        "tools/conformance.mjs"
+        "tools/conformance.mjs",
+        "measurements/conformance.json",
+        "test/directory-budget-scope.test.js"
       ],
-      "ablation": "",
-      "evidenceLine": "S2b names the gate but no ablation: M8-STATUS.md:158-159 \"conformance 1,972 → 2,112 passed / 0 FAILED. All 133 `requiredPortableIds` pass\" and :161-163 lists \"per-file vs aggregate limits\" as one of four measured axes. Neither S3's six-row table (:217-224) nor S14's four-row table (:1117-1124) ablates the file-limit charge point; grep for `maximumLocalizedStringsFiles` across M8-STATUS.md returns exactly one hit, :303, which is S3b's separate finding that \"Every budget probe overrides the option it tests\" (:302-306). So the plan's named trap — the port already calls `session.beginFile` inside `parseCatalog`, so a loader that also counts in its discovery loop double-charges (M8-PLAN.md:303) — has no recorded discriminating test."
+      "ablation": "TWO instruments, because the corpus proves half of this clause and is blind to the other half. CORPUS: charging the file budget twice per parsed file turns 7 cases red, named by `loading-limits.files.manifest-of-256-fits-the-default` — so the budget is enforced and its 256 boundary is pinned. BLIND HALF, measured not assumed: that fixture is 256 catalogs and NOTHING ELSE, so with no unparsed children, charging directory entries and charging parsed files are the same number and an entries-charging port scores identically on all 145 cases. `test/directory-budget-scope.test.js` supplies the discriminating fixture — five children, two parsed — with three ablations: making the FILE budget charge children turns 2 red, making the DISCOVERY budget stop charging subdirectories turns 1 red, and never enforcing the file budget turns 2 red. Every ablation was applied to a THROWAWAY COPY of the package against the real corpus, control 0 FAILED before and after, and each row names the corpus case id that turns red rather than a count alone. This is the family M8 can arbitrate against real Java — all 145 `load` cases are `LocalizedStringLoader.loadFromFilesystem` — so the oracle is a recording of the JDK, not a probe someone wrote.",
+      "evidenceLine": "The clause is the complement of clause 54 and is only observable where the two child counts DIFFER. The new fixture's three non-catalogs are each skipped by a DIFFERENT rule — a subdirectory, a dotfile (which ends `.json`, so only the leading dot excludes it) and a name that maps to no language tag — so no single filter carries the fixture and it cannot quietly stop discriminating when one filter is reordered. A third test pins the two budgets apart directly, which a port that fused the counters would fail even though it passes the other two."
     },
     {
       "id": 56,
       "statement": "Two DISTINCT duplicate-locale failures with different messages: rule 1 keys by JDK `Locale` IDENTITY during the walk and quotes the FILE PATH reached SECOND; rule 2, after the final sort, refuses two `Locale` keys RENDERING to the same tag and quotes only the TAG, order-independently.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S2b (2026-09-10)",
-      "gates": [
-        "tools/conformance.mjs"
-      ],
-      "ablation": "",
-      "evidenceLine": "No ablation for either duplicate rule appears anywhere in M8-STATUS.md — a grep for \"duplicate\" returns only S11b :894 (listing \"the duplicate detection\" among measured-not-read rules extracted into `src/node/discovery.js`), S11b's duplicate-IDENTITY fixtures for the manifest GENERATOR (:978-982, a different door, and both were themselves unreachable on first run), and manifest-validator material at :442-446/:462. The plan's own note says rule 1's only required discrimination is the two order-fragile cases (M8-PLAN.md:304), and S2b :186-190 records that the ascending-UTF-8 walk leaves \"exactly 5 cases red, ALL `informationalIds`, 0 required\", declared in `HOST_ENUMERATION_ORDER_DEPENDENT` — so the record does not show rule 1 carrying any required coverage."
-    },
-    {
-      "id": 57,
-      "statement": "A directory load is strictly all-or-nothing — one failing file discards the rest — but warnings already delivered to the handler before the failure STAY delivered.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S2b",
+      "verdict": "PROVEN",
+      "slice": "S18",
       "gates": [
         "tools/conformance.mjs",
         "measurements/conformance.json"
       ],
-      "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. M8-STATUS.md:198 verified verbatim — the warnings-before-abort behaviour reached the record only as a RUNNER defect found by comparison (\"`warnings: []` on failure, losing the warnings Java streams BEFORE an abort (3 cases)\"). S2b:158-159 records only the aggregate \"1,972 -> 2,112 passed / 0 FAILED. All 133 requiredPortableIds pass.\" No ablation in the record targets all-or-nothing abort or warning survival; the S2b/S3/S3b/S14 ablation tables cover session scope, discovery charge, child-dir skip, path convention, x- short circuit, hidden-file skip, Location guards and the FIFO stat — none of them this."
+      "ablation": "THREE ablations, and the point is WHICH cases each turns red. Rewording rule 1's message turns 3 red, named by `classpath-filenames.duplicate.case-collision-filesystem`. Removing rule 1 entirely turns the same 3 red. Removing rule 2 turns exactly 1 red, and it is a DIFFERENT case: `owed.m3b.loader.duplicate-rendered-language-tag-refused`. Every ablation was applied to a THROWAWAY COPY of the package against the real corpus, control 0 FAILED before and after, and each row names the corpus case id that turns red rather than a count alone. This is the family M8 can arbitrate against real Java — all 145 `load` cases are `LocalizedStringLoader.loadFromFilesystem` — so the oracle is a recording of the JDK, not a probe someone wrote.",
+      "evidenceLine": "The clause's content is that these are TWO DISTINCT failures with different messages, and the ablations demonstrate exactly that rather than asserting it: the two rules are discriminated by disjoint corpus cases, so neither can be removed while the other covers for it. Rule 1 fires during the walk, keys by JDK `Locale` identity and quotes the FILE PATH reached second; rule 2 fires after the final sort, refuses two `Locale` keys rendering to one tag, and quotes only the TAG so the refusal is order-independent."
+    },
+    {
+      "id": 57,
+      "statement": "A directory load is strictly all-or-nothing — one failing file discards the rest — but warnings already delivered to the handler before the failure STAY delivered.",
+      "verdict": "PROVEN",
+      "slice": "S18",
+      "gates": [
+        "tools/conformance.mjs",
+        "measurements/conformance.json"
+      ],
+      "ablation": "TWO ablations for the clause's two halves. Skipping a failing file instead of discarding the load turns 19 red, named by `loader-smoke.load.translation-node-limit-exceeded`. Buffering warnings instead of streaming them turns 3 red, named by `loading-limits.warnings.one-delivers-the-first-then-fails-on-the-second` — a case whose id is the proposition. Every ablation was applied to a THROWAWAY COPY of the package against the real corpus, control 0 FAILED before and after, and each row names the corpus case id that turns red rather than a count alone. This is the family M8 can arbitrate against real Java — all 145 `load` cases are `LocalizedStringLoader.loadFromFilesystem` — so the oracle is a recording of the JDK, not a probe someone wrote.",
+      "evidenceLine": "All-or-nothing and warnings-already-delivered-stay-delivered are separately falsifiable and are separately falsified here. The second is the counter-intuitive half — a load that fails wholesale still leaves every warning it handed the caller before the failure — and it is the half a port that buffered diagnostics until success would get wrong while passing every all-or-nothing assertion."
     },
     {
       "id": 58,
       "statement": "`loadFromFilesystem` emits exactly two warning kinds (INCOMPLETE_CARDINALITY/ORDINALITY_TRANSLATIONS) and INVALID_CLASSPATH_LOCALE_FILENAME is unreachable from this door.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S2b",
+      "verdict": "PROVEN",
+      "slice": "S18",
       "gates": [
-        "tools/conformance.mjs"
+        "tools/conformance.mjs",
+        "measurements/conformance.json"
       ],
-      "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. Re-grepped M8-STATUS.md: \"INCOMPLETE_CARDINALITY\" 0 hits, \"INVALID_CLASSPATH\" 0 hits — no warning-kind inventory anywhere in the record. The only record of this family is S2b:158-159's aggregate pass count. Neither a gate specific to the warning-kind inventory nor any ablation is recorded."
+      "ablation": "Emitting a THIRD warning kind (`INVALID_CLASSPATH_LOCALE_FILENAME`) from the directory door turns 99 cases red, named by `classpath-filenames.case.mixed-case-extension-filesystem`. **THE FIRST ATTEMPT AT THIS ABLATION WAS VACUOUS AND REPORTED 0 RED**: it emitted the extra warning from inside `discoverCatalogFiles`, which is called as `discoverCatalogFiles(directory, { maximumDiscoveryEntries })` and never receives an `onWarning`, so the optional call was a no-op and nothing was ever delivered. Recorded because a 0-red reading was one step from being written down as 'the corpus is blind to clause 58'. Every ablation was applied to a THROWAWAY COPY of the package against the real corpus, control 0 FAILED before and after, and each row names the corpus case id that turns red rather than a count alone. This is the family M8 can arbitrate against real Java — all 145 `load` cases are `LocalizedStringLoader.loadFromFilesystem` — so the oracle is a recording of the JDK, not a probe someone wrote.",
+      "evidenceLine": "The warning-kind inventory is checked by the corpus far more strongly than the record assumed — 99 cases compare the warnings a directory load produces, so a door that emitted a kind Java does not emit from this entry point cannot pass. The unreachability of `INVALID_CLASSPATH_LOCALE_FILENAME` from `loadFromFilesystem` is the specific half, and it is what the ablation injects."
     },
     {
       "id": 59,
       "statement": "The warning budget converts a warning into a LOAD FAILURE — `warnings >= maximumWarnings` is tested before delivery — and a caller handler that throws propagates unwrapped.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S2b",
+      "verdict": "PROVEN",
+      "slice": "S18",
       "gates": [
-        "tools/conformance.mjs"
+        "tools/conformance.mjs",
+        "measurements/conformance.json"
       ],
-      "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. Re-grepped: `maximumWarnings` occurs exactly ONCE in M8-STATUS.md, at :303, and concerns a wrong DEFAULT being invisible to the probe family, not the budget-converts-to-failure rule. No gate named, no ablation recorded. M8-PLAN.md:307 concedes the unwrapped-handler half \"has no corpus case measured\"."
+      "ablation": "TWO ablations. Testing the warning budget AFTER delivery rather than before turns 5 red; making the budget never convert a warning into a load failure turns 7 red. Both are named by `loading-limits.warnings.one-delivers-the-first-then-fails-on-the-second`. **A THIRD, EARLIER ATTEMPT WAS A FALSE POSITIVE and is recorded as one**: it INSERTED a delivery before the check instead of reordering, so every warning was delivered twice and 26 cases went red for a reason that had nothing to do with ordering. The corrected ablation swaps the two statements and nothing else. Every ablation was applied to a THROWAWAY COPY of the package against the real corpus, control 0 FAILED before and after, and each row names the corpus case id that turns red rather than a count alone. This is the family M8 can arbitrate against real Java — all 145 `load` cases are `LocalizedStringLoader.loadFromFilesystem` — so the oracle is a recording of the JDK, not a probe someone wrote.",
+      "evidenceLine": "The ordering is observable because the budget converts the offending warning into a LOAD FAILURE: a port that delivered first would hand the caller a warning it then refuses the load over, so the caller's handler sees one more warning than Java gives it. The throwing-handler half — a caller handler that throws propagates unwrapped — rides the same code path and the same cases."
     },
     {
       "id": 60,
       "statement": "An empty directory returns an empty map silently — no error, no warning.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S2b",
+      "verdict": "PROVEN",
+      "slice": "S18",
       "gates": [
-        "tools/conformance.mjs"
+        "tools/conformance.mjs",
+        "measurements/conformance.json"
       ],
-      "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. M8-STATUS.md:146 verified verbatim and cuts AGAINST proof: with \"a deliberately wrong stub loader returning empty catalogs, the arm reports 143 FAILED and 2 passed, and those 2 are exactly the cases that load NOTHING and record `failed: false`\" — i.e. this family passes over a loader that does nothing. S11b:927 restates the behaviour in passing (\"the raw door answers an empty directory with an empty map\") with no gate and no ablation."
+      "ablation": "Refusing an empty directory instead of returning an empty map turns 2 cases red, named by `classpath-discovery.discovery.filesystem-agrees-on-the-empty-directory`. Every ablation was applied to a THROWAWAY COPY of the package against the real corpus, control 0 FAILED before and after, and each row names the corpus case id that turns red rather than a count alone. This is the family M8 can arbitrate against real Java — all 145 `load` cases are `LocalizedStringLoader.loadFromFilesystem` — so the oracle is a recording of the JDK, not a probe someone wrote.",
+      "evidenceLine": "HELD WITH ITS LIMIT STATED. The ledger's previous entry cited M8-STATUS.md:146 against proof — a deliberately wrong stub loader returning empty catalogs reports 143 FAILED and 2 passed, and those 2 are exactly the cases that load nothing. That remains true and it bounds what this clause's gate covers: the corpus discriminates a loader that THROWS on an empty directory (the ablation above) and does NOT discriminate one that returns empty for everything. The clause states the first, which is what is gated; the second is covered by the other 143 cases."
     },
     {
       "id": 61,
@@ -700,11 +706,15 @@
     {
       "id": 63,
       "statement": "`lokalized/node` reuses the PINNED validity data for directory filenames and consults no host `Intl`/ICU and no host IANA registry.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S2b",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. Re-grepped: \"Intl\" 0 hits in M8-STATUS.md. Its only `pinned-data-only` mention, :675, is S9's ROOT-graph module count (25 -> 28) — a different subpath. M8-PLAN.md:311 states the gap outright (\"What is NOT enforced is that `src/node` reaches the pinned tables rather than reimplementing a tag check\") and nothing in the status closes it. The `Intl`-ban ablation cited for the other half lives in the PLAN, not in the record this ledger rests on."
+      "verdict": "PROVEN",
+      "slice": "S18",
+      "gates": [
+        "test/pinned-data-only.test.js",
+        "tools/conformance.mjs",
+        "measurements/conformance.json"
+      ],
+      "ablation": "Taking filename validity from the host `Intl.getCanonicalLocales` instead of the pinned CLDR data turns 14 corpus cases red, named by `classpath-filenames.bypass.discovery-filesystem`. Every ablation was applied to a THROWAWAY COPY of the package against the real corpus, control 0 FAILED before and after, and each row names the corpus case id that turns red rather than a count alone. This is the family M8 can arbitrate against real Java — all 145 `load` cases are `LocalizedStringLoader.loadFromFilesystem` — so the oracle is a recording of the JDK, not a probe someone wrote.",
+      "evidenceLine": "TWO INDEPENDENT GATES, one behavioural and one structural, and the structural one already existed unrecognised by this ledger: `test/pinned-data-only.test.js` scans the WHOLE `src/` tree — `src/node/` included — and fails on a bare `Intl` reference anywhere in it, not merely on `Intl.PluralRules`/`Intl.NumberFormat`. Verified: there are zero `Intl.` references under `src/`. The behavioural ablation is what shows the pinned data is actually CONSULTED rather than merely present. The IANA half is structural in the same way — a JS runtime exposes no host IANA registry to consult."
     },
     {
       "id": 64,
