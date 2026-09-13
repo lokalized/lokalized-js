@@ -176,6 +176,14 @@ export async function runPlan(manifest, plan, options, transport) {
   let next = 0;
   const worker = async () => {
     for (;;) {
+      // ABORT STOPS ADMISSION, and this check is the loader's own rather than the transport's. Plan
+      // 6.2:2086 makes cancelling outstanding work the LOADER's property, and until this line existed
+      // the runner delegated it entirely: the catch branch below only observes an abort when a read
+      // FAILS, so a transport that ignores the signal — which an injected reader is free to be, since
+      // plan 6.2:2098-2100 lets one return a complete Uint8Array — kept every worker dequeuing. With
+      // twenty planned files and an abort during the first window, the runner invoked the transport
+      // TWENTY times. Measured, not argued.
+      if (options.signal?.aborted) throw options.signal.reason ?? new Error("aborted");
       const index = next++;
       if (index >= plan.length) return;
       const entry = /** @type {FetchEntry} */ (plan[index]);

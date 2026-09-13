@@ -46,16 +46,22 @@
     },
     {
       "reason": "M8 clause 30: manifest tiebreakers validated against the full manifest (src/load/manifest.js) and filtered to loaded tags in the shared runner (src/load/run-plan.js). No new modules; both graphs grew by the same 5,986 bytes because lokalized/node composes lokalized/load."
+    },
+    {
+      "reason": "M8 clause 22: the plan runner now checks options.signal at the top of its worker loop, so aborting stops ADMISSION rather than relying on the transport to refuse. 748 bytes, no new modules; node composes load."
+    },
+    {
+      "reason": "M8 clause 19: the loaded branch now refuses a record whose two copies of its own warning list disagree (src/internal/loaded-input.js). 3,725 bytes, no new modules; it is in the root graph, so every subpath that composes core moves."
     }
   ],
   "subpaths": {
     "lokalized": {
       "modules": 29,
-      "bytes": 811962
+      "bytes": 815687
     },
     "lokalized/core": {
       "modules": 28,
-      "bytes": 803717
+      "bytes": 807442
     },
     "lokalized/parse": {
       "modules": 26,
@@ -63,7 +69,7 @@
     },
     "lokalized/load": {
       "modules": 36,
-      "bytes": 705427
+      "bytes": 706175
     },
     "lokalized/ssr": {
       "modules": 2,
@@ -75,15 +81,15 @@
     },
     "lokalized/node": {
       "modules": 39,
-      "bytes": 741067
+      "bytes": 741815
     },
     "lokalized/data/ordinal": {
       "modules": 31,
-      "bytes": 831457
+      "bytes": 835182
     },
     "lokalized/data/ranges": {
       "modules": 31,
-      "bytes": 836326
+      "bytes": 840051
     }
   }
 }

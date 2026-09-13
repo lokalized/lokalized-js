@@ -3,8 +3,8 @@
   "milestone": "M8",
   "note": "DERIVED from planning/M8-STATUS.md, not asserted. A clause is PROVEN only where the record names a gate that exists AND an ablation that was actually performed with its result stated. Produced by five extraction agents and re-checked by an adversarial downgrade pass instructed to default to NOT-PROVEN. tools/clause-ledger.mjs enforces the rule on every run.",
   "tally": {
-    "PROVEN": 27,
-    "NOT-PROVEN": 53,
+    "PROVEN": 34,
+    "NOT-PROVEN": 46,
     "DEFERRED": 13
   },
   "clauses": [
@@ -204,42 +204,52 @@
     {
       "id": 19,
       "statement": "The loaded branch of createStrings preserves LoadedStrings.warnings exactly, without resorting.",
-      "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "Absent from M8-STATUS.md entirely: the three occurrences of \"clause 19\" (:8, :19, :23) are all M7's budget clause, and no line mentions warning preservation or resorting in the loaded branch. S9 (:642-690) describes the loaded branch's three rejections, limits reuse and plan recomputation only. The plan states this clause exists separately precisely because \"a correct loader plus a resorting createStrings passes clause 18\" (M8-PLAN.md:267, cite confirmed)."
+      "verdict": "PROVEN",
+      "slice": "S16 (probes) + S17 (the consistency refusal that makes the guarantee universal)",
+      "gates": [
+        "test/loaded-warnings.test.js",
+        "src/internal/loaded-input.js",
+        "npm run verify"
+      ],
+      "ablation": "FIFTEEN ablations over 21 tests, all firing, controls clean on both sides. Nine against the preservation probes: sorting the replay by locale, by locale-then-key and by key; deduplicating; skipping the onWarning replay; re-stamping the source; sorting missingLanguageForms; handing out the internal array; and making the LOADER emit catalogs in an order other than fetch-plan order. Six against the consistency refusal: removing it entirely turns 5 red; comparing only the COUNTS turns the three ordering tests red and leaves the count test green; comparing only the FIRST pair turns exactly the later-index test red; comparing by object IDENTITY rather than by value turns the CONTROL red — which is what proves the value comparison is load-bearing, since every serialized record rebuilds its objects; defaulting a missing `warnings` field to [] turns the missing-field test red; and deriving the comparison from the aggregate itself — the tautology that can never disagree — turns 4 red.",
+      "evidenceLine": "UPGRADED FROM NOT-PROVEN, and the mechanism is stated rather than glossed. The loaded branch still does not READ `loaded.warnings`: it hands `catalogs` to the shared construction path, which replays each ParsedStringsFile's warnings in catalogs-key order. What changed is that a record whose two copies of its own warning list disagree is now REFUSED at construction, so for every record that constructs, `getWarnings()` equals `loaded.warnings` exactly, by value. The clause's guarantee therefore holds UNIVERSALLY where it previously held only by coincidence — the coincidence being that `run-plan.js` builds `catalogs` and `warnings` from one slot walk. MEASURED BEFORE THE CHECK WAS WRITTEN, in an instrumented copy of the package across the whole suite, conformance and two differentials: 88 constructions from a loaded record, 0 disagreements, 0 source-field differences — but 77 of those 88 carried NO warnings, and all 11 that did came from the file written for this clause. Before this work the repository had never constructed from a loaded record carrying a warning, so 'nothing breaks' is thin evidence and is recorded as thin. The hazard is real rather than theoretical: a record survives JSON.stringify/parse and structuredClone intact (measured — that is the server-render path), but SORTING `catalogs` for deterministic output was accepted by every other check, since `requestedFiles` is untouched and the catalog SET is unchanged, and it silently changed the order `getWarnings()` reported while the record's own field said otherwise. Dropping a catalog was already refused by the coverage check; reordering was refused by nothing. WHETHER THE AGGREGATE IS AUTHORITATIVE OR DERIVED REMAINS A MAINTAINER QUESTION, deliberately not settled here — but it is now a question about internal design rather than about observable behaviour, and refusing the disagreement is what makes either answer safe to adopt later."
     },
     {
       "id": 20,
       "statement": "At most EIGHT catalog reads are active at once, and queued work retains fetch-plan order.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S8",
+      "verdict": "PROVEN",
+      "slice": "S16",
       "gates": [
-        "test/fetch-loader.test.js"
+        "test/fetch-concurrency.test.js",
+        "npm run verify"
       ],
-      "ablation": "S8 records \"removing the concurrency cap\" among six ablations \"all firing\" (:584-588), with no red test named for it. No ablation anywhere touches the queue-ORDER conjunct.",
-      "evidenceLine": "DOWNGRADED: the cap half rests on :586 \"removing the concurrency cap\" inside \":584 Six ablations, all firing\", but the anti-vacuity guard the row cites (:594-596 \"peak concurrency is BOTH at most 8 and greater than 1\") is exactly what M8-PLAN.md:268 rules insufficient — it names a >=9-file manifest (8 admitted, 9th queued) as the discriminating input and says \"'It never exceeded 8 in a 3-file manifest' proves nothing\"; the record never states the fixture's file count. And the clause's second conjunct, queued work retaining fetch-plan order, has no gate and no ablation in the record (S8's ordering ablation is about assembling OUTPUT from slots, not admission order); the named gate on disk asserts only peak<=8 and peak>1."
+      "ablation": "SIX ablations over 11 tests, all firing. cap-16 and cap-4 (a one-literal change in either direction) each turn 8 red; pool-unbounded turns 8 red; a STRIPED worker pool — eight workers, worker s taking every eighth plan entry, which respects the cap EXACTLY and still admits queued work out of plan order — turns 4 red; pumping the queue only from the success path turns 1 red; an unsorted plan turns 6 red. Every ablation was applied to a THROWAWAY COPY of the package, never to the working tree, and the harness itself was negative-tested four ways before its results were trusted: an absent anchor and an ambiguous anchor both report DID-NOT-LAND rather than a clean run, a behaviour-preserving edit reports DID NOT FIRE, and an expected-red naming a test that does not exist is reported as such. Controls: 108 tests reported, 0 failing, before and after.",
+      "evidenceLine": "The cap conjunct was previously gated by `peak <= 8 && peak > 1`, which a loader capped at 2, 4 or 6 satisfies while contradicting the sentence — so the shipped assertion admitted three wrong implementations. It is now an EXACT count obtained without any timing in it: plan more than eight files, have every read return a promise that never settles, and the invocation count at quiescence IS the cap. Measured: exactly 8 of 20. The queue-ORDER conjunct had never been probed at all, which the ledger's own prior entry said; the striped-pool ablation is what discriminates it, because it is the mutation that keeps the cap correct and the order wrong."
     },
     {
       "id": 21,
       "statement": "Fetch requests default to {mode:\"cors\", credentials:\"same-origin\"} and the bounded `request` override is applied IDENTICALLY to every planned request.",
-      "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "No line. \"cors\", \"credentials\" and request-init appear nowhere in M8-STATUS.md; S8's six ablations (:584-588) contain none, and the S8 entry (:568-606) never mentions request defaults or the override, although M8-PLAN.md:205 scoped them to that slice."
+      "verdict": "PROVEN",
+      "slice": "S16",
+      "gates": [
+        "test/fetch-request-init.test.js",
+        "npm run verify"
+      ],
+      "ablation": "ELEVEN ablations over 11 tests, all firing: each default constant changed on its own; the override forwarded but dropped; the override applied to the first concurrency window only; the init rebuilt per entry rather than snapshotted once; an unspecified field falling back to something other than its documented default; the override stripped from `loadStrings` alone while `loadEntireManifest` keeps it; and per-entry manifest data leaking into the init. Every ablation was applied to a THROWAWAY COPY of the package, never to the working tree, and the harness itself was negative-tested four ways before its results were trusted: an absent anchor and an ambiguous anchor both report DID-NOT-LAND rather than a clean run, a behaviour-preserving edit reports DID NOT FIRE, and an expected-red naming a test that does not exist is reported as such. Controls: 108 tests reported, 0 failing, before and after.",
+      "evidenceLine": "The shipped test asserted the override over two requests and never asserted the DEFAULT `credentials: \"same-origin\"` at all — the half of the sentence with no override in it. It also could not see a loader that applied the override to the first eight requests only, because two requests never leave the first concurrency window. The new file drives twelve planned files through both Fetch doors."
     },
     {
       "id": 22,
       "statement": "Abort cancels outstanding work and rejects, and is NEVER converted into partial success.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S8",
+      "verdict": "PROVEN",
+      "slice": "S16",
       "gates": [
-        "test/fetch-loader.test.js"
+        "test/load-abort.test.js",
+        "src/load/run-plan.js",
+        "npm run verify"
       ],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:577 \"the fetches resolve BACKWARDS, stream FOREVER, abort mid-flight and lie about their digests\" — the record's only abort mention. None of S8's six ablations (:584-588) touches abort, and nothing records the abort-under-`allow-partial` case the plan names as the discriminating input (M8-PLAN.md:270)."
+      "ablation": "SIX ablations over 12 tests, all firing: removing the runner's own admission check; funnelling an aborted read into the ordinary per-file failure path; wrapping the abort reason so it is no longer distinguishable; dropping the signal from the Fetch transport; dropping it from the Node transport; and letting an abort escape the chunk loop without releasing the body. Every ablation was applied to a THROWAWAY COPY of the package, never to the working tree, and the harness itself was negative-tested four ways before its results were trusted: an absent anchor and an ambiguous anchor both report DID-NOT-LAND rather than a clean run, a behaviour-preserving edit reports DID NOT FIRE, and an expected-red naming a test that does not exist is reported as such. Controls: 108 tests reported, 0 failing, before and after.",
+      "evidenceLine": "PROVEN BY IMPLEMENTATION as well as by probe: the runner did NOT cancel outstanding work, it delegated that entirely to the transport. Its worker loop observed an abort only in the CATCH branch — i.e. only when a read FAILED — so a transport that ignores the signal, which an injected reader is free to be under plan 6.2:2098-2100, left every worker dequeuing. Measured before the fix: twenty planned files, abort during the first window, TWENTY transport invocations. The load still rejected, so 'abort rejects' was never wrong; 'cancels outstanding work' was. `src/load/run-plan.js` now checks `options.signal?.aborted` at the top of the worker loop; the same probe measures 1 invocation. The shipped test asserted only that the rejection was `instanceof Error`, which a rejection for any unrelated reason satisfies."
     },
     {
       "id": 23,
@@ -266,22 +276,26 @@
     {
       "id": 25,
       "statement": "WebCrypto digest counts chunks against the 8 MiB cap, retains ONE bounded body, then digests it; peak-memory benchmarks must INCLUDE that buffer and digest copy.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S8",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:838 \"`SubtleCrypto.digest` is one-shot, so the browser door assembles a bounded body and then hashes it\" — descriptive prose in S11a, not a gate. No retained-bytes measurement, no benchmark and no ablation anywhere in the record; M8-PLAN.md:273 itself calls this \"Weakly gateable at best\"."
+      "verdict": "PROVEN",
+      "slice": "S16",
+      "gates": [
+        "test/digest-memory-bounds.test.js",
+        "npm run verify"
+      ],
+      "ablation": "EIGHT ablations over 11 tests, all firing: charging the cap to the current chunk rather than the running total (5 red); taking the cap from `Content-Length` (6 red); taking it from the declared `decodedBytes` (5 red); draining the whole body before measuring (1 red); hoisting the byte counter outside the per-file scope (1 red); digesting only the first chunk (6 red); digesting the decoded text re-encoded (2 red); and digesting each chunk and keeping the last (6 red). Every ablation was applied to a THROWAWAY COPY of the package, never to the working tree, and the harness itself was negative-tested four ways before its results were trusted: an absent anchor and an ambiguous anchor both report DID-NOT-LAND rather than a clean run, a behaviour-preserving edit reports DID NOT FIRE, and an expected-red naming a test that does not exist is reported as such. Controls: 108 tests reported, 0 failing, before and after.",
+      "evidenceLine": "The clause's three propositions were separated rather than fused. Chunk accounting is observable at the boundary with a body that exceeds the cap only in AGGREGATE across chunks. 'Retains one bounded body, then digests it' is made executable as a digest CALL COUNT of exactly one per file over a buffer whose byteLength equals the streamed total — the only residue that order leaves at the public boundary. The peak-memory-benchmark sentence is documentation-shaped and is recorded as deferred rather than given an invented probe."
     },
     {
       "id": 26,
       "statement": "SHA-256 is verified BEFORE UTF-8 parsing.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S8",
+      "verdict": "PROVEN",
+      "slice": "S16",
       "gates": [
-        "test/fetch-loader.test.js"
+        "test/digest-before-parse.test.js",
+        "npm run verify"
       ],
-      "ablation": "S8 records \"verifying the digest AFTER parsing\" among six \"all firing\", but over a probe the plan names as non-discriminating for ORDER; no red test is named.",
-      "evidenceLine": "DOWNGRADED: the record's own parenthetical defeats the claim. :584-586 states the probe body \"is valid JSON, so a parse-first loader succeeds and never notices — the STAGE is what proves the order\", while M8-PLAN.md:274 requires \"A body whose digest is wrong AND whose JSON is malformed\" precisely because \"On every valid input the two orders are indistinguishable\". With valid JSON and a wrong digest, a parse-then-verify loader still fails at the digest stage, so the recorded ablation separates verified-at-all from not-verified, not before-parsing from after. The plan's discriminating input was declined and the record names no test that went red."
+      "ablation": "SEVEN ablations over 34 tests, all firing: never comparing the digest (22 red); comparing it AFTER parsing (6 red); decoding before digesting (3 red); stripping a BOM before hashing on the Fetch door (2 red) and on the Node door (4 red); letting allow-partial rescue a corrupt fallback (3 red); and collapsing every failure to one stage name (28 red). Every ablation was applied to a THROWAWAY COPY of the package, never to the working tree, and the harness itself was negative-tested four ways before its results were trusted: an absent anchor and an ambiguous anchor both report DID-NOT-LAND rather than a clean run, a behaviour-preserving edit reports DID NOT FIRE, and an expected-red naming a test that does not exist is reported as such. Controls: 108 tests reported, 0 failing, before and after.",
+      "evidenceLine": "THE SHIPPED PROBE COULD NOT FAIL AND ITS OWN COMMENT SAID WHY: its corrupt body was valid JSON, so a parse-first loader parses it successfully, then checks the digest, and reports stage 'digest' exactly as a digest-first loader does. The record claimed 'the STAGE is what proves the order'; the stage proves the order only when the body fails BOTH stages. The new probe serves a body that is same-length, digest-wrong AND unparseable, so the reported stage names which check ran first — with a second manifest DECLARING those corrupt bytes as the control, which must report 'parse', proving the body genuinely fails parsing. Both doors, and the Node door in both its buffered and streaming forms, because the two doors hash by different mechanisms and a green on one is not evidence about the other."
     },
     {
       "id": 27,
@@ -342,11 +356,14 @@
     {
       "id": 32,
       "statement": "There is NO hidden process-global or browser-global catalog cache.",
-      "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "No line. \"cache\" occurs in M8-STATUS.md only at :807 (plan 6.4 cache-correctness prose, explicitly \"documentation for M-D, not code, and nothing here implements or gates it\") and :1062 (clause-50 fixtures NOT written). The module-graph / two-realm instruments that exist (`test/ssr-graph.test.js`, `test/ssr-two-realm.test.js`) are recorded as gating the SSR trust boundary, not module-level catalog state."
+      "verdict": "PROVEN",
+      "slice": "S16",
+      "gates": [
+        "test/no-global-catalog-cache.test.js",
+        "npm run verify"
+      ],
+      "ablation": "TWELVE ablations over 16 tests, all firing — one per cache SHAPE, because the clause is a universal negative and only an enumeration can support it: a module-scoped map of parsed catalogs; the same of raw bytes; a retained-but-never-read map (invisible to every behavioural probe, which is why the retention arm exists); a write-only registry on globalThis; the same hung off an ambient host rather than the global root; a registered-symbol global shared across realms; a CacheStorage wrapper on the DEFAULT transport only, which every injected-transport ledger is green over; a per-file-NAME memo in the raw directory door; the same keyed by name AND size, which survives the rewrite arm and is caught only by a second directory whose same-named catalog is deliberately the same length; a plan registry written onto the caller's own manifest object; and a compiled-instance cache in core keyed by catalogVersion, then by catalogFingerprint — the key an author in THIS codebase actually reaches for. Every ablation was applied to a THROWAWAY COPY of the package, never to the working tree, and the harness itself was negative-tested four ways before its results were trusted: an absent anchor and an ambiguous anchor both report DID-NOT-LAND rather than a clean run, a behaviour-preserving edit reports DID NOT FIRE, and an expected-red naming a test that does not exist is reported as such. Controls: 108 tests reported, 0 failing, before and after.",
+      "evidenceLine": "RECORDED AS AN ENUMERATION, not as an unqualified absence: no finite probe set proves a universal negative, and the twelve shapes above are what is gated. Four doors are driven (loadStrings, loadEntireManifest, the Node file doors and the directory door) because a memo in one door's planner is invisible from another, which is the seam S10 paid for. MEASURED AND WORTH A DECISION: one `loadStrings` call runs `validateStringsManifest` FOUR times, each recomputing the full SHA-256 catalog fingerprint. That is not a defect and it is what 'no hidden cache' costs, but it is the obvious thing a later author memoizes, and a validation memo keyed on manifest object identity would be caught by NO test in this file."
     },
     {
       "id": 33,

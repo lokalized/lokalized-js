@@ -132,8 +132,12 @@ test("a body that never ends fails on the byte LIMIT rather than exhausting memo
 });
 
 test("a wrong digest fails at DIGEST, before the body is parsed", async () => {
-  // The body below is valid JSON, so a loader that parsed first would succeed and never notice. The
-  // stage is what proves the order.
+  // **THE SECOND SENTENCE OF THIS COMMENT USED TO CLAIM AN ORDER THIS PROBE CANNOT SEE.** It read
+  // "the stage is what proves the order", which does not follow from the first sentence: a parse-first
+  // loader parses this valid body successfully, THEN checks the digest, and reports stage `digest`
+  // exactly as a digest-first loader does. A stage name proves an order only when the body fails BOTH
+  // stages. What this test actually proves is that a mismatch is DETECTED and is fatal — which is
+  // worth keeping. The ordering probe is `test/digest-before-parse.test.js`.
   const m = manifest(["en"]);
   const fetchImpl = injectedFetch({ respond: () => streamed([utf8.encode('{"Other.Key":"different"}')]) });
   const error = await loadStrings(m, "en", { fetch: fetchImpl.impl }).then(() => null, (e) => e);
@@ -182,6 +186,9 @@ test("abort rejects and is never converted into partial success", async () => {
   const error = await loadStrings(m, "fr", {
     fetch: fetchImpl.impl, signal: controller.signal, partialFailure: "allow-partial",
   }).then((value) => value, (e) => e);
+  // Weak on purpose and no longer load-bearing: `instanceof Error` is satisfied by a rejection for any
+  // unrelated reason. `test/load-abort.test.js` carries the distinguishing assertions, the
+  // no-queued-work-after-abort count and the body-release check.
   assert.ok(error instanceof Error, "an aborted load must reject, not resolve to a partial result");
   assert.ok(!(error && /** @type {any} */ (error).complete === false), "abort is not a partial success");
 });
@@ -193,6 +200,11 @@ test("at most eight catalog reads are active at once", async () => {
     respond: async (url) => { await new Promise((r) => setTimeout(r, 5)); return okBody(url); },
   });
   await loadEntireManifest(m, { fetch: fetchImpl.impl });
+  // **THIS PAIR IS NOT THE GATE — `test/fetch-concurrency.test.js` is.** `<= 8 && > 1` is satisfied by
+  // a loader capped at 2, 4 or 6, all of which contradict plan 6.2:2087, and it says nothing at all
+  // about the sentence's second half (queued work retains fetch-plan order). It is kept as a smoke
+  // check over a fixture that really does run work in parallel; the exact, timing-free count lives in
+  // that file, measured by stalling every read and reading the invocation count at quiescence.
   assert.ok(fetchImpl.peak() <= 8, `peak concurrency was ${fetchImpl.peak()}, which exceeds the cap of 8`);
   assert.ok(fetchImpl.peak() > 1, "the fixture must actually run work in parallel, or the cap is untested");
 });

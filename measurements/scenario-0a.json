@@ -9,19 +9,19 @@
     {
       "label": "root + raw-text catalog",
       "modules": 29,
-      "sourceBytes": 811962,
-      "importMs": 0.295,
-      "constructionMs": 0.117,
-      "firstRenderMs": 0.3846,
+      "sourceBytes": 815687,
+      "importMs": 0.316,
+      "constructionMs": 0.131,
+      "firstRenderMs": 0.3985,
       "retainedBytes": 69376
     },
     {
       "label": "core + parsed equivalent",
       "modules": 28,
-      "sourceBytes": 803717,
-      "importMs": 0.692,
-      "constructionMs": 0.3962,
-      "firstRenderMs": 0.348,
+      "sourceBytes": 807442,
+      "importMs": 0.68,
+      "constructionMs": 0.4096,
+      "firstRenderMs": 0.3705,
       "retainedBytes": 400504
     }
   ],
@@ -318,6 +318,13 @@
       "growth": [
         "root + raw-text catalog: source graph grew 809651 -> 811962 bytes",
         "core + parsed equivalent: source graph grew 801406 -> 803717 bytes"
+      ]
+    },
+    {
+      "reason": "M8 clause 19: createStrings({ loaded }) now refuses a record whose aggregate warnings list disagrees with the per-catalog copies it carries (src/internal/loaded-input.js, +3,725 B, no new modules).",
+      "growth": [
+        "root + raw-text catalog: source graph grew 811962 -> 815687 bytes",
+        "core + parsed equivalent: source graph grew 803717 -> 807442 bytes"
       ]
     }
   ],

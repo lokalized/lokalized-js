@@ -170,6 +170,8 @@ export function optionsFromLoadedStrings(options) {
       `which is [${recomputed.join(", ")}]`,
     );
 
+  requireWarningsAgree(loaded);
+
   const { loaded: _consumed, ...rest } = options;
   return {
     options: {
@@ -185,6 +187,71 @@ export function optionsFromLoadedStrings(options) {
     verification: verificationRecord(loaded, coverage, planned, covered, manifestConfiguration),
   };
 }
+
+/**
+ * (4) the record's two COPIES of its own warnings must agree.
+ *
+ * **A `LoadedStrings` carries every warning twice** — once inside each `ParsedStringsFile` under
+ * `catalogs`, and once more as the flat aggregate `warnings`. Plan 3.2:629-632 says the loaded
+ * branch "preserves `LoadedStrings.warnings` exactly … without resorting", but construction does not
+ * read that field at all: it hands `catalogs` to the shared construction path, which REPLAYS each
+ * file's own warnings in catalogs-key order. For every record the loader produces the two are
+ * identical, because `run-plan.js` builds `catalogs` and `warnings` from one slot walk — so the
+ * clause's outcome held and only its mechanism diverged, which is why nothing ever caught it.
+ *
+ * **THE HAZARD IS SILENT AND THE TRANSFORM THAT TRIGGERS IT IS ORDINARY.** A record survives
+ * `JSON.stringify`/`parse` and `structuredClone` intact — measured, and that is the server-render
+ * path — but anything that REBUILDS it decouples the two copies. Sorting `catalogs` for
+ * deterministic output is accepted today and silently changes the order `getWarnings()` reports
+ * while the record's own field still says otherwise: no error, no diagnostic, two answers. Dropping
+ * a catalog is already refused by the coverage check above; reordering was not refused by anything.
+ *
+ * So the duplicate is made safe rather than left to chance: the record must be SELF-CONSISTENT, and
+ * a record that is not says so at construction instead of rendering one answer and reporting
+ * another. This deliberately does NOT decide whether the aggregate is authoritative or derived —
+ * that is a maintainer question, and refusing the disagreement is what makes either answer safe to
+ * adopt later.
+ *
+ * The comparison is by VALUE, not identity: a round-tripped record rebuilds every warning object,
+ * and plan 4.3 makes defensive copying the house style, so identity would refuse conforming records.
+ *
+ * @param {Record<string, any>} loaded
+ */
+function requireWarningsAgree(loaded) {
+  if (!Array.isArray(loaded.warnings))
+    throw configurationError("`loaded.warnings` must be an array");
+
+  /** Plan 4.4:1551-1564's seven fields, in one comparable string. */
+  const signature = (/** @type {any} */ warning) => JSON.stringify([
+    warning?.type, warning?.source, warning?.locale, warning?.key, warning?.placeholder,
+    [...(warning?.missingLanguageForms ?? [])], warning?.message,
+  ]);
+
+  /** The aggregate construction will actually produce: each file's own list, in catalogs-key order. */
+  const derived = [];
+  for (const file of Object.values(loaded.catalogs ?? {}))
+    for (const warning of /** @type {any} */ (file)?.warnings ?? []) derived.push(warning);
+
+  const declared = loaded.warnings;
+  if (declared.length !== derived.length)
+    throw configurationError(
+      `\`loaded.warnings\` lists ${declared.length} warning(s) while the catalogs it carries hold ` +
+      `${derived.length}; the record disagrees with itself about what the load produced`,
+    );
+
+  for (let index = 0; index < derived.length; ++index)
+    if (signature(declared[index]) !== signature(derived[index]))
+      throw configurationError(
+        `\`loaded.warnings\` disagrees with the catalogs at index ${index}: the record lists ` +
+        `${describeWarning(declared[index])} where its own catalogs hold ` +
+        `${describeWarning(derived[index])}. A record whose two copies of a warning list differ ` +
+        `renders one answer and reports another`,
+      );
+}
+
+/** @param {any} warning */
+const describeWarning = (warning) =>
+  warning === undefined ? "nothing" : `'${warning?.locale ?? "?"}/${warning?.key ?? "?"}'`;
 
 /**
  * Plan 3.4:711-735's record, built from what was just proved.
