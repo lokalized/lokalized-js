@@ -1,8 +1,8 @@
 {
-  "corpusSha256": "91cffc8454e30bf783e2e24ad0b50bf5c2f93897f3e3d0d0551d43d99f660671",
+  "corpusSha256": "02626938783d6c4606f05fd290909ea51b02af5d73ff36cc8145de7c4973a8f6",
   "librarySourcesSha256": "f9dd1d8cab988a6d8e7496a21d7c13b989e58b22096074ba6cebd3835c82374c",
   "behavioralVectorsVersion": "1.0.0",
-  "applicable": 2358,
+  "applicable": 2363,
   "passedIds": [
     "accept-language.absent.null-header",
     "accept-language.blank.whitespace-only",
@@ -1146,6 +1146,11 @@
     "interpolation-escapes.strict.three-backslashes-emit-backslash-then-literal-placeholder",
     "interpolation-escapes.strict.trailing-lone-backslash-survives",
     "language-forms.tuples.all-61-axis-name-render-name",
+    "loader-path-shapes.load.absent-path-refuses",
+    "loader-path-shapes.load.child-directory-is-not-descended-into",
+    "loader-path-shapes.load.child-directory-still-charges-the-budget",
+    "loader-path-shapes.load.regular-file-refuses",
+    "loader-path-shapes.load.special-file-refuses",
     "loader-smoke.load.clean-directory-reports-locales-and-keys",
     "loader-smoke.load.incomplete-cardinality-emits-warning",
     "loader-smoke.load.translation-node-limit-exceeded",

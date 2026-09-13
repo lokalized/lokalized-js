@@ -826,6 +826,19 @@ function normalizeAcceptLanguage(acceptLanguage) {
 }
 
 /**
+ * The two allowlisted `negotiate` type names the port declared nowhere until M8.
+ *
+ * **BOTH ARE DERIVED FROM WHAT SHIPS.** `LocaleMatcher` is plan 3.5:883's two-method interface, taken
+ * as a `Pick` of the negotiator this module actually returns rather than retyped — so a signature
+ * change in the runtime moves the declared type with it instead of leaving the two to disagree.
+ * `LanguageRange` is core's type re-exported, and plan 3.1:372 says so in as many words ("re-exports
+ * core's `LanguageRange` type"): a second definition here would be a second thing to keep in step.
+ *
+ * @typedef {import("../core/index.js").LanguageRange} LanguageRange
+ * @typedef {Pick<ReturnType<typeof createLocaleNegotiator>, "matchFor" | "bestMatchFor">} LocaleMatcher
+ */
+
+/**
  * A matcher over one applicable locale configuration.
  *
  * Every `matchFor*` is STRICT: no acceptable candidate reports an unmatched result rather than

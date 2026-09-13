@@ -137,8 +137,41 @@ jobs:
       # that machine-dependent timings be re-recorded from whatever host happened to go red.
       - name: Scenario 2k performance and memory measurement
         run: npm run scenario:2k
+      # A clause may not be recorded PROVEN without a gate that exists on disk AND an ablation that
+      # was actually performed. M8's close-out was otherwise going to be a prose verdict table, and a
+      # close-out that reads its own prose back to itself is this project's most-repeated defect.
+      - name: M8 acceptance-clause ledger
+        run: npm run clause:ledger
       - name: Generated-placeholder spike
         run: npm run spike:placeholders
+
+      # THE SPEC REPOSITORY'S OWN GATES, which nothing in CI ran until 2026-09-11.
+      #
+      # This job already checked lokalized-spec out for its ARTIFACTS and never ran its CHECKS, so
+      # every spec-side ratchet was re-verified only when a human happened to run `npm run check`
+      # there. `check:coverage` is the one that matters most: it fails on an undispositioned branch
+      # AND on a STALE one, and slice S14 moved it — four dispositions deleted — with no automated
+      # re-check behind the claim. That is the same shape as clause 19's proof obligation, found the
+      # same way, and it is fixed here rather than argued around.
+      #
+      # FIVE OF THE TEN RUN HERE. The exclusions are measured, not assumed, and each is named so a
+      # reader does not mistake this for the whole suite:
+      #   check:allowlist, check:surface, check:registry  — resolve the PLAN through
+      #     scripts/planning-path.mjs and exit 2 with a remedy when it is absent. The planning
+      #     directory is deliberately outside every checkout and is not pushed, so these cannot run
+      #     in CI by design. Measured: exit 2 with LOKALIZED_PLANNING_DIR unset.
+      #   check:vectors, check:iana                       — drive the pinned JDK against
+      #     lokalized-java, which this workflow does not check out or build. Measured: exit 1 naming
+      #     the JDK path. They fail LOUDLY rather than skipping, which is why they are excluded here
+      #     rather than run and ignored.
+      - name: Spec-repo gates that need neither the plan nor the JDK
+        working-directory: lokalized-spec
+        run: |
+          npm run check:snapshot
+          npm run check:schemas
+          npm run check:datalock
+          npm run check:archive
+          npm run check:coverage
 
   packed:
     runs-on: ubuntu-latest

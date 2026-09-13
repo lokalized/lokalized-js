@@ -40,16 +40,19 @@
     },
     {
       "reason": "M8 S9-owed: core gains the applicable-configuration split (the selection channel reads the full manifest, the resolution channel the loaded catalogs) and the per-use lookup-coverage check. No new module — source only."
+    },
+    {
+      "reason": "M8 close-out: the nine promised-but-undeclared type names land in core and negotiate, and tools/gen-data.js now emits all five fields plan 2.2 declares for DataProvenance (the shipped provenance carried two, so the type could not be declared truthfully)."
     }
   ],
   "subpaths": {
     "lokalized": {
       "modules": 29,
-      "bytes": 809651
+      "bytes": 811962
     },
     "lokalized/core": {
       "modules": 28,
-      "bytes": 801406
+      "bytes": 803717
     },
     "lokalized/parse": {
       "modules": 26,
@@ -57,7 +60,7 @@
     },
     "lokalized/load": {
       "modules": 36,
-      "bytes": 699140
+      "bytes": 699441
     },
     "lokalized/ssr": {
       "modules": 2,
@@ -65,19 +68,19 @@
     },
     "lokalized/negotiate": {
       "modules": 15,
-      "bytes": 391336
+      "bytes": 392110
     },
     "lokalized/node": {
       "modules": 39,
-      "bytes": 734780
+      "bytes": 735081
     },
     "lokalized/data/ordinal": {
       "modules": 31,
-      "bytes": 829146
+      "bytes": 831457
     },
     "lokalized/data/ranges": {
       "modules": 31,
-      "bytes": 834015
+      "bytes": 836326
     }
   }
 }

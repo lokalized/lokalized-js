@@ -9,20 +9,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 29,
-      "sourceBytes": 809651,
-      "importMs": 0.265,
-      "constructionMs": 0.1183,
-      "firstRenderMs": 0.346,
+      "sourceBytes": 811962,
+      "importMs": 0.295,
+      "constructionMs": 0.117,
+      "firstRenderMs": 0.3846,
       "retainedBytes": 69376
     },
     {
       "label": "core + parsed equivalent",
       "modules": 28,
-      "sourceBytes": 801406,
-      "importMs": 0.657,
-      "constructionMs": 0.3764,
-      "firstRenderMs": 0.3423,
-      "retainedBytes": 396496
+      "sourceBytes": 803717,
+      "importMs": 0.692,
+      "constructionMs": 0.3962,
+      "firstRenderMs": 0.348,
+      "retainedBytes": 400504
     }
   ],
   "rebaselines": [
@@ -311,6 +311,13 @@
       "growth": [
         "root + raw-text catalog: source graph grew 803490 -> 809651 bytes",
         "core + parsed equivalent: source graph grew 795245 -> 801406 bytes"
+      ]
+    },
+    {
+      "reason": "M8 close-out: the nine allowlisted type names the port declared nowhere are now declared (types are erased at runtime; the bytes are JSDoc), and src/data/provenance.js carries all five fields plan 2.2's DataProvenance declares instead of two, so the type asserts what the runtime actually has.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 809651 -> 811962 bytes",
+        "core + parsed equivalent: source graph grew 801406 -> 803717 bytes"
       ]
     }
   ],

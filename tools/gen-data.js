@@ -138,7 +138,8 @@ const rangeGroups = (groups) =>
  * both sides can compare a single value rather than a hash of their own differing encodings.
  */
 const provenance = (source) =>
-  `/** @returns {{cldrVersion: string, dataFingerprint: string}} */\n` +
+  `/** @returns {{formatVersion: number, cldrVersion: string, generatorVersion: string, ` +
+  `inputsSha256: string, dataFingerprint: string}} */\n` +
   `export const decode = () => (${js(source)});\n`;
 
 const dataLock = JSON.parse(readFileSync(join(specDir, "generated/cldr-data-lock.json"), "utf8"));
@@ -181,8 +182,22 @@ const MODULES = [
   },
   {
     file: "provenance.js",
-    what: "cldr-data-lock.{cldrVersion,dataFingerprint}",
-    source: { cldrVersion: dataLock.cldrVersion, dataFingerprint: dataLock.dataFingerprint },
+    // ALL FIVE FIELDS PLAN 2.2 DECLARES, not the two the port used to carry.
+    //
+    // `DataProvenance extends SourceDataProvenance` — `{formatVersion, cldrVersion, generatorVersion,
+    // inputsSha256}` plus `dataFingerprint` — and the shipped object carried only `cldrVersion` and
+    // `dataFingerprint`. So the two allowlisted TYPE names could not be declared truthfully: writing
+    // the plan's shape would have asserted fields `ordinalData.provenance` does not have, and `tsc`
+    // would have caught it the moment anything consumed them. The lock has held all five all along;
+    // this emits them, which makes the contract and the runtime agree instead of choosing one.
+    what: "cldr-data-lock.{formatVersion,cldrVersion,generatorVersion,inputsSha256,dataFingerprint}",
+    source: {
+      formatVersion: dataLock.formatVersion,
+      cldrVersion: dataLock.cldrVersion,
+      generatorVersion: dataLock.generatorVersion,
+      inputsSha256: dataLock.inputsSha256,
+      dataFingerprint: dataLock.dataFingerprint,
+    },
     encode: provenance,
   },
 ];

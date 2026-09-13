@@ -35,6 +35,7 @@
  *   node tools/conformance.mjs [--verbose] [--family <prefix>] [--json <path>] [--write]
  */
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -1596,6 +1597,26 @@ function materializeFixtureDirectory(fixture, fixtureId) {
   }
 
   const directory = join(fixtureRunRoot, fixtureId);
+
+  // **THE FIXTURE'S PATH SHAPE, which is not always a directory (spec-repo slice S14).** Four of
+  // Java's filesystem guards are only reachable when the path is absent, is a regular file, holds a
+  // child DIRECTORY, or holds a special file — so the corpus gained a transport that can say so, and
+  // a runner that ignored it would materialize a plain directory and compare the port against an
+  // `expected` block recorded for a DIFFERENT input. That is not hypothetical: the spec-side build
+  // did exactly that on its first run and banked `failed: false` for an absent path.
+  const pathShape = fixture.pathShape ?? "directory";
+  if (pathShape === "absent") {
+    // Nothing is created. The parent already exists, so the loader refuses the path the fixture
+    // named rather than an ancestor.
+    materializedDirectories.set(fixtureId, directory);
+    return directory;
+  }
+  if (pathShape === "regular-file") {
+    writeFileSync(directory, `${JSON.stringify({ "Key.A": "a" }, null, 2)}\n`, "utf8");
+    materializedDirectories.set(fixtureId, directory);
+    return directory;
+  }
+
   mkdirSync(directory, { recursive: true });
   const names = new Set([
     ...Object.keys(fixture.rawFilesBase64 ?? {}),
@@ -1603,6 +1624,28 @@ function materializeFixtureDirectory(fixture, fixtureId) {
     ...Object.keys(declaredFilesFor(fixtureId, fixture)),
   ]);
   for (const name of names) writeFileSync(join(directory, name), parseResourceFor(fixture, fixtureId, name));
+
+  // Entries whose SHAPE is the point. `mkfifo` FAILS rather than skips: a runner that quietly wrote
+  // a regular file here would compare the port against an expectation recorded for a pipe, and
+  // report green.
+  for (const [name, entry] of Object.entries(fixture.entries ?? {})) {
+    const path = join(directory, name);
+    if (entry.kind === "directory") {
+      mkdirSync(path, { recursive: true });
+      for (const [childName, contents] of Object.entries(entry.files ?? {}))
+        writeFileSync(join(path, childName), `${JSON.stringify(contents, null, 2)}\n`, "utf8");
+    } else if (entry.kind === "fifo") {
+      const made = spawnSync("mkfifo", [path], { encoding: "utf8" });
+      if (made.error || made.status !== 0)
+        throw new Error(
+          `fixture ${fixtureId}: cannot create the FIFO entry '${name}'; mkfifo is required to ` +
+          `compare against a special-file expectation. ${made.error?.message ?? made.stderr}`,
+        );
+    } else {
+      throw new Error(`fixture ${fixtureId}: entry '${name}' has unknown kind ${JSON.stringify(entry.kind)}`);
+    }
+  }
+
   materializedCount += names.size;
   materializedDirectories.set(fixtureId, directory);
   return directory;

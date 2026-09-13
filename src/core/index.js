@@ -168,6 +168,41 @@ import { PLURAL_DATA_RUNTIME, UnsupportedLocaleError } from "../internal/plural.
  *   complete: boolean }>} StringsLoadVerification
  */
 
+/**
+ * The names the symbol allowlist has promised since M0 and the port declared NOWHERE.
+ *
+ * Found by `test/declared-surface.test.js` in M8 S5 — the allowlist gate was one-directional, so ten
+ * promised names had no declaration at all. These are types for runtime that ALREADY SHIPS, so
+ * declaring them is a gap in the published surface rather than new behaviour.
+ *
+ * **THE FIRST TWO ARE DERIVED, NOT TRANSCRIBED.** `Strings` is the shape `createStrings` returns and
+ * `DirectLocaleContext` the shape one of its methods returns, so neither can drift from the runtime
+ * the way a hand-written interface would — and this file has already had a comment assert the inverse
+ * of the code beside it.
+ *
+ * @typedef {ReturnType<typeof createStrings>} Strings
+ * @typedef {ReturnType<Strings["getDirectLocaleContext"]>} DirectLocaleContext
+ * @typedef {Readonly<{ range: string, weight: number }>} LanguageRange
+ */
+
+/**
+ * The pinned-data provenance the optional plural modules carry, plan 2.2:455-463.
+ *
+ * **THE RUNTIME WAS NARROWER THAN THE CONTRACT AND THE RUNTIME MOVED, not the type.** The shipped
+ * object carried `{cldrVersion, dataFingerprint}` — two of the five the plan declares — so writing
+ * the plan's shape here would have asserted fields `ordinalData.provenance` does not have, and `tsc`
+ * would have caught it the moment anything consumed them. `cldr-data-lock.json` has held all five all
+ * along; `tools/gen-data.js` now emits them, so the contract and the runtime agree rather than one
+ * being quietly bent to the other.
+ *
+ * @typedef {Readonly<{ formatVersion: number, cldrVersion: string, generatorVersion: string,
+ *   inputsSha256: string }>} SourceDataProvenance
+ * @typedef {SourceDataProvenance & Readonly<{ dataFingerprint: string }>} DataProvenance
+ * @typedef {Readonly<{ $lokalized: "ordinal-data", provenance: DataProvenance }>} OrdinalData
+ * @typedef {Readonly<{ $lokalized: "cardinal-range-data",
+ *   provenance: DataProvenance }>} CardinalRangeData
+ */
+
 const freeze = Object.freeze;
 
 /**

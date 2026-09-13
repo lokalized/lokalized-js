@@ -54,21 +54,23 @@ const OWNERS_BY_SUBPATH = /** @type {Record<string, string[]>} */ ({
  */
 const OWED = /** @type {Record<string, { owner: string, why: string }>} */ ({
   // --- `core`, `parse` and `negotiate`: declaration gaps in CLOSED milestones, found 2026-09-10 ---
+  //
+  // NINE OF THE TEN WERE DELIVERED 2026-09-11 on the maintainer's decision, and their entries are
+  // deleted, which is the record. They were types for runtime that already shipped, so declaring
+  // them closed a gap in the PUBLISHED SURFACE rather than adding behaviour — and two of them forced
+  // a real correction: `DataProvenance`/`SourceDataProvenance` declare five fields where the shipped
+  // provenance object carried two, so the generator now emits all five rather than the declaration
+  // asserting fields the runtime does not have.
+  //
+  // `parse:mergeParsedStringsFiles` is the tenth and is different in kind: it is a FUNCTION promised
+  // publicly with no implementation anywhere. It moves to M9 rather than being dropped, because the
+  // allowlist is generated from the plan and dropping a name needs a plan edit.
   // Recorded AS FOUND, not assigned. These are types for runtime that already ships (`Strings`,
   // `OrdinalData`, `DataProvenance`) or, in one case, a function that was allowlisted and never
   // written: `mergeParsedStringsFiles` has ZERO implementation anywhere in `src/`. Whether a closed
   // milestone is reopened for them or a later one adopts them is the maintainer's call. What this
   // table does is stop them being invisible, which they were until this test existed.
-  "core:CardinalRangeData": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
-  "core:DataProvenance": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
-  "core:DirectLocaleContext": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
-  "core:LanguageRange": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
-  "core:OrdinalData": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
-  "core:SourceDataProvenance": { owner: "UNASSIGNED", why: "type for shipped runtime; core is closed" },
-  "core:Strings": { owner: "UNASSIGNED", why: "the central instance type; core is closed and ships it unnamed" },
-  "parse:mergeParsedStringsFiles": { owner: "UNASSIGNED", why: "allowlisted with ZERO implementation anywhere in src/" },
-  "negotiate:LanguageRange": { owner: "UNASSIGNED", why: "re-export of core's type; that milestone is closed" },
-  "negotiate:LocaleMatcher": { owner: "UNASSIGNED", why: "negotiate type; that milestone is closed" },
+  "parse:mergeParsedStringsFiles": { owner: "M9", why: "allowlisted with ZERO implementation anywhere in src/; the maintainer chose to implement rather than drop it (2026-09-11), and the allowlist is generated from the plan so dropping it would need a plan edit" },
   "negotiate:LocaleNegotiator": { owner: "M9", why: "plan 3.5 puts the negotiator in M9" },
   // --- M8's own remaining to-build list ---------------------------------------------------------
   // The six `load` TYPES landed in S5, `chain`/`fetchSet` in S7, and the two SSR functions in S10;
