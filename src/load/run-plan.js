@@ -124,6 +124,42 @@ async function loadOne(/** @type {FetchEntry} */ entry, /** @type {any} */ optio
 }
 
 /**
+ * Plan 6.2:2103-2107 — the RESOLUTION channel's tiebreakers, filtered to what actually loaded.
+ *
+ * **THE MANIFEST'S FULL SET CANNOT BE HANDED TO `createStrings` AND NEVER COULD BE.** The core
+ * applies Java's construction rule (`DefaultStrings.<init>:394`): a language code's tiebreaker list
+ * must be an exact permutation of the catalogs that language actually has. A lookup-subset load
+ * fetches the candidate chain and nothing else, so a manifest declaring `{en: [en-GB, en-US, en]}`
+ * hands back a `complete: true` record naming three `en` catalogs when one arrived — and its own
+ * core refuses it. That was live on the flagship `loadStrings` door until this filter existed, and
+ * every test here missed it for one reason: every fixture declared `tiebreakers: {}`.
+ *
+ * Each declared list keeps its DECLARED ORDER; this list IS the resolution order for an ambiguous
+ * language code, so re-deriving it from the loaded set would silently reorder it.
+ *
+ * A language with zero survivors is OMITTED rather than kept as an empty order, which the plan names
+ * separately because the two are not the same value: an empty array is a declared order that resolves
+ * nothing, and the core validates it strictly.
+ *
+ * `manifestLocaleConfiguration` keeps the FULL set — the selection channel reads the manifest, the
+ * resolution channel reads what loaded.
+ *
+ * @param {Readonly<Record<string, readonly string[]>>} declared
+ * @param {readonly string[]} loadedTags both are already normalized by `requireManifestTag`.
+ */
+function tiebreakersForLoaded(declared, loadedTags) {
+  const loaded = new Set(loadedTags);
+  /** @type {Record<string, readonly string[]>} */
+  const filtered = Object.create(null);
+  for (const [languageCode, candidates] of Object.entries(declared ?? {})) {
+    const kept = candidates.filter((tag) => loaded.has(tag));
+    if (kept.length === 0) continue;
+    filtered[languageCode] = Object.freeze(kept);
+  }
+  return Object.freeze(filtered);
+}
+
+/**
  * @param {StringsManifestV1} manifest @param {readonly FetchEntry[]} plan
  * @param {any} options @param {LoadTransport} transport
  */
@@ -190,7 +226,7 @@ export async function runPlan(manifest, plan, options, transport) {
 
   return Object.freeze({
     catalogs: Object.freeze(catalogs),
-    tiebreakers: validated.tiebreakers,
+    tiebreakers: tiebreakersForLoaded(validated.tiebreakers, Object.keys(catalogs)),
     fallbackLocale: validated.fallbackLocale,
     // THE MANIFEST'S FULL CONFIGURATION, not the loaded subset, and it is not a convenience field.
     // `createStrings({ loaded })` recomputes the fetch plan from it (plan 3.4:727); without it the

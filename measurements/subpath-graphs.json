@@ -43,6 +43,9 @@
     },
     {
       "reason": "M8 close-out: the nine promised-but-undeclared type names land in core and negotiate, and tools/gen-data.js now emits all five fields plan 2.2 declares for DataProvenance (the shipped provenance carried two, so the type could not be declared truthfully)."
+    },
+    {
+      "reason": "M8 clause 30: manifest tiebreakers validated against the full manifest (src/load/manifest.js) and filtered to loaded tags in the shared runner (src/load/run-plan.js). No new modules; both graphs grew by the same 5,986 bytes because lokalized/node composes lokalized/load."
     }
   ],
   "subpaths": {
@@ -60,7 +63,7 @@
     },
     "lokalized/load": {
       "modules": 36,
-      "bytes": 699441
+      "bytes": 705427
     },
     "lokalized/ssr": {
       "modules": 2,
@@ -72,7 +75,7 @@
     },
     "lokalized/node": {
       "modules": 39,
-      "bytes": 735081
+      "bytes": 741067
     },
     "lokalized/data/ordinal": {
       "modules": 31,

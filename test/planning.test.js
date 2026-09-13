@@ -243,7 +243,7 @@ test("PROJECTION (plan-only): each entry carries ITS OWN file's digest", () => {
   // across the fixture — which is how this file was first written — an entry taking its digest from
   // the wrong manifest entry is byte-identical and completely invisible.
   const m = manifest({ "en-GB": file("en-GB"), "en-CA": file("en-CA"), en: file("en") },
-    { tiebreakers: { en: ["en-CA", "en-GB"] } });
+    { tiebreakers: { en: ["en-CA", "en-GB", "en"] } });
   for (const entry of fetchSet(m, "en-GB"))
     assert.equal(entry.sha256, digestFor(entry.locale),
       `${entry.locale} must carry its own digest, not another file's`);

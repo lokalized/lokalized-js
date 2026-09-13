@@ -3,8 +3,8 @@
   "milestone": "M8",
   "note": "DERIVED from planning/M8-STATUS.md, not asserted. A clause is PROVEN only where the record names a gate that exists AND an ablation that was actually performed with its result stated. Produced by five extraction agents and re-checked by an adversarial downgrade pass instructed to default to NOT-PROVEN. tools/clause-ledger.mjs enforces the rule on every run.",
   "tally": {
-    "PROVEN": 26,
-    "NOT-PROVEN": 54,
+    "PROVEN": 27,
+    "NOT-PROVEN": 53,
     "DEFERRED": 13
   },
   "clauses": [
@@ -317,11 +317,15 @@
     {
       "id": 30,
       "statement": "Manifest tiebreakers are validated against the FULL manifest then filtered to loaded tags in declared order; a language with zero loaded catalogs is OMITTED, not kept as an empty order.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S8",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:1043 \"TIEBREAKERS are what differ, since a loader filters them to the loaded tags (plan 6.2:2102-2105)\" — an aside inside the E5 ablation narrative of a different clause. The fixture M8-PLAN.md:278 names (every file for one nonfallback language fails, proving its now-empty entry is omitted) is recorded nowhere, and no ablation covers omission-versus-empty."
+      "verdict": "PROVEN",
+      "slice": "S15",
+      "gates": [
+        "test/manifest-tiebreakers.test.js",
+        "test/node-directory-manifest.test.js",
+        "npm run verify"
+      ],
+      "ablation": "SIX ablations, each naming the test it turns red, with a clean control on both sides (99 pass / 0 fail before and after). A1, the filter removed so the manifest's full list is returned — which is what shipped — turns FIVE red: 'a lookup-subset load produces a record its OWN core accepts', 'the DECLARED ORDER survives filtering rather than being re-derived', 'a language with ZERO surviving catalogs is OMITTED, not kept as an empty order', 'SELECTION keeps the full manifest while RESOLUTION keeps what loaded', and 'END TO END: an ordinary directory of sibling catalogs generates, loads AND constructs'. A2, sorting the filtered list instead of keeping the declared order, turns the DECLARED ORDER test red, alone. A3, retaining a zero-survivor language as an empty order, turns the OMITTED test red, alone. A4, filtering manifestLocaleConfiguration as well, turns the SELECTION test red, alone. A5, dropping the permutation check, turns the two manifest-validation refusals red. A6, dropping the missing-entry check, turns 'an AMBIGUOUS language with no tiebreaker at all is REFUSED, at publication' red. Two further ablations were added from an adversarial design pass whose agents were forbidden from reading src/, which named both as gaps a plausible implementation would slip through. A7, writing the omission guard as 'more than one survivor' rather than 'none' — which passes both a multi-survivor and a zero-survivor probe and is still wrong — turns three red, including the one-survivor subset case. A8, rebuilding the surviving order from the loaded catalogs instead of keeping it from the declaration, turns the DECLARED ORDER test red; it also confirms that assertion discriminates manifest-key order and completion order, not merely sorted order. Eight ablations, each naming its reds, controls clean on both sides (42 pass / 0 fail).",
+      "evidenceLine": "PROVEN BY IMPLEMENTATION, not by record repair: the clause had NO CODE in either half and two live defects followed. 1. runPlan returned validated.tiebreakers unfiltered, so every loadStrings subset load from a manifest declaring any tiebreaker produced a complete:true record its own createStrings refused, under Java's exact-permutation rule at DefaultStrings.<init>:394. 2. validateStringsManifest checked tiebreakers against nothing, so a directory holding en.json beside en-GB.json generated a manifest, loaded it complete:true, then refused to construct — advising createStrings({tiebreakers}), which loaded-input.js:49 explicitly forbids. Both measured directly before the fix, not argued. All 1,069 pre-existing tests passed over both defects because every loader fixture declared tiebreakers:{}. Conformance is byte-identical across the fix at 2,117 passed / 0 FAILED — Java has no manifest, so the corpus is structurally blind to this clause and its staying green is not evidence. The manifest rule refused two of this repo's OWN fixtures on its first run — test/manifest.test.js declared a tiebreaker for en-001 while publishing no such file, and test/planning.test.js omitted en from an en tiebreaker list — and both were repaired to be legal rather than the rule weakened."
     },
     {
       "id": 31,

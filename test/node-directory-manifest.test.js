@@ -25,7 +25,8 @@ import { after, test } from "node:test";
 import { createStrings } from "../src/core/index.js";
 import { createSsrStamp } from "../src/ssr/index.js";
 import {
-  createStringsManifestFromDirectory, loadStringsFromDirectory, readStringsFromDirectory,
+  createStringsManifestFromDirectory, loadStringsFromDirectory, loadStringsFromFiles,
+  readStringsFromDirectory,
 } from "../src/node/index.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
 
@@ -73,7 +74,10 @@ test("keys are NORMALIZED TAGS and urls are the names ON DISK", async () => {
   // would be wrong in opposite directions: `${tag}.json` invents a suffix `fr` does not have, and
   // using the file name as the key publishes `en-US.JSON` as a locale.
   const path = directory({ "en-US.JSON": bodyFor("en-US"), "de.JsOn": bodyFor("de"), fr: bodyFor("fr"), "en.json": bodyFor("en") });
-  const manifest = await createStringsManifestFromDirectory(path, OPTIONS);
+  // The tiebreaker is not incidental to the fixture: a directory publishing both `en` and `en-US`
+  // declares an ambiguous language, and plan 6.2:2103 refuses a manifest that leaves it unresolved
+  // because no instance could ever be constructed from one.
+  const manifest = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { en: ["en-US", "en"] } });
 
   assert.deepEqual(Object.keys(manifest.files).sort(), ["de", "en", "en-US", "fr"]);
   const resolved = (/** @type {string} */ tag) => new URL(manifest.files[tag].url, manifest.baseUrl).href;
@@ -188,7 +192,7 @@ test("an ordinary catalog name is not gratuitously escaped", async () => {
   // and a space. What is left to assert here is the complement — that an ordinary name is passed
   // through unchanged rather than escaped into something the CDN will not serve.
   const path = directory({ "en.json": bodyFor("en"), "en-US.JSON": bodyFor("en-US") });
-  const manifest = await createStringsManifestFromDirectory(path, OPTIONS);
+  const manifest = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { en: ["en-US", "en"] } });
   assert.equal(manifest.files.en.url, "en.json");
   assert.equal(manifest.files["en-US"].url, "en-US.JSON");
 });
@@ -452,13 +456,16 @@ test("a ReadonlyMap of tiebreakers is HONOURED, not silently dropped", async () 
   const path = directory(catalogs(["en", "fr", "fr-CA"]));
   const viaRecord = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { fr: ["fr", "fr-CA"] } });
   const viaMap = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: new Map([["fr", ["fr", "fr-CA"]]]) });
-  const without = await createStringsManifestFromDirectory(path, OPTIONS);
+  const reversed = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { fr: ["fr-CA", "fr"] } });
 
   assert.deepEqual(viaMap.tiebreakers, viaRecord.tiebreakers);
   assert.equal(viaMap.catalogFingerprint, viaRecord.catalogFingerprint);
-  // The anti-vacuity half: the two must differ from declaring none, or the equality above would hold
-  // over a generator that dropped BOTH forms.
-  assert.notEqual(viaMap.catalogFingerprint, without.catalogFingerprint);
+  // THE ANTI-VACUITY HALF, and it is stronger than the control it replaced. This used to compare
+  // against declaring NO tiebreakers, which a directory holding `fr` and `fr-CA` may no longer do —
+  // plan 6.2:2103 refuses a manifest that leaves an ambiguous language unresolved. Comparing against
+  // the REVERSED order proves more than presence did: the declared ORDER reaches the fingerprint, so
+  // a generator that kept the entry and lost its order is caught too.
+  assert.notEqual(viaMap.catalogFingerprint, reversed.catalogFingerprint);
 });
 
 test("a non-canonically spelled tiebreaker is normalized, not turned into a self-contradiction", async () => {
@@ -506,4 +513,41 @@ test("a locale the raw door loads but no manifest may key on names the FILE", as
   assert.deepEqual(Object.keys(readStringsFromDirectory(path).catalogs), ["en", "en-US-POSIX"]);
   await assert.rejects(() => createStringsManifestFromDirectory(path, OPTIONS),
     /en-US-x-lvariant-POSIX\.json in .* a manifest cannot publish: 'en-US-POSIX'/);
+});
+
+test("END TO END: an ordinary directory of sibling catalogs generates, loads AND constructs", async () => {
+  // **THE WHOLE NODE PIPELINE WAS BROKEN FOR THE MOST ORDINARY MULTI-CATALOG LAYOUT THERE IS, and
+  // every slice that built a piece of it was green.** `en.json` beside `en-GB.json` generated a
+  // manifest, loaded it with `complete: true`, and then `createStrings` refused — advising the caller
+  // to pass `createStrings({ tiebreakers })`, which the loaded branch explicitly forbids. Two defects
+  // met here and neither was visible from inside the slice that shipped it: the generator published a
+  // manifest that left an ambiguous language unresolved, and the runner handed the core the FULL
+  // declared tiebreaker list rather than the one filtered to what loaded.
+  //
+  // This test exists at the SEAM because that is the only place either is observable. S10 paid for
+  // the same lesson one layer down.
+  const path = directory(catalogs(["en", "en-GB", "fr"]));
+  const manifest = await createStringsManifestFromDirectory(path,
+    { ...OPTIONS, tiebreakers: { en: ["en-GB", "en"] } });
+  const loaded = await loadStringsFromDirectory(path, { ...OPTIONS, tiebreakers: { en: ["en-GB", "en"] } });
+
+  assert.equal(loaded.complete, true);
+  assert.deepEqual(Object.keys(manifest.files).sort(), ["en", "en-GB", "fr"]);
+  const strings = createStrings({ loaded, locale: "en-GB" });
+  assert.equal(strings.get("Hi"), "hello en-GB");
+
+  // A LOOKUP SUBSET over the same directory, which is where the filter is load-bearing: `fr` pulls
+  // `fr` and the fallback `en` and leaves `en-GB` unfetched, so the declared two-name order must
+  // arrive as one name rather than as a permutation of catalogs that are not there.
+  //
+  // **THE FIRST DRAFT OF THIS HALF PROVED NOTHING** — it asked `loadStringsFromDirectory` for a
+  // `lookupLocale`, which that door does not take (it whole-loads by design), and guarded the
+  // assertions behind `if (coverage.kind === "lookup")`, so they never ran and the test reported
+  // green. A pass count is not proof that an assertion executed. The subset door is
+  // `loadStringsFromFiles`, and it is called unconditionally.
+  const subset = await loadStringsFromFiles(manifest, "fr");
+  assert.equal(subset.coverage.kind, "lookup", "guard against the conditional that made this vacuous");
+  assert.deepEqual(Object.keys(subset.catalogs).sort(), ["en", "fr"], "en-GB is NOT fetched");
+  assert.deepEqual({ ...subset.tiebreakers }, { en: ["en"] });
+  assert.doesNotThrow(() => createStrings({ loaded: subset, locale: "fr" }));
 });

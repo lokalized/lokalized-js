@@ -37,6 +37,7 @@ import {
   validateJsonNestingDepth,
 } from "../internal/json-parse.js";
 import { isKnownLanguageTag } from "../internal/locale-cldr.js";
+import { primaryLanguage } from "../internal/locale.js";
 import { jdkLocaleWellFormed } from "../internal/locale-jdk-tag.js";
 import { normalizeTag } from "../internal/locale.js";
 import { parseError, rethrowAsParseError } from "../internal/parse-diagnostics.js";
@@ -209,6 +210,8 @@ export function validateStringsManifest(input, options = {}) {
     );
   }
 
+  validateManifestTiebreakers(files, tiebreakers);
+
   const manifest = /** @type {StringsManifestV1} */ (Object.freeze({
     formatVersion: /** @type {1} */ (1),
     catalogVersion: input.catalogVersion,
@@ -305,3 +308,72 @@ export function parseStringsManifest(input, options = {}) {
 
   return validateStringsManifest(/** @type {{ value: unknown }} */ (document).value, options);
 }
+
+/**
+ * Plan 6.2:2103 — "Manifest tiebreakers are validated against the FULL manifest".
+ *
+ * **THIS IS WHAT MAKES THE LOADER'S FILTER SAFE RATHER THAN SILENT.** `runPlan` filters the declared
+ * tiebreakers down to the catalogs that actually loaded, so without this check a tiebreaker naming a
+ * tag the manifest never declared — `en-UK` for `en-GB`, the kind of thing a publisher writes once —
+ * is simply dropped on the floor and the manifest resolves by a shorter order than its author wrote.
+ * A filter that cannot distinguish "did not load" from "was never real" is the `ReadonlyMap` defect
+ * S11b found, wearing different clothes.
+ *
+ * The RULE is the core's, at manifest scope: `DefaultStrings.<init>:388` refuses a language code with
+ * no catalogs and `:394` requires an exact permutation of that language's catalogs. Applying it here
+ * against the manifest's declared files means a manifest that validates is a manifest whose declared
+ * coverage can be constructed from; applying it against the LOADED subset instead would refuse every
+ * lookup-subset load, which is the defect this pair of changes exists to fix.
+ *
+ * Private-use and undetermined tags are skipped exactly as the core skips them: they carry no
+ * broad-language matching semantics, so two of them create no ambiguity for a tiebreaker to resolve.
+ *
+ * @param {Record<string, unknown>} files declared files, keyed by normalized tag
+ * @param {Record<string, readonly string[]>} tiebreakers normalized, in declared order
+ */
+function validateManifestTiebreakers(files, tiebreakers) {
+  /** @type {Map<string, string[]>} */
+  const declaredByLanguageCode = new Map();
+  for (const tag of Object.keys(files)) {
+    const languageCode = primaryLanguage(tag);
+    if (languageCode.length === 0) continue;
+    const existing = declaredByLanguageCode.get(languageCode);
+    if (existing === undefined) declaredByLanguageCode.set(languageCode, [tag]);
+    else existing.push(tag);
+  }
+
+  // BOTH DIRECTIONS. A manifest declaring two catalogs for one language and NO tiebreaker for it is
+  // not merely under-specified: `createStrings` refuses it outright (`DefaultStrings.<init>:388`), so
+  // the manifest describes coverage that can never be loaded. Refusing it here is the difference
+  // between a publisher learning it at build time and a browser learning it at run time.
+  for (const [languageCode, declared] of declaredByLanguageCode) {
+    if (declared.length > 1 && tiebreakers[languageCode] === undefined)
+      throw configurationError(
+        `The manifest declares ${declared.length} files for '${languageCode}' [${declared.join(", ")}] ` +
+        `and no tiebreakers for it, so no instance could resolve between them`);
+  }
+
+  for (const [languageCode, candidates] of Object.entries(tiebreakers)) {
+    const declared = declaredByLanguageCode.get(languageCode);
+    if (declared === undefined)
+      throw configurationError(
+        `The manifest declares tiebreakers for '${languageCode}' but no file for that language`);
+
+    const seen = new Set();
+    for (const candidate of candidates) {
+      if (seen.has(candidate))
+        throw configurationError(
+          `The tiebreakers for '${languageCode}' name '${candidate}' twice; this list is a resolution ` +
+          `order, so a repeat has no recoverable meaning`);
+      seen.add(candidate);
+    }
+    const unrelated = candidates.filter((tag) => !declared.includes(tag));
+    const missing = declared.filter((tag) => !seen.has(tag));
+    if (unrelated.length > 0 || missing.length > 0)
+      throw configurationError(
+        `The tiebreakers for '${languageCode}' must be an exact permutation of the files the manifest ` +
+        `declares for that language [${declared.join(", ")}]; missing: [${missing.join(", ")}]; ` +
+        `unrelated: [${unrelated.join(", ")}]`);
+  }
+}
+

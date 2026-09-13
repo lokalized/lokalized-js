@@ -34,7 +34,7 @@ function manifest(overrides = {}) {
       en: { url: "en.json", sha256: "a".repeat(64) },
       fr: { url: "fr.json", sha256: "b".repeat(64), decodedBytes: 140 },
     },
-    tiebreakers: { en: ["en-001", "en"] },
+    tiebreakers: {},
     ...overrides,
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
@@ -42,9 +42,20 @@ function manifest(overrides = {}) {
 }
 
 test("a well-formed manifest validates and is defensively copied", () => {
-  const source = manifest();
+  // THE TIEBREAKER HALF NEEDS A MANIFEST WHOSE TIEBREAKERS ARE LEGAL. Plan 6.2:2103 validates them
+  // against the full manifest, so this fixture's original `{en: ["en-001", "en"]}` over a manifest
+  // publishing no `en-001` is refused before any copy could be observed — and was, on that rule's
+  // first run. The list here is an exact permutation of the `en` files the manifest declares.
+  const source = manifest({
+    files: {
+      en: { url: "en.json", sha256: "a".repeat(64) },
+      "en-001": { url: "en-001.json", sha256: "d".repeat(64) },
+      fr: { url: "fr.json", sha256: "b".repeat(64), decodedBytes: 140 },
+    },
+    tiebreakers: { en: ["en-001", "en"] },
+  });
   const validated = validateStringsManifest(source);
-  assert.deepEqual(Object.keys(validated.files).sort(), ["en", "fr"]);
+  assert.deepEqual(Object.keys(validated.files).sort(), ["en", "en-001", "fr"]);
 
   // Plan 6.1: `validateStringsManifest` "defensively copies". Mutating the caller's object afterwards
   // must not change what was validated, or a manifest could be swapped after its fingerprint checked.
