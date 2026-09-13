@@ -253,9 +253,22 @@ test("the file door and the Fetch door produce the SAME result from the same man
   // proves the two transports deliver the same bytes and classify them the same way — it says
   // nothing about whether the shared rules are right. What it WOULD catch is a transport that
   // reordered, renamed or re-staged anything, which is the whole risk of adding a second one.
+  // **ONE MANIFEST CANNOT DRIVE BOTH DOORS, and that is the rule rather than a limitation.** Plan
+  // 6.2:2035 has each door refuse the other's scheme BEFORE any I/O, so the comparison is between two
+  // manifests that differ in `baseUrl` and in nothing else. Their `catalogFingerprint`s are asserted
+  // EQUAL below, which is what makes them the same catalog set: the identity projection covers
+  // {formatVersion, catalogVersion, resolvedFallbackLocale, localeToSha256, tiebreakers} and neither
+  // `baseUrl` nor any file URL, so a scheme change is invisible to identity by design.
+  //
+  // This test used to hand the file-scheme manifest to BOTH doors, which the Fetch door accepted
+  // because its half of the scheme rule had no implementation. It does now.
   const { manifest } = directoryManifest(["fr", "en", "de"]);
+  const served = /** @type {any} */ ({ ...manifest, baseUrl: "https://cdn.example/v1/" });
+  assert.equal(served.catalogFingerprint, manifest.catalogFingerprint,
+    "the two manifests must be the same catalog set, or nothing below is a comparison");
+
   const viaFiles = await loadEntireManifestFromFiles(manifest);
-  const viaFetch = await loadEntireManifest(manifest, {
+  const viaFetch = await loadEntireManifest(served, {
     fetch: async (/** @type {string} */ url) => {
       const tag = /** @type {string} */ (url.split("/").pop()).replace(/\.json$/, "");
       let sent = false;
@@ -266,13 +279,21 @@ test("the file door and the Fetch door produce the SAME result from the same man
     },
   });
 
-  for (const field of ["requestedFiles", "catalogIdentity", "manifestLocaleConfiguration", "coverage", "complete"])
+  for (const field of ["catalogIdentity", "manifestLocaleConfiguration", "coverage", "complete"])
     assert.deepEqual(/** @type {any} */ (viaFiles)[field], /** @type {any} */ (viaFetch)[field], field);
   assert.deepEqual(Object.keys(viaFiles.catalogs), Object.keys(viaFetch.catalogs));
 
+  // `requestedFiles` carries ABSOLUTE urls, so it is compared on everything except the origin — the
+  // plan ORDER and each entry's digest, which is what "the same result" means once the scheme is
+  // necessarily different.
+  const planShape = (/** @type {any} */ result) =>
+    result.requestedFiles.map((/** @type {any} */ entry) =>
+      ({ locale: entry.locale, sha256: entry.sha256, name: entry.url.split("/").pop() }));
+  assert.deepEqual(planShape(viaFiles), planShape(viaFetch), "plan order and per-entry digests");
+
   // And the identical lookup subset, where the plan is a candidate walk rather than a sort.
   const subsetFiles = await loadStringsFromFiles(manifest, "fr-BE");
-  const subsetFetch = await loadStrings(manifest, "fr-BE", {
+  const subsetFetch = await loadStrings(served, "fr-BE", {
     fetch: async (/** @type {string} */ url) => {
       const tag = /** @type {string} */ (url.split("/").pop()).replace(/\.json$/, "");
       let sent = false;
@@ -282,6 +303,6 @@ test("the file door and the Fetch door produce the SAME result from the same man
       }) } };
     },
   });
-  assert.deepEqual(subsetFiles.requestedFiles, subsetFetch.requestedFiles);
+  assert.deepEqual(planShape(subsetFiles), planShape(subsetFetch));
   assert.deepEqual(subsetFiles.coverage, subsetFetch.coverage);
 });

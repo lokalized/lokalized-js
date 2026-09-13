@@ -52,16 +52,22 @@
     },
     {
       "reason": "M8 clause 19: the loaded branch now refuses a record whose two copies of its own warning list disagree (src/internal/loaded-input.js). 3,725 bytes, no new modules; it is in the root graph, so every subpath that composes core moves."
+    },
+    {
+      "reason": "M8 clauses 10 and 33: the Fetch door gained the scheme preflight its Node sibling already had (src/load/fetch-loader.js), and the loaded branch now hands construction the option name it actually reads (src/internal/loaded-input.js)."
+    },
+    {
+      "reason": "M8 clause 75: StringsLoadingError gains the construction token StringsParseError has had since M5, and DigestUnavailableError becomes a real Error subclass instead of a plain Error with its name assigned afterwards. No new modules."
     }
   ],
   "subpaths": {
     "lokalized": {
       "modules": 29,
-      "bytes": 815687
+      "bytes": 816560
     },
     "lokalized/core": {
       "modules": 28,
-      "bytes": 807442
+      "bytes": 808315
     },
     "lokalized/parse": {
       "modules": 26,
@@ -69,7 +75,7 @@
     },
     "lokalized/load": {
       "modules": 36,
-      "bytes": 706175
+      "bytes": 709809
     },
     "lokalized/ssr": {
       "modules": 2,
@@ -81,15 +87,15 @@
     },
     "lokalized/node": {
       "modules": 39,
-      "bytes": 741815
+      "bytes": 742840
     },
     "lokalized/data/ordinal": {
       "modules": 31,
-      "bytes": 835182
+      "bytes": 836055
     },
     "lokalized/data/ranges": {
       "modules": 31,
-      "bytes": 840051
+      "bytes": 840924
     }
   }
 }

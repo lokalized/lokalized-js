@@ -33,16 +33,38 @@ const DEFAULT_REQUEST = Object.freeze({ mode: "cors", credentials: "same-origin"
 
 export { StringsLoadingError } from "./run-plan.js";
 
-/** Plan 6.2: the loader fails CLOSED when WebCrypto is absent, before any catalog I/O. */
+/**
+ * Plan 6.2: the loader fails CLOSED when WebCrypto is absent, before any catalog I/O.
+ *
+ * **A REAL CLASS, because plan 8.5 requires a CATCHABLE one.** This was a plain `Error` with its
+ * `name` and `code` assigned after construction, so a consumer could only recognise it by string —
+ * `error.name === "DigestUnavailableError"` — and never by `instanceof`. The name and code are
+ * unchanged, so every string-matching consumer and every recorded message keeps working; what is
+ * added is the thing the clause actually asks for. The construction token mirrors `StringsParseError`
+ * and `StringsLoadingError`.
+ */
+export class DigestUnavailableError extends Error {
+  /** @param {symbol} token the internal construction token @param {string} message */
+  constructor(token, message) {
+    if (token !== DIGEST_ERROR_TOKEN)
+      throw new TypeError("DigestUnavailableError is not constructible; it is thrown by lokalized/load");
+
+    super(message);
+    /** @type {"DigestUnavailableError"} */
+    this.name = "DigestUnavailableError";
+    /** @type {"DIGEST_UNAVAILABLE"} */
+    this.code = "DIGEST_UNAVAILABLE";
+  }
+}
+
+/** Unexported by design: only this package can hand it to the constructor. */
+const DIGEST_ERROR_TOKEN = Symbol("lokalized.digest-unavailable-error");
+
 function digestUnavailable() {
-  const error = /** @type {Error & { code: string }} */ (new Error(
+  return new DigestUnavailableError(DIGEST_ERROR_TOKEN,
     "WebCrypto is unavailable, so catalog digests cannot be verified. `lokalized/load` fails closed " +
     "rather than fetching bodies it cannot check; WebCrypto is secure-context gated, and a " +
-    "trustworthy loopback origin counts as one.",
-  ));
-  error.name = "DigestUnavailableError";
-  error.code = "DIGEST_UNAVAILABLE";
-  return error;
+    "trustworthy loopback origin counts as one.");
 }
 
 /**
@@ -70,11 +92,36 @@ async function* responseChunks(response) {
 /** @type {import("./run-plan.js").LoadTransport} */
 const FETCH_TRANSPORT = {
   defaultStage: "fetch",
-  preflight(options) {
+  preflight(options, plan) {
     const subtle = globalThis.crypto?.subtle;
     if (!subtle || typeof subtle.digest !== "function") throw digestUnavailable();
     if (typeof (options.fetch ?? globalThis.fetch) !== "function")
       throw configurationError("No fetch implementation is available; pass one as `options.fetch`");
+
+    // **THE MIRROR OF THE NODE DOOR'S CHECK, AND IT WAS MISSING.** Plan 6.2:2035 gives the rule in one
+    // sentence for both doors — "Fetch loaders reject base or resolved URLs outside http:/https: and
+    // Node file loaders reject anything outside file:" — and only the second half had code. Measured
+    // before this existed: a manifest whose `baseUrl` is `file:///srv/catalogs/` loaded through this
+    // door and invoked the transport with `file:///srv/catalogs/en.json`, while the Node door refused
+    // the symmetric `https:` manifest with zero reader invocations.
+    //
+    // IN PREFLIGHT rather than in `read`, for the reason S11a recorded when it put the Node check
+    // here: inside `read` the refusal degrades into one `LoadFailure` among many, and under
+    // `allow-partial` that is a SUCCESSFUL load which silently skipped a file the caller asked for.
+    // A manifest is either addressable by this door or it is not, and that is knowable before any I/O.
+    for (const entry of plan) {
+      let protocol;
+      try {
+        protocol = new URL(entry.url).protocol;
+      } catch {
+        protocol = null;
+      }
+      if (protocol !== "http:" && protocol !== "https:")
+        throw configurationError(
+          `The Fetch loaders read \`http:\` and \`https:\` URLs only, and '${entry.locale}' resolves ` +
+          `to '${entry.url}'. Read local files with \`loadStringsFromFiles\` from lokalized/node, or ` +
+          `point \`baseUrl\` at the origin serving them`);
+    }
   },
   async read(entry, options, limits) {
     const fetchImpl = options.fetch ?? globalThis.fetch;

@@ -3,8 +3,8 @@
   "milestone": "M8",
   "note": "DERIVED from planning/M8-STATUS.md, not asserted. A clause is PROVEN only where the record names a gate that exists AND an ablation that was actually performed with its result stated. Produced by five extraction agents and re-checked by an adversarial downgrade pass instructed to default to NOT-PROVEN. tools/clause-ledger.mjs enforces the rule on every run.",
   "tally": {
-    "PROVEN": 41,
-    "NOT-PROVEN": 39,
+    "PROVEN": 58,
+    "NOT-PROVEN": 22,
     "DEFERRED": 13
   },
   "clauses": [
@@ -23,14 +23,15 @@
     {
       "id": 2,
       "statement": "The catalog fingerprint EXCLUDES itself, the CLDR/data fingerprints, and transport-only baseUrl, url and decodedBytes, so server and CDN manifests identify the same translations.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S6",
+      "verdict": "PROVEN",
+      "slice": "S22",
       "gates": [
-        "npm run verify",
-        "npm run check"
+        "test/identity-projection-and-error-classes.test.js",
+        "test/catalog-identity.test.js",
+        "npm run verify"
       ],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:407-411 enumerates the complete gate (one exclusion test per excluded field, each with an included-field control), but :412-414 records only \"four turned the tests red and one did not\" and names ONLY the ablation that did not fire — which is the canonicalizer's array order, not the exclusion set. A gate with no attributable ablation; the included-field control is a positive control on the INPUT, not an ablation of the implementation."
+      "ablation": "THREE ablations, all firing. Adding `baseUrl` to the projection and adding `cldrVersion` to it each turn \"clause 2: the projection keeps EXACTLY the five identity fields\" red; folding the transport-only per-file `url` into the per-locale digest turns the two-origins test and the one-field-at-a-time test red. Control 5 tests / 0 failing before and after.",
+      "evidenceLine": "MEASURED BLIND AT THE LAYER THAT ACTUALLY EXCLUDES: `computeCatalogIdentity` hashes whatever projection it is handed, and `src/load/identity.js:110` says so — it \"cannot exclude `baseUrl` or a per-file `url`, because they never reach it: this is the function that drops them\". The function that drops them is `catalogIdentityInputFor`, and nothing tested it: adding `baseUrl` to it turned ZERO tests red across eight files, and so did adding `cldrVersion`. Only the per-file `url` was gated, incidentally — folding it into the digest changes the hashed VALUE, which the pinned-bytes test catches for a reason unrelated to exclusion. AND THE WIDENING IS SILENT: the canonicalizer IGNORES a member it does not know (measured — `{...the five, baseUrl}` produces byte-identical output), so a widened projection changes no fingerprint and no behaviour, and the exact-key-set assertion is the only thing that can catch it."
     },
     {
       "id": 3,
@@ -60,13 +61,15 @@
     {
       "id": 5,
       "statement": "The manifest has NO IANA field; createStrings adds the rendering core's IANA identity to StringsLoadVerification and SSR compares it separately.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S10 (partial)",
+      "verdict": "PROVEN",
+      "slice": "S20",
       "gates": [
-        "test/runtime-metadata.test.js"
+        "test/load-verification-record.test.js",
+        "test/runtime-metadata.test.js",
+        "npm run verify"
       ],
-      "ablation": "S10 ablation I, \"the pinned identity constants drift\" -> 2 metadata tests red (M8-STATUS.md:750-764) — it bears on the identity constants, not on the manifest rejecting an iana* member.",
-      "evidenceLine": "M8-STATUS.md:698-700 (StringsLoadVerification shipped) and :782-784 (test/runtime-metadata.test.js asserts the ianaRegistryDate value is jdk-oracle-shaped; file confirmed on disk). But clause 5 appears in no verdict list — S10's clause verdicts at :788-800 cover 36-48 only — and nothing records the schema test the plan names (\"the manifest shape rejects an iana* member\") or an assertion that getLoadVerification() carries ianaRegistryDate/ianaDataFingerprint. [cite fix: that plan phrase is M8-PLAN.md:253, not :250.]"
+      "ablation": "TWO ablations, both firing, each turning exactly one named test red. Taking the record's IANA identity from the LOADED record instead of the renderer reds \"clause 5: the record's IANA identity comes from the RENDERER, not from the loaded record\". Carrying an offered `ianaRegistryDate` through manifest validation instead of dropping it reds \"clause 5: the manifest format carries no IANA field, and one offered is not adopted\". Found by an ablation SWEEP over the whole SSR family — nine mutations run against ssr-stamp, ssr-graph, ssr-two-realm, runtime-metadata, load-to-strings, fetch-loader, loaded-branch and declared-surface together, control 64 tests / 0 failing — rather than by reasoning about which clause looked weakest.",
+      "evidenceLine": "MEASURED BLIND BEFORE THE FILE EXISTED: the IANA-from-the-loader ablation turned ZERO tests red across all eight files. The blindness is structural rather than an oversight — every SSR test builds its record through a real loader, where the renderer's IANA identity and the loader's agree by construction, so the two sources can only be told apart by a record that deliberately CLAIMS a different one. The loader does not emit these fields at all, which the new test asserts first, so the renderer is their only possible source. loaded-input.js:288-292 had said exactly this in a comment since S10 — \"taking them from `loaded` would be indistinguishable now and wrong the moment that check is relaxed\" — and nothing checked it."
     },
     {
       "id": 6,
@@ -110,13 +113,15 @@
     {
       "id": 10,
       "statement": "Before any catalog I/O, Fetch loaders reject base or resolved URLs outside http:/https: and Node file loaders reject anything outside file:; planning stays pure; common manifest parse/validate preserves all three schemes.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S11a (Node half only)",
+      "verdict": "PROVEN",
+      "slice": "S21",
       "gates": [
-        "the scheme non-invocation test (S11a; file not named in the record — test/node-file-loader.test.js exists on disk)"
+        "test/load-door-boundaries.test.js",
+        "src/load/fetch-loader.js",
+        "npm run verify"
       ],
-      "ablation": "S11a ablation K: \"the scheme is checked inside the reader instead of at preflight\" -> the non-invocation test red, control green (M8-STATUS.md:860-869); the record adds that the mis-placed check degrades into one LoadFailure among many, which under allow-partial is a successful load that silently skipped a file.",
-      "evidenceLine": "M8-STATUS.md:844-852 covers the NODE door only (\"these loaders reject any resolved non-file: URL\", checked in the transport's PREFLIGHT with an injected reader that records every call and must record none). The plan names a fixture PAIR; the Fetch door's pre-I/O rejection of a file: URL is absent — grep for \"scheme\" in M8-STATUS.md returns only :460 (the manifest validator), :844 and :864. [cite fix: the plan row is M8-PLAN.md:258, not :255.]"
+      "ablation": "THREE ablations, all firing. Removing the Fetch door's scheme preflight — which is exactly what shipped until this slice — turns both clause-10 Fetch tests red. Checking only the first planned entry (the \"base only\" reading) turns the RESOLVED-url test red. Emptying the preflight loop so the refusal would have to happen in `read` turns both red, which is what shows the check's POSITION is load-bearing and not cosmetic. Ablations run against a throwaway copy, control 33 tests / 0 failing before and after; the harness reports DID-NOT-LAND for an absent or ambiguous anchor and DID NOT FIRE for a behaviour-preserving edit, and both were re-verified after it was changed this slice.",
+      "evidenceLine": "PROVEN BY IMPLEMENTATION: the clause's Fetch half had NO CODE. Plan 6.2 states the rule once for both doors and only the Node half existed. Measured before the fix — a manifest whose `baseUrl` is `file:///srv/catalogs/` loaded through the Fetch door and invoked the transport with `file:///srv/catalogs/en.json`, while the Node door refused the mirror-image `https:` manifest with ZERO reader invocations. Invisible because no test had ever handed a door the other door's scheme. The refusal lives in PREFLIGHT for the reason S11a recorded when it put the Node check there: inside `read` it degrades into one `LoadFailure` among many, and under `allow-partial` that is a SUCCESSFUL load which silently skipped a file the caller asked for. Both halves are proven by NON-INVOCATION — the transport records every call and the assertion is that it recorded none — with a control in which each door loads its own scheme end to end. The cross-door consistency test in `test/node-file-loader.test.js` was repaired rather than weakened: it handed ONE file-scheme manifest to both doors, which only worked because this clause was unimplemented; it now compares two manifests differing solely in `baseUrl`, with their identities asserted equal first."
     },
     {
       "id": 11,
@@ -141,23 +146,28 @@
     {
       "id": 13,
       "statement": "loadEntireManifest plans files in normalized-tag order; complete means every file in the DECLARED coverage succeeded; catalogIdentity always identifies the FULL manifest even for a lookup subset.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S10 (order limb) / S9",
+      "verdict": "PROVEN",
+      "slice": "S20",
       "gates": [
+        "test/load-verification-record.test.js",
         "test/load-to-strings.test.js",
-        "test/fetch-loader.test.js"
+        "test/fetch-loader.test.js",
+        "npm run verify"
       ],
-      "ablation": "S10 ablation G: \"loadEntireManifest plans in JSON key order\" -> the handshake test (test/load-to-strings.test.js) red while ALL 12 fetch-loader.test.js tests stay green; ablation F: \"entire-manifest not order-checked (the S9 shape)\" -> the reversed test red (M8-STATUS.md:750-764).",
-      "evidenceLine": "The normalized-tag-order limb is strongly proven (:704-718 records the defect — a manifest whose keys are not already sorted produced a LoadedStrings this core refuses — and its fix). But the plan's own discriminating case for this clause (a subset load whose catalogIdentity is asserted EQUAL to the whole-manifest load's, \"since a naive implementation fingerprints what it loaded\") is recorded nowhere, and the complete-semantics limb has no ablation (S9's three rejections at :660-666 are listed without an ablation table). [cite fix: the plan row is M8-PLAN.md:261, not :259.]"
+      "ablation": "The normalized-tag-order limb keeps S10's own ablation (a manifest whose keys are not sorted produced a LoadedStrings this core refuses; `test/load-to-strings.test.js` is the gate). The IDENTITY limb is newly gated by two ablations, both firing: reporting `catalogIdentity: null` for a lookup subset reds \"clause 13: a lookup subset carries the FULL manifest's identity\", and recomputing the fingerprint over the catalogs that ARRIVED reds \"clause 13: an INCOMPLETE load still identifies the full manifest\". Found by an ablation SWEEP over the whole SSR family — nine mutations run against ssr-stamp, ssr-graph, ssr-two-realm, runtime-metadata, load-to-strings, fetch-loader, loaded-branch and declared-surface together, control 64 tests / 0 failing — rather than by reasoning about which clause looked weakest.",
+      "evidenceLine": "MEASURED BLIND: the null-for-a-subset ablation turned ZERO red. Nothing anywhere read the identity of a subset, so \"identifies the FULL manifest even for a lookup subset\" was carried entirely by the implementation reading `validated.catalogFingerprint` and by nobody looking. The new test asserts the subset is PROPER before comparing the two identities, so the equality cannot hold for the uninteresting reason, and covers both ways a subset arises — a planned lookup subset and an allow-partial load whose declared coverage partly failed."
     },
     {
       "id": 14,
       "statement": "Every loader snapshots limit overrides once, validates them under 4.5 and returns a complete FROZEN loadingLimits; all paths share one normalized record; a standalone call that omits a relaxed limit context fails under defaults.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S9 (partial)",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "The only trace in the record is M8-STATUS.md:660 \"...and the loader's OWN limits reused so a relaxed result is not spuriously refused\", with no ablation and no frozen-record assertion. Plan 8.3's named fixture — a manifest above the default file count carried through six boundaries under one relaxed context and FAILING when that context is omitted at a standalone boundary — is not recorded as written. S11b's adjacent finding (:961-964, \"'limits are validated before any I/O' covered only one of the two budgets it named\") is booked against clause 64. [cite fix: the plan row is M8-PLAN.md:262, not :261.]"
+      "verdict": "PROVEN",
+      "slice": "S21",
+      "gates": [
+        "test/load-door-boundaries.test.js",
+        "npm run verify"
+      ],
+      "ablation": "TWO ablations, both firing, each turning the clause's test red: returning the caller's RAW overrides instead of the normalized record, and returning the record unfrozen. Ablations run against a throwaway copy, control 33 tests / 0 failing before and after; the harness reports DID-NOT-LAND for an absent or ambiguous anchor and DID NOT FIRE for a behaviour-preserving edit, and both were re-verified after it was changed this slice.",
+      "evidenceLine": "MEASURED BLIND BEFORE THE FILE EXISTED: the raw-overrides ablation turned ZERO tests red across eight files. It is invisible while every fixture uses default limits, because then the raw overrides, the normalized record and the defaults are the same numbers. The probe supplies exactly ONE override and asserts all seven limits are present with the defaults filled in, the override survives, and the record is frozen — a loader handing back what it was given would return an object with a single key."
     },
     {
       "id": 15,
@@ -184,22 +194,28 @@
     {
       "id": 17,
       "statement": "Stage classification: Fetch acquisition/HTTP -> fetch, Node/injected-reader acquisition -> read, and byte, digest, decode, parse and validation each keep their own stage (seven in the union).",
-      "verdict": "NOT-PROVEN",
-      "slice": "S11a (partial) / S8",
+      "verdict": "PROVEN",
+      "slice": "S21",
       "gates": [
-        "the stage-taxonomy test (S11a ablation L; file not named in the record)"
+        "test/error-cause-chains.test.js",
+        "test/fetch-loader.test.js",
+        "test/node-file-loader.test.js",
+        "npm run verify"
       ],
-      "ablation": "S11a ablation L: \"a classified limit refusal is relabelled as a read failure\" -> the stage-taxonomy test red, control green (M8-STATUS.md:860-869).",
-      "evidenceLine": "Exactly ONE boundary (limit vs read) is ablated. The plan's bar is one fixture per stage asserting the stage string, \"seven in the union\", because \"a single 'it failed' assertion collapses all seven\"; the record enumerates neither the seven stages nor a fixture per stage, and S8's digest-before-parse ablation (:584-586) only mentions in passing that \"the STAGE is what proves the order\". [cite fix: the plan row is M8-PLAN.md:265, not :264.]"
+      "ablation": "Re-staging the byte-limit failure as `read` — collapsing two of the seven stages — turns FIVE red across three files, including \"C3a: reachable stages name themselves and never hand back the runner's classification envelope\" and \"a missing file fails at the READ stage, and a limit refusal stays a LIMIT\". Ablations run against a throwaway copy, control 33 tests / 0 failing before and after; the harness reports DID-NOT-LAND for an absent or ambiguous anchor and DID NOT FIRE for a behaviour-preserving edit, and both were re-verified after it was changed this slice.",
+      "evidenceLine": "The previous entry said exactly ONE boundary was ablated and the plan's bar is one fixture per stage. S19's clause-76 file supplied the rest as a side effect of proving cause retention: its C3a/C3b tests walk the reachable stages and pin each one's name AND its declared cause shape in both directions, which is what makes a collapse of any two stages visible rather than only the limit/read pair."
     },
     {
       "id": 18,
       "statement": "Warnings are ordered by fetch-plan order and THEN depth-first declaration order, independent of request completion timing.",
-      "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:258-260: \"Stated plainly rather than claimed: warning ORDER ACROSS FILES is still uncovered, and cannot be [compared]\" — the record says so itself for the Java-arbitrated side. The plan requires the cross-file fetch-plan half to be driven by an injected out-of-order fetch, and S8's six ablations (:584-589) contain no warning-order entry. [cite fix: the plan row is M8-PLAN.md:266, not :265.]"
+      "verdict": "PROVEN",
+      "slice": "S19",
+      "gates": [
+        "test/loader-warning-order.test.js",
+        "npm run verify"
+      ],
+      "ablation": "SEVEN ablations over 18 tests, all firing: assembling the aggregate in ARRIVAL order (4 red); assembling in manifest-key order (5); sorting the aggregate by key (5); sorting each block by placeholder (3); indexing warnings by SUCCESS position rather than plan slot (1); appending the fallback file's block unconditionally (7); and planning the whole candidate chain rather than the tiebreaker-ordered plan (1). Method: a first pass of agents FORBIDDEN from reading src/ designed the probes from the plan text alone, a second adversarial pass tried to refute each design and returned concrete repairs, and a third wrote the file with the repairs applied. Every ablation ran against a throwaway copy of the package; the harness was negative-tested four ways after being changed (absent anchor and ambiguous anchor report DID-NOT-LAND, a behaviour-preserving edit reports DID NOT FIRE, and an expected-red naming a nonexistent test is reported as such), control 132 tests / 0 failing.",
+      "evidenceLine": "\"Independent of request completion timing\" cannot fail unless something completes out of order, so the probe drives a deterministic gate scheduler that releases reads in the REVERSE of plan order and asserts BY NAME that the observed settle order differed from plan order — without that assertion the whole file is vacuous. The universal form is not claimed and is recorded as deferred: two schedules per door are sampled, not all interleavings. The designer's original fixture was MEASURED to throw ConfigurationError before planning and was respecified."
     },
     {
       "id": 19,
@@ -320,13 +336,15 @@
     {
       "id": 29,
       "statement": "A partial result sets `complete: false` and makes NO server/client parity claim.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S10",
+      "verdict": "PROVEN",
+      "slice": "S20",
       "gates": [
-        "test/ssr-stamp.test.js"
+        "test/fetch-loader.test.js",
+        "test/manifest-tiebreakers.test.js",
+        "npm run verify"
       ],
-      "ablation": "",
-      "evidenceLine": "Clause 29 is never named in M8-STATUS.md. The nearest record is :1053-1056, which quotes an existing test title \"clause 39: an INCOMPLETE load is refused\" while correcting a latent defect in it; S10's ten-row ablation table (:753-764) has no row for the complete:false refusal, and no slice records the loader SETTING `complete: false` on a partial result."
+      "ablation": "A partial result claiming `complete: true` turns two red: \"allow-partial returns successes ONLY when the fallback file loaded\" and \"SELECTION keeps the full manifest while RESOLUTION keeps what loaded\". Found by an ablation SWEEP over the whole SSR family — nine mutations run against ssr-stamp, ssr-graph, ssr-two-realm, runtime-metadata, load-to-strings, fetch-loader, loaded-branch and declared-surface together, control 64 tests / 0 failing — rather than by reasoning about which clause looked weakest.",
+      "evidenceLine": "The clause was never named in M8-STATUS.md and is gated after all — the sweep found it rather than the record claiming it. The `complete: false` half is what both reds turn on; the \"makes NO server/client parity claim\" half is discharged by clause 39's refusal, since a `complete: false` record is exactly what `createSsrStamp` rejects, and that refusal has its own ablation."
     },
     {
       "id": 30,
@@ -368,20 +386,27 @@
     {
       "id": 33,
       "statement": "The `loaded` branch reuses the loader's frozen normalized `loadingLimits` for every revalidation — a relaxed result is not spuriously rejected and a fabricated one cannot bypass the same limits.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S9",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:660-661 \"the loader's OWN limits reused so a relaxed result is not spuriously refused\" — an implementation claim. The S9 entry (:642-691) contains NO ablation of any kind and names no test file for the branch; the three gates it does report firing (:674-679) are root-graph module/size gates, not behavioural ones."
+      "verdict": "PROVEN",
+      "slice": "S21",
+      "gates": [
+        "test/load-door-boundaries.test.js",
+        "test/loaded-branch.test.js",
+        "npm run verify"
+      ],
+      "ablation": "Writing the limits back under the key `limits` — the name `createStrings` does not read, and what shipped until this slice — turns TWO red: the new clause-33 test and the repaired `loaded-branch.test.js` test. A third ablation returns the conflict guard to that same dead spelling and turns the conflict test red. Ablations run against a throwaway copy, control 33 tests / 0 failing before and after; the harness reports DID-NOT-LAND for an absent or ambiguous anchor and DID NOT FIRE for a behaviour-preserving edit, and both were re-verified after it was changed this slice.",
+      "evidenceLine": "PROVEN BY IMPLEMENTATION, and the defect was a single word. `optionsFromLoadedStrings` handed construction `limits: loaded.loadingLimits` while `createStrings` builds its session from `options.loadingLimits` (core/index.js:836), so THE LOADED BRANCH REVALIDATED UNDER THE DEFAULTS ON EVERY CONSTRUCTION — doing precisely what the comment three lines above it says it must not (\"neither falls back to defaults nor permits a second override\"). The ablation that replaced that value with `undefined` turned ZERO tests red, because the field was already dead. The same misspelling was in the conflict guard, so a caller COULD pass `loadingLimits` beside `loaded` unchallenged — the second override the same sentence forbids. **AND THE TEST THAT CLAIMED TO PROVE THIS WAS VACUOUS**: `loaded-branch.test.js` asserted `doesNotThrow` over the flat catalog `{\"Deep\":\"plain\"}`, which every configuration accepts; it built a nested object and discarded it with `void deep`; and its \"relaxed\" `maximumJsonNestingDepth: 4` is TIGHTER than the default of 128, so its premise was inverted too. It is now two-directional and is red under the ablation."
     },
     {
       "id": 34,
       "statement": "`createStrings` requires EXACT equality between `loaded.cldrVersion`/`dataFingerprint` and core's own constants, failing with `ConfigurationError` even when the file plan matches.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S9",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:659 \"exact pinned-provenance equality\" — named in a list of implemented rejections with no ablation and no gate file. S9a's related check (:608-633) is the manifest-door runtime compatibility check, and its \"turned 40 existing tests red on its first run\" (:628) is an incidental red from fixtures hard-coding a fingerprint, not an ablation of this clause."
+      "verdict": "PROVEN",
+      "slice": "S21",
+      "gates": [
+        "test/loaded-branch.test.js",
+        "npm run verify"
+      ],
+      "ablation": "Dropping the exact pinned-provenance equality turns \"REJECTS a result produced against different pinned CLDR data\" red. Ablations run against a throwaway copy, control 33 tests / 0 failing before and after; the harness reports DID-NOT-LAND for an absent or ambiguous anchor and DID NOT FIRE for a behaviour-preserving edit, and both were re-verified after it was changed this slice.",
+      "evidenceLine": "The previous entry cited an implementation claim with no gate named. The gate exists and the sweep found it: the equality is checked before any catalog is accepted, and the ablation isolates it from the file-plan check the clause explicitly says it must outlive — \"failing with ConfigurationError even when the file plan matches\"."
     },
     {
       "id": 35,
@@ -397,11 +422,16 @@
     {
       "id": 36,
       "statement": "The three core seams widen from constant-return literals to the plan's declared signatures (`getCatalogIdentity`, `isCatalogComplete`, `getLoadVerification`).",
-      "verdict": "NOT-PROVEN",
-      "slice": "S10",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:790 \"36 PROVEN (the declared signatures widened; `types/core/index.d.ts` now emits them)\" — an assertion with no ablation: S10's ten-row table (:753-764) has no row touching the seam signatures, and the declaration-comparison gate M8-PLAN.md:284 calls \"new work\" is not recorded as built (S5's `test/declared-surface.test.js` is described at :349-362 as checking delivery of NAMES, not types)."
+      "verdict": "PROVEN",
+      "slice": "S20",
+      "gates": [
+        "test/load-verification-record.test.js",
+        "test/ssr-stamp.test.js",
+        "types/core/index.d.ts",
+        "npm run verify"
+      ],
+      "ablation": "ALL THREE SEAMS, one ablation each, all firing. Re-narrowing `getCatalogIdentity()` to a constant turns 23 red; re-narrowing `getLoadVerification()` turns 24. The third seam was BLIND — `isCatalogComplete()` as the constant `true` turned ZERO red — and is now gated in both directions: the constant `true` and the constant `false` each red \"clause 36: isCatalogComplete() reports the RECORD's completeness, not a constant\". Found by an ablation SWEEP over the whole SSR family — nine mutations run against ssr-stamp, ssr-graph, ssr-two-realm, runtime-metadata, load-to-strings, fetch-loader, loaded-branch and declared-surface together, control 64 tests / 0 failing — rather than by reasoning about which clause looked weakest.",
+      "evidenceLine": "The previous entry was an assertion with no ablation — S10's ten-row table has no row naming clause 36. Two of the three seams turn out to be gated heavily and incidentally, by the SSR tests that read them; the third was gated by nothing because every stamped instance is complete by construction (`createSsrStamp` refuses anything else), so a constant `true` is indistinguishable there. The new test's three arms cover a partial load, a whole load, and direct construction — whose `true` is the documented asymmetry rather than an accident."
     },
     {
       "id": 37,
@@ -428,14 +458,15 @@
     {
       "id": 39,
       "statement": "`createSsrStamp` reads `getLoadVerification()`, rejects null and `complete:false`, cross-checks identity/manifest configuration/completeness against the `Strings` inspection methods, requires `coveredLocales` to EQUAL `getSupportedLocales()` and every renderer-owned `plannedLocales` entry to be covered, and NEVER recomputes a candidate/fetch plan with its own kernel.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S10 (2026-09-11)",
+      "verdict": "PROVEN",
+      "slice": "S20",
       "gates": [
         "test/ssr-stamp.test.js",
-        "test/ssr-graph.test.js"
+        "test/ssr-graph.test.js",
+        "npm run verify"
       ],
-      "ablation": "Only ablation A (`lokalized/ssr` imports the locale kernel) bears on this clause, and its red column reads \"2 graph tests\" (:755) — tied to clause 39's LAST conjunct (the prohibition) by prose at :733-736, not by the table. Clause 39's six instance cross-checks have no recorded ablation.",
-      "evidenceLine": "DOWNGRADED: clause 39 appears in NO ablation row's red column across all ten rows (:755-764), unlike 37, 38, 40, 41, 42, 43, 45, 46, 47 and 48 which are each named there. Its verdict rests on the assertion at :792-793 (\"39 PROVEN — seven separately falsifiable cross-checks plus the graph prohibition\") — whose own count contradicts the plan, which says \"Six separately falsifiable checks plus one prohibition\" (M8-PLAN.md:287). The gate is real (tests \"clause 39: the six checks\" and \"clause 39: each cross-check against the instance is separately falsifiable\" exist in test/ssr-stamp.test.js), but a test asserting its own falsifiability is a passing test, not a performed ablation; grep for `getLoadVerification`/`coveredLocales`/`plannedLocales` across M8-STATUS.md returns one incidental remark (:1025) and no ablation. The record also states that one clause-39 fixture was latently wrong and unenforced until S9-owed found it (:1053-1057), which is exactly why the passing suite cannot self-certify."
+      "ablation": "THREE ablations, all firing, each naming its reds. Accepting a null verification record (so a directly constructed instance could be stamped) turns 3 red: clause 38's, clause 40's and clause 47's tests. Accepting `complete: false` turns \"clause 39: an INCOMPLETE load is refused, and the partial load itself is legitimate\" red. Dropping the completeness cross-check against the instance turns \"clause 39: each cross-check against the instance is separately falsifiable\" and clause 40's test red. Found by an ablation SWEEP over the whole SSR family — nine mutations run against ssr-stamp, ssr-graph, ssr-two-realm, runtime-metadata, load-to-strings, fetch-loader, loaded-branch and declared-surface together, control 64 tests / 0 failing — rather than by reasoning about which clause looked weakest.",
+      "evidenceLine": "DOWNGRADED PREVIOUSLY BECAUSE CLAUSE 39 APPEARED IN NO ABLATION ROW'S RED COLUMN across S10's ten rows, unlike the ten sibling clauses each named there. The gate existed and the evidence did not; the sweep supplies it. The separately-falsifiable cross-check test is the load-bearing one — it is what distinguishes a stamp that performs its cross-checks from one that performs a subset and passes because the fixture agrees on the rest."
     },
     {
       "id": 40,
@@ -487,13 +518,14 @@
     {
       "id": 44,
       "statement": "Strict hydration accepts only `localeDataMode:\"pinned\"` with `cardinalityMode:\"exact\"`; a host-`Intl` stamp forces a client render; a mismatch throws `ConfigurationError`; an integration must NOT silently hydrate mismatched translated content.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S10 (2026-09-11)",
+      "verdict": "PROVEN",
+      "slice": "S20",
       "gates": [
-        "test/ssr-stamp.test.js"
+        "test/ssr-stamp.test.js",
+        "npm run verify"
       ],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:794 asserts \"…43, 44, 45…PROVEN\", but NOT ONE of the ten ablation rows (:755-764) names clause 44. Its only other mention is inside clause 43's discussion (:798-800): \"every value other than `pinned`/`exact` is refused by clause 44's rule first; the test asserts that specific message rather than relaxing to 'it throws'\" — a described gate, not an ablation. The gate itself is real and on disk (\"clause 44: hydration modes\", \"clause 44: strict hydration accepts only pinned/exact, and says what to do instead\"), so this fails condition (b) only. The clause's second half — the no-silent-mismatch application precondition the plan says must NOT be merged with the first (M8-PLAN.md:292) — is gated nowhere in the record."
+      "ablation": "Accepting any `localeDataMode`/`cardinalityMode` pair turns two red: \"clause 44: strict hydration accepts only pinned/exact, and says what to do instead\" and \"clause 43: EVERY field of the stamp is compared, and they are the plan's fifteen\". Found by an ablation SWEEP over the whole SSR family — nine mutations run against ssr-stamp, ssr-graph, ssr-two-realm, runtime-metadata, load-to-strings, fetch-loader, loaded-branch and declared-surface together, control 64 tests / 0 failing — rather than by reasoning about which clause looked weakest.",
+      "evidenceLine": "M8-STATUS.md:794 asserted clause 44 PROVEN and not one of S10's ten ablation rows named it. The gate is real: the check is written as its own rule on the PRESENTED stamp rather than left to the field comparison, which would only catch a host-Intl stamp when the two sides happen to disagree — and the ablation reds the field-comparison test too, which is what shows the two checks are not the same check wearing different names."
     },
     {
       "id": 45,
@@ -800,20 +832,26 @@
     {
       "id": 72,
       "statement": "Instance lifecycle: `createStrings` compiles eagerly; servers keep immutable instances per catalog version and atomically replace references; locale selection is per call with no mutable process-global locale.",
-      "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. Re-grepped: \"process-global\" 0 hits in M8-STATUS.md; no lifecycle gate recorded. No slice addresses it and no amendment disposes of it — including the two halves M8-PLAN.md:320 itself calls falsifiable (no mutable process-global locale state, no in-place mutation of a live instance)."
+      "verdict": "PROVEN",
+      "slice": "S19",
+      "gates": [
+        "test/instance-lifecycle.test.js",
+        "npm run verify"
+      ],
+      "ablation": "TWELVE ablations over 30 tests, all firing: lazy compilation (5 red); compiling only the first whole-message alternative (1); only the first fragment alternative (1); not compiling nested branches (1); resolving the locale resolver once at construction (2); an unkeyed process-global candidate-chain memo (14); a sticky per-call locale (1); a compiled-instance cache keyed by catalog version (1); aliasing the tiebreaker list (1); returning the supported list uncopied (1); registering a `languagechange` listener at import (3); and snapshotting `navigator` at import (1). Method: a first pass of agents FORBIDDEN from reading src/ designed the probes from the plan text alone, a second adversarial pass tried to refute each design and returned concrete repairs, and a third wrote the file with the repairs applied. Every ablation ran against a throwaway copy of the package; the harness was negative-tested four ways after being changed (absent anchor and ambiguous anchor report DID-NOT-LAND, a behaviour-preserving edit reports DID NOT FIRE, and an expected-red naming a nonexistent test is reported as such), control 132 tests / 0 failing.",
+      "evidenceLine": "EAGER COMPILATION IS OBSERVABLE ONLY THROUGH A KEY NOTHING ASKS FOR — an invalid expression in an unreached branch must fail at CONSTRUCTION — and the control that stops \"unreached\" collapsing into \"structurally dead\" is a sibling key that renders. Independently confirmed by the parent before the file existed: a shape-valid, expression-broken alternative throws `ExpressionEvaluationError` at construction while the same shape with a valid expression constructs and renders. The \"atomically replace references\" half is advice to applications; what IS falsifiable is catalog-version binding across a reload, and that is probed."
     },
     {
       "id": 73,
       "statement": "Closures make a `Strings` instance non-serializable; RSC integrations send raw/canonical catalog data or a manifest and construct a client instance rather than serializing compiled closures.",
-      "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. Re-grepped: \"structuredClone\" 0 hits in M8-STATUS.md; the only \"serialization\" hit, :791, is S10's whole-object privacy diff for the SSR stamp — a different clause. M8-PLAN.md:321 assigns the RSC documentation to M-D but states \"the constraint is M8's\", and nothing in the record defers or gates it."
+      "verdict": "PROVEN",
+      "slice": "S19",
+      "gates": [
+        "test/strings-serializability.test.js",
+        "npm run verify"
+      ],
+      "ablation": "EIGHT ablations over 7 tests, all firing: giving the instance a data property (1 red); making it serialize \"nicely\" (1); moving its members onto a prototype (2); letting a compiled memo ride the wire payload (1); handing back loaded tiebreakers as a Map (2); handing placeholders over as the parser's Map (3); identity no longer covering tiebreakers (1); and making value recognition realm-dependent (3). Method: a first pass of agents FORBIDDEN from reading src/ designed the probes from the plan text alone, a second adversarial pass tried to refute each design and returned concrete repairs, and a third wrote the file with the repairs applied. Every ablation ran against a throwaway copy of the package; the harness was negative-tested four ways after being changed (absent anchor and ambiguous anchor report DID-NOT-LAND, a behaviour-preserving edit reports DID NOT FIRE, and an expected-red naming a nonexistent test is reported as such), control 132 tests / 0 failing.",
+      "evidenceLine": "The clause is a CONTRAST and is tested as one: a `Strings` instance must NOT survive a serialization boundary (12 own keys, every one a function, `JSON.stringify` answers `{}`) while the payloads the plan says to send instead — a `LoadedStrings` record, or a manifest — must. Both directions are asserted, over BOTH construction doors; a one-directional probe would be satisfied by a library that serialized nothing usefully at all. The realm-dependence ablation is the sharp one: structural recognition is what lets a record cross a boundary and still be understood."
     },
     {
       "id": 74,
@@ -830,28 +868,36 @@
       "id": 75,
       "statement": "StringsLoadingError / StringsParseError / DigestUnavailableError are genuine catchable Error subclasses whose unexported internal token rejects consumer construction and subclassing, gated by declaration AND runtime tests.",
       "verdict": "NOT-PROVEN",
-      "slice": "S8 (ships the classes only)",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:570 records only that `loadStrings, loadEntireManifest and StringsLoadingError ship from lokalized/load`, and :593 mentions DigestUnavailableError as a failure mode. The words 'constructible', 'subclass' and 'token' appear NOWHERE in the record; S6b's five ablations and S8's six ablations name no constructibility or subclassing test."
+      "slice": "S22 (runtime half gated; the export is a maintainer decision)",
+      "gates": [
+        "test/identity-projection-and-error-classes.test.js"
+      ],
+      "ablation": "TWO ablations, both firing. Removing `StringsLoadingError`'s construction token turns its test red; returning `DigestUnavailableError` to a plain `Error` with `name` and `code` assigned afterwards turns its test red.",
+      "evidenceLine": "HELD AT NOT-PROVEN DELIBERATELY, with real work landed and the remaining gap named. TWO defects were found and fixed: `StringsLoadingError` shipped with a PUBLIC constructor and no token, so a consumer could fabricate a load failure that every `instanceof` check would believe; and `DigestUnavailableError` was NOT A CLASS AT ALL — `new Error(...)` with `name` and `code` assigned afterwards, recognisable only by string comparison. Both now mirror `StringsParseError`, whose token has refused consumer construction since M5, and the name and code are unchanged so every string-matching consumer and every recorded message still works. WHAT REMAINS IS THE CLAUSE'S OTHER WORD, \"catchable\": `DigestUnavailableError` is not exported from `lokalized/load`, so a consumer still cannot write `instanceof DigestUnavailableError`. Exporting it widens the public surface and the allowlist is derived rather than hand-edited, so it is a maintainer decision and is recorded as one rather than taken inside a proof slice."
     },
     {
       "id": 76,
       "statement": "Library errors use Error.cause for library-owned causal chains without copying cause text into redacted messages (governs LoadFailure.cause).",
-      "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "No occurrence of 'Error.cause' anywhere in M8-STATUS.md, and no slice, gate or ablation addresses LoadFailure.cause by reference or message redaction. The nearest recorded work is S11a ablation L (:865, a classified `limit` refusal relabelled as `read`), which is the stage taxonomy, not the cause chain."
+      "verdict": "PROVEN",
+      "slice": "S19",
+      "gates": [
+        "test/error-cause-chains.test.js",
+        "npm run verify"
+      ],
+      "ablation": "EIGHT ablations over 20 tests, all firing: normalizing a caught cause into a fresh Error carrying the same text (12 red — the only surviving separator is reference identity); joining cause text into the aggregate message (5); joining it only in the plural case (3); the digest stage attaching no cause (3); the limit stage's cause becoming a string (2); the Fetch pre-read rewrapping (4); abort discarding the reason (1); and partial failures being serialized (3). Method: a first pass of agents FORBIDDEN from reading src/ designed the probes from the plan text alone, a second adversarial pass tried to refute each design and returned concrete repairs, and a third wrote the file with the repairs applied. Every ablation ran against a throwaway copy of the package; the harness was negative-tested four ways after being changed (absent anchor and ambiguous anchor report DID-NOT-LAND, a behaviour-preserving edit reports DID NOT FIRE, and an expected-red naming a nonexistent test is reported as such), control 132 tests / 0 failing.",
+      "evidenceLine": "TWO PROPOSITIONS JOINED BY \"without\", and they are separately falsified. Retention is asserted by `===` against a module-held sentinel, because a plausible wrapper leaves the cause truthy, `instanceof Error`, same `name` and character-identical in `message` — identity is the only thing left that separates the arms. The no-copy half governs the REDACTED message built while contextualizing a recognized error (plan :1129-1131), NOT the construction-time validator, whose message legitimately quotes its cause because that is Java's wording and M7 gates it byte-for-byte. Measured by the parent before the file existed, so the distinction is recorded rather than assumed."
     },
     {
       "id": 77,
       "statement": "Concurrent locales have no cross-talk — 9.3's 'Node server concurrency with per-call locales'.",
-      "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:594-596 records only the fetch CONCURRENCY CAP test — 'it asserts peak concurrency is BOTH at most 8 and greater than 1' — which is clause 21's proposition about one load's fetches, not interleaved in-flight loads for DIFFERENT locales sharing one instance. 'cross-talk' appears nowhere in the record."
+      "verdict": "PROVEN",
+      "slice": "S19",
+      "gates": [
+        "test/concurrent-locales.test.js",
+        "npm run verify"
+      ],
+      "ablation": "FIFTEEN ablations over 41 tests, all firing, and they span three layers because cross-talk can live in any of them. CORE: an instance-level chain memo (29 red), a global chain cache (4), a global catalog cache (4), a shared render context (2), shared placeholder values (2), a resolver memo (4), an async observer (6). LOADER: shared result slots (7), arrival-order assembly of successes (16) and of failures (6), a memoized limit snapshot (8), a global abort slot (10), a global eight-read semaphore (10). SELECTION: a memoized direct-locale context (3) and a collapsed selection channel (2). Method: a first pass of agents FORBIDDEN from reading src/ designed the probes from the plan text alone, a second adversarial pass tried to refute each design and returned concrete repairs, and a third wrote the file with the repairs applied. Every ablation ran against a throwaway copy of the package; the harness was negative-tested four ways after being changed (absent anchor and ambiguous anchor report DID-NOT-LAND, a behaviour-preserving edit reports DID NOT FIRE, and an expected-red naming a nonexistent test is reported as such), control 132 tests / 0 failing.",
+      "evidenceLine": "EVERY CONTENT-COMPARING PROBE IN THIS REPOSITORY USED ONE LOCALE before this file — the gap was named by an agent reviewing a different clause. The discriminating fixture is interleaved work in several locales whose answers are distinguishable, where shared scratch produces one locale's string under another's request. The shared-slots ablation is the one worth keeping: it is GREEN SEQUENTIALLY AND RED INTERLEAVED BY CONSTRUCTION, which is exactly why a sequential control sits beside it. Conformance is byte-identical under almost all of these — no corpus case runs two loads at once."
     },
     {
       "id": 78,

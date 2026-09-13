@@ -146,30 +146,42 @@ test("REJECTS a catalog filed under a name it does not claim", () => {
 test("REJECTS `loaded` alongside any direct input it would duplicate", () => {
   // Plan 3.4 lists them as alternatives. Merging would make the instance depend on which source
   // construction read first.
-  for (const conflicting of ["strings", "fallbackLocale", "tiebreakers", "limits", "catalogIdentity"])
+  // `loadingLimits` is the option's PUBLIC NAME (core/index.js:70, emitted at
+  // types/core/index.d.ts:324). This list used to say `limits`, which `createStrings` does not accept
+  // from any caller — so the guard covered a spelling nothing could pass and left the real one open.
+  for (const conflicting of ["strings", "fallbackLocale", "tiebreakers", "loadingLimits", "catalogIdentity"])
     assert.throws(
       () => createStrings({ loaded: loadedStrings(), locale: "fr", [conflicting]: {} }),
       /already carries/, `${conflicting} must not be accepted alongside loaded`);
 });
 
 test("the loader's own limits are reused, not the defaults", () => {
-  // Plan 3.4: the branch "neither falls back to defaults nor permits a second override", so a catalog
-  // loaded under RELAXED limits must not be spuriously rejected when it revalidates. A default-using
-  // branch refuses this instance; a relaxed one builds it.
-  const deep = { a: { b: { c: { d: { e: "x" } } } } };
-  const relaxed = parseStrings(JSON.stringify({ Deep: "plain" }), {
-    locale: "en", limits: { maximumJsonNestingDepth: 4 },
-  });
-  void deep;
-  assert.doesNotThrow(() => createStrings({
+  // Plan 3.4: the branch "neither falls back to defaults nor permits a second override".
+  //
+  // **THIS TEST WAS VACUOUS AND ITS COMMENT CLAIMED THE OPPOSITE — recorded rather than quietly
+  // rewritten.** It asserted `doesNotThrow` over the flat catalog `{"Deep":"plain"}`, which every
+  // configuration accepts, so it passed whether or not the record's limits were consulted; it built a
+  // deeply nested object and then discarded it with `void deep`; and its "relaxed"
+  // `maximumJsonNestingDepth: 4` is TIGHTER than the default of 128, so the premise was inverted too.
+  // It was green over a real defect: the loaded branch handed construction a `limits` key, while
+  // `createStrings` reads `options.loadingLimits`, so the record's limits were never applied at all.
+  //
+  // The discriminating fixture asserts BOTH directions, because a branch that ignored the record and
+  // one that refused everything both satisfy a single arm.
+  const twoNodes = parseStrings(JSON.stringify({ A: "a", B: "b" }), { locale: "en" });
+  const withLimit = (/** @type {number} */ maximumTranslationNodes) => () => createStrings({
     loaded: loadedStrings({
-      catalogs: { en: relaxed },
+      catalogs: { en: twoNodes },
       requestedFiles: [{ locale: "en" }],
       coverage: { kind: "lookup", lookupLocale: "en" },
-      loadingLimits: { maximumJsonNestingDepth: 4, maximumTranslationNodes: 2 },
+      loadingLimits: { maximumTranslationNodes },
     }),
     locale: "en",
-  }));
+  });
+
+  assert.doesNotThrow(withLimit(8), "a budget the catalog fits must build");
+  assert.throws(withLimit(1), /translation node/i,
+    "and a budget it does not fit must refuse — which is what proves the record was read");
 });
 
 test("entire-manifest coverage IS order-checked, in normalized-tag order", () => {

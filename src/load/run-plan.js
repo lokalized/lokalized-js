@@ -53,8 +53,19 @@ const MAXIMUM_ACTIVE_READS = 8;
  * should not have to know whether the bytes came from the network or the disk.
  */
 export class StringsLoadingError extends Error {
-  /** @param {string} message @param {readonly any[]} failures */
-  constructor(message, failures) {
+  /**
+   * NOT CONSTRUCTIBLE BY A CONSUMER, and the token is what makes that enforceable rather than
+   * advisory — it also refuses `class Mine extends StringsLoadingError` at instantiation time.
+   * `StringsParseError` has had exactly this shape since M5; this class shipped without it, so a
+   * consumer could fabricate a load failure that every `instanceof` check would believe.
+   *
+   * @param {symbol} token the internal construction token
+   * @param {string} message @param {readonly any[]} failures
+   */
+  constructor(token, message, failures) {
+    if (token !== LOADING_ERROR_TOKEN)
+      throw new TypeError("StringsLoadingError is not constructible; it is thrown by the loaders");
+
     super(message);
     this.name = "StringsLoadingError";
     /** @type {string} */
@@ -62,6 +73,18 @@ export class StringsLoadingError extends Error {
     /** @type {readonly any[]} */
     this.failures = Object.freeze([...failures]);
   }
+}
+
+/** Unexported by design: only this package can hand it to the constructor. */
+const LOADING_ERROR_TOKEN = Symbol("lokalized.strings-loading-error");
+
+/**
+ * The only way to raise one. Mirrors `parseError` in `internal/parse-diagnostics.js`.
+ *
+ * @param {string} message @param {readonly any[]} failures
+ */
+export function loadingError(message, failures) {
+  return new StringsLoadingError(LOADING_ERROR_TOKEN, message, failures);
 }
 
 /** @param {ArrayBuffer | Uint8Array} buffer */
@@ -215,7 +238,7 @@ export async function runPlan(manifest, plan, options, transport) {
   const fallbackLoaded = fallbackRow ? fallbackRow.ok : false;
 
   if (failures.length > 0 && (!allowPartial || !fallbackLoaded))
-    throw new StringsLoadingError(
+    throw loadingError(
       `${failures.length} catalog file(s) failed to load` +
       (allowPartial && !fallbackLoaded ? "; the resolved fallback-locale file is among them, so a partial result is not offered" : ""),
       failures,

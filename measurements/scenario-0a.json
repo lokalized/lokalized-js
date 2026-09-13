@@ -9,19 +9,19 @@
     {
       "label": "root + raw-text catalog",
       "modules": 29,
-      "sourceBytes": 815687,
-      "importMs": 0.316,
-      "constructionMs": 0.131,
-      "firstRenderMs": 0.3985,
+      "sourceBytes": 816560,
+      "importMs": 0.256,
+      "constructionMs": 0.1087,
+      "firstRenderMs": 0.3669,
       "retainedBytes": 69376
     },
     {
       "label": "core + parsed equivalent",
       "modules": 28,
-      "sourceBytes": 807442,
-      "importMs": 0.68,
-      "constructionMs": 0.4096,
-      "firstRenderMs": 0.3705,
+      "sourceBytes": 808315,
+      "importMs": 0.667,
+      "constructionMs": 0.3907,
+      "firstRenderMs": 0.3207,
       "retainedBytes": 400504
     }
   ],
@@ -325,6 +325,13 @@
       "growth": [
         "root + raw-text catalog: source graph grew 811962 -> 815687 bytes",
         "core + parsed equivalent: source graph grew 803717 -> 807442 bytes"
+      ]
+    },
+    {
+      "reason": "M8 clause 33: createStrings({ loaded }) now supplies loadingLimits under the name core reads; the key it used before was dead.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 815687 -> 816560 bytes",
+        "core + parsed equivalent: source graph grew 807442 -> 808315 bytes"
       ]
     }
   ],

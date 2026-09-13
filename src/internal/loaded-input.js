@@ -46,7 +46,10 @@ export function optionsFromLoadedStrings(options) {
 
   // Plan 3.4 lists `loaded` and the direct inputs as alternatives, not a merge. Accepting both would
   // make the answer depend on which one construction happened to read first.
-  for (const conflicting of ["strings", "fallbackLocale", "tiebreakers", "limits", "catalogIdentity"])
+  // `loadingLimits`, NOT `limits`: that is the option's public name (core/index.js:70, and it is what
+  // `types/core/index.d.ts` emits). Guarding the wrong spelling let a caller pass `loadingLimits`
+  // beside `loaded` unchallenged — the "second override" plan 3.4 forbids in the same sentence.
+  for (const conflicting of ["strings", "fallbackLocale", "tiebreakers", "loadingLimits", "catalogIdentity"])
     if (options[conflicting] !== undefined)
       throw configurationError(
         `createStrings({ loaded }) already carries ${conflicting}; supplying it alongside would make ` +
@@ -182,7 +185,14 @@ export function optionsFromLoadedStrings(options) {
       // The loader's OWN normalized record, reused verbatim. Plan 3.4: the branch "neither falls back
       // to defaults nor permits a second override", so a catalog loaded under relaxed limits
       // revalidates under those same limits rather than being spuriously rejected by the defaults.
-      limits: loaded.loadingLimits,
+      //
+      // **THIS KEY WAS `limits` AND NOTHING READS THAT NAME.** `createStrings` builds its session from
+      // `options.loadingLimits` (core/index.js:836), so the loaded branch revalidated under the
+      // DEFAULTS on every construction — doing precisely what the three lines above say it must not.
+      // Measured: the ablation that replaced this value with `undefined` turned ZERO tests red across
+      // eight files, because the field was already dead. A comment two lines from the code it
+      // describes is a claim like any other.
+      loadingLimits: loaded.loadingLimits,
     },
     verification: verificationRecord(loaded, coverage, planned, covered, manifestConfiguration),
   };
