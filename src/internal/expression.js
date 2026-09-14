@@ -46,6 +46,7 @@
 import { LANGUAGE_FORM_NAMES } from "./catalog.js";
 import {
   ExpressionEvaluationError,
+  expressionEvaluationError,
   TokenType,
   extractTokens,
   isLanguageFormTokenType,
@@ -67,7 +68,7 @@ import {
  * other's, which is exactly the bug a caller writing `catch (e) { if (e instanceof
  * ExpressionEvaluationError) ... }` would never think to look for.
  */
-export { ExpressionEvaluationError };
+export { ExpressionEvaluationError, expressionEvaluationError };
 
 /**
  * @param {string} message
@@ -76,8 +77,8 @@ export { ExpressionEvaluationError };
  */
 function fail(message, cause) {
   return cause === undefined
-    ? new ExpressionEvaluationError(message)
-    : new ExpressionEvaluationError(message, { cause });
+    ? expressionEvaluationError(message)
+    : expressionEvaluationError(message, { cause });
 }
 
 /** @param {unknown} error */

@@ -9,20 +9,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 29,
-      "sourceBytes": 816560,
-      "importMs": 0.256,
-      "constructionMs": 0.1087,
-      "firstRenderMs": 0.3669,
+      "sourceBytes": 822785,
+      "importMs": 0.284,
+      "constructionMs": 0.1124,
+      "firstRenderMs": 0.3426,
       "retainedBytes": 69376
     },
     {
       "label": "core + parsed equivalent",
       "modules": 28,
-      "sourceBytes": 808315,
-      "importMs": 0.667,
-      "constructionMs": 0.3907,
-      "firstRenderMs": 0.3207,
-      "retainedBytes": 400504
+      "sourceBytes": 814540,
+      "importMs": 0.651,
+      "constructionMs": 0.3807,
+      "firstRenderMs": 0.3302,
+      "retainedBytes": 410496
     }
   ],
   "rebaselines": [
@@ -332,6 +332,20 @@
       "growth": [
         "root + raw-text catalog: source graph grew 815687 -> 816560 bytes",
         "core + parsed equivalent: source graph grew 807442 -> 808315 bytes"
+      ]
+    },
+    {
+      "reason": "S29: exported the two plan-3.5 error classes the port had built and never published (DigestUnavailableError, ExpressionEvaluationError) and added the construction token plan 3.5:1107 requires. Module count unchanged at 29/28; the bytes are the guard, the factory and its docblock.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 816560 -> 818655 bytes",
+        "core + parsed equivalent: source graph grew 808315 -> 810410 bytes"
+      ]
+    },
+    {
+      "reason": "S29: the createStrings option union and the two plan-3.5 error-class exports. Module count unchanged at 29/28.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 818655 -> 822785 bytes",
+        "core + parsed equivalent: source graph grew 810410 -> 814540 bytes"
       ]
     }
   ],

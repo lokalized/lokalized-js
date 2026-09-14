@@ -14,6 +14,16 @@
  * The clause's consequence is concrete: a manifest served from a CDN and the same manifest on the
  * origin differ in `baseUrl` and in nothing else, and must identify the same translations.
  *
+ * **CLAUSE 75 CLOSES IN S29, AND THE BLOCKER THIS FILE RECORDED WAS WRONG.** The paragraph below said
+ * the remaining half "needs `DigestUnavailableError` exported from `lokalized/load`, which is an
+ * allowlist decision and is deliberately not taken here". **Plan 3.5:1092-1100 had already taken it:**
+ * it declares NINE error classes as package exports of the form `const X: CatchOnlyErrorClass<X>`,
+ * `DigestUnavailableError` among them at :1099, and :1107 says those runtime values "are public for
+ * catching and `instanceof`" while the declarations "expose no constructor or extension signature".
+ * Plan 3.1's `load` row permits it under the "loading errors" category `StringsLoadingError` already
+ * occupies. There was no widening to decide — only an undelivered promise, invisible because the
+ * allowlist is generated from section **3.1 alone** and the plan declares these in **3.5**.
+ *
  * **CLAUSE 75 IS TESTED HERE FOR THE HALF THAT NOW HOLDS.** `StringsParseError` has refused consumer
  * construction since M5; `StringsLoadingError` shipped without that guard and `DigestUnavailableError`
  * was not a class at all — a plain `Error` with `name` and `code` assigned afterwards, recognisable
@@ -164,4 +174,72 @@ test("clause 75: DigestUnavailableError is a class, not an Error with a name ass
   } finally {
     Object.defineProperty(globalThis, "crypto", { value: real, configurable: true });
   }
+});
+
+// ---------------------------------------------------------------------------------------------
+// Clause 75, closed — the two classes plan 3.5 declared and nothing exported.
+// ---------------------------------------------------------------------------------------------
+
+test("clause 75: the newly exported classes are CATCHABLE and NOT CONSTRUCTIBLE", async () => {
+  // Driven through the PUBLIC subpaths, not through internal modules: the proposition is that a
+  // CONSUMER can catch these, and a consumer only has the nine entry points.
+  const { DigestUnavailableError } = await import("../src/load/index.js");
+  const { ExpressionEvaluationError, createStrings } = await import("../src/core/index.js");
+
+  for (const [label, ErrorClass, code] of /** @type {[string, any, string][]} */ ([
+    ["DigestUnavailableError", DigestUnavailableError, "DIGEST_UNAVAILABLE"],
+    ["ExpressionEvaluationError", ExpressionEvaluationError, "EXPRESSION_EVALUATION"],
+  ])) {
+    assert.equal(typeof ErrorClass, "function", `${label} must be exported as a value, not a type`);
+    assert.ok(Object.prototype.isPrototypeOf.call(Error, ErrorClass), `${label} extends Error`);
+    assert.throws(() => new ErrorClass("fake"), /not constructible/, `${label}: direct construction`);
+    assert.throws(() => { class Mine extends ErrorClass {} ; new Mine("fake"); },
+      /not constructible/, `${label}: subclass instantiation`);
+    assert.equal(ErrorClass.prototype.constructor, ErrorClass);
+    assert.equal(typeof code, "string");
+  }
+
+  // THE CONTROL, and the half "not constructible" alone would be satisfied by an unusable class: a
+  // real library operation still throws one, and `instanceof` on the EXPORTED binding recognises it.
+  const thrown = (() => {
+    try {
+      // THE PROBE WAS WRONG ON ITS FIRST ATTEMPT and the control is what said so -- `{{v, ,}}` is
+      // refused by the PLACEHOLDER guard, which raises a plain configuration error, so it never
+      // reached the evaluator at all. The `zh-123` shape, inside the fixture written to check it.
+      createStrings({
+        strings: { en: { K: { translation: "t", alternatives: [{ "a<==b": { translation: "y" } }] } } },
+        fallbackLocale: "en", locale: "en",
+      });
+      return null;
+    } catch (error) { return error; }
+  })();
+  assert.ok(thrown instanceof ExpressionEvaluationError,
+    "a real construction failure must be catchable through the exported class");
+  assert.equal(/** @type {any} */ (thrown).code, "EXPRESSION_EVALUATION");
+});
+
+test("clause 75: plan 3.5 declares nine of these, and the record says which are still owed", async () => {
+  // THE ANTI-VACUITY HALF. The two tests above prove two classes behave; they say nothing about the
+  // seven others the plan declares, and a reader would take "clause 75 closed" for all nine. This
+  // asserts the CURRENT SPLIT so the day one of the remaining six lands, this test goes red and the
+  // record is forced to move with it.
+  const core = await import("../src/core/index.js");
+  const parse = await import("../src/parse/index.js");
+  const load = await import("../src/load/index.js");
+  const exported = new Set([...Object.keys(core), ...Object.keys(parse), ...Object.keys(load)]);
+
+  // Plan 3.5:1092-1100, in the plan's own order.
+  const DECLARED = ["LokalizedError", "MissingTranslationError", "UnsupportedLocaleError",
+    "ExpressionEvaluationError", "ResolutionError", "StringsParseError", "StringsLoadingError",
+    "DigestUnavailableError", "ConfigurationError"];
+
+  assert.deepEqual(DECLARED.filter((name) => exported.has(name)).sort(),
+    ["DigestUnavailableError", "ExpressionEvaluationError", "MissingTranslationError",
+      "StringsLoadingError", "StringsParseError"],
+    "five of plan 3.5's nine error classes are exported; changing that must change this record");
+
+  // The three that have no class at all, measured rather than assumed — `UnsupportedLocaleError`
+  // exists in `src/internal/plural.js` and is a DIFFERENT case from these, so it is named apart.
+  assert.deepEqual(DECLARED.filter((name) => !exported.has(name)).sort(),
+    ["ConfigurationError", "LokalizedError", "ResolutionError", "UnsupportedLocaleError"]);
 });

@@ -88,6 +88,12 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     // because catching it is the point: a `THROW_EXCEPTION` failure response with no retained cause
     // raises one, and a consumer who cannot name the class can only match on a message.
     ["core", "MissingTranslationError", "core errors"],
+    // THE SAME CATEGORY, AND THE SAME REASON, DELIVERED IN S29. Plan 3.5:1092-1100 declares NINE
+    // error classes as package exports; the port shipped three. This is one of the six that were
+    // declared and undelivered — not a widening of the surface, which is what the record had called
+    // it. Its constructor takes the internal token, so it is catchable and not constructible, which
+    // is exactly what :1107-1108 asks of every name in that block.
+    ["core", "ExpressionEvaluationError", "core errors"],
     ["core", "cardinalityForNumber", "cardinal classifiers/support probes"],
     ["core", "cardinalityForOperands", "cardinal classifiers/support probes"],
     ["core", "supportedCardinalitiesForLocale", "cardinal classifiers/support probes"],
@@ -158,6 +164,9 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     // is exported because CATCHING it is the point: its `failures` are the per-file diagnosis, in
     // fetch-plan order, and a consumer that cannot name the class can only match on a message.
     ["load", "StringsLoadingError", "loading errors"],
+    // Its sibling under the same category, and the half M8 clause 75 was held on. Plan 3.5:1099
+    // declares it; S22 gave it the token; nothing had ever exported it.
+    ["load", "DigestUnavailableError", "loading errors"],
   ]);
 
   /** @param {string} owner @returns {Set<string>} */

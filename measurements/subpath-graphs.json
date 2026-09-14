@@ -58,24 +58,33 @@
     },
     {
       "reason": "M8 clause 75: StringsLoadingError gains the construction token StringsParseError has had since M5, and DigestUnavailableError becomes a real Error subclass instead of a plain Error with its name assigned afterwards. No new modules."
+    },
+    {
+      "reason": "S28: src/load/index.js stops DECLARING core's CatalogIdentity and StringsLoadCoverage and consumes them inline, so lokalized/load no longer re-exports the two types plan 3.1 says it must not re-own. The two typedef blocks became prose recording why; +439 B on load, +6 B on node. No module added to any graph."
+    },
+    {
+      "reason": "S29: plan 3.5:1092-1100 declares nine error classes as package exports and the port shipped three. DigestUnavailableError now exports from lokalized/load and ExpressionEvaluationError from lokalized/core; the latter gained the construction token plan 3.5:1107 requires, plus an expressionEvaluationError() factory because it is raised from three modules. No module added to any graph; the growth is the guard, the factory and the prose recording why."
+    },
+    {
+      "reason": "S29: createStrings gains the OPTION UNION plan 3.2:565-588 declares. The port had only the direct arm and read the loaded member through an any cast, so createStrings({ loaded, locale }) -- M8's flagship call -- failed to typecheck for a TypeScript consumer (TS2353). Both arms now spell the other's members never, so a mixed call is refused too. Growth is the two typedefs and the prose recording the defect."
     }
   ],
   "subpaths": {
     "lokalized": {
       "modules": 29,
-      "bytes": 816560
+      "bytes": 822785
     },
     "lokalized/core": {
       "modules": 28,
-      "bytes": 808315
+      "bytes": 814540
     },
     "lokalized/parse": {
       "modules": 26,
-      "bytes": 635450
+      "bytes": 636787
     },
     "lokalized/load": {
       "modules": 36,
-      "bytes": 709809
+      "bytes": 712304
     },
     "lokalized/ssr": {
       "modules": 2,
@@ -87,15 +96,15 @@
     },
     "lokalized/node": {
       "modules": 39,
-      "bytes": 742840
+      "bytes": 744183
     },
     "lokalized/data/ordinal": {
       "modules": 31,
-      "bytes": 836055
+      "bytes": 842280
     },
     "lokalized/data/ranges": {
       "modules": 31,
-      "bytes": 840924
+      "bytes": 847149
     }
   }
 }

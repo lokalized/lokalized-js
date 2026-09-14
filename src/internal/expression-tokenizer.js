@@ -137,12 +137,35 @@ export const TokenType = Object.freeze({
  * `instanceof` this exact class (a second copy of the module, a wrapper defined elsewhere) can still
  * recognise it.
  */
+/** Unexported by design: only this package can hand it to the constructor. */
+const EXPRESSION_ERROR_TOKEN = Symbol("lokalized.ExpressionEvaluationError");
+
+/**
+ * The only way to raise one, because the class is now PUBLIC and its constructor is guarded.
+ *
+ * Plan 3.5:1092-1100 declares nine error classes as package exports of the form
+ * `const X: CatchOnlyErrorClass<X>`, and :1107-1108 says the runtime constructors "require an
+ * unexported internal token, so plain-JavaScript direct construction and subclass instantiation fail
+ * rather than creating partially initialized library errors". This class is raised from three modules,
+ * so the token cannot stay module-private beside a single call site the way `DIGEST_ERROR_TOKEN` does;
+ * the factory is what keeps it private, exactly as `loadingError` and `parseError` already do.
+ *
+ * @param {string} message @param {{ cause?: unknown }} [options]
+ */
+export function expressionEvaluationError(message, options) {
+  return new ExpressionEvaluationError(EXPRESSION_ERROR_TOKEN, message, options);
+}
+
 export class ExpressionEvaluationError extends Error {
   /**
+   * @param {symbol} token the internal construction token
    * @param {string} message
    * @param {{ cause?: unknown }} [options]
    */
-  constructor(message, options) {
+  constructor(token, message, options) {
+    if (token !== EXPRESSION_ERROR_TOKEN)
+      throw new TypeError("ExpressionEvaluationError is not constructible; it is thrown by lokalized");
+
     super(message, options);
     /** @type {string} */
     this.name = "ExpressionEvaluationError";
@@ -411,7 +434,7 @@ function unexpectedContent(expression, position) {
   // Special message for the common error of using "=" instead of "==" for equality checks.
   if (codePoint === 0x3d) errorMessage = `${errorMessage} Did you mean '=='?`;
 
-  return new ExpressionEvaluationError(errorMessage);
+  return expressionEvaluationError(errorMessage);
 }
 
 /**

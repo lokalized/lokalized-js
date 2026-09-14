@@ -46,7 +46,7 @@ import { LANGUAGE_FORM_NAMES } from "./catalog.js";
 // adds no module: `npm run scenario:0a` reports 25 root / 24 core before and after.
 // `contextualizePlaceholderFailure` needs it to reproduce `DefaultStrings.java:1270-1281`, which
 // preserves the failing exception's TYPE rather than flattening every cause into one class.
-import { ExpressionEvaluationError } from "./expression-tokenizer.js";
+import { ExpressionEvaluationError, expressionEvaluationError } from "./expression-tokenizer.js";
 import { cardinalCategoryFor, operandsFromDecimalText, operandsFromNumber } from "./plural.js";
 
 const PLACEHOLDER_START = "{{";
@@ -1068,7 +1068,7 @@ function resolveExpressionTranslation(definition, values, context) {
         `${cause instanceof Error ? cause.message : String(cause)}`;
 
       throw cause instanceof ExpressionEvaluationError
-        ? new ExpressionEvaluationError(message, { cause })
+        ? expressionEvaluationError(message, { cause })
         : new Error(message, { cause });
     }
 
@@ -1147,7 +1147,7 @@ function contextualizePlaceholderFailure(key, placeholderName, binding, selectio
     `definition declared at ${binding.declaringPath}${selectionContext}: ${causeMessage}`;
 
   return cause instanceof ExpressionEvaluationError
-    ? new ExpressionEvaluationError(message, { cause })
+    ? expressionEvaluationError(message, { cause })
     : new Error(message, { cause });
 }
 

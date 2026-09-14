@@ -21,15 +21,16 @@
 /** @typedef {import("../internal/parse-warnings.js").LocalizedStringWarning} LocalizedStringWarning */
 
 /**
- * A catalog set's identity, independent of where it was served from.
+ * A catalog set's identity, independent of where it was served from — CORE'S TYPE, CONSUMED HERE.
  *
- * Plan section 2.2 (`interface CatalogIdentity`). The two fields are deliberately separate: the
- * VERSION is chosen by whoever publishes, while the FINGERPRINT is derived from the content, so a
- * republished-but-identical catalog keeps its fingerprint and a silently-changed one cannot.
- *
- * @typedef {object} CatalogIdentity
- * @property {string} catalogVersion
- * @property {string} catalogFingerprint
+ * Plan section 2.2 (`interface CatalogIdentity`) gives it to `core`, and plan 3.1's `load` row ends
+ * "it consumes but does not re-own or re-export core's `CatalogIdentity` and `StringsLoadCoverage`".
+ * This module used to DECLARE it, which `tsc` emits as `export type CatalogIdentity` on
+ * `lokalized/load` — the re-export that sentence forbids. The two declarations had also drifted:
+ * core's was `Readonly<{...}>` and this one was not, so the same public name meant a frozen record on
+ * one subpath and a mutable one on the other. Referenced INLINE rather than through a module-scope
+ * `@typedef`, because an imported typedef is emitted as an export too — measured on
+ * `ParsedStringsFile`, which arrives by import and still appears as `export type` in `types/load`.
  */
 
 /**
@@ -83,13 +84,12 @@
  */
 
 /**
- * What a load was asked to cover.
+ * What a load was asked to cover — CORE'S TYPE, CONSUMED HERE, for the same reason as
+ * `CatalogIdentity` above.
  *
  * Plan section 2.2 (`type StringsLoadCoverage`). The `lookup` arm carries NORMALIZED planning input
  * and the plan states plainly that the tag NEED NOT OCCUR IN THE MANIFEST — a lookup locale is a
  * request, not a claim about what was published.
- *
- * @typedef {{ kind: "lookup", lookupLocale: string } | { kind: "entire-manifest" }} StringsLoadCoverage
  */
 
 /**
@@ -120,11 +120,11 @@
  * @property {Readonly<Record<string, readonly string[]>>} tiebreakers
  * @property {string} fallbackLocale
  * @property {Readonly<{ fallbackLocale: string, supportedLocales: readonly string[], tiebreakers: Readonly<Record<string, readonly string[]>> }>} manifestLocaleConfiguration
- * @property {CatalogIdentity} catalogIdentity
+ * @property {import("../core/index.js").CatalogIdentity} catalogIdentity
  * @property {string} cldrVersion
  * @property {string} dataFingerprint
  * @property {StringsLoadingLimits} loadingLimits
- * @property {StringsLoadCoverage} coverage
+ * @property {import("../core/index.js").StringsLoadCoverage} coverage
  * @property {readonly FetchEntry[]} requestedFiles
  * @property {readonly LoadFailure[]} failures
  * @property {readonly LocalizedStringWarning[]} warnings
@@ -133,7 +133,16 @@
 
 export { computeCatalogIdentity } from "./identity.js";
 export { chain, fetchSet } from "./planning.js";
-export { StringsLoadingError, loadEntireManifest, loadStrings } from "./fetch-loader.js";
+/**
+ * `DigestUnavailableError` IS EXPORTED BECAUSE THE PLAN ALREADY DECLARED IT, not because this widens
+ * anything. Plan 3.5:1099 lists `const DigestUnavailableError: CatchOnlyErrorClass<DigestUnavailableError>`
+ * among nine package exports, and :1107 says those runtime values "are public for catching and
+ * `instanceof`" while their declarations "expose no constructor or extension signature" — which is
+ * exactly the shape S22 gave this class. Plan 3.1's `load` row permits it under the "loading errors"
+ * category that `StringsLoadingError` already sits in. M8 clause 75 was recorded as blocked on a
+ * maintainer decision to widen the surface; there was no widening to decide.
+ */
+export { DigestUnavailableError, StringsLoadingError, loadEntireManifest, loadStrings } from "./fetch-loader.js";
 export {
   localeConfigurationForManifest,
   parseStringsManifest,

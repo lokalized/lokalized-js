@@ -30,6 +30,7 @@ import {
 } from "../internal/catalog.js";
 import {
   ExpressionEvaluationError,
+  expressionEvaluationError,
   compile as compileExpression,
   evaluate as evaluateCompiledExpression,
 } from "../internal/expression.js";
@@ -57,7 +58,24 @@ import { PLURAL_DATA_RUNTIME, UnsupportedLocaleError } from "../internal/plural.
 /** @typedef {import("../internal/parse-warnings.js").LocalizedStringWarning} LocalizedStringWarning */
 
 /**
- * @typedef {object} CreateStringsOptions
+ * THE LOADED DOOR WAS UNCALLABLE FROM TYPESCRIPT, and every test in this repository is JavaScript so
+ * not one of them could see it.
+ *
+ * Plan 3.2:565-588 declares `CreateStringsOptions` as a UNION —
+ * `DirectCreateStringsOptions | LoadedCreateStringsOptions` — whose arms carry `?: never` members
+ * that make the two mutually exclusive. This module declared only the DIRECT arm and read the loaded
+ * one through `/** @type {any} *\/ (options).loaded` at the top of `createStrings`, so `tsc` emitted
+ * `strings` and `fallbackLocale` as REQUIRED and no `loaded` member at all. MEASURED 2026-09-14:
+ * `createStrings({ loaded: record, locale: "fr-BE" })` — M8's flagship call, the one the plan's own
+ * 6.2 examples spell — fails with `TS2353: Object literal may only specify known properties, and
+ * 'loaded' does not exist in type 'CreateStringsOptions'`, while the direct door typechecks.
+ *
+ * The RUNTIME was never wrong: `internal/loaded-input.js:52-56` already refuses every member the
+ * plan marks `?: never` beside `loaded`. What was missing is the declaration saying so, and the
+ * `any` cast is exactly what hid it — this project's standing lesson that a cast is a place a gate
+ * cannot look.
+ *
+ * @typedef {object} DirectCreateStringsOptions
  * @property {string} fallbackLocale
  * @property {Record<string, unknown> | ReadonlyMap<string, unknown>} strings plan section 3.2's
  *   `CatalogMap`: each locale tag mapped to one `CatalogInput`. A `Map` is accepted alongside a
@@ -74,6 +92,10 @@ import { PLURAL_DATA_RUNTIME, UnsupportedLocaleError } from "../internal/plural.
  *   catalogs".
  * @property {undefined} [runtimeLimits] plan 4.6: v1 exposes no runtime-limit customization, and a
  *   non-undefined value is refused at construction rather than silently ignored.
+ * @property {never} [loaded] plan 3.2:575. WITHOUT THIS THE UNION DOES NOT DISCRIMINATE, which the
+ *   control caught: TypeScript relaxes excess-property checking against a union, so a call naming
+ *   BOTH `loaded` and `strings` matched this arm with `loaded` waved through. Both arms have to
+ *   spell the other's members `never` for the pair to be mutually exclusive to a caller.
  * @property {CatalogIdentity | null} [catalogIdentity] plan 3.4:635's build-produced identity for a
  *   DIRECT construction. Core validates its shape, not its truth, and reports it from
  *   `getCatalogIdentity()`; it does not make the instance stampable, because plan 6.4 requires a
@@ -117,6 +139,41 @@ import { PLURAL_DATA_RUNTIME, UnsupportedLocaleError } from "../internal/plural.
  *   match's own fallback when unmatched, REPLACES the lookup locale — the asymmetry against
  *   `localeResolver` that the one-fixture six-ingress table exists to pin.
  */
+
+/**
+ * The LOADED arm of plan 3.2:577-585. Every member the plan marks `?: never` is spelled here as
+ * `never`, which is what makes the two arms mutually exclusive TO A TYPESCRIPT CALLER — the runtime
+ * has refused the same combinations since S9, in `internal/loaded-input.js`, and the declaration is
+ * what had never said so.
+ *
+ * @typedef {object} LoadedCreateStringsOptions
+ * @property {import("../load/index.js").LoadedStrings} loaded the record a loader returned. Plan
+ *   6.2's own examples call `createStrings({ loaded, locale })` directly, which is the call that did
+ *   not typecheck.
+ * @property {string} [locale]
+ * @property {() => string} [localeResolver]
+ * @property {() => import("../internal/locale.js").LocaleMatch} [localeMatchResolver] plan 3.2 calls
+ *   this a `LocaleMatchResult`; the port name for the same shape is `LocaleMatch`.
+ * @property {never} [fallbackLocale]
+ * @property {never} [strings]
+ * @property {never} [tiebreakers]
+ * @property {never} [catalogIdentity]
+ * @property {undefined} [runtimeLimits]
+ * @property {(warning: LocalizedStringWarning) => void} [onWarning]
+ * @property {{ ordinal?: unknown, ranges?: unknown }} [pluralData]
+ * @property {(term: string, locale: string) => unknown} [phoneticResolver]
+ * @property {import("../internal/bidi.js").BidiIsolation} [bidiIsolation]
+ * @property {BuiltinFallbackPolicy | FallbackPolicy} [fallbackPolicy]
+ * @property {(event: FallbackEvent) => void} [onFallback]
+ * @property {FailureHandler} [onFailure]
+ */
+
+/**
+ * Plan 3.2:586-588, verbatim: `DirectCreateStringsOptions | LoadedCreateStringsOptions`.
+ *
+ * @typedef {DirectCreateStringsOptions | LoadedCreateStringsOptions} CreateStringsOptions
+ */
+
 
 /**
  * @typedef {"missing-translation" | "no-matching-alternative" | "resolution-failure"} FailureReason
@@ -580,6 +637,19 @@ function translationFailureFor(key, lookupLocale, localeMatch, attemptedLocales,
  * plan 8.3's "identical match-object identity through result, failure and thrown-failure paths"
  * runs through here, so a copy would break it silently.
  */
+/**
+ * RE-EXPORTED, NOT RE-DECLARED, and exported at all because plan 3.5:1095 already declares it.
+ *
+ * The plan lists nine error classes as package exports of the form `const X: CatchOnlyErrorClass<X>`
+ * and says at :1107 that the runtime values "are public for catching and `instanceof`" while the
+ * declarations "expose no constructor or extension signature". The class is built in
+ * `internal/expression-tokenizer.js` because that is where expression failures are raised; core is
+ * where plan 3.1 puts "core errors", the category `MissingTranslationError` already occupies.
+ *
+ * Its constructor now takes the internal token, so a consumer can catch one and cannot fabricate one.
+ */
+export { ExpressionEvaluationError };
+
 export class MissingTranslationError extends Error {
   /**
    * @param {symbol} token the internal construction token
@@ -639,11 +709,21 @@ export function createStrings(options) {
   // the load-bearing half — it is what makes direct construction ineligible for a stamp.
   /** @type {Readonly<StringsLoadVerification> | null} */
   let loadVerification = null;
+  // NARROWED ONCE, HERE, AND THAT IS THE WHOLE POINT OF THE UNION. Past this block every remaining
+  // line reads the DIRECT arm, because `optionsFromLoadedStrings` has already turned a loaded record
+  // into one. Before the union existed this function took the direct shape and reached the loaded
+  // member through `(/** @type {any} */ (options)).loaded`, so the caller-facing declaration lost the
+  // door entirely while the body kept working.
   if (/** @type {any} */ (options).loaded !== undefined) {
     const normalized = optionsFromLoadedStrings(/** @type {any} */ (options));
-    options = /** @type {CreateStringsOptions} */ (/** @type {unknown} */ (normalized.options));
+    options = /** @type {DirectCreateStringsOptions} */ (/** @type {unknown} */ (normalized.options));
     loadVerification = /** @type {any} */ (normalized.verification);
   }
+  // BOUND AFTER THE BRANCH, NOT BEFORE IT. The first version of this line ran ahead of the
+  // normalization and so pointed at the ORIGINAL loaded options on the loaded path -- 125 tests red,
+  // which is what a narrowing placed one statement too early costs.
+  /** @type {DirectCreateStringsOptions} */
+  const direct = /** @type {any} */ (options);
 
   // Plan 3.4:635 — "`getCatalogIdentity()` returns null unless the caller supplies a build-produced
   // `catalogIdentity`; core validates its SHAPE, NOT ITS TRUTH." A build pipeline that knows what it
@@ -669,7 +749,7 @@ export function createStrings(options) {
   // keeps the same two values apart: the constructor parameter, and `this.fallbackLocale`, which is
   // the loaded catalog the parameter names (`DefaultStrings.java:446-470`). Only the second is a
   // catalog anything can be served from, and only the first is what the ambient locale defaults to.
-  const configuredFallbackLocale = normalizeTag(options.fallbackLocale);
+  const configuredFallbackLocale = normalizeTag(direct.fallbackLocale);
 
   // THE FIRST OF THREE CONSTRUCTION INGRESS CHECKS — `LocaleUtils.requireWellFormed(fallbackLocale,
   // "Fallback locale")`, which Java runs at BOTH `Strings.java:211` (the builder's entry point) and
@@ -710,7 +790,7 @@ export function createStrings(options) {
   // lookup came back empty. Collapsing them into the one message this used to raise would make
   // `owed-construct.refusal.catalog-omitted` and `.catalog-null` indistinguishable, which is the
   // whole property those two rows are read against each other for.
-  if (options.strings === undefined)
+  if (direct.strings === undefined)
     throw new TypeError(
       "createStrings({ strings }) is required: supply a record or a Map of locale tag to catalog",
     );
@@ -767,7 +847,7 @@ export function createStrings(options) {
   // `normalizeTag`'s RESULT is discarded here and its THROW is not: a malformed configured locale is
   // still refused at construction rather than at the first lookup, which is unchanged behaviour and
   // is what `owed-construct.*` records.
-  const ambientLocaleSource = options.locale ?? options.fallbackLocale;
+  const ambientLocaleSource = options.locale ?? direct.fallbackLocale;
   normalizeTag(ambientLocaleSource);
 
   // A callback of the wrong SHAPE is a configuration mistake and is refused here; a callback that
@@ -833,7 +913,7 @@ export function createStrings(options) {
   // ONE session across every catalog, not one per file. Java's aggregate budgets
   // (`maximumTotalInputBytes`, `maximumLocalizedStringsFiles`) are per-LOAD: a session per catalog
   // would enforce each file's own limit and silently never enforce the aggregate at all.
-  const session = new LoadingSession(options.loadingLimits);
+  const session = new LoadingSession(direct.loadingLimits);
 
   /** @type {LocalizedStringWarning[]} */
   const warnings = [];
@@ -853,7 +933,7 @@ export function createStrings(options) {
    */
   const localesByLanguageTag = new Map();
 
-  for (const [tag, raw] of catalogEntries(options.strings)) {
+  for (const [tag, raw] of catalogEntries(direct.strings)) {
     // `DefaultStrings.java:273`. A `Map` catalog can carry a null key where a record cannot, and a
     // nullish key reaching `normalizeTag` used to be reported as "a locale tag must be a non-empty
     // string" — true, but it names the wrong mistake and does not distinguish a null KEY from a
@@ -925,7 +1005,7 @@ export function createStrings(options) {
   }
 
   const supported = [...catalogs.keys()];
-  const tiebreakers = safeTiebreakers(options.tiebreakers);
+  const tiebreakers = safeTiebreakers(direct.tiebreakers);
 
   // `DefaultStrings.java:304-314`, and it runs BEFORE the tiebreaker rules below, exactly as Java
   // orders the two. Sorted by tag because the walk below and Java's diagnostic both read this list
@@ -2674,7 +2754,7 @@ function compileDefinitionExpressions(definition, compiled, visited = new Set(),
    * @param {unknown} cause the evaluator's own error, retained by reference as Java retains it
    */
   const invalid = (sentence, cause) => {
-    const error = new ExpressionEvaluationError(
+    const error = expressionEvaluationError(
       `Invalid localized string '${rootKey}' for locale '${locale}': ${sentence}`,
       { cause },
     );

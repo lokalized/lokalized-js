@@ -58,7 +58,7 @@
     "check": "tsc --noEmit",
     "types": "tsc --emitDeclarationOnly",
     "test": "node --test",
-    "verify": "npm run check && npm run types && npm test && npm run size:graph && npm run subpath:graphs && npm run likely-subtag-consumers && npm run conformance && npm run scenario:0a && npm run scenario:2k && npm run clause:ledger && npm run spike:placeholders",
+    "verify": "npm run check && npm run types && npm run declarations && npm test && npm run size:graph && npm run subpath:graphs && npm run likely-subtag-consumers && npm run conformance && npm run scenario:0a && npm run scenario:2k && npm run clause:ledger && npm run spike:placeholders",
     "likely-subtag-consumers": "node tools/likely-subtag-consumers.mjs",
     "conformance": "node tools/conformance.mjs",
     "conformance:write": "node tools/conformance.mjs --write",
@@ -77,7 +77,8 @@
     "diff:lookup": "node tools/lookup-diff/run.mjs",
     "diff:likely-subtag": "node tools/likely-subtag-diff/run.mjs",
     "diff:load": "node tools/load-diff/run.mjs",
-    "clause:ledger": "node tools/clause-ledger.mjs"
+    "clause:ledger": "node tools/clause-ledger.mjs",
+    "declarations": "node tools/declaration-probes/run.mjs"
   },
   "devDependencies": {
     "@types/node": "22.10.2",

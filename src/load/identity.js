@@ -21,7 +21,7 @@
 import { canonicalBytes } from "../internal/jcs.js";
 import { sha256Hex } from "../internal/sha256.js";
 
-/** @typedef {import("./index.js").CatalogIdentity} CatalogIdentity */
+/** @typedef {import("../core/index.js").CatalogIdentity} CatalogIdentity */
 /** @typedef {import("./index.js").CatalogIdentityInputV1} CatalogIdentityInputV1 */
 /** @typedef {import("./index.js").StringsManifestV1} StringsManifestV1 */
 
