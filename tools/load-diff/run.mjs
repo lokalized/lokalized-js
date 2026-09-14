@@ -24,8 +24,23 @@
  * loader is EAGER and single-pass — so in a directory with MORE THAN ONE fault, whichever the walk
  * reaches first decides the outcome, and no JS runtime reproduces that order. **Every probe here
  * must be SINGLE-FAULT.** A probe whose answer depends on visit order would be green or red
- * according to the host filesystem, which is not a comparison at all. `assertSingleFault` below is
- * the enforcement, not the convention.
+ * according to the host filesystem, which is not a comparison at all.
+ *
+ * **SINGLE-FAULTEDNESS IS A CONVENTION HERE, NOT AN ENFORCEMENT, and this sentence used to say the
+ * opposite.** It ended "`assertSingleFault` below is the enforcement, not the convention" and there
+ * was no such function — one grep hit, in the comment claiming it existed. That is the eighth text
+ * in this project found asserting its own enforcement, the same shape as `src/core/index.js` once
+ * naming a test file that did not exist.
+ *
+ * **A MECHANICAL ENFORCEMENT WAS ATTEMPTED AND MEASURED INERT, which is why none ships.** The
+ * candidate was: re-materialize every probe with its directory entries created in REVERSE order and
+ * require the port's observation to be byte-identical. It runs clean over all 40 probes — and it
+ * stays clean when the port's own `entries.sort(byUtf8Bytes)` is ABLATED AWAY, because `readdirSync`
+ * on this host returns a stable order regardless of creation order. A check that cannot fail on the
+ * machine that runs it is worse than none, so it was removed rather than shipped green.
+ *
+ * What remains is each probe's `discriminates` line, which says why it is single-fault where that is
+ * not obvious. Whoever finds a real enforcement should replace this paragraph with it.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
