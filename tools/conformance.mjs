@@ -10,10 +10,20 @@
  *
  * Four outcomes, and the distinctions between the last three are the whole point:
  *
- *   passed         the JS result matches Java's recorded behavior
- *   FAILED         the JS implementation ran and produced something different -> always a defect
- *   unsupported    this path is not implemented YET                          -> remaining work
- *   no counterpart the operation is a JVM concept with no JS equivalent       -> never work
+ *   passed          the JS result matches Java's recorded behavior
+ *   FAILED          the JS implementation ran and produced something different -> always a defect
+ *   unsupported     this path is not implemented YET                          -> remaining work
+ *   refused by design this configuration is one v1 DECLINES to offer          -> never work
+ *   no counterpart  the operation is a JVM concept with no JS equivalent      -> never work
+ *
+ * THE SPLIT WAS MADE ONCE AND LEFT HALF DONE, which is what `BY_DESIGN_UNSUPPORTED` finishes.
+ * "no counterpart" was carved out of "unsupported" for the classpath family; a SECOND family with
+ * the identical property stayed behind and was counted as remaining work for five milestones. Plan
+ * 4.6 fixes v1's runtime limits and makes a non-undefined `runtimeLimits` a construction-time
+ * `ConfigurationError`, so the 43 cases whose fixture LOWERS or RAISES a limit and whose answer
+ * depends on it can never be replayed — not "not yet", never. Measured 2026-09-14: 102 cases carry a
+ * `runtimeLimits` fixture, 59 of them pass under the fixed values because the override never
+ * mattered, and the remaining 43 are 57% of everything this runner called remaining work.
  *
  * The last two used to be one bucket, and that bucket lied. 159 cases exercise Java's classpath
  * discovery — `ClassLoader.getResources`, JAR package entries, the reserved `META-INF/versions`
@@ -188,6 +198,39 @@ const NO_JS_COUNTERPART = {
     absentFrom: "classpath",
   },
 };
+
+/**
+ * Unsupported reasons that are PERMANENT: the port declines this configuration by design, so the
+ * case can never convert and counting it as remaining work overstates the backlog.
+ *
+ * Keyed on the REASON rather than on the operation, and that is the whole correction. The previous
+ * generation of this distinction — `NO_JS_COUNTERPART` — is keyed on the OPERATION name, so the
+ * partition check built on it (below) could only ever see a family that arrives on that axis. The
+ * runtime-limit family arrives on a FIXTURE property instead and was invisible to it, which is this
+ * project's recurring defect shape: a guard keyed on the wrong axis covers its own family and
+ * nothing else.
+ *
+ * An entry here makes two claims and both are checked. That the reason is permanent — sourced to a
+ * plan sentence, never to a judgement — and that some case still reports it, so a declaration cannot
+ * outlive the capability gap it describes.
+ */
+const BY_DESIGN_UNSUPPORTED = {
+  "runtime-limit overrides are not implemented": {
+    plan: "4.6",
+    why:
+      "plan 4.6: \"V1 exposes no runtime-limit customization\" and \"A non-undefined `runtimeLimits` " +
+      "option is a construction-time `ConfigurationError`\". A fixture that lowered or raised a limit " +
+      "can only ever be replayed under the fixed values, so a case whose recorded answer DEPENDS on " +
+      "the override has no reachable JS configuration. Not a gap to be built: a capability v1 declines",
+  },
+};
+
+/**
+ * The partitions plan 8.2 requires to pass with an EMPTY unsupported set before a strict release.
+ * `informationalIds` is deliberately absent — 8.2 says those "may be unsupported and never enter
+ * either numerator", which is exactly the bucket a permanently unconvertible case belongs in.
+ */
+const REQUIRED_PARTITIONS = new Set(["requiredPortableIds", "requiredImplementationIds"]);
 
 /**
  * Owner milestone for paths that are genuinely unbuilt, sourced to plan v7 section 10.3 rather than
@@ -3733,6 +3776,27 @@ const passed = [];
 const failed = [];
 const skipped = [];
 const reasons = new Map();
+/** id -> the PERMANENT reason it reported, across both families. Feeds the partition gate. */
+const permanentReasonOf = new Map();
+/** Unsupported for a reason declared PERMANENT. Never remaining work; reported and counted apart. */
+const byDesign = [];
+const byDesignReasons = new Map();
+/** Every unsupported reason this run actually produced, for the staleness check on the table. */
+const reasonsSeen = new Set();
+/**
+ * One entry point for both `unsupported` sites, so the permanence split cannot be applied at one and
+ * forgotten at the other -- which is how the classpath carve-out came to cover one family only.
+ * @param {string} id @param {string} reason
+ */
+const recordUnsupported = (id, reason) => {
+  reasonsSeen.add(reason);
+  const permanent = Object.prototype.hasOwnProperty.call(BY_DESIGN_UNSUPPORTED, reason);
+  const bucket = permanent ? byDesign : skipped;
+  const tally = permanent ? byDesignReasons : reasons;
+  if (permanent) permanentReasonOf.set(id, reason);
+  bucket.push(id);
+  tally.set(reason, (tally.get(reason) ?? 0) + 1);
+};
 /** Cases naming an operation with no JS counterpart. Never remaining work; reported separately. */
 const nonportable = [];
 const nonportableReasons = new Map();
@@ -3807,8 +3871,7 @@ for (const testCase of cases) {
     } else {
       const attributable = classifyFailure(testCase, fixture, outcome.actual, outcome.wanted);
       if (attributable) {
-        skipped.push(testCase.id);
-        reasons.set(attributable, (reasons.get(attributable) ?? 0) + 1);
+        recordUnsupported(testCase.id, attributable);
       } else {
         failed.push({ id: testCase.id, actual: outcome.actual, wanted: outcome.wanted });
       }
@@ -3816,10 +3879,10 @@ for (const testCase of cases) {
   } catch (error) {
     if (error instanceof NoCounterpart) {
       nonportable.push(testCase.id);
+      permanentReasonOf.set(testCase.id, error.message);
       nonportableReasons.set(error.message, (nonportableReasons.get(error.message) ?? 0) + 1);
     } else if (error instanceof Unsupported) {
-      skipped.push(testCase.id);
-      reasons.set(error.message, (reasons.get(error.message) ?? 0) + 1);
+      recordUnsupported(testCase.id, error.message);
     } else {
       // A real crash is a FAILURE, never an "unsupported". Conflating them would let a skeleton hide
       // its own bugs behind the same label it uses for honestly-unimplemented paths.
@@ -3876,6 +3939,42 @@ const coincidentalIds = new Set([
 const recordablePassed = passed.filter((id) => !coincidentalIds.has(id));
 const notRecorded = passed.filter((id) => coincidentalIds.has(id));
 
+/**
+ * THE PARTITION GATE, KEYED ON THE OUTCOME RATHER THAN ON THE OPERATION.
+ *
+ * Plan 8.2 partitions the corpus and says a strict parity-backed release "requires every
+ * `requiredPortableId` to pass and empty failed, xfailed, and unsupported sets for that partition";
+ * 8.5 repeats it as "the strict required partition must show zero failed, xfailed, and unsupported
+ * IDs". A case that can NEVER convert — for any declared permanent reason — sitting in one of those
+ * partitions therefore makes that release unreachable whatever the port builds.
+ *
+ * THE PREVIOUS VERSION OF THIS CHECK ASKED `NO_JS_COUNTERPART[c.operation]`, and the whole finding
+ * of this slice is that the question is on the wrong axis. It caught the 145 classpath cases, they
+ * were repartitioned, and it has printed nothing since — while 43 cases with the identical property
+ * sat in `requiredPortableIds` unseen, because they are identified by a FIXTURE property and not by
+ * an operation name. Asking instead "did this case report a PERMANENT reason" covers both families
+ * and any third that arrives on a third axis.
+ *
+ * MEASURED when this was written: 43, all `requiredPortableIds`, all from plan 4.6's fixed limits.
+ */
+const partitionOf = new Map(cases.map((c) => [c.id, c.partition]));
+/** @type {[string, string[]][]} */
+const unconvertibleButRequired = [...permanentReasonOf.entries()]
+  .filter(([id]) => REQUIRED_PARTITIONS.has(partitionOf.get(id) ?? ""))
+  .reduce((groups, [id, reason]) => {
+    const row = groups.find(([r]) => r === reason);
+    if (row) row[1].push(id); else groups.push([reason, [id]]);
+    return groups;
+  }, /** @type {[string, string[]][]} */ ([]))
+  .sort((a, b) => b[1].length - a[1].length);
+
+/**
+ * The other direction, which is what stops the table above becoming a list of excuses: a permanence
+ * claim NO case reports any more. The capability gap it describes has closed, or the cases moved,
+ * and either way the entry is now a sentence nothing checks.
+ */
+const staleByDesignReasons = Object.keys(BY_DESIGN_UNSUPPORTED).filter((r) => !reasonsSeen.has(r));
+
 // `unsupportedIds` stays the COMPLETE set of cases that neither passed nor failed, because plan 8.5
 // gates a strict parity-backed release on that set being empty and narrowing it here would quietly
 // relax the release gate. The new fields partition it: what is unbuilt, and what is unbuildable.
@@ -3893,9 +3992,19 @@ const report = {
   /** Passing, but never ratcheted. See `coincidentalIds` — reported, never silently dropped. */
   coincidentallyPassingIds: notRecorded,
   failedIds: failed.map((f) => f.id),
-  unsupportedIds: [...skipped, ...nonportable],
+  unsupportedIds: [...skipped, ...byDesign, ...nonportable],
   notImplementedIds: skipped,
+  /** Unsupported permanently, by a declared design decision. Never remaining work. */
+  byDesignIds: byDesign,
   nonportableIds: nonportable,
+  /**
+   * The RATCHET on the partition defect, and the reason this stopped being a printed paragraph.
+   * A permanently unconvertible case in a required partition makes plan 8.5's release declaration
+   * unreachable. Recorded as an exact ID SET so a NEW one fails the run while the known set — which
+   * only the corpus can fix — stays visible instead of blocking every build behind one decision.
+   */
+  unconvertibleRequiredIds: [...nonportable, ...byDesign]
+    .filter((id) => REQUIRED_PARTITIONS.has(partitionOf.get(id) ?? "")).sort(),
   causeMessageMatchedIds: causeMessageMatched,
 };
 if (jsonOut) writeFileSync(jsonOut, `${JSON.stringify(report, null, 2)}\n`, "utf8");
@@ -3905,6 +4014,47 @@ if (jsonOut) writeFileSync(jsonOut, `${JSON.stringify(report, null, 2)}\n`, "utf
 let regressions = [];
 /** @type {string[]} */
 let newlyPassing = [];
+/**
+ * A permanently unconvertible case in a required partition that the baseline does not already
+ * carry. THIS is the term in the exit expression, and the reason this check stopped being a printed
+ * paragraph: the previous version reported the classpath defect every run and said outright that
+ * "its exit status ignores them", which is how it survived long enough to be fixed by hand and then
+ * go dormant. The KNOWN set stays visible without blocking every build behind a corpus decision that
+ * is the maintainer's; a NEW one fails immediately.
+ * @type {string[]}
+ */
+let newlyUnconvertibleRequired = [];
+/**
+ * The MIRROR term, and the one that gates the axis this slice is about.
+ *
+ * A recorded partition defect that is no longer reported is either a WIN — the corpus repartitioned
+ * it, or the port learned to run it — or the CHECK HAS GONE BLIND. Those are indistinguishable from
+ * here, so both cost a deliberate `--write` that states which. Without this term the whole gate is
+ * one-directional: narrowing the check back to `NO_JS_COUNTERPART[c.operation]` — the exact defect
+ * being repaired — would drop 43 ids and pass silently, which is how the previous version came to be
+ * dormant without anyone noticing.
+ * @type {string[]}
+ */
+let staleUnconvertibleRecords = [];
+/**
+ * THE BASELINE'S OWN CORPUS IDENTITY, COMPARED — which it was not.
+ *
+ * `corpusSha256` was added because its predecessor was "a useful number under the wrong name", and
+ * the comment beside it names the exact hazard: "a baseline could be measured against one corpus
+ * revision and read back against another with nothing to notice". It was then WRITTEN and never
+ * READ, so nothing noticed. MEASURED 2026-09-14, before this line existed: the recorded digest was
+ * `02626938` and the corpus on disk hashed `c860804c` — the same 2,363 cases with different
+ * content, and every ratchet in this file had been comparing against a corpus revision the artifact
+ * was not recorded for. A value recorded for a purpose and never consumed is this project's most
+ * repeated defect, and this is the first time it has been the digest of the specification itself.
+ *
+ * It GATES rather than reports, on `scenario:2k`'s reasoning: a digest is deterministic and
+ * machine-independent, so re-recording it asks nobody to reproduce a machine-specific number.
+ * `librarySourcesSha256` needs no separate term — it is a field OF the corpus, so it cannot move
+ * without moving this digest.
+ * @type {string | null}
+ */
+let staleCorpusDigest = null;
 /** @type {string[]} */
 let causeMessageRegressions = [];
 /**
@@ -3940,6 +4090,23 @@ if (!familyFilter) {
     // candidate for `--write` either, or the next reviewer records it in good faith.
     newlyPassing = recordablePassed.filter((id) => !wasPassing.has(id));
 
+    // Absent from an older baseline, which must not read as "none": an artifact recorded before this
+    // field existed would otherwise report every known id as newly broken. `null` means NOT RECORDED
+    // and suppresses the gate for one run, the same reading `scenario:0a` gives a missing graph.
+    const recordedUnconvertible = Array.isArray(baseline.unconvertibleRequiredIds)
+      ? new Set(baseline.unconvertibleRequiredIds)
+      : null;
+    if (recordedUnconvertible) {
+      const nowUnconvertible = new Set(report.unconvertibleRequiredIds);
+      newlyUnconvertibleRequired = report.unconvertibleRequiredIds
+        .filter((/** @type {string} */ id) => !recordedUnconvertible.has(id));
+      staleUnconvertibleRecords = [...recordedUnconvertible].filter((id) => !nowUnconvertible.has(id)).sort();
+    }
+
+    // Absent means NOT RECORDED, never "agrees" — the same reading `scenario:0a` gives a missing graph.
+    if (typeof baseline.corpusSha256 === "string" && baseline.corpusSha256 !== report.corpusSha256)
+      staleCorpusDigest = `${baseline.corpusSha256.slice(0, 8)} -> ${report.corpusSha256.slice(0, 8)}`;
+
     staleDrops = (Array.isArray(baseline.deliberatelyDroppedIds) ? baseline.deliberatelyDroppedIds : [])
       .filter((/** @type {{id: string, resolved?: boolean}} */ entry) =>
         entry.resolved !== true && nowPassing.has(entry.id));
@@ -3970,7 +4137,7 @@ if (!familyFilter) {
         ...regressions.map((/** @type {string} */ id) => ({ id, reason: dropReason })),
       ];
       mkdirSync(dirname(baselinePath), { recursive: true });
-      writeFileSync(baselinePath, `${JSON.stringify({ ...report, passedIds: [...recordablePassed].sort(), coincidentallyPassingIds: [...notRecorded].sort(), failedIds: [], unsupportedIds: [...skipped, ...nonportable].sort(), notImplementedIds: [...skipped].sort(), nonportableIds: [...nonportable].sort(), causeMessageMatchedIds: [...causeMessageMatched].sort(), deliberatelyDroppedIds }, null, 2)}\n`, "utf8");
+      writeFileSync(baselinePath, `${JSON.stringify({ ...report, passedIds: [...recordablePassed].sort(), coincidentallyPassingIds: [...notRecorded].sort(), failedIds: [], unsupportedIds: [...skipped, ...byDesign, ...nonportable].sort(), notImplementedIds: [...skipped].sort(), byDesignIds: [...byDesign].sort(), nonportableIds: [...nonportable].sort(), unconvertibleRequiredIds: report.unconvertibleRequiredIds, causeMessageMatchedIds: [...causeMessageMatched].sort(), deliberatelyDroppedIds }, null, 2)}\n`, "utf8");
     }
   }
 }
@@ -3983,6 +4150,8 @@ console.log(`  passed         ${String(passed.length).padStart(5)}   (${pct}% of
   (nonportable.length ? `; ${portablePct}% of the ${portableCount} with a JS counterpart)` : ")"));
 console.log(`  FAILED         ${String(failed.length).padStart(5)}`);
 console.log(`  unsupported    ${String(skipped.length).padStart(5)}   not implemented yet`);
+if (byDesign.length)
+  console.log(`  by design      ${String(byDesign.length).padStart(5)}   a configuration v1 declines; these can never move`);
 if (nonportable.length)
   console.log(`  no counterpart ${String(nonportable.length).padStart(5)}   JVM-only by design; these can never move`);
 
@@ -4078,6 +4247,12 @@ if (skipped.length) {
     console.log(`  ${String(n).padStart(5)}  ${reason}`);
 }
 
+if (byDesign.length) {
+  console.log(`\nREFUSED BY DESIGN (${byDesign.length}) — not remaining work:`);
+  for (const [reason, count] of [...byDesignReasons].sort((a, b) => b[1] - a[1]))
+    console.log(`  ${String(count).padStart(5)}  ${reason}\n         ${BY_DESIGN_UNSUPPORTED[reason].why}`);
+}
+
 if (nonportable.length) {
   console.log(`\nNO JS COUNTERPART (${nonportable.length}) — not remaining work:`);
   for (const [reason, n] of [...nonportableReasons].sort((a, b) => b[1] - a[1]))
@@ -4085,22 +4260,53 @@ if (nonportable.length) {
   for (const [operation, entry] of Object.entries(NO_JS_COUNTERPART))
     if (cases.some((c) => c.operation === operation)) console.log(`         ${operation}: ${entry.java}`);
 
-  // The corpus's own partition disagrees, and that disagreement belongs in the corpus, not in a
-  // workaround here. Plan 8.2 puts "explicitly nonportable" cases in `informationalIds`, which "may
-  // be unsupported and never enter either numerator"; these sit in `requiredPortableIds`, which 8.2
-  // and 8.5 require to pass with an EMPTY unsupported set before a strict parity-backed release. As
-  // partitioned, lokalized-js cannot ever reach that release, whatever it builds. Reported every
-  // run, computed from the corpus rather than a memorized number, and never silently absorbed.
-  const misPartitioned = cases.filter((c) => NO_JS_COUNTERPART[c.operation] && c.partition === "requiredPortableIds");
-  if (misPartitioned.length) {
-    const already = nonportable.length - misPartitioned.length;
-    console.log(`\n  CORPUS PARTITION DEFECT: ${misPartitioned.length} of these ${nonportable.length} are partitioned`);
-    console.log(`  'requiredPortableIds' (${already} are already 'informationalIds'). Plan 8.2 requires every`);
-    console.log(`  requiredPortableId to pass with an empty unsupported set for a strict parity-backed release,`);
-    console.log(`  so as written no JS release can ever qualify. The fix is in the corpus, not this runner:`);
-    console.log(`  repartition them as informationalIds in lokalized-spec/cases/classpath-*.cases.json and`);
-    console.log(`  re-ingest. This runner does not treat them as passing, and its exit status ignores them.`);
+}
+
+if (newlyUnconvertibleRequired.length) {
+  console.log(`\nNEW PARTITION DEFECT (${newlyUnconvertibleRequired.length}) — a case that can never` +
+    `\nconvert has entered a partition plan 8.2 requires to pass, and the baseline does not carry it:`);
+  for (const id of newlyUnconvertibleRequired) console.log(`  ${id}  (${permanentReasonOf.get(id)})`);
+  console.log(`Repartition it as informationalIds in lokalized-spec/cases, or -- if the conflict is` +
+    `\naccepted -- record it with --write so the acceptance is in the artifact rather than in a head.`);
+}
+
+if (unconvertibleButRequired.length) {
+  console.log(`\nCORPUS PARTITION DEFECT (${report.unconvertibleRequiredIds.length}) — permanently unconvertible` +
+    `\ncases sitting in a partition plan 8.2 requires to pass:`);
+  for (const [reason, ids] of unconvertibleButRequired) {
+    console.log(`  ${String(ids.length).padStart(5)}  ${reason}`);
+    for (const id of ids.slice(0, 4)) console.log(`           ${id}`);
+    if (ids.length > 4) console.log(`           ... and ${ids.length - 4} more`);
   }
+  console.log(`Plan 8.2 puts explicitly nonportable cases in 'informationalIds', which "may be unsupported` +
+    `\nand never enter either numerator"; 8.2 and 8.5 require the strict partition to show zero` +
+    `\nunsupported IDs. As partitioned these make a strict parity-backed release unreachable whatever` +
+    `\nthe port builds. THE FIX IS IN THE CORPUS, NOT HERE: repartition them in lokalized-spec/cases` +
+    `\nand re-ingest, or record the conflict with --write once the maintainer has decided.`);
+}
+
+if (staleCorpusDigest) {
+  console.log(`\nSTALE BASELINE: recorded against a DIFFERENT corpus revision (${staleCorpusDigest}).` +
+    `\nEvery ratchet in this artifact -- the passing-ID set included -- has been compared against a` +
+    `\ncorpus it was not recorded for. Re-run with --write after reviewing what the corpus changed.`);
+}
+
+if (staleUnconvertibleRecords.length) {
+  console.log(`\nSTALE PARTITION-DEFECT RECORDS (${staleUnconvertibleRecords.length}) — recorded as` +
+    `\npermanently unconvertible in a required partition, and no longer reported as either:`);
+  for (const id of staleUnconvertibleRecords.slice(0, 8)) console.log(`  ${id}`);
+  if (staleUnconvertibleRecords.length > 8)
+    console.log(`  ... and ${staleUnconvertibleRecords.length - 8} more`);
+  console.log(`Either the corpus repartitioned them, or the port now runs them, or THIS CHECK HAS GONE` +
+    `\nBLIND -- the three look identical from here. Re-record with --write and say which.`);
+}
+
+if (staleByDesignReasons.length) {
+  console.log(`\nSTALE BY-DESIGN DECLARATIONS (${staleByDesignReasons.length}) — nothing reported them:`);
+  for (const reason of staleByDesignReasons)
+    console.log(`  "${reason}" — plan ${BY_DESIGN_UNSUPPORTED[reason].plan}`);
+  console.log(`A permanence claim that no case reaches has outlived the capability gap it describes.` +
+    `\nDelete the entry, or find why the cases stopped reporting it.`);
 }
 
 if (failed.length) {
@@ -4316,5 +4522,7 @@ process.exit(
   staleNonportabilityClaims.length === 0 && staleAdaptations.length === 0 &&
   staleDrops.length === 0 && staleMessageDivergences.length === 0 &&
   uncomparedExpectedFields.length === 0 && staleUncomparedDeclarations.length === 0 &&
-  staleOwnerMilestones.length === 0 ? 0 : 1,
+  staleOwnerMilestones.length === 0 && newlyUnconvertibleRequired.length === 0 &&
+  staleUnconvertibleRecords.length === 0 && staleByDesignReasons.length === 0 &&
+  staleCorpusDigest === null ? 0 : 1,
 );

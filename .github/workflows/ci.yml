@@ -154,7 +154,7 @@ jobs:
       # re-check behind the claim. That is the same shape as clause 19's proof obligation, found the
       # same way, and it is fixed here rather than argued around.
       #
-      # FIVE OF THE TEN RUN HERE. The exclusions are measured, not assumed, and each is named so a
+      # SIX OF THE ELEVEN RUN HERE. The exclusions are measured, not assumed, and each is named so a
       # reader does not mistake this for the whole suite:
       #   check:allowlist, check:surface, check:registry  — resolve the PLAN through
       #     scripts/planning-path.mjs and exit 2 with a remedy when it is absent. The planning
@@ -169,6 +169,7 @@ jobs:
         run: |
           npm run check:snapshot
           npm run check:schemas
+          npm run check:partitions
           npm run check:datalock
           npm run check:archive
           npm run check:coverage
