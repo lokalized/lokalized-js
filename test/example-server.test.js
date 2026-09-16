@@ -39,14 +39,26 @@ let shop;
 before(async () => { shop = await startBookshop({ catalogVersion: "2026.09.15" }); });
 after(async () => { await shop.close(); });
 
-/** @param {string} html */
+/**
+ * Read the stamp back the way a BROWSER would: `JSON.parse(element.textContent)`, with no decoding
+ * step of our own.
+ *
+ * That is the point of this helper. It used to un-escape five HTML entities by hand, which made a
+ * real defect look like a convention: the renderer was running the page's HTML escaper over the
+ * stamp, and a `script` element is raw text, so the parser never decodes those entities and a client
+ * doing `JSON.parse` got `&quot;formatVersion&quot;…` and a SyntaxError. Parsing the raw text here
+ * is what makes the escaper's correctness a gated property instead of a private agreement between
+ * the renderer and this file.
+ *
+ * @param {string} html
+ */
 function stampFrom(html) {
   const match = /<script type="application\/json" id="lokalized-ssr-stamp">([^<]*)<\/script>/.exec(html);
   assert.ok(match, "the rendered document carries no SSR stamp");
-  const decoded = /** @type {string} */ (match[1])
-    .replaceAll("&quot;", '"').replaceAll("&#39;", "'")
-    .replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
-  return JSON.parse(decoded);
+  const text = /** @type {string} */ (match[1]);
+  assert.ok(!/&(?:quot|amp|lt|gt|#39);/.test(text),
+    `the stamp is HTML-escaped inside a script element, so a browser cannot parse it: ${text.slice(0, 80)}`);
+  return JSON.parse(text);
 }
 
 /** @param {string} html */

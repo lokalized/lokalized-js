@@ -37,23 +37,23 @@
     {
       "label": "edge worker",
       "modules": 47,
-      "sourceBytes": 1098953,
+      "sourceBytes": 1102676,
       "nodeBuiltinEdges": 0,
       "ianaClosureBytes": 23482,
-      "importMs": 0.4975
+      "importMs": 0.5055
     },
     {
       "label": "server renderer",
       "modules": 54,
-      "sourceBytes": 1169916,
+      "sourceBytes": 1173639,
       "nodeBuiltinEdges": 10,
       "ianaClosureBytes": 23482,
-      "importMs": 17.604
+      "importMs": 8.5917
     }
   ],
-  "negotiateMsPerHeader": 0.06835,
-  "firstRenderMs": 0.9593,
-  "retainedBytes": -14352,
+  "negotiateMsPerHeader": 0.07579,
+  "firstRenderMs": 1.0033,
+  "retainedBytes": 0,
   "requestsPerRender": {
     "fr-CA": 4,
     "fr-CH": 4,
@@ -82,6 +82,20 @@
       "growth": [
         "edge worker: source graph grew 1097426 -> 1098953 bytes",
         "server renderer: source graph grew 1168389 -> 1169916 bytes"
+      ]
+    },
+    {
+      "reason": "M9 S9: the ISO-code direction fix; both example graphs reach the locale kernel",
+      "growth": [
+        "edge worker: source graph grew 1098953 -> 1101675 bytes",
+        "server renderer: source graph grew 1169916 -> 1172638 bytes"
+      ]
+    },
+    {
+      "reason": "M-D S13: examples/app/render.js gained escapeJsonForScript, replacing escapeHtml for the SSR stamp inside <script type=\"application/json\"> — a script element is raw text, so the HTML-escaped stamp was unparseable by any browser. +1001 bytes in both variants (the two share the view).",
+      "growth": [
+        "edge worker: source graph grew 1101675 -> 1102676 bytes",
+        "server renderer: source graph grew 1172638 -> 1173639 bytes"
       ]
     }
   ]

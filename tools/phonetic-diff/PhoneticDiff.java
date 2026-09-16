@@ -13,6 +13,9 @@ import java.util.*;
  * render too; which locale the callback receives, how many times it runs and whether it runs at all
  * are visible only here.
  *
+ * Every scenario prints the cause CHAIN as well as the deepest cause message — see {@link
+ * #causeShape}, which is the column {@code deepest(...)} throws away.
+ *
  * Input is TSV, one scenario per line:
  *   name \t fallbackLocale \t instanceLocale \t requestLocale \t key \t resolverSpec \t placeholders \t catalogs
  * where `catalogs` is `locale::base64(json)` joined by ';;' and `placeholders` is `name=TYPE:value`
@@ -20,6 +23,18 @@ import java.util.*;
  */
 public class PhoneticDiff {
   static List<String> CALLS = new ArrayList<>();
+
+  /**
+   * An application exception the library has no reason to recognize — the FOURTH arm of
+   * {@code DefaultStrings.contextualizePlaceholderFailure} ({@code :1279-1281}), which returns
+   * {@code cause} unchanged rather than contextualizing it.
+   *
+   * It is deliberately a class {@code com.lokalized} never CONSTRUCTS, so one class-keyed map on the
+   * JS side can spell the application's throw and the library's wrapper as two different things.
+   */
+  static class AppFailure extends RuntimeException {
+    AppFailure(String message) { super(message); }
+  }
 
   static PhoneticResolver resolverFor(String spec) {
     String[] parts = spec.split(":", 2);
@@ -45,6 +60,21 @@ public class PhoneticDiff {
       }
       case "return-null": delegate = (t, l) -> null; break;
       case "throw": delegate = (t, l) -> { throw new IllegalStateException("resolver refuses"); };
+      break;
+      // THE TWO ARMS `throw` CANNOT REACH, and they exist because `throw` hands the two libraries
+      // exceptions of DIFFERENT CATEGORIES — Java an `IllegalStateException` (recognized by
+      // `:1276`), JavaScript a plain `Error` (arm 4, plan 3.5:1135-1136). That row therefore
+      // compares two different questions and is declared as a probe asymmetry on the runner side;
+      // these two hand BOTH libraries a matched category and compare the chain exactly.
+      //
+      // A `NumberFormatException` IS an `IllegalArgumentException`, so `:1273` recognizes it — and
+      // the exception that arm builds at `:1274` is a PLAIN IAE, so the subclass survives only as
+      // `cause`. That is what makes this probe discriminate "the ladder keeps the CATEGORY" from
+      // "it keeps the TYPE": a port doing the latter emits its recognized class twice.
+      case "throw-invalid-value":
+        delegate = (t, l) -> { throw new NumberFormatException("resolver refuses"); };
+      break;
+      case "throw-app": delegate = (t, l) -> { throw new AppFailure("resolver refuses"); };
       break;
       default: throw new IllegalArgumentException(spec);
     }
@@ -83,6 +113,35 @@ public class PhoneticDiff {
   static Throwable deepest(Throwable t) {
     while (t.getCause() != null && t.getCause() != t) t = t.getCause();
     return t;
+  }
+
+  /**
+   * The cause CHAIN, outermost first, fully qualified, joined by {@code '<'} — the value
+   * {@code deepest(...).getMessage()} throws away.
+   *
+   * WHY IT IS WORTH EMITTING. {@code DefaultStrings.contextualizePlaceholderFailure:1270-1281}
+   * picks among FOUR arms by the CLASS of what it caught: three rebuild a contextualized exception
+   * of the same CATEGORY ({@code :1271}, {@code :1274}, {@code :1277}) and the fourth returns the
+   * application's own exception UNCHANGED ({@code :1281}). A message cannot tell those apart — an
+   * arm-4 passthrough and a contextualized rebuild both end at the same deepest message, which is
+   * the only thing the previous column carried. The chain's CLASSES and its DEPTH are the
+   * observation, and both halves are needed: depth alone cannot see a port that wraps with the
+   * wrong category, classes alone cannot see one that wraps twice.
+   *
+   * FULLY QUALIFIED ON PURPOSE. A simple name is ambiguous across packages, and this column is
+   * MAPPED on the JS side rather than compared verbatim — the same discipline {@code LookupDiff}'s
+   * runner applies to an error class, since no Java class name can ever equal a JS error name.
+   *
+   * SELF-REFERENTIAL CHAINS TERMINATE. {@code getCause()} may legally return the throwable itself;
+   * {@code deepest} above already guards for it and so does this walk.
+   */
+  static String causeShape(Throwable t) {
+    StringBuilder sb = new StringBuilder();
+    for (Throwable c = t; c != null; c = c.getCause() == c ? null : c.getCause()) {
+      if (sb.length() > 0) sb.append('<');
+      sb.append(c.getClass().getName());
+    }
+    return sb.toString();
   }
 
   public static void main(String[] args) throws Exception {
@@ -125,10 +184,12 @@ public class PhoneticDiff {
             + "\t" + r.getResolvedLocale().map(Locale::toLanguageTag).orElse("-")
             + "\t" + r.getFailureReason().map(Object::toString).orElse("-")
             + "\t" + (r.getCause().isPresent()
-                ? String.valueOf(deepest(r.getCause().get()).getMessage()).replace("\n", "\\n") : "-");
+                ? String.valueOf(deepest(r.getCause().get()).getMessage()).replace("\n", "\\n") : "-")
+            + "\t" + (r.getCause().isPresent() ? causeShape(r.getCause().get()) : "-");
       } catch (Exception e) {
         result = "THROWN\t" + e.getClass().getSimpleName() + ": "
-            + String.valueOf(e.getMessage()).replace("\n", "\\n") + "\t-\t-\t-";
+            + String.valueOf(e.getMessage()).replace("\n", "\\n") + "\t-\t-\t-"
+            + "\t" + causeShape(e);
       }
 
       out.append(name).append('\t').append(result)

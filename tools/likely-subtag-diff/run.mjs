@@ -13,7 +13,7 @@
  * was unproven rather than false. `tools/likely-subtag-consumers.mjs` supplies the inventory and
  * gates it against the source each run; this tool supplies the measurement.
  *
- * WHAT IT COMPARES, and why it is five fields rather than one. `lokalized-java` reads
+ * WHAT IT COMPARES, and why it is seven fields rather than one. `lokalized-java` reads
  * `CldrLocaleData.LIKELY_SUBTAGS_BY_TAG` at exactly two sites and the port reads its own table at
  * exactly two — `likelySubtagFor` and `preferredRegionAlias` on both sides. But a differential over
  * `likelySubtagFor` alone would prove only that the two tables are the same bytes; what M7's clause
@@ -25,6 +25,16 @@
  *   canonicalTag    `…canonicalLanguageTag`                     — reaches the SECOND table read, `preferredRegionAlias`
  *   fallbackChain   `…fallbackLocalesFor`                       — truncation stopped at a likely-script boundary
  *   rightToLeft     `BidiUtils.localeUsesRightToLeftScript`     — script maximization for bidi isolation
+ *   jdkScript       `Locale#getScript()` (BidiUtils.java:54)    — the script field BEFORE maximization
+ *   bidiScript      the script reaching `isRightToLeftScript`   — the script field AFTER it
+ *
+ * THE LAST TWO ARE THE INTERMEDIATES `rightToLeft` COLLAPSES, and the collapse is why they were
+ * worth emitting. `localeUsesRightToLeftScript` ends in a set-membership test over LOWERCASED
+ * script codes, so it sorts this string into two classes and erases every difference inside a
+ * class: `Latn` vs `latn`, `Latn` vs `Cyrl`, `Arab` vs `Hebr` are all the same answer. The port's
+ * model of the field is `locale-jdk-tag.js parseJdkTag(...).script`, and this differential compared
+ * it only through that two-valued function of it. Read the block above `COLUMNS` for the measured
+ * ablations, including the one that does NOT hold.
  *
  * THE SECOND TABLE READ IS THE ONE NOBODY HAD WRITTEN DOWN, and it is only observable through
  * `canonicalLanguageTag`: a deprecated region subtag with more than one CLDR replacement (there are
@@ -44,7 +54,7 @@
  * TWO VERDICTS, kept apart the way `tools/direct-tag-diff/` keeps them apart:
  *
  *   WELL-FORMED (the clause). Every field must agree exactly, on both sides.
- *   ILL-FORMED. The three string-in/string-out consumers still must agree exactly — the port takes
+ *   ILL-FORMED. The five string-in/string-out consumers still must agree exactly — the port takes
  *     the same raw string Java does and there is no decided divergence for them, so this is free
  *     discrimination and it is gated. The two `Locale`-taking consumers reach the table only through
  *     `normalizeTag`, which REFUSES an ill-formed tag by the decision `tools/direct-tag-diff/`'s
@@ -302,16 +312,80 @@ const { decode: decodeRegionAliases } = await import("../../src/data/aliases-reg
 const likelyTable = decodeLikely();
 const regionAliasTable = decodeRegionAliases();
 
-/** The five compared columns, each named by the consumer it observes on both sides. */
+/** The seven compared columns, each named by the consumer it observes on both sides. */
 const COLUMNS = {
   likelySubtag: "CldrLocaleData.likelySubtagFor / locale-cldr.js likelySubtagFor",
   languageScript: "…languageScriptForLikelySubtag / locale-cldr.js languageScriptForLikelySubtag",
   canonicalTag: "…canonicalLanguageTag (reaches preferredRegionAlias) / locale-cldr.js canonicalLanguageTag",
   fallbackChain: "…fallbackLocalesFor (likely-script truncation boundary) / locale-cldr.js fallbackLocaleTagsFor",
   rightToLeft: "BidiUtils.localeUsesRightToLeftScript / bidi.js localeUsesRightToLeftScript",
+  jdkScript: "Locale#getScript() (BidiUtils.java:54) / locale-jdk-tag.js parseJdkTag(...).script",
+  bidiScript: "the script reaching isRightToLeftScript (BidiUtils.java:54-61) / parseJdkTag + likelySubtagFor",
 };
 
-/** Columns whose port side goes through `normalizeTag`, which refuses ill-formed tags by decision. */
+/**
+ * THE TWO SCRIPT COLUMNS: WHAT THEY GATE, WHAT THEY DO NOT, AND THE ABLATION THAT DOES NOT HOLD.
+ * Every number below was measured on the pinned Corretto 21 over the probe space this file builds;
+ * none of it is a prediction.
+ *
+ * WHY THEY EXIST. `rightToLeft` is `RIGHT_TO_LEFT_SCRIPTS.has(script.toLowerCase())` — a two-valued
+ * function of a string. The string is the port's model of `Locale#getScript()`,
+ * `parseJdkTag(...).script`. It is read verbatim at `bidi.js:134/138` and `plural.js:974`, and
+ * every `JdkTagParts` consumer reads it through `renderJdkTag:499`, `jdkBaseLocale` and
+ * `localeIdentity` — `locale.js` and `node/discovery.js` among them. Before these columns, this
+ * differential evaluated that field 35,281 times and could not see any difference that stayed
+ * inside one class of the membership test.
+ *
+ * THE ABLATION THAT PROVES THEY PARTICIPATE, chosen because it is the defect the collapse hides
+ * best: drop the JDK's script title-casing in `locale-jdk-tag.js:221`
+ * (`parts.script = titleCase(subtags[index] ?? "")` -> `parts.script = subtags[index] ?? ""`), so
+ * the port reports the script AS SPELLED where `Locale#getScript()` canonicalizes it.
+ *
+ *   PRISTINE TOOL, ablation in place: exit 0, and the report is BYTE-IDENTICAL to the control —
+ *     all five columns OK, 172,530 well-formed cells agreeing, same 321 region-alias probes. The
+ *     blind spot is not an argument, it is that output.
+ *   IMPROVED TOOL, same ablation: exit 1, `jdkScript` 7,647 cells differ and `bidiScript` 7,647,
+ *     the other five columns still OK. 7,647 is exactly the `recasedScriptProbes` count reported
+ *     below, which is what makes that counter the right anti-vacuity guard rather than a proxy.
+ *   `node tools/conformance.mjs`, same ablation: exit 0, 2,117 passed / 0 FAILED, and the whole
+ *     report BYTE-IDENTICAL to the unablated run. The corpus never spells a script in anything but
+ *     its canonical case, so it cannot see this at all.
+ *   `npm test`, same ablation: exit 0, 1,570 of 1,570 passing. NOTHING in this repository catches
+ *     it. `test/bidi-zzzz-script.test.js` asserts `parseJdkTag("ar-Zzzz").script === "Zzzz"` and
+ *     `parseJdkTag("ar-Latn").script === "Latn"` — both already spelled in the JDK's canonical
+ *     case, so the assertions hold with the canonicalization deleted. So these two columns are the
+ *     ONLY thing that compares the port's model of `Locale#getScript()` against the JDK's.
+ *
+ * THE RAW PROBE IS LOAD-BEARING. Both port sides take `row.tag`, NOT `normalizeTag(row.tag)`, which
+ * is why they are absent from `NORMALIZED_COLUMNS` below. `renderJdkTag:499` re-title-cases the
+ * script on its way out (`isScriptSubtag(script) ? titleCase(script) : ""`), so a port side that
+ * normalized first would launder the ablation through the port's own renderer. MEASURED, by running
+ * `parseJdkTag(normalizeTag(row.tag)).script` beside the shipped form with the ablation in place:
+ * the normalized spelling disagrees with Java on 0 of the 34,506 well-formed probes where the raw
+ * spelling disagrees on 7,647. A column can be defeated by its own port side, and this one would
+ * have been. The raw form is also the exact analogue of the Java side, which is
+ * `Locale.forLanguageTag(probe).getScript()` on the same raw string, and it buys the ill-formed
+ * bucket for free the way the three string-in/string-out consumers already do.
+ *
+ * WHAT THEY DO NOT GATE — the prediction that did NOT hold, kept here rather than deleted. The
+ * defect this differential originally found was a CALL-SITE defect: `bidi.js` read the script
+ * through `tagPartsFor`, which elides CLDR's `Zzzz` placeholder. Restoring that read is caught by
+ * `rightToLeft` and by `rightToLeft` ALONE — 84 cells, re-measured on this tree — and reds
+ * `jdkScript` and `bidiScript` on ZERO. It cannot do otherwise: `bidi.js` exports only the boolean,
+ * so the port side of `bidiScript` is a MIRROR of `bidi.js:131-139` living in this runner, built
+ * from the port's own exported `parseJdkTag` and `likelySubtagFor`. These columns gate the port's
+ * MODEL of the JDK script field; they do not gate which model `bidi.js` chooses to call, and they
+ * do not widen the `Zzzz` coverage by one cell. `test/bidi-zzzz-script.test.js` is what gates the call
+ * site, and it stays the whole enforcement of it.
+ *
+ * `jdkScript` carries no mirror caveat at all: one exported port function, called once, against one
+ * JDK method.
+ */
+
+/**
+ * Columns whose port side goes through `normalizeTag`, which refuses ill-formed tags by decision.
+ * `jdkScript` and `bidiScript` are deliberately NOT here — see the note above.
+ */
 const NORMALIZED_COLUMNS = new Set(["fallbackChain", "rightToLeft"]);
 
 const javaReads = assertJavaTableReads();
@@ -342,6 +416,11 @@ try {
   const cldr = await import("../../src/internal/locale-cldr.js");
   const { normalizeTag } = await import("../../src/internal/locale.js");
   const { localeUsesRightToLeftScript } = await import("../../src/internal/bidi.js");
+  // `jdkLanguageTag` is the port's `Locale.forLanguageTag(tag).toLanguageTag()`; `bidiScript` needs
+  // it because Java's `likelySubtagFor(Locale)` IS `likelySubtagFor(locale.toLanguageTag())`
+  // (CldrLocaleData.java:173-177) — a different input from the raw probe the `likelySubtag` column
+  // feeds, so this maximization is not a re-run of that column.
+  const { jdkLanguageTag, parseJdkTag } = await import("../../src/internal/locale-jdk-tag.js");
 
   /** @param {() => string} answer */
   const guarded = (answer) => {
@@ -366,6 +445,34 @@ try {
   let illFormedRefused = 0;
   /** Probes on which `preferredRegionAlias` demonstrably chose a NON-FIRST replacement. */
   const discriminatingRegionAliases = new Set();
+  /**
+   * ANTI-VACUITY for the two script columns, in the shape `discriminatingRegionAliases` already
+   * uses, and counted off the JAVA answers alone so each is a statement about the probe space
+   * rather than about the port.
+   *
+   *   recasedScriptProbes  a probe whose script Java REWROTE — `row.jdkScript` is non-empty and the
+   *     probe string does not contain it verbatim, i.e. `Locale.forLanguageTag` canonicalized the
+   *     case (`zh-hant` -> `Hant`). These are the ONLY rows on which the title-casing ablation
+   *     described above `COLUMNS` is visible, and the count is exactly the number of `jdkScript`
+   *     cells that ablation reds: 7,647 both.
+   *   maximizedScripts  a probe with NO explicit script whose bidi script is non-empty, i.e. one on
+   *     which the maximizing branch of BidiUtils.java:56-61 actually fired. Without one, the second
+   *     intermediate is never observed and `bidiScript` is a copy of `jdkScript` on every row.
+   *
+   * BOTH GATES ARE NEGATIVE-TESTED, by narrowing the probe space rather than by forcing a counter:
+   * restricting `inputs()` to tags carrying a script subtag takes `maximizedScripts` to 0 and exits
+   * 1; restricting it to tags carrying none takes `recasedScriptProbes` to 0 and exits 1; the full
+   * space is the clean control for both.
+   *
+   * AND THE SENSITIVITY OF THE FIRST IS STATED RATHER THAN ASSUMED, because it is weaker than it
+   * looks. Section (9)'s case sweep produces 7,645 of the 7,647; deleting that sweep entirely
+   * leaves 2 — `zh-hant` and `ZH-hant`, which the CORPUS spells — so the count collapses by 99.97%
+   * and the gate does NOT fire. It is a floor at one, like `discriminatingRegionAliases`, not a
+   * ratchet. A narrowing that removed the sweep would keep this column green while destroying
+   * almost all of its discrimination, and nothing here would say so.
+   */
+  let recasedScriptProbes = 0;
+  let maximizedScripts = 0;
 
   /** @type {Map<string, string[]>} */
   const aliasTargets = new Map();
@@ -385,6 +492,21 @@ try {
       canonicalTag: guarded(() => cldr.canonicalLanguageTag(row.tag)),
       fallbackChain: guarded(() => cldr.fallbackLocaleTagsFor(normalizeTag(row.tag)).join("|")),
       rightToLeft: guarded(() => String(localeUsesRightToLeftScript(normalizeTag(row.tag)))),
+      // RAW `row.tag`, never `normalizeTag(row.tag)` — see the note above `COLUMNS`. Normalizing
+      // first would re-title-case the script through `renderJdkTag:499` before `parseJdkTag` saw
+      // it, which launders the defect these columns exist to catch.
+      jdkScript: guarded(() => parseJdkTag(row.tag).script),
+      bidiScript: guarded(() => {
+        // A mirror of `bidi.js:131-139`. It cannot get the VALUES wrong — both
+        // ingredients are the port's own exported functions — but it can get the BRANCH wrong, so
+        // it is written to match that block statement for statement.
+        let script = parseJdkTag(row.tag).script;
+        if (script.length === 0) {
+          const likelySubtag = cldr.likelySubtagFor(jdkLanguageTag(row.tag));
+          if (likelySubtag !== null) script = parseJdkTag(likelySubtag).script;
+        }
+        return script;
+      }),
     };
 
     // Did this probe exercise the SECOND table read discriminatingly? Only measurable on the Java
@@ -395,6 +517,13 @@ try {
       const chosen = /-([A-Za-z]{2}|[0-9]{3})(?:-|$)/.exec(row.canonicalTag)?.[1] ?? "";
       const index = targets.findIndex((target) => target.toLowerCase() === chosen.toLowerCase());
       if (index > 0) discriminatingRegionAliases.add(`${region?.[1]} -> ${chosen} (target ${index + 1} of ${targets.length}) via ${row.tag}`);
+    }
+
+    const javaJdkScript = /** @type {string} */ (row.jdkScript);
+    const javaBidiScript = /** @type {string} */ (row.bidiScript);
+    if (!javaJdkScript.startsWith(" ") && !javaBidiScript.startsWith(" ")) {
+      if (javaJdkScript.length > 0 && !row.tag.includes(javaJdkScript)) recasedScriptProbes++;
+      if (javaJdkScript.length === 0 && javaBidiScript.length > 0) maximizedScripts++;
     }
 
     for (const column of Object.keys(COLUMNS)) {
@@ -440,6 +569,8 @@ try {
   console.log("");
   console.log(`  well-formed cells agreeing  ${agree.wellFormed}`);
   console.log(`  ill-formed  cells agreeing  ${agree.illFormed}  (of which ${illFormedRefused} are the port's decided refusal)`);
+  console.log(`  probes whose script the JDK REWROTE, so jdkScript separates what rightToLeft cannot: ${recasedScriptProbes}`);
+  console.log(`  probes whose bidi script came from MAXIMIZATION, so bidiScript is not a copy: ${maximizedScripts}`);
   console.log(`  preferredRegionAlias probes that chose a NON-FIRST replacement: ${discriminatingRegionAliases.size}`);
   for (const line of [...discriminatingRegionAliases].slice(0, 8)) console.log(`      ${line}`);
 
@@ -450,6 +581,28 @@ try {
       "\nFAILED: no probe made `preferredRegionAlias` choose a non-first replacement, so the SECOND " +
         "of the two likely-subtag table reads was never discriminated. The `canonicalTag` column " +
         "would be green whether or not that read is implemented. Widen section (5) of inputs().",
+    );
+    exitCode = 1;
+  }
+
+  // The same guard for the two script columns. Either count at zero makes one of them a function of
+  // a column that already existed, which is the `zh-123` shape at harness level: the column would be
+  // green whether or not the port models the field correctly.
+  if (recasedScriptProbes === 0) {
+    console.error(
+      "\nFAILED: no probe carries a script that `Locale.forLanguageTag` had to rewrite, so the " +
+        "`jdkScript` column separates nothing `rightToLeft` did not already separate — every " +
+        "remaining difference in that field would be one the RTL membership test also sees. " +
+        "Section (9)'s case sweep produces all but 2 of these and the corpus produces the rest; " +
+        "widen section (9) of inputs().",
+    );
+    exitCode = 1;
+  }
+  if (maximizedScripts === 0) {
+    console.error(
+      "\nFAILED: no probe reached the maximizing branch of BidiUtils.java:56-61 with a non-empty " +
+        "result, so `bidiScript` is a copy of `jdkScript` on every row and the second intermediate " +
+        "is unobserved. Widen section (7) of inputs().",
     );
     exitCode = 1;
   }

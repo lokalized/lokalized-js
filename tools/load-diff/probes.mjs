@@ -36,6 +36,61 @@ const TWO_INCOMPLETE_PLACEHOLDERS = JSON.stringify({
 
 const ONE_KEY = JSON.stringify({ A: "a" });
 
+/**
+ * A catalog rich enough that the PARSED CONTENT column is not vacuous.
+ *
+ * Every other body here is `{"A":"a"}` or a one-placeholder warning fixture. MEASURED by deleting
+ * this probe and re-running: eight of `run.mjs`'s nine `CONTENT_DISCRIMINATORS` fire at once, so
+ * without it the probe space contains no commentary, no range, neither kind of alternative list and
+ * no declaration order that is not already alphabetical — every one of those members would be
+ * `null`/`[]` on both sides of all 40 comparisons, and a column that can only ever be `[]` agrees
+ * for free.
+ *
+ * THREE DECLARATION ORDERS ARE DELIBERATELY NOT ALPHABETICAL, because a port that SORTED any of them
+ * would be indistinguishable from one that preserved the file's order otherwise: the placeholders are
+ * `summary` before `noun`, the cardinal forms are `CARDINALITY_OTHER` before `CARDINALITY_ONE`, and
+ * both alternative lists put `count > 100` before `count == 0` (`>` sorts after `=`). `run.mjs`'s
+ * `CONTENT_DISCRIMINATORS` fails the run if that stops being true of the probe space.
+ *
+ * IT LOADS WITH NO WARNING AND NO FAILURE — measured, `warnings: []` on both sides — which is what
+ * keeps it single-fault: `en`'s cardinal forms are ONE and OTHER, and both language-form placeholders
+ * supply exactly those two. So the ONLY thing this probe can report is a content difference.
+ *
+ * WHAT IT DOES NOT REACH, said here rather than left to be found: only the `CARDINALITY_` prefix of
+ * `LoadDiff.fileFormatName`'s ten is exercised. The other nine are held by the Java inventory in
+ * `run.mjs` plus that function's refusal to fall through to `name()`, not by a probe.
+ *
+ * ABLATION, measured 2026-09-15: deleting this probe exits 1 with `DEGENERATE PROBE SET (8)`. It is
+ * NOT the only probe whose content column is non-empty — the warning fixtures carry a placeholder, so
+ * that one term stays satisfied — but it is the only source of a commentary, a range, either
+ * alternative list, and any declaration order that is not already alphabetical. With it present, five
+ * single mutations of the port's `projectNode` each red exactly this probe while `npm run
+ * conformance` stays byte-identical at 2,117 passed / 0 FAILED.
+ */
+const RICH_CATALOG = JSON.stringify({
+  Items: {
+    translation: "{{count}} {{noun}} {{summary}}",
+    commentary: "Shown on the cart screen",
+    placeholders: {
+      summary: {
+        translation: "in your cart",
+        alternatives: [{ "count > 100": "in your very full cart" }, { "count == 0": "in your empty cart" }],
+      },
+      noun: { value: "count", translations: { CARDINALITY_OTHER: "items", CARDINALITY_ONE: "item" } },
+    },
+    alternatives: [{ "count > 100": { translation: "so many" } }, { "count == 0": { translation: "nothing yet" } }],
+  },
+  Range: {
+    translation: "{{startValue}}-{{endValue}} {{noun}}",
+    placeholders: {
+      noun: {
+        range: { start: "startValue", end: "endValue" },
+        translations: { CARDINALITY_OTHER: "items", CARDINALITY_ONE: "item" },
+      },
+    },
+  },
+});
+
 export const PROBES = [
   // ---- blind spot 1: the discovery budget charges entries it then SKIPS ----------------------
   {
@@ -222,6 +277,15 @@ export const PROBES = [
     },
     options: {},
     discriminates: "a port that warns on every incomplete placeholder: a range-driven one legitimately supplies a subset and is skipped",
+  },
+
+  // ---- blind spot 7: the parsed CONTENT behind each key, not merely the key --------------------
+  {
+    name: "parsed-content-is-compared",
+    files: { en: RICH_CATALOG },
+    options: {},
+    discriminates:
+      "a port that agrees on every KEY and parses a different message behind it — a dropped commentary, a dropped range, a sorted or reversed alternative list, a placeholder map or per-form translation map rebuilt in a different order. Single-fault: the catalog is valid and loads with no warning, so the only thing this probe can report is a content difference",
   },
 
   // ---- blind spot 6: the path convention, which the corpus scrubs away -------------------------

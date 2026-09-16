@@ -18,11 +18,11 @@
  */
 
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, test } from "node:test";
 
 import { createStrings } from "../src/core/index.js";
 import { normalizeTag } from "../src/internal/locale.js";
-import { jdkLanguageSubtag, parseJdkTag, renderJdkTag } from "../src/internal/locale-jdk-tag.js";
+import { jdkLanguageSubtag, jdkLanguageTag, parseJdkTag, renderJdkTag } from "../src/internal/locale-jdk-tag.js";
 
 describe("`und` is dropped case-SENSITIVELY, and only as a primary language subtag", () => {
   /**
@@ -228,5 +228,68 @@ describe("`throwExceptionFor` validates the attempted locales when it has no cau
         !(error instanceof TypeError) &&
         error.message === "No match for 'Absent' was found for locale 'en'.",
     );
+  });
+});
+
+describe("`jdkLanguageSubtag` models JDK 17+, not the pre-17 storage conversion", () => {
+  /**
+   * **MEASURED ON THE PINNED CORRETTO 21, 2026-09-15, and the literals below ARE the measurement.**
+   *
+   *     tag          toLanguageTag   getLanguage   "specific"
+   *     he           he              he            false
+   *     iw           he              he            false
+   *     id           id              id            false
+   *     in           id              id            false
+   *     iw-Latn-US   he-Latn-US      he            true
+   *
+   * `java.locale.useOldISOCodes` stopped defaulting to true in JDK 17, so a `Locale` stores the
+   * CURRENT code. The port mapped the other way — `he -> iw` — until this test existed, and the
+   * comment that justified it asserted the inverse of the measurement.
+   *
+   * THIS IS THE JDK-LESS HALF. `diff:direct-tag`'s `getLanguage` column is what FOUND it and is the
+   * thorough gate — 46,483 probes against the real JDK — but it needs the pinned toolchain and runs
+   * in neither `verify` nor CI. These rows need neither, so a regression fails `npm test`.
+   */
+  const MEASURED = /** @type {[string, string][]} */ ([
+    ["he", "he"], ["iw", "he"], ["id", "id"], ["in", "id"], ["yi", "yi"], ["ji", "yi"],
+    ["iw-Latn-US", "he"], ["he-IL", "he"], ["in-ID", "id"],
+  ]);
+
+  test("both spellings of a superseded code answer the MODERN one", () => {
+    for (const [tag, expected] of MEASURED)
+      assert.equal(jdkLanguageSubtag(tag), expected, tag);
+  });
+
+  test("and a bare superseded tag is therefore NOT 'specific', as Java scores it", () => {
+    // `DefaultStrings.java:1905` — `!locale.toLanguageTag().equalsIgnoreCase(locale.getLanguage())`
+    // — ported at `src/internal/locale.js`. The predicate decides whether candidates narrow to the
+    // structurally filtered set, so getting it wrong can change which catalog answers.
+    //
+    // **THE INPUT IS THE NORMALIZED CANDIDATE, WHICH IS WHAT PRODUCTION PASSES, and a first draft of
+    // this test got that wrong.** Java's own left-hand side is `toLanguageTag()`, not the caller's
+    // spelling; the port's is a supported catalog tag, and every one of those has been through
+    // `normalizeTag`, which canonicalizes `iw -> he`. Feeding the RAW spelling here would exercise a
+    // comparison the predicate never makes.
+    const specific = (/** @type {string} */ tag) => {
+      const candidate = normalizeTag(tag);
+      return candidate.toLowerCase() !== jdkLanguageSubtag(candidate).toLowerCase();
+    };
+    for (const tag of ["he", "iw", "id", "in", "yi", "ji"])
+      assert.equal(specific(tag), false, `${tag} must not count as specific`);
+    // THE CONTROL: a tag that really IS more specific than its language must still say so, or the
+    // assertion above is satisfied by a predicate that answers false for everything.
+    for (const tag of ["iw-Latn-US", "he-IL", "en-US", "fr-CA"])
+      assert.equal(specific(tag), true, `${tag} must count as specific`);
+  });
+
+  test("the round trip is untouched: `toLanguageTag` still renders the modern spelling", () => {
+    // The port collapses both spellings onto one INTERNAL representative and `renderJdkTag` inverts
+    // it. That choice is invisible from outside and must stay invisible — `diff:direct-tag` compares
+    // 46,400 well-formed tags on this very field.
+    for (const [tag] of MEASURED)
+      assert.equal(jdkLanguageTag(tag), jdkLanguageTag(tag.replace(/^iw/, "he").replace(/^in/, "id").replace(/^ji/, "yi")),
+        `${tag} and its modern spelling must render identically`);
+    assert.equal(jdkLanguageTag("iw"), "he");
+    assert.equal(jdkLanguageTag("in-ID"), "id-ID");
   });
 });

@@ -440,9 +440,19 @@ export function renderJdkTag(parts) {
 		}
 	}
 
-	// --- `BaseLocale.getInstance`: casing, then `convertOldISOCodes` ---------------------------
-	// A `Locale` stores the SUPERSEDED code; `toLanguageTag` converts back. The round trip is
-	// observable elsewhere through `jdkLanguageSubtag`, so it is modelled rather than short-circuited.
+	// --- `BaseLocale.getInstance`: casing, then an INTERNAL representative ---------------------
+	// **THIS IS THE PORT'S OWN STORAGE CHOICE, NOT A CLAIM ABOUT THE JDK, and the distinction was
+	// paid for.** This block used to be described as "a `Locale` stores the SUPERSEDED code;
+	// `toLanguageTag` converts back", which was true of `convertOldISOCodes` before JDK 17 and is
+	// false of the pinned Corretto 21: `java.locale.useOldISOCodes` no longer defaults to true, so a
+	// `Locale` stores `he` and `getLanguage()` answers `he`.
+	//
+	// Collapsing both spellings onto ONE representative here is still right, and is what makes `he`
+	// and `iw` one locale for `localeIdentity` and for the round trip — `renderJdkTag` inverts it, so
+	// `toLanguageTag` is byte-identical to Java over all 46,400 well-formed probes either way. Which
+	// representative is chosen is invisible from outside. What is NOT invisible is
+	// `jdkLanguageSubtag`, which EXPOSES a stored code as `Locale#getLanguage()`; it therefore maps
+	// forward to the modern spelling rather than reading this one, and the comment there records why.
 	language = language.toLowerCase();
 	if (language === "he") language = "iw";
 	else if (language === "yi") language = "ji";
@@ -595,9 +605,24 @@ export function jdkLanguageSubtag(tag) {
 			? ""
 			: parts.language;
 
-	if (language === "he") language = "iw";
-	else if (language === "yi") language = "ji";
-	else if (language === "id") language = "in";
+	// **FORWARD, NOT BACKWARD, AND THE DIRECTION WAS MEASURED RATHER THAN READ.** This block used to
+	// rewrite `he -> iw`, `yi -> ji`, `id -> in` — the pre-JDK-17 storage conversion — and the comment
+	// at `src/internal/locale.js:1795` justified it by asserting that "a bare `he` counts as
+	// 'specific' (its stored language is the superseded `iw`)". **That is the inverse of what the
+	// pinned JDK does.** `java.locale.useOldISOCodes` stopped defaulting to true in JDK 17 and this
+	// project pins Corretto 21, so a `Locale` stores the CURRENT code and `getLanguage()` reports it:
+	//
+	//     Locale.forLanguageTag("iw").getLanguage()  ->  "he"
+	//     Locale.forLanguageTag("he").getLanguage()  ->  "he"
+	//     Locale.forLanguageTag("in").getLanguage()  ->  "id"
+	//
+	// Deleting the rewrite outright would ALSO be wrong: `forLanguageTag` canonicalizes the
+	// superseded spelling on the way in, so the tag `iw` must answer `he` rather than `iw`. The
+	// mapping therefore runs forward. Found by `diff:direct-tag`'s `getLanguage` column, which the
+	// oracle had never emitted — 5,220 of 46,483 probes disagreed, every one of them this family.
+	if (language === "iw") language = "he";
+	else if (language === "ji") language = "yi";
+	else if (language === "in") language = "id";
 
 	return isLanguageSubtag(language) ? language : "";
 }

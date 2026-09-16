@@ -52,6 +52,25 @@ function escapeHtml(text) {
 }
 
 /**
+ * Embed JSON inside `<script type="application/json">`. **Not `escapeHtml`.**
+ *
+ * A `script` element is raw text: the HTML parser does not decode character references inside it, so
+ * `escapeHtml` would deliver a literal `&quot;` to the client and `JSON.parse(element.textContent)`
+ * would throw. That is what this file used to do, and the test that read the stamp back un-escaped
+ * five entities by hand — which made the defect look like a convention.
+ *
+ * What actually has to be neutralized is the one sequence that can END the element (`</script`) or
+ * open a comment (`<!--`). Escaping every `<` as `\u003C` covers both and is still valid JSON, so
+ * the client parses the raw text directly. U+2028/U+2029 are escaped for the benefit of anyone who
+ * inlines this into a JavaScript literal instead.
+ *
+ * @param {string} json
+ */
+function escapeJsonForScript(json) {
+  return json.replace(/</g, "\\u003C").replaceAll("\u2028", "\\u2028").replaceAll("\u2029", "\\u2029");
+}
+
+/**
  * Render the page.
  *
  * `strings.get(key, placeholders, callOptions)` — the third slot is the per-call locale decision, and
@@ -88,7 +107,7 @@ export function renderPage(strings, view) {
 
   const stampScript = view.stamp === undefined ? "" :
     `\n  <script type="application/json" id="lokalized-ssr-stamp">${
-      escapeHtml(JSON.stringify(view.stamp))}</script>`;
+      escapeJsonForScript(JSON.stringify(view.stamp))}</script>`;
 
   return `<!doctype html>
 <html lang="${escapeHtml(view.servedLocale)}">

@@ -40,6 +40,35 @@
  * change every outcome number this tool prints is byte-identical (320,234/520,597 identical,
  * 200,366 declared, 0 unexplained, 7/10 construction, 2,156 ill-formed refused).
  *
+ * EVERY OUTCOME NOW CARRIES AN EIGHTH FIELD TOO — the SELECTION-CHANNEL MATCH the outcome itself
+ * carries (`TranslationResult#getLocaleMatchResult()`, and the matcher door's own result), through
+ * one encoder shared by both doors. See `matchAgrees` for why it is a CHANNEL and not a seventh
+ * outcome field: this project's own standing invariant is that selection and resolution legitimately
+ * disagree, so the six outcome fields cannot stand in for it.
+ *
+ * IT CLOSED A BLIND SPOT WITH NO DIVERGENCE BEHIND IT, which is the only kind worth adding and the
+ * hardest to justify from a green report. THE ABLATION, measured 2026-09-15 on the pinned Corretto
+ * 21, is one word at `src/core/index.js:1504` — the per-call ingress handing the matcher
+ * `lookupLocale` instead of `perCallLocale`, i.e. normalizing the caller's tag TWICE, which is
+ * precisely what the eight-line comment at `:1494-1501` exists to forbid. That comment had already
+ * MEASURED the consequence against this same JDK and named the family (`UND-x-a`, catalogs
+ * {fr, nb, nn}) — so the port was right, the rule was written down, and no instrument in this
+ * repository could tell whether the port still obeyed it:
+ *
+ *   PRISTINE tool, port ablated  ->  exit 0, and the report BYTE-IDENTICAL to the un-ablated
+ *                                    control, line for line
+ *   IMPROVED tool, port ablated  ->  exit 1, 114 unexplained (320,120/520,597 identical), and all
+ *                                    114 agree on all six OUTCOME fields AND on the whole call
+ *                                    trace — rows no other channel here can see
+ *   `node tools/conformance.mjs`, port ablated  ->  exit 0, 2,117 passed / 0 FAILED, and the
+ *                                    report BYTE-IDENTICAL to the un-ablated control
+ *
+ * The 114 are the `UND-x-a` family: `requestedLanguageRanges [und-x-a]` in Java against `[x-a]` in a
+ * double-normalizing port, with the translation, the supplying locale, the attempted chain and the
+ * fallback flag all identical. Adding the channel moved NO number this tool already printed — the
+ * un-ablated headline is byte-identical across the change — so the whole return on it is that
+ * ablation.
+ *
  * A DIVERGENCE RULE CANNOT ABSORB A TRACE DIFFERENCE — `KNOWN_DIVERGENCES` is consulted only for
  * rows whose traces already agree. Every rule in the table argues about wording or an error class
  * and none of them has anything to say about which callbacks ran, so letting one explain a
@@ -971,6 +1000,9 @@ function lookupJs(strings, key, tag, viaAmbient) {
     const result = viaAmbient
       ? strings.getResult(key)
       : strings.getResult(key, undefined, { locale: tag });
+    // THE SELECTION CHANNEL'S OWN COPY, carried by the result and described by none of the six
+    // fields below. See `matchAgrees`.
+    jsMatch = matchEncoding(result.localeMatch);
     return [
       String(result.status).replace(/-/g, "_").toUpperCase(),
       flatten(result.translation),
@@ -1005,6 +1037,9 @@ function lookupJs(strings, key, tag, viaAmbient) {
 function matcherJs(strings, tag) {
   try {
     const match = strings.getDirectLocaleContext(tag).localeMatch;
+    // Through the SAME encoder the lookup door uses — which is what brings this shape's
+    // `consideredLocales` and `fallbackLocale` along; the six fields below drop both.
+    jsMatch = matchEncoding(match);
     return [
       "MATCH",
       match.locale ?? "-",
@@ -1077,6 +1112,19 @@ const flatten = (value) =>
 const jsTrace = [];
 
 /**
+ * THE PORT'S SELECTION-CHANNEL MATCH for the probe currently running, in `matchEncoding`'s spelling.
+ *
+ * A module-level cell for the same mechanical reason `LookupDiff.java`'s `MATCH` is one: the loop
+ * appends fields AROUND `lookupJs` / `matcherJs` / `inspectionJs` and cannot reach inside them for a
+ * value computed off a result object those functions consume. Reset to `-` immediately before each
+ * probe, beside `jsTrace.length = 0`, so a probe that throws before any result exists emits `-`
+ * rather than the previous probe's match.
+ *
+ * @type {string}
+ */
+let jsMatch = "-";
+
+/**
  * A port `FailureReason` in the spelling Java's `TranslationFailureReason` enum prints.
  *
  * The SAME adaptation `lookupJs` already makes for `status` and `failureReason` — `-` to `_`,
@@ -1104,7 +1152,8 @@ function causeClass(cause) {
 }
 
 /**
- * Do the two six-field OUTCOMES agree? The trace is NOT compared here — see `traceAgrees`.
+ * Do the two six-field OUTCOMES agree? Neither the trace nor the selection-channel match is
+ * compared here — see `traceAgrees` and `matchAgrees`.
  *
  * The ONLY adaptation is the error class, which JavaScript cannot spell Java's way. Everything else
  * — status, rendered string, supplying locale, the whole attempted-locale list, failure reason,
@@ -1128,11 +1177,113 @@ function agreeOnOutcome(java, js) {
   return OUTCOME_FIELDS.every((index) => java[index] === js[index]);
 }
 
-/** The six OUTCOME fields of a row; field 6 is the trace and is compared by `traceAgrees`. */
+/**
+ * The six OUTCOME fields of a row; field 6 is the trace, compared by `traceAgrees`, and field 7 is
+ * the selection-channel match, compared by `matchAgrees`. Both are CHANNELS, not outcome fields.
+ */
 const OUTCOME_FIELDS = [0, 1, 2, 3, 4, 5];
 
 /** The index of the CALL TRACE within a row's fields, on both sides. */
 const TRACE_FIELD = 6;
+
+/** The index of the SELECTION-CHANNEL MATCH within a row's fields, on both sides. */
+const MATCH_FIELD = 7;
+
+/**
+ * THE INGRESSES AT WHICH THE EIGHTH FIELD IS WHOLLY NEW INFORMATION, and the honest statement of
+ * this channel's SCOPE — it does not discriminate uniformly across the eleven shapes, and saying so
+ * is the difference between a load-bearing comparison and one a reader over-credits:
+ *
+ *   * `per-call` and `ambient` — the two LOOKUP ingresses. Their six outcome fields are status,
+ *     translation, supplying locale, attempted chain, failure reason and the fallback flag: NOT ONE
+ *     of them carries any part of the selection. The whole eighth field is new here, and these are
+ *     the rows the ablation below reds.
+ *   * `matcher` — five of the encoding's seven members restate the six outcome fields
+ *     (`locale`, `languageRange`, `matchType`, `isMatch`, `requestedLanguageRanges`). Only
+ *     `fallbackLocale` and `consideredLocales` are new, which is still worth emitting: they are what
+ *     the matcher shape has always dropped.
+ *   * the four `inspect-*` shapes and `construction` — `-` on BOTH sides by construction, because no
+ *     `TranslationResult` and no `LocaleMatchResult` exists on those paths. The channel observes
+ *     nothing there and must not be read as if it did.
+ *
+ * `lookupMatchesCompared` below counts the first bucket and GATES on it, so a probe space that lost
+ * its lookup rows — or a port whose `result.localeMatch` went `undefined` while
+ * `getDirectLocaleContext` kept answering — can never leave this channel green on the strength of
+ * the matcher shape alone, where it is mostly a restatement of fields already compared.
+ */
+const LOOKUP_INGRESSES = new Set(["per-call", "ambient"]);
+
+/**
+ * The port's side of a `LocaleMatchResult`, in the encoding `LookupDiff.java`'s `match` defines.
+ *
+ * ONE ENCODER for both doors here too, mirroring the oracle: the lookup door reads
+ * `result.localeMatch` and the matcher door reads `getDirectLocaleContext(tag).localeMatch`, and
+ * they must produce the identical spelling or a real divergence would be indistinguishable from a
+ * formatting one.
+ *
+ * THE TWO ADAPTATIONS ARE THE ONES THIS FILE ALREADY MAKES. `matchType` travels through the same
+ * `-` to `_`, uppercased, transformation `lookupJs` applies to `status` and `failureReason`; and the
+ * winning range travels as a `{ range, weight }` PAIR in this port and as a bare string from a
+ * caller, exactly as `matcherJs` already documents. Everything else is verbatim.
+ *
+ * `effectiveWeight` and the per-range weights are outside the encoding on BOTH sides — see
+ * `LookupDiff.java`'s `match` for the measurement that says comparing them would red every matched
+ * row on `1.0` vs `1` rather than on behaviour.
+ *
+ * @param {any} match the port's `LocaleMatch`, or null/undefined when the outcome carries none
+ * @returns {string}
+ */
+function matchEncoding(match) {
+  if (match == null) return "-";
+  const considered = match.consideredLocales ?? [];
+  const requested = match.requestedLanguageRanges ?? [];
+  return [
+    match.locale ?? "-",
+    typeof match.languageRange === "string" ? match.languageRange : (match.languageRange?.range ?? "-"),
+    String(match.matchType).replace(/-/g, "_").toUpperCase(),
+    String(match.isMatch),
+    match.fallbackLocale ?? "-",
+    considered.length === 0 ? "-" : considered.join("~"),
+    requested.length === 0
+      ? "-"
+      : requested.map((/** @type {{range: string}} */ member) => member.range).join("~"),
+  ].join("|");
+}
+
+/**
+ * Do the two SELECTION-CHANNEL MATCHES agree — byte for byte?
+ *
+ * WHY THIS IS A CHANNEL AND NOT A SEVENTH OUTCOME FIELD. `CLAUDE.md`'s standing invariant is that
+ * "selection and resolution are separate channels: `matchFor` and the per-key `candidateChain`
+ * legitimately disagree". The six outcome fields describe the RESOLUTION walk and the matcher shape
+ * asks the SELECTION door a question of its own; neither one reads the copy of the selection that
+ * `TranslationResult#getLocaleMatchResult()` hands a lookup's caller. Two libraries can agree on all
+ * six outcome fields, on the whole call trace, and on the matcher shape, and still put a different
+ * `localeMatch` on the result object — and until 2026-09-15 nothing here could see it.
+ *
+ * ROUTED EXACTLY WHERE THE TRACE IS, BEFORE `KNOWN_DIVERGENCES`, on the same argument that channel
+ * already carries: every rule in that table argues about a DIAGNOSTIC's wording or an error class,
+ * and none of them has anything to say about which locale the selection channel picked. A wording
+ * rule must never be able to absorb a selection difference.
+ *
+ * NO ADAPTATION AND NO DEFAULTS. `-` matches only `-`, so a side that stopped emitting the field
+ * disagrees with one that still does rather than quietly matching it.
+ *
+ * WHAT PROVES IT PARTICIPATES, with the numbers, because a comparison that is never consulted looks
+ * exactly like one that always agrees. Ablate `src/core/index.js:1504` from
+ * `matchFor(perCallLocale, …)` to `matchFor(lookupLocale, …)` and this comparison reds 114 rows
+ * (exit 1); the SAME ablation leaves the pristine tool at exit 0 with a byte-identical report and
+ * leaves `npm run conformance` at exit 0 with a byte-identical report. All 114 agree on all six
+ * outcome fields and on the trace, so no other channel in this file — and no corpus case — can see
+ * them. `LOOKUP_INGRESSES` states where this channel does and does not discriminate, and
+ * `lookupMatchesCompared` gates the part of the probe space the 114 come from.
+ *
+ * @param {string} javaField the java side's eighth field
+ * @param {string} jsField the port side's eighth field
+ */
+function matchAgrees(javaField, jsField) {
+  return javaField === jsField;
+}
 
 /**
  * Do the two CALL TRACES agree — the `fallbackPolicy` consultations and the `onFailure` invocation,
@@ -1267,10 +1418,10 @@ try {
     // added or removed MID-row, which shifts every later slice; it cannot catch a trailing one. The
     // two checks are complementary and both are kept.
     //
-    // DERIVED, NOT PINNED: `4 + PROBE_SHAPES.length * 7` is the same arithmetic the gate below
+    // DERIVED, NOT PINNED: `4 + PROBE_SHAPES.length * 8` is the same arithmetic the gate below
     // already prints in its own error message, so adding a shape moves both together and a literal
     // cannot go stale behind the layout.
-    const expectedFields = fields[0] === "C" ? 5 : 4 + PROBE_SHAPES.length * 7;
+    const expectedFields = fields[0] === "C" ? 5 : 4 + PROBE_SHAPES.length * 8;
     if (fields.length !== expectedFields)
       throw new Error(
         `the oracle emitted ${fields.length} column(s) on a '${fields[0]}' row where ` +
@@ -1295,10 +1446,11 @@ try {
     }
     const tag = Buffer.from(fields[2], "base64").toString("utf8");
     const wellFormed = fields[3] === "true";
-    // SEVEN fields per outcome, not six: the seventh is the `fallbackPolicy` / `onFailure` CALL
-    // TRACE. See `traceAgrees` and `LookupDiff.java`'s `TRACE`.
+    // EIGHT fields per outcome, not six: the seventh is the `fallbackPolicy` / `onFailure` CALL
+    // TRACE and the eighth is the SELECTION-CHANNEL MATCH the outcome carries. See `traceAgrees`
+    // and `matchAgrees`, and `LookupDiff.java`'s `TRACE` and `MATCH`.
     const outcomes = PROBE_SHAPES.map((_, index) => ({
-      java: fields.slice(4 + index * 7, 11 + index * 7),
+      java: fields.slice(4 + index * 8, 12 + index * 8),
       wellFormed,
     }));
 
@@ -1308,11 +1460,11 @@ try {
     // a message field. A short final slice would also make `row.java[TRACE_FIELD]` `undefined`,
     // which `traceAgrees` would then compare against a real trace. Fail loudly instead.
     for (const outcome of outcomes)
-      if (outcome.java.length !== 7)
+      if (outcome.java.length !== 8)
         throw new Error(
-          `the oracle emitted ${outcome.java.length} field(s) for one outcome where 7 are expected ` +
-            `(${fields.length} field(s) on the line, ${PROBE_SHAPES.length} shape(s) x 7 + 4 = ` +
-            `${PROBE_SHAPES.length * 7 + 4} expected) — LookupDiff.java and run.mjs have drifted`,
+          `the oracle emitted ${outcome.java.length} field(s) for one outcome where 8 are expected ` +
+            `(${fields.length} field(s) on the line, ${PROBE_SHAPES.length} shape(s) x 8 + 4 = ` +
+            `${PROBE_SHAPES.length * 8 + 4} expected) — LookupDiff.java and run.mjs have drifted`,
         );
 
     javaRows.set(rowKey(fields[1], tag), outcomes);
@@ -1351,6 +1503,26 @@ try {
   // reported as the asymmetry it is rather than as agreement.
   let javaTracesRecorded = 0;
   let jsTracesRecorded = 0;
+  // …and the same two numbers for the SELECTION-CHANNEL MATCH. `matchDisagreed` is every row whose
+  // eighth fields differ; `matchOnlyDisagreed` is the subset whose six outcome fields AND trace both
+  // agree — rows no other channel here can see. Printing the second is how a later reader can tell
+  // whether this channel still discriminates anything or has become decoration.
+  let matchDisagreed = 0;
+  let matchOnlyDisagreed = 0;
+  // The channel's own staleness gate, on the trace channel's reasoning. A comparison in which
+  // NEITHER side ever emitted a match is not a green comparison, it is a dead one: an oracle that
+  // stopped calling `getLocaleMatchResult`, or a port whose `result.localeMatch` went `undefined`,
+  // would compare `-` against `-` on every row and report an agreement it has not earned. Counted
+  // per side so a channel that died on ONE side is reported as the asymmetry it is.
+  let javaMatchesRecorded = 0;
+  let jsMatchesRecorded = 0;
+  // …and the THIRD term, which the two above cannot supply: rows at a LOOKUP ingress where BOTH
+  // sides carried a match. See `LOOKUP_INGRESSES` — those are the only rows on which the eighth
+  // field is new information rather than a partial restatement of the matcher shape's own six, so a
+  // run in which this is 0 has a live-looking channel that compares nothing the tool did not already
+  // compare. Both per-side counters would still be large in that state, which is exactly why this
+  // one exists.
+  let lookupMatchesCompared = 0;
 
   /**
    * Compare one row and file it. Returns whether the two sides fully agree.
@@ -1370,13 +1542,28 @@ try {
   function route(row) {
     if (row.java[TRACE_FIELD] !== "-") javaTracesRecorded++;
     if (row.js[TRACE_FIELD] !== "-") jsTracesRecorded++;
+    if (row.java[MATCH_FIELD] !== "-") javaMatchesRecorded++;
+    if (row.js[MATCH_FIELD] !== "-") jsMatchesRecorded++;
+    if (LOOKUP_INGRESSES.has(row.ingress) && row.java[MATCH_FIELD] !== "-" && row.js[MATCH_FIELD] !== "-")
+      lookupMatchesCompared++;
     const tracesAgree = traceAgrees(row.java[TRACE_FIELD], row.js[TRACE_FIELD]);
+    const matchesAgree = matchAgrees(row.java[MATCH_FIELD], row.js[MATCH_FIELD]);
     const outcomeAgrees = agreeOnOutcome(row.java, row.js);
-    if (tracesAgree && outcomeAgrees) return true;
+    if (tracesAgree && matchesAgree && outcomeAgrees) return true;
 
     if (!tracesAgree) {
       traceDisagreed++;
       if (outcomeAgrees) traceOnlyDisagreed++;
+      unexplained.push(row);
+      return false;
+    }
+
+    // THE SELECTION CHANNEL, checked before the rule table for the same reason the trace is: a
+    // `KNOWN_DIVERGENCES` rule argues about wording or about an error class and must never be able
+    // to explain away a different SELECTION.
+    if (!matchesAgree) {
+      matchDisagreed++;
+      if (outcomeAgrees) matchOnlyDisagreed++;
       unexplained.push(row);
       return false;
     }
@@ -1483,9 +1670,10 @@ try {
     // rule). Only the MESSAGE says which library answered the question that was asked, so the
     // refusal travels through `route` and `KNOWN_DIVERGENCES` exactly like a lookup's.
     //
-    // The SEVENTH field is the call trace and it is `-` on both sides here BY CONSTRUCTION rather
-    // than by omission: neither library consults a fallback policy or a failure handler while
-    // building a `Strings`, so an entry on either side would itself be the divergence — which is
+    // The SEVENTH field is the call trace and the EIGHTH is the selection-channel match; both are
+    // `-` on both sides here BY CONSTRUCTION rather than by omission: neither library consults a
+    // fallback policy or a failure handler while building a `Strings`, and no `LocaleMatchResult`
+    // exists before one exists. An entry on either side would itself be the divergence — which is
     // what `route` would report, since `-` matches only `-`.
     /** @type {Row} */
     const constructionRow = {
@@ -1494,11 +1682,11 @@ try {
       key: "-",
       ingress: "construction",
       java: java.built
-        ? ["BUILT", "-", "-", "-", "-", "-", "-"]
-        : ["THROWN", java.errorClass, java.message, "-", "-", "-", "-"],
+        ? ["BUILT", "-", "-", "-", "-", "-", "-", "-"]
+        : ["THROWN", java.errorClass, java.message, "-", "-", "-", "-", "-"],
       js: jsRefusal === null
-        ? ["BUILT", "-", "-", "-", "-", "-", "-"]
-        : ["THROWN", jsRefusal.name, jsRefusal.message, "-", "-", "-", "-"],
+        ? ["BUILT", "-", "-", "-", "-", "-", "-", "-"]
+        : ["THROWN", jsRefusal.name, jsRefusal.message, "-", "-", "-", "-", "-"],
     };
     constructionCompared++;
     if (route(constructionRow)) constructionAgree++;
@@ -1518,6 +1706,7 @@ try {
         // call and not after it, because an empty trace is the observation on every probe whose
         // ingress check fires before the walk starts.
         jsTrace.length = 0;
+        jsMatch = "-";
         const jsOutcome = [
           ...(shape.matcher === true
             ? matcherJs(perCall, tag)
@@ -1525,6 +1714,7 @@ try {
               ? inspectionJs(perCall, tag, shape.inspect, set.fallback)
               : lookupJs(shape.viaAmbient ? viaAmbient : perCall, shape.key, tag, shape.viaAmbient === true)),
           jsTrace.length === 0 ? "-" : jsTrace.join(";"),
+          jsMatch,
         ];
         /** @type {Row} */
         const row = {
@@ -1586,6 +1776,17 @@ try {
       `${javaTracesRecorded} java / ${jsTracesRecorded} js row(s) recorded at least one call.`,
   );
 
+  console.log(
+    `the SELECTION CHANNEL (TranslationResult#getLocaleMatchResult, and the matcher door's own ` +
+      `result, through one encoder): ${matchDisagreed} row(s) whose MATCHES differ, of which ` +
+      `${matchOnlyDisagreed} agree on all six OUTCOME fields and on the trace — those are the rows ` +
+      `only this channel can see. A match divergence is always unexplained: no KNOWN_DIVERGENCES ` +
+      `rule is consulted for a row whose selections differ. ` +
+      `${javaMatchesRecorded} java / ${jsMatchesRecorded} js row(s) carried a match, ` +
+      `${lookupMatchesCompared} of them at a LOOKUP ingress on BOTH sides — the rows on which the ` +
+      `eighth field is new information rather than a partial restatement of the matcher shape.`,
+  );
+
   /** @param {Row} row */
   const show = (row) =>
     console.log(
@@ -1593,7 +1794,9 @@ try {
         `\n    java ${row.java.slice(0, TRACE_FIELD).join(" | ")}` +
         `\n    js   ${row.js.slice(0, TRACE_FIELD).join(" | ")}` +
         `\n    java trace ${row.java[TRACE_FIELD]}` +
-        `\n    js   trace ${row.js[TRACE_FIELD]}`,
+        `\n    js   trace ${row.js[TRACE_FIELD]}` +
+        `\n    java match ${row.java[MATCH_FIELD]}` +
+        `\n    js   match ${row.js[MATCH_FIELD]}`,
     );
 
   if (constructionMismatches.length) {
@@ -1654,6 +1857,33 @@ try {
         "callbacks in `shared` are no longer installed, or no probe reaches a failing walk",
     );
 
+  // The SELECTION channel's own staleness gate, one per side, on the identical reasoning: a side
+  // that stopped emitting the field compares "-" against "-" on every row and reports an agreement
+  // it has not earned. An oracle that dropped `getLocaleMatchResult`, or a port whose
+  // `result.localeMatch` went `undefined`, is exactly that.
+  if (javaMatchesRecorded === 0)
+    console.log(
+      "STALE: the oracle carried no LocaleMatchResult on any row — LookupDiff's `MATCH` is no " +
+        "longer recorded, or no probe reaches an outcome that carries a match",
+    );
+  if (jsMatchesRecorded === 0)
+    console.log(
+      "STALE: the port carried no localeMatch on any row — `result.localeMatch` / " +
+        "`getDirectLocaleContext(tag).localeMatch` is no longer read, or no probe reaches an " +
+        "outcome that carries a match",
+    );
+  // The third term, and the one the two above cannot express. See `LOOKUP_INGRESSES`: with only
+  // matcher rows carrying a match, five of the encoding's seven members restate fields `matcherJs`
+  // already prints and the channel is very nearly decoration. It would still report two large
+  // per-side counts, so the asymmetry gates above would stay silent.
+  if (lookupMatchesCompared === 0)
+    console.log(
+      "STALE: no LOOKUP row carried a match on BOTH sides — the selection channel is observing " +
+        "only the matcher shape, where it is mostly a restatement of the six outcome fields; " +
+        "either `PROBE_SHAPES` lost its lookup ingresses or a lookup result stopped carrying a " +
+        "LocaleMatchResult",
+    );
+
   // An OPEN PORT DEFECT does NOT make the run green — it only makes the failure print its own root
   // cause instead of arriving as anonymous mismatches. Same rule as `tools/direct-tag-diff/`'s.
   process.exit(
@@ -1665,7 +1895,10 @@ try {
       illFormedRefused > 0 &&
       wellFormedCompared > 0 &&
       javaTracesRecorded > 0 &&
-      jsTracesRecorded > 0
+      jsTracesRecorded > 0 &&
+      javaMatchesRecorded > 0 &&
+      jsMatchesRecorded > 0 &&
+      lookupMatchesCompared > 0
       ? 0
       : 1,
   );

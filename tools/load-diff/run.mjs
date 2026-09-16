@@ -4,7 +4,7 @@
  * `diff:load` — the NINTH differential, and the first that drives a real filesystem.
  *
  * WHAT IT COMPARES AND WHY THE CORPUS CANNOT. The 145 `load` cases record this same Java method, so
- * the obvious question is what a differential adds. Six answers, each MEASURED rather than supposed:
+ * the obvious question is what a differential adds. Seven answers, each MEASURED rather than supposed:
  *
  *   1. the discovery-budget charge on entries that are then SKIPPED;
  *   2. the child-directory skip — no corpus fixture contains a child directory at all;
@@ -18,6 +18,31 @@
  *      erases the three different renderings Java uses in ONE load. Ablating `toRealPath` out of a
  *      prototype left the corpus at 140/145. Here BOTH SIDES ARE HANDED THE SAME DIRECTORY, so
  *      nothing needs scrubbing and the paths are compared verbatim.
+ *   7. THE PARSED CONTENT BEHIND EACH KEY — `contentByLocale`, the newest column. Every other column
+ *      is about WHICH files were read and what the loader SAID about them; not one of them looks at
+ *      what was actually parsed, so a port that agreed on every locale, key, warning and refusal
+ *      message could still have built a different message behind the key and this tool printed
+ *      `40 identical`.
+ *
+ * **THE EVIDENCE THAT COLUMN 7 IS LOAD-BEARING RATHER THAN DECORATION, measured 2026-09-15 on the
+ * pinned JDK.** Five port-side mutations of `projectNode` in `src/internal/parse-file.js` — dropping
+ * `commentary`, dropping a language-form placeholder's `range`, rebuilding the placeholder map in
+ * sorted order, sorting the whole-message alternative list, and sorting a placeholder's per-form
+ * translations — were each applied ALONE, in a copy of the tree:
+ *
+ *   - with THIS tool: exit 1, `MISMATCHES (1)`, naming `parsed-content-is-compared`, all five;
+ *   - with the tool AS IT WAS BEFORE the column, same mutation still in place: exit 0,
+ *     `40 identical`, all five. That is what makes the blind spot real rather than asserted;
+ *   - `npm run conformance` under each: exit 0, 2,117 passed / 0 FAILED, and BYTE-IDENTICAL to the
+ *     un-ablated run (`diff` empty, all five). The corpus cannot see any of them.
+ *
+ * Controls, both sides: pristine source reads exit 0 / `40 identical` on the old tool and exit 0 /
+ * `41 identical` on this one.
+ *
+ * **AND THE COLUMN DISCRIMINATES ONLY OVER THE GRAPH A PROBE ACTUALLY LOADS**, which is a narrower
+ * claim than "41 probes agree" and is why `CONTENT_DISCRIMINATORS` below fails the run when a
+ * discriminating input leaves the probe space. Ablated: deleting the one rich probe leaves the other
+ * 40 comparing normally and exits 1 with `DEGENERATE PROBE SET (8)`.
  *
  * THE HARD CONSTRAINT, stated at the top because violating it produces exactly the instrument this
  * project has been burned by. Java's enumeration order is the filesystem's, not sorted, and the
@@ -93,6 +118,29 @@ const JAVA_INVENTORY = [
   ["LocalizedStringLoader.java", "Duplicate locale key rendering as language tag"],
   ["LocalizedStringLoader.java", "discovery entries"],
   ["LocalizedStringLoader.java", "is not a regular file"],
+  // THE THREE ORDER CLAIMS the parsed-content column rests on. `LoadDiff.describe` emits placeholders,
+  // per-form translations and both alternative lists as ARRAYS precisely because Java preserves the
+  // file's declaration order in each; if any of these became a sorted or hashed map on the Java side,
+  // the column would be comparing an order the oracle no longer has and would still print `identical`.
+  ["LocalizedStringLoader.java", "Map<@NonNull String, @NonNull PlaceholderDefinition> placeholderDefinitions = new LinkedHashMap<>();"],
+  ["LocalizedStringLoader.java", "Map<@NonNull LanguageForm, @NonNull String> translationsByLanguageForm = new LinkedHashMap<>();"],
+  ["LocalizedStringLoader.java", "array order defines first-match precedence"],
+  // AND THE ONE ORDER THAT IS NOT A CLAIM: the loader collects a file's strings into a HashSet, which
+  // is why `describe`'s rows are keyed in sorted key order rather than in the set's iteration order.
+  ["LocalizedStringLoader.java", "Set<@NonNull LocalizedString> localizedStrings = new HashSet<>();"],
+  // The file-format spellings `LoadDiff.fileFormatName` emits. `LocalizedStringUtils` is
+  // package-private, so the harness carries its own instanceof chain; these assert that chain has not
+  // gone stale. A moved prefix would otherwise make both sides agree on a name no file format uses.
+  ["LocalizedStringUtils.java", 'CARDINALITY_NAME_PREFIX = "CARDINALITY_"'],
+  ["LocalizedStringUtils.java", 'ORDINALITY_NAME_PREFIX = "ORDINALITY_"'],
+  ["LocalizedStringUtils.java", 'GENDER_NAME_PREFIX = "GENDER_"'],
+  ["LocalizedStringUtils.java", 'GRAMMATICAL_CASE_NAME_PREFIX = "CASE_"'],
+  ["LocalizedStringUtils.java", 'DEFINITENESS_NAME_PREFIX = "DEFINITENESS_"'],
+  ["LocalizedStringUtils.java", 'CLASSIFIER_NAME_PREFIX = "CLASSIFIER_"'],
+  ["LocalizedStringUtils.java", 'FORMALITY_NAME_PREFIX = "FORMALITY_"'],
+  ["LocalizedStringUtils.java", 'CLUSIVITY_NAME_PREFIX = "CLUSIVITY_"'],
+  ["LocalizedStringUtils.java", 'ANIMACY_NAME_PREFIX = "ANIMACY_"'],
+  ["LocalizedStringUtils.java", 'PHONETIC_NAME_PREFIX = "PHONETIC_"'],
 ];
 
 for (const [file, fragment] of JAVA_INVENTORY) {
@@ -195,6 +243,54 @@ const javaByName = new Map(loadRecorder.rows.map((row) => [row.name, row]));
 const { readStringsFromDirectory } = await import(join(root, "src/node/index.js"));
 const { ordinalData } = await import(join(root, "src/data/ordinal.js"));
 
+/**
+ * The port's model of ONE loaded string, in the SAME shape `LoadDiff.describe` emits.
+ *
+ * REBUILT INDEPENDENTLY rather than serialized from the port's own projection, which is the point of
+ * a differential: `src/internal/parse-file.js` and this function are two descriptions of the same
+ * graph, and only the Java side arbitrates between them.
+ *
+ * ABSENT-VS-NULL IS NORMALIZED HERE AND NOWHERE ELSE. The port OMITS an optional member it does not
+ * have (`projectNode` spreads conditionally) while Java writes an explicit `null`, and `canonical`
+ * sorts object keys without reconciling a missing key against a null one. So every optional member is
+ * written out explicitly — `translation`, `commentary`, `value`, `range` — rather than spread.
+ *
+ * The four declaration ORDERS are lists, matching the Java half, because `canonical` sorts object
+ * keys and an order carried by a map would not be compared at all.
+ */
+function describePort(node) {
+  const placeholders = [];
+  for (const [name, placeholder] of Object.entries(node.placeholders ?? {})) {
+    if (placeholder.kind === "language-form")
+      placeholders.push({
+        name,
+        kind: "language-form",
+        value: placeholder.value ?? null,
+        range: placeholder.range ? { start: placeholder.range.start, end: placeholder.range.end } : null,
+        translations: Object.entries(placeholder.translations).map(([form, translation]) => ({ form, translation })),
+      });
+    else
+      placeholders.push({
+        name,
+        kind: "expression",
+        translation: placeholder.translation,
+        alternatives: (placeholder.alternatives ?? []).map((alternative) => ({
+          expression: alternative.expression,
+          translation: alternative.translation,
+        })),
+      });
+  }
+  return {
+    translation: node.translation ?? null,
+    commentary: node.commentary ?? null,
+    placeholders,
+    alternatives: (node.alternatives ?? []).map((alternative) => ({
+      expression: alternative.expression,
+      ...describePort(alternative),
+    })),
+  };
+}
+
 /** The port's observation, in the SAME shape the Java half emits. */
 function portObservation(probe, directory) {
   const warnings = [];
@@ -224,6 +320,12 @@ function portObservation(probe, directory) {
       keysByLocale: Object.fromEntries(
         locales.map((tag) => [tag, loaded.catalogs[tag].strings.map((s) => s.key).sort()]),
       ),
+      contentByLocale: Object.fromEntries(
+        locales.map((tag) => [
+          tag,
+          Object.fromEntries(loaded.catalogs[tag].strings.map((s) => [s.key, describePort(s)])),
+        ]),
+      ),
       warnings,
     };
   } catch (error) {
@@ -233,6 +335,7 @@ function portObservation(probe, directory) {
       failureMessage: error instanceof Error ? error.message : String(error),
       locales: [],
       keysByLocale: {},
+      contentByLocale: {},
       warnings,
     };
   }
@@ -320,6 +423,7 @@ for (const probe of PROBES) {
     failureMessage: javaMessage,
     locales: java.locales,
     keysByLocale: java.keysByLocale,
+    contentByLocale: java.contentByLocale,
     warnings: java.warnings,
   };
   const actual = { ...port, failureMessage: portMessage, failureType: port.failed ? port.failureType : null };
@@ -346,6 +450,69 @@ if (!observations.some((row) => row.locales.length > 1)) degenerate.push("no pro
 if (!observations.some((row) => row.failed && row.warnings.length > 0))
   degenerate.push("no probe delivers a warning and THEN fails — the streaming rule is unexercised");
 
+/**
+ * THE PARSED-CONTENT COLUMN DISCRIMINATES ONLY OVER THE GRAPH THE PROBE SPACE ACTUALLY LOADS, and
+ * that is a narrower thing than "41 probes agree".
+ *
+ * MEASURED, not supposed: delete `parsed-content-is-compared` from `probes.mjs` and the run exits 1
+ * with `DEGENERATE PROBE SET (8)` — EIGHT of the nine terms below fire at once. The one that survives
+ * is `a PLACEHOLDER`, from the warning fixtures. Commentary, ranges, both alternative lists and every
+ * non-alphabetical declaration order are absent from the rest of the probe space entirely, so those
+ * members of the column would be `null`/`[]` on both sides of all 40 other comparisons and would
+ * agree for free. That is the `Zzzz` lesson — covering a branch is not discriminating it — and it is
+ * why these are nine specific terms rather than one "some probe has content" check.
+ *
+ * EACH ROW IS THE STALE LINE FOR ONE MEASURED ABLATION. The five port-side ablations that prove this
+ * column participates each need one specific input present, and each row below fires the moment that
+ * input leaves the probe space:
+ *
+ *   commentary dropped                       needs a string carrying a COMMENTARY
+ *   range member dropped                     needs a RANGE-driven placeholder
+ *   placeholder map rebuilt in sorted order  needs two placeholders declared OUT of alphabetical order
+ *   alternative list sorted                  needs two alternatives declared OUT of sorted order
+ *   per-form translations sorted             needs two forms declared OUT of alphabetical order
+ *
+ * Declaration order is the subtle one: a probe whose placeholders happen to be declared `a` then `b`
+ * is IDENTICAL under a port that sorts them, so "two placeholders" is not enough and "two
+ * placeholders the wrong way round" is what the ablation needs. `declaredOutOfOrder` is that test.
+ */
+const contentEntries = (row) => {
+  const entries = [];
+  const walk = (entry) => {
+    entries.push(entry);
+    for (const alternative of entry.alternatives) walk(alternative);
+  };
+  for (const keyed of Object.values(row.contentByLocale ?? {}))
+    for (const entry of Object.values(keyed)) walk(entry);
+  return entries;
+};
+
+/** True when a declared sequence is long enough AND not in ascending order — see above. */
+const declaredOutOfOrder = (names) =>
+  names.length > 1 && names.some((name, index) => index > 0 && names[index - 1] > name);
+
+const CONTENT_DISCRIMINATORS = [
+  ["a PLACEHOLDER", (entry) => entry.placeholders.length > 0],
+  ["a COMMENTARY", (entry) => entry.commentary !== null],
+  ["a RANGE-driven placeholder", (entry) => entry.placeholders.some((row) => row.range !== null)],
+  ["a WHOLE-MESSAGE ALTERNATIVE", (entry) => entry.alternatives.length > 0],
+  ["a generated-placeholder FRAGMENT ALTERNATIVE",
+    (entry) => entry.placeholders.some((row) => (row.alternatives ?? []).length > 0)],
+  ["TWO placeholders declared OUT of alphabetical order",
+    (entry) => declaredOutOfOrder(entry.placeholders.map((row) => row.name))],
+  ["TWO per-form translations declared OUT of alphabetical order",
+    (entry) => entry.placeholders.some((row) => declaredOutOfOrder((row.translations ?? []).map((t) => t.form)))],
+  ["TWO whole-message alternatives declared OUT of sorted order",
+    (entry) => declaredOutOfOrder(entry.alternatives.map((row) => row.expression))],
+  ["TWO fragment alternatives declared OUT of sorted order",
+    (entry) => entry.placeholders.some((row) => declaredOutOfOrder((row.alternatives ?? []).map((a) => a.expression)))],
+];
+
+for (const [what, holds] of CONTENT_DISCRIMINATORS)
+  if (!observations.some((row) => contentEntries(row).some(holds)))
+    degenerate.push(`no probe loads a string carrying ${what} —` +
+      ` the parsed-content column agrees for free on that member`);
+
 console.log(`diff:load — ${compared} probe(s) against lokalized-java 3.0.0 on the pinned JDK`);
 console.log(`  probe directories under ${workRoot}`);
 
@@ -368,8 +535,8 @@ if (mismatches.length) {
     console.log(`    port ${canonical(row.actual)}`);
   }
 } else if (!degenerate.length && !unmapped.length) {
-  console.log(`\n  ${compared} identical — every probe's locales, keys, failure identity, verbatim`);
-  console.log(`  message and full ordered warning list agree with the oracle.`);
+  console.log(`\n  ${compared} identical — every probe's locales, keys, PARSED CONTENT, failure`);
+  console.log(`  identity, verbatim message and full ordered warning list agree with the oracle.`);
 }
 
 const fieldProblems = oracleFieldProblems("load", loadRecorder, UNCOMPARED_ORACLE_FIELDS);

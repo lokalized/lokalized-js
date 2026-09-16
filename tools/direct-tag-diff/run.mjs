@@ -407,7 +407,8 @@ try {
   if (run.status !== 0) throw new Error(`oracle execution failed:\n${run.stderr}`);
 
   const { normalizeTag } = await import("../../src/internal/locale.js");
-  const { jdkLanguageTag } = await import("../../src/internal/locale-jdk-tag.js");
+  const { jdkBaseLocale, jdkLanguageSubtag, jdkLanguageTag, jdkLocaleWellFormed, parseJdkTag } =
+    await import("../../src/internal/locale-jdk-tag.js");
   // THE ORACLE'S OWN FIELDS, OBSERVED RATHER THAN ASSUMED. See tools/oracle-field-coverage.mjs: the
   // "the oracle emits it and nothing reads it" defect has now been found in three separate tools,
   // this one included, and reading a runner carefully is how all three survived.
@@ -433,8 +434,46 @@ try {
   const stale = [];
   /** @type {string[]} */
   const agreeingFamilyMembers = [];
+  /**
+   * THE `Locale`'s OWN FIELDS, added 2026-09-15 — and the tool found a live port defect on the first
+   * run that compared them.
+   *
+   * Until then this differential compared ONE port expression (`jdkLanguageTag`) and one boolean,
+   * while `src/internal/locale-jdk-tag.js` modelled five separate things about the same JDK object.
+   * The other four were never emitted by the oracle, so no recording proxy and no column count could
+   * have noticed: **a value the harness HAS and never prints is invisible by construction.**
+   *
+   * `getLanguage()` is the one that matters. It reports the code a `Locale` STORES, which is not the
+   * one `toLanguageTag()` renders, and the two differ for exactly the superseded-ISO family.
+   * @type {{tag: string, field: string, java: string, js: string}[]}
+   */
+  const localeFieldDefects = [];
+  // ANTI-VACUITY, both directions. The first says the probe space actually contains tags whose stored
+  // language differs from the rendered one — without it, `getLanguage` agreeing proves nothing
+  // because nothing would have exercised the difference. The second says at least one well-formed tag
+  // denotes a `Locale` the BUILDER refuses, which is what separates `setLocale` acceptance from the
+  // `setLanguageTag` check above it.
+  let storedLanguageDiffersFromRendered = 0;
+  let localeRejectedByBuilder = 0;
 
   for (const row of rows) {
+    // ABOVE the ill-formed early-exit, deliberately: `tools/oracle-field-coverage.mjs` records that
+    // its proxy is per-FIELD and not per-BUCKET, so a field read only on the well-formed path would
+    // satisfy the proxy while leaving the ill-formed rows uncompared — the gap S32 fixed by hand in
+    // this very tool.
+    const base = jdkBaseLocale(parseJdkTag(row.tag));
+    for (const [field, java, js] of /** @type {[string, string, string][]} */ ([
+      ["getLanguage", row.language, jdkLanguageSubtag(row.tag)],
+      ["getScript", row.script, base.script],
+      ["getCountry", row.country, base.region],
+      ["getVariant", row.variant, base.variants.join("_")],
+      ["setLocale accepts", String(row.localeWellFormed), String(jdkLocaleWellFormed(row.tag))],
+    ]))
+      if (java !== js) localeFieldDefects.push({ tag: row.tag, field, java, js });
+
+    if (row.language !== String(row.normalized).split("-")[0]) storedLanguageDiffersFromRendered++;
+    if (row.wellFormed && !row.localeWellFormed) localeRejectedByBuilder++;
+
     /** @type {string | null} */
     let actual = null;
     let refused = false;
@@ -581,6 +620,27 @@ try {
       console.log(`  ${defect.tag}\n    java ${JSON.stringify(defect.java)}\n    js   ${JSON.stringify(defect.js)}`);
   }
 
+  if (localeFieldDefects.length) {
+    /** @type {Record<string, number>} */
+    const byField = {};
+    for (const defect of localeFieldDefects) byField[defect.field] = (byField[defect.field] ?? 0) + 1;
+    console.log(`\nLOCALE FIELD DEFECTS (${localeFieldDefects.length}) — the port's model of a JDK ` +
+      `\`Locale\`'s own fields disagreed with the JDK:`);
+    console.log(`  by field: ${Object.entries(byField).map(([f, n]) => `${f} ${n}`).join(", ")}`);
+    for (const defect of localeFieldDefects.slice(0, 12))
+      console.log(`  ${JSON.stringify(defect.tag)} ${defect.field}\n` +
+        `    java ${JSON.stringify(defect.java)}\n    js   ${JSON.stringify(defect.js)}`);
+  }
+  // THE TWO ANTI-VACUITY LINES, reported whether or not the comparison found anything: a green
+  // `getLanguage` column over a probe space where the stored and rendered languages never differ
+  // proves nothing, and neither does a green `setLocale` column where the builder never refuses.
+  if (storedLanguageDiffersFromRendered === 0)
+    console.log("STALE: no probe's stored language differs from its rendered one — the getLanguage " +
+      "column cannot discriminate over this probe space");
+  if (localeRejectedByBuilder === 0)
+    console.log("STALE: no well-formed probe denotes a Locale the builder refuses — the setLocale " +
+      "column cannot discriminate over this probe space");
+
   const fieldProblems = oracleFieldProblems("direct-tag", recorder, UNCOMPARED_ORACLE_FIELDS);
   if (fieldProblems.length) {
     console.log(`\nORACLE FIELD COVERAGE (${fieldProblems.length}):`);
@@ -594,6 +654,9 @@ try {
       stale.length === 0 &&
       fieldProblems.length === 0 &&
       illFormedTruncationDefects.length === 0 &&
+      localeFieldDefects.length === 0 &&
+      storedLanguageDiffersFromRendered > 0 &&
+      localeRejectedByBuilder > 0 &&
       illFormedTruncated.length > 0
       ? 0
       : 1,

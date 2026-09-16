@@ -88,13 +88,29 @@ import java.util.Locale.LanguageRange;
  * did not, the refusal's fully-qualified class and message — a set Java refuses and the port accepts
  * (or the reverse) is a defect in its own right and must never be silently skipped, and a set both
  * sides refuse for DIFFERENT reasons is one too. Then one {@code P} line per probe carrying ELEVEN
- * SEVEN-field outcomes: the cross of three keys and the two lookup ingresses, then the keyless
+ * EIGHT-field outcomes: the cross of three keys and the two lookup ingresses, then the keyless
  * matcher ingress, then the four inspection ingresses.
  *
  * <p>THE SEVENTH FIELD IS THE CALL TRACE and it is new — the outcomes were six fields until
  * 2026-09-09, and six fields are an OUTCOME. See {@link #TRACE} for the measurement that says an
  * outcome is not enough: two libraries reached the same refusal for {@code en-x-lvariant-NY} by
  * running a walk and by never starting one, and every field this oracle printed agreed.
+ *
+ * <p>THE EIGHTH FIELD IS THE SELECTION-CHANNEL MATCH, added 2026-09-15 — the
+ * {@code LocaleMatchResult} that {@code TranslationResult#getLocaleMatchResult()} (:185) carries on
+ * every lookup outcome, encoded by {@link #match}. It is the lookup door's own copy of the
+ * selection, and it was emitted by nothing: the six outcome fields describe the RESOLUTION walk and
+ * the matcher shape reaches the selection through a different door on a different instance member.
+ * {@code CLAUDE.md}'s own standing invariant says the two channels "legitimately disagree", so the
+ * one the lookup carries is not derivable from the other and had to be printed.
+ *
+ * <p>WHAT PROVES IT PARTICIPATES rather than decorating the report, measured on the pinned Corretto
+ * 21: ablating the port's per-call ingress at {@code src/core/index.js:1504} from
+ * {@code matchFor(perCallLocale, …)} to {@code matchFor(lookupLocale, …)} reds 114 rows through this
+ * field (exit 1), while the PRISTINE tool is exit 0 over the same ablation with a byte-identical
+ * report and {@code npm run conformance} is exit 0 with a byte-identical report. All 114 agree on
+ * all six outcome fields and on the whole call trace. See {@code run.mjs}'s {@code matchAgrees} and
+ * {@code LOOKUP_INGRESSES} for where the field does and does not discriminate.
  *
  * <p>CONSTRUCTION IS AN INGRESS AXIS IN ITS OWN RIGHT, and it was blind until it carried its
  * reason. Java validates {@code Fallback locale} ({@code Strings.java:211},
@@ -205,17 +221,73 @@ public class LookupDiff {
   static final List<String> TRACE = new ArrayList<>();
 
   /**
-   * Runs one probe with a FRESH trace and appends the trace as the outcome's seventh field.
+   * THE SELECTION-CHANNEL SNAPSHOT of the probe currently running — the {@code LocaleMatchResult}
+   * the outcome carries, in the encoding {@link #match} defines.
    *
-   * <p>The clear happens here rather than inside each probe method so that a probe that throws
-   * before it records anything still emits an empty trace rather than the previous probe's — which
-   * is the exact observation that matters, since {@code calls=[]} is the evidence an ingress check
-   * fired before the walk started.
+   * <p>WHY IT EXISTS. {@code TranslationResult#getLocaleMatchResult()} (:185) is the SELECTION
+   * channel's copy of itself, carried by every lookup outcome, and until 2026-09-15 this oracle
+   * printed nothing from it: the six outcome fields describe the RESOLUTION walk (status,
+   * translation, supplying locale, attempted chain, reason, fallback flag) and the matcher shape
+   * describes the selection made through a DIFFERENT door. Two libraries can agree on both and
+   * still hand a lookup's caller a different match: the value lives on the result, it is public, and
+   * nothing here observed it.
+   *
+   * <p>A STATIC CELL, mirroring {@code TRACE}, for the same mechanical reason — {@code traced}
+   * appends fields AROUND a probe and cannot reach inside it for a value {@code describe} computed.
+   * Cleared by {@code traced} before every probe, so a probe that throws before any result exists
+   * emits {@code -} rather than the previous probe's match.
+   */
+  static String MATCH = "-";
+
+  /**
+   * ONE ENCODER for the {@code LocaleMatchResult} both doors produce, so the lookup door's copy and
+   * the matcher door's copy can never drift into two spellings.
+   *
+   * <p>Pipe-separated in the style of {@code TRACE}, {@code ~} inside the two lists, {@code -} for
+   * an absent {@code Optional} and for an empty list:
+   *
+   * <pre>
+   *   locale|languageRange|matchType|isMatch|fallbackLocale|considered~…|requestedRange~…
+   * </pre>
+   *
+   * <p>{@code effectiveWeight} IS DELIBERATELY NOT IN IT, and the reason is the {@code zh-123} shape
+   * inside the field added to gate the match. {@code matchFor(Locale)} builds
+   * {@code List.of(new LanguageRange(tag))} ({@code LocaleMatcher.java:63-66}), so the weight is
+   * {@code 1.0} on every match and null on every non-match — a restatement of {@code isMatch} — and
+   * Java prints a {@code Double} ({@code 1.0}) where JavaScript prints a number ({@code 1}), so
+   * comparing it verbatim would red every matched row on FORMATTING rather than on behaviour. The
+   * range weights inside {@code requestedLanguageRanges} are omitted for the same reason.
+   */
+  static String match(LocaleMatchResult m) {
+    List<String> considered = new ArrayList<>();
+    for (Locale locale : m.getConsideredLocales()) considered.add(locale.toLanguageTag());
+    List<String> requested = new ArrayList<>();
+    for (LanguageRange range : m.getRequestedLanguageRanges()) requested.add(range.getRange());
+
+    return m.getLocale().map(Locale::toLanguageTag).orElse("-")
+        + "|" + m.getLanguageRange().map(LanguageRange::getRange).orElse("-")
+        + "|" + m.getMatchType()
+        + "|" + m.isMatch()
+        + "|" + m.getFallbackLocale().toLanguageTag()
+        + "|" + (considered.isEmpty() ? "-" : String.join("~", considered))
+        + "|" + (requested.isEmpty() ? "-" : String.join("~", requested));
+  }
+
+  /**
+   * Runs one probe with a FRESH trace and a FRESH selection-channel snapshot, and appends them as
+   * the outcome's seventh and eighth fields.
+   *
+   * <p>Both clears happen here rather than inside each probe method so that a probe that throws
+   * before it records anything still emits an empty trace and an empty match rather than the
+   * previous probe's — which is the exact observation that matters, since {@code calls=[]} is the
+   * evidence an ingress check fired before the walk started, and a stale {@link #MATCH} would make a
+   * refusal look as though it had carried a selection it never produced.
    */
   static String traced(java.util.function.Supplier<String> probe) {
     TRACE.clear();
+    MATCH = "-";
     String outcome = probe.get();
-    return outcome + "\t" + (TRACE.isEmpty() ? "-" : String.join(";", TRACE));
+    return outcome + "\t" + (TRACE.isEmpty() ? "-" : String.join(";", TRACE)) + "\t" + MATCH;
   }
 
   /** A cause's fully-qualified class, or {@code -}. See {@link #TRACE} for why it is not simplified. */
@@ -304,9 +376,12 @@ public class LookupDiff {
     System.out.print(out);
   }
 
-  /** Seven fields, like every traced outcome: the six of the outcome plus an empty trace. */
+  /**
+   * Eight fields, like every traced outcome: the six of the outcome, an empty trace, and an empty
+   * selection-channel match. Emitted WITHOUT {@code traced}, so it supplies all eight itself.
+   */
   static String noSet() {
-    return "NOSET\t-\t-\t-\t-\t-\t-";
+    return "NOSET\t-\t-\t-\t-\t-\t-\t-";
   }
 
   /** The per-call ingress: `TranslationOptions.Builder#locale`, which validates at :310. */
@@ -362,6 +437,11 @@ public class LookupDiff {
       LocaleMatchResult match = strings.matchFor(Locale.forLanguageTag(tag));
       List<String> requested = new ArrayList<>();
       for (LanguageRange range : match.getRequestedLanguageRanges()) requested.add(range.getRange());
+
+      // THE EIGHTH FIELD, through the SAME encoder the lookup door's copy uses — which is what
+      // brings this shape's `consideredLocales` and `fallbackLocale` along. They were dropped by
+      // the six fields below and by nothing else; one encoder for both doors is the point.
+      MATCH = match(match);
 
       return "MATCH"
           + "\t" + match.getLocale().map(Locale::toLanguageTag).orElse("-")
@@ -459,6 +539,10 @@ public class LookupDiff {
   static String describe(TranslationResult r) {
     List<String> attempted = new ArrayList<>();
     for (Locale locale : r.getAttemptedLocales()) attempted.add(locale.toLanguageTag());
+
+    // THE SELECTION CHANNEL'S OWN COPY, which the six fields below do not describe: they describe
+    // the RESOLUTION walk. See `MATCH`.
+    MATCH = r.getLocaleMatchResult().map(LookupDiff::match).orElse("-");
 
     return r.getStatus()
         + "\t" + flatten(r.getTranslation())

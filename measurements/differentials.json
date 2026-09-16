@@ -1,26 +1,26 @@
 {
-  "recordedAt": "2026-09-16T01:35:58.527Z",
-  "sourceSha256": "a652c03abed122d45511dda8107e36e51a59a1f21c871e92da98622763a94add",
+  "recordedAt": "2026-09-16T02:49:56.224Z",
+  "sourceSha256": "ff7acf6d05a66a6dcbbc98368b05b73c67cdb5a7a825b5345e75735b76530b54",
   "differentials": {
     "load": {
       "exit": 0,
-      "headline": "40 identical — every probe's locales, keys, failure identity, verbatim",
-      "toolSha256": "9ed4f2de609d6e038c8aef3fa68644ef6bc716e721734fb8467ac58060efe686"
+      "headline": "41 identical — every probe's locales, keys, PARSED CONTENT, failure",
+      "toolSha256": "6863a3a902f8290933ddac98f3fbba739420f5da3276ebb997447437f42d7aac"
     },
     "likely-subtag": {
       "exit": 0,
-      "headline": "cells           176405 = 35281 probes x 5 consumers",
-      "toolSha256": "120a5f4a231ba55103e6768f90c0313cc15e5338022fce80b837b5c94622b6e1"
+      "headline": "cells           246967 = 35281 probes x 7 consumers",
+      "toolSha256": "59adb4c417de34e59db6e43793b1a89b72cdb40e4785a315c4423b9b54d76f12"
     },
     "lookup": {
       "exit": 0,
       "headline": "end-to-end lookup differential against lokalized-3.0.0 on the pinned JDK: 320234/520597 well-formed lookups identical over 6789 tag(s) x 10 catalog set(s) x 11 shape(s) (3 keys x 2 lookup ingresses, p",
-      "toolSha256": "fc62fe5d19b7336b1d7d0e31c1a7613597759d1ed78136c283ca0c5f69d197f2"
+      "toolSha256": "c4c1bf7772ed9baf044598a1d023ffc899fc676242aaaa41f3ae8d2924d3f4c6"
     },
     "direct-tag": {
       "exit": 0,
       "headline": "Locale.forLanguageTag differential against Java on the pinned JDK: 46400/46400 well-formed tags identical, 0 declared divergence(s), 0 open port defect(s) over 0 probe(s), 0 unexplained; 83 ill-formed",
-      "toolSha256": "4dde5aea26aa71961cf3c1d1319fa750f84e724c2b41982bb3a8f89df780e5e5"
+      "toolSha256": "ad00e2f30b9800ac79cbc1ecab4c04165ca5183de5aad9e6321e0740aac8954a"
     },
     "language-range": {
       "exit": 0,
@@ -30,22 +30,22 @@
     "tokenizer": {
       "exit": 0,
       "headline": "tokenizer differential against Java on the pinned JDK: 373/373 identical",
-      "toolSha256": "088220d5f91be12eda71b34738fde4428ce7036a0d482e17d1fa70b810c6703e"
+      "toolSha256": "573fd28cc2e5d38b0ce0e3995df7312fe64971b177c9ef35b39591a91bdcfd6a"
     },
     "parse": {
       "exit": 0,
-      "headline": "parse differential against Java on the pinned JDK: 114/114 identical",
-      "toolSha256": "908c60148d8623b743a987649b144729c8ec9d2c76e21c3115ff6d417e30f3d1"
+      "headline": "parse differential against Java on the pinned JDK: 136/136 identical",
+      "toolSha256": "c4d9eed7bc87add4ca5d2410dcf7aa0142984b957ab80fa295c3dbf0d86012d3"
     },
     "interpolate": {
       "exit": 0,
-      "headline": "interpolation/bidi differential against Java on the pinned JDK: 657/657 identical",
-      "toolSha256": "039449fd011011f295dda9544d646f1956eed1b61a16ad266bf5e03bd68c94f2"
+      "headline": "interpolation/bidi differential against Java on the pinned JDK: 662/662 identical",
+      "toolSha256": "f4827cf95c3cf8706af11391d7b874d45d0399df36c54408f67373a787ceac9e"
     },
     "phonetic": {
       "exit": 0,
-      "headline": "67/73 identical, 6 known divergence(s), 0 unexplained",
-      "toolSha256": "408d8e186c6bde86f856ce5db8f606528c304764d84bb1c1f2807c04654adcae"
+      "headline": "69/77 identical, 8 known divergence(s), 0 unexplained",
+      "toolSha256": "7acff88930bbcf3b6cbc98c27462e5db612a50c7a2dcfffa3be3f54aaa7f1e46"
     }
   }
 }

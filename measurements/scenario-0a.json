@@ -9,19 +9,19 @@
     {
       "label": "root + raw-text catalog",
       "modules": 31,
-      "sourceBytes": 869917,
-      "importMs": 0.278,
-      "constructionMs": 0.1102,
-      "firstRenderMs": 0.3843,
-      "retainedBytes": 80024
+      "sourceBytes": 872639,
+      "importMs": 0.342,
+      "constructionMs": 0.1105,
+      "firstRenderMs": 0.3804,
+      "retainedBytes": 76448
     },
     {
       "label": "core + parsed equivalent",
       "modules": 30,
-      "sourceBytes": 859668,
-      "importMs": 0.713,
-      "constructionMs": 0.4173,
-      "firstRenderMs": 0.3332,
+      "sourceBytes": 862390,
+      "importMs": 0.726,
+      "constructionMs": 0.4089,
+      "firstRenderMs": 0.3259,
       "retainedBytes": 452056
     }
   ],
@@ -399,6 +399,13 @@
       "growth": [
         "root + raw-text catalog: source graph grew 862263 -> 869917 bytes",
         "core + parsed equivalent: source graph grew 852014 -> 859668 bytes"
+      ]
+    },
+    {
+      "reason": "M9 S9: the ISO-code direction fix and its two corrected comments in src/internal/{locale-jdk-tag,locale}.js; module counts unchanged",
+      "growth": [
+        "root + raw-text catalog: source graph grew 869917 -> 872639 bytes",
+        "core + parsed equivalent: source graph grew 859668 -> 862390 bytes"
       ]
     }
   ],

@@ -103,24 +103,27 @@
     },
     {
       "reason": "M9 S8: src/negotiate/index.js renders a refused weight with javaDoubleText on the object door, matching the header door and Java's Double.toString; the comment records the measurement that found it"
+    },
+    {
+      "reason": "M9 S9: jdkLanguageSubtag maps the superseded ISO codes FORWARD to the modern spelling (the pinned JDK 21 behaviour) and both inverted comments are corrected with their measurements"
     }
   ],
   "subpaths": {
     "lokalized": {
       "modules": 31,
-      "bytes": 869917
+      "bytes": 872639
     },
     "lokalized/core": {
       "modules": 30,
-      "bytes": 859668
+      "bytes": 862390
     },
     "lokalized/parse": {
       "modules": 28,
-      "bytes": 678785
+      "bytes": 681507
     },
     "lokalized/load": {
       "modules": 38,
-      "bytes": 766979
+      "bytes": 769701
     },
     "lokalized/ssr": {
       "modules": 3,
@@ -128,19 +131,19 @@
     },
     "lokalized/negotiate": {
       "modules": 16,
-      "bytes": 411107
+      "bytes": 413829
     },
     "lokalized/node": {
       "modules": 41,
-      "bytes": 796048
+      "bytes": 798770
     },
     "lokalized/data/ordinal": {
       "modules": 33,
-      "bytes": 889430
+      "bytes": 892152
     },
     "lokalized/data/ranges": {
       "modules": 33,
-      "bytes": 894303
+      "bytes": 897025
     }
   }
 }

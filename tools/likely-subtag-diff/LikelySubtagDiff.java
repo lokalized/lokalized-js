@@ -25,12 +25,15 @@ import java.util.Optional;
  *       (there are 23) picks the replacement whose likely subtag matches;
  *   <li>{@code fallbackLocalesFor} consults the table through {@code crossesLikelyScriptBoundary},
  *       which stops subtag truncation at a likely-script boundary;
- *   <li>{@code BidiUtils.localeUsesRightToLeftScript} maximizes a script-less tag through the table.
+ *   <li>{@code BidiUtils.localeUsesRightToLeftScript} maximizes a script-less tag through the table;
+ *   <li>{@code jdkScript} and {@code bidiScript} are the two string-valued intermediates that last
+ *       boolean collapses into one bit — the script BEFORE the maximizing branch, and the script
+ *       AFTER it.
  * </ul>
  *
  * <p>Each answer is emitted as its own field so a divergence names the CONSUMER, not just "the
  * table". Every call is individually guarded: a probe that makes one consumer throw must not cost
- * the run the other four, and "which consumer throws on what" is itself a comparison this tool
+ * the run the other six, and "which consumer throws on what" is itself a comparison this tool
  * makes.
  *
  * <p>One JSON object per line, no JSON dependency — every value is a tag, a boolean, or a
@@ -56,6 +59,8 @@ public final class LikelySubtagDiff {
           .append(quote(call(() -> CldrLocaleData.canonicalLanguageTag(probe))))
           .append(",\"fallbackChain\":").append(quote(call(() -> fallbackChain(probe))))
           .append(",\"rightToLeft\":").append(quote(call(() -> rightToLeft(probe))))
+          .append(",\"jdkScript\":").append(quote(call(() -> jdkScript(probe))))
+          .append(",\"bidiScript\":").append(quote(call(() -> bidiScript(probe))))
           .append("}\n");
     }
 
@@ -97,6 +102,56 @@ public final class LikelySubtagDiff {
 
   private static String rightToLeft(String probe) {
     return String.valueOf(BidiUtils.localeUsesRightToLeftScript(Locale.forLanguageTag(probe)));
+  }
+
+  /**
+   * {@code Locale#getScript()} — the FIRST of the two string-valued intermediates that
+   * {@code BidiUtils.java:54-61} collapses into the boolean above, emitted so it can be compared on
+   * its own.
+   *
+   * <p>WHY THE BOOLEAN IS NOT A COMPARISON OF THIS. {@code localeUsesRightToLeftScript} ends in
+   * {@code CldrLocaleData.isRightToLeftScript(script)}, a set-membership test over lowercased
+   * script codes, so it partitions this string into exactly two classes. Every difference INSIDE a
+   * class — {@code Latn} against {@code latn}, {@code Latn} against {@code Cyrl}, {@code Arab}
+   * against {@code Hebr} — is erased before the column sees it. The port's model of this field
+   * ({@code locale-jdk-tag.js parseJdkTag(...).script}) is read verbatim by {@code bidi.js} and
+   * {@code plural.js} and through {@code renderJdkTag} by every other {@code JdkTagParts}
+   * consumer, and nothing in this differential compared it except through that two-valued
+   * collapse.
+   *
+   * <p>Deliberately the RAW probe, not a round-tripped tag: {@code Locale.forLanguageTag} is what
+   * normalizes the script's case here, and handing the port a tag that had already been through its
+   * own renderer would launder exactly the defects this column exists to catch.
+   */
+  private static String jdkScript(String probe) {
+    return Locale.forLanguageTag(probe).getScript();
+  }
+
+  /**
+   * The script that actually reaches {@code CldrLocaleData.isRightToLeftScript} — the SECOND
+   * intermediate, after the maximizing branch has or has not fired.
+   *
+   * <p>A line-for-line mirror of {@code BidiUtils.java:54-61} rather than a paraphrase: the same
+   * {@code Locale}, the same {@code likelySubtagFor(Locale)} overload (which is
+   * {@code likelySubtagFor(locale.toLanguageTag())}, {@code CldrLocaleData.java:173-177} — a
+   * DIFFERENT input from the raw probe the {@code likelySubtag} column compares), and the same
+   * second {@code Locale.forLanguageTag(...).getScript()} on the maximized tag.
+   *
+   * <p>It is a copy of {@code jdkScript} on every probe carrying an explicit script; the rows where
+   * it is not are the ones the runner counts and gates.
+   */
+  private static String bidiScript(String probe) {
+    Locale locale = Locale.forLanguageTag(probe);
+    String script = locale.getScript();
+
+    if (script.length() == 0) {
+      Optional<String> likelySubtag = CldrLocaleData.likelySubtagFor(locale);
+
+      if (likelySubtag.isPresent())
+        script = Locale.forLanguageTag(likelySubtag.get()).getScript();
+    }
+
+    return script;
   }
 
   private static String optional(Optional<String> value) {

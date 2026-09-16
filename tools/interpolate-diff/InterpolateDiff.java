@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Independent differential oracle for the M5b escape grammar and bidi isolation.
@@ -19,6 +20,11 @@ import java.util.Map;
  * Both mechanisms are ports of code whose behavior is easy to describe wrongly: the escape branch
  * scans forward to the NEXT closing delimiter rather than a matching one, and `isolate` repairs
  * unbalanced isolate structure while copying. A second reading of the source is not an oracle.
+ *
+ * A lenient row carries TWO columns, not one. The rendered string is the obvious observable and it
+ * is the WEAKER of the two: every branch of the lenient scan that declines to treat something as a
+ * placeholder re-emits the bytes it consumed, so the rendered column is byte-identical over a whole
+ * family of scan defects. `names` is the other half — see the `lenient` case below.
  */
 public final class InterpolateDiff {
   public static void main(String[] args) throws Exception {
@@ -46,9 +52,41 @@ public final class InterpolateDiff {
       out.append("{\"section\":\"").append(section).append("\",\"in\":").append(quoted).append(',');
       try {
         switch (section) {
-          case "lenient":
-            out.append("\"ok\":true,\"out\":").append(quote(interpolator.interpolate(input, context)));
+          case "lenient": {
+            // THE SECOND OBSERVABLE OF THE LENIENT SCAN, AND THE ONE THE RENDERED STRING HIDES.
+            // `placeholderNamesInLeniently` (StringInterpolator.java:222) runs the SAME private
+            // scan with an empty context and returns the placeholder names it reached, as a
+            // LinkedHashSet in first-occurrence order (:105 the accumulator, :189 the add,
+            // :289 the defensive copy that keeps the order).
+            //
+            // Two real scan defects are invisible in `out` and visible only here, because both
+            // re-emit exactly the bytes they consumed:
+            //   - an escape region that stops at an inner `{{` instead of running to the next `}}`
+            //     re-scans text Java copied verbatim, so it reaches names Java never saw;
+            //   - an identifier rule that accepts what Java rejects (a leading digit, say) turns
+            //     `{{9x}}` from copied-through text into an unresolved placeholder, which the
+            //     interpolator writes back as `{{` + `9x` + `}}` — the same bytes.
+            //
+            // ORDER IS PART OF THE OBSERVATION, not a detail of the container. The failure-key
+            // consumer (DefaultStrings.java:1403) drops it into a HashMap, which is exactly why
+            // the rendered column cannot see an order defect; the same accumulator is joined IN
+            // ORDER into the strict path's "Missing value for placeholder(s) [%s]" message at
+            // DefaultStrings.java:1377-1380, so the order is a real observable of this engine.
+            //
+            // Both values are computed before either is appended: the catch below appends a
+            // `"ok":false` row, so a throw partway through an append would leave a malformed one.
+            String rendered = interpolator.interpolate(input, context);
+            Set<String> names = StringInterpolator.placeholderNamesInLeniently(input);
+            out.append("\"ok\":true,\"out\":").append(quote(rendered)).append(",\"names\":[");
+            boolean firstName = true;
+            for (String name : names) {
+              if (!firstName) out.append(',');
+              out.append(quote(name));
+              firstName = false;
+            }
+            out.append(']');
             break;
+          }
           case "isolate":
             out.append("\"ok\":true,\"out\":").append(quote(BidiUtils.isolate(input)));
             break;

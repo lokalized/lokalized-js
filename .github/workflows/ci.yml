@@ -88,6 +88,11 @@ jobs:
       # 2026-09-15 while wiring `check:examples`, which would have been the fourth.
       - name: Type-check the executed examples as consumer TypeScript
         run: npm run check:examples
+      # Every README sample is EXECUTED and every output it claims is asserted. A README is the
+      # largest prose surface this project has, and prose asserting its own correctness is the defect
+      # class it has caught fourteen times.
+      - name: Execute the README's samples and assert their claimed output
+        run: npm run check:readme
       - name: Consumer-shaped TypeScript declaration probes
         run: npm run declarations
       # A SKIP IS A GATE THAT STOPPED GATING. Each corpus-driven test skips when the sibling spec

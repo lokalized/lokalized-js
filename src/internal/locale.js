@@ -1791,8 +1791,17 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 		const filteredCandidates = structurallyFilteredLocales(range, candidates);
 
 		if (filteredCandidates.length > 0) {
-			// Java compares the tag against `Locale#getLanguage()`, not against its normalized language,
-			// so a bare `he` counts as "specific" (its stored language is the superseded `iw`).
+			// Java compares the tag against `Locale#getLanguage()`, not against its normalized language.
+			//
+			// **THE SENTENCE THAT USED TO FOLLOW HERE WAS THE INVERSE OF THE FACT, and it was the
+			// justification for a live defect.** It read: "so a bare `he` counts as 'specific' (its
+			// stored language is the superseded `iw`)". Measured on the pinned Corretto 21, a bare
+			// `he` has `toLanguageTag()` and `getLanguage()` BOTH `he` and counts as NOT specific;
+			// `java.locale.useOldISOCodes` stopped defaulting to true in JDK 17. `jdkLanguageSubtag`
+			// answered `iw` here until 2026-09-15, so this predicate scored the superseded family
+			// specific where Java does not — and it decides whether `candidates` narrows to the
+			// structurally filtered set before the tiebreaker walk, so it can change which catalog
+			// answers. Found by `diff:direct-tag`'s `getLanguage` column: 5,220 of 46,483 probes.
 			const hasSpecificMatch =
 				filteredCandidates.some((locale) => !equalsIgnoreCase(locale, jdkLanguageSubtag(locale)));
 			if (hasSpecificMatch) candidates = filteredCandidates;
