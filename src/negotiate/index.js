@@ -46,6 +46,7 @@
 
 import { decode as decodeRangeEquivalents } from "../data/iana-range-equivalents.js";
 import { matchFor, matchForRanges, normalizeTag } from "../internal/locale.js";
+import { RUNTIME_METADATA } from "../internal/runtime-metadata.js";
 import {
 	LOCALE_INGRESS_DESCRIPTION,
 	requireJdkWellFormedLocale,
@@ -706,9 +707,27 @@ function languageRangeFrom(value) {
 
 	const weight = candidate.weight === undefined ? MAXIMUM_WEIGHT : candidate.weight;
 
+	// `javaDoubleText`, NOT `String(weight)`, and the difference is two shapes rather than one.
+	// Java renders the offending weight with `Double.toString`, so an integral value carries its
+	// `.0` and a large one uses the `E` form: `weight=2.0`, `weight=-1.0`, `weight=1.0E21`. JS spells
+	// those `2`, `-1` and `1e+21` — the last differing in the mantissa AND the exponent marker, so a
+	// repair that merely appended `.0` to integral values would still be wrong. The HEADER door six
+	// hundred lines up (`:524`) has always used `javaDoubleText` for exactly this rendering; this
+	// door did not, so the two spelled the same sentence differently.
+	//
+	// MEASURED on the pinned JDK 2026-09-15, both doors against `Locale.LanguageRange.parse`:
+	//   java  weight=2.0 for language range "fr". It must be between 0.0 and 1.0.
+	//   port  weight=2   for language range "fr". It must be between 0.0 and 1.0.   (this door)
+	// The header door was already byte-identical to Java. Found by opening the CONSTRUCTOR arm of
+	// `diff:language-range`, which the oracle had never emitted and the runner had never compared —
+	// an EMIT-side blind spot, invisible to the recording proxy and to any column count.
 	if (typeof weight !== "number" || Number.isNaN(weight) || weight < MINIMUM_WEIGHT || weight > MAXIMUM_WEIGHT)
-		throw new RangeError(`weight=${String(weight)} for language range "${candidate.range}". ` +
-			"It must be between 0.0 and 1.0.");
+		throw new RangeError(
+			// A NON-NUMBER cannot reach Java at all — its parameter is a `double` — so that arm is the
+			// port's own guard and keeps its own rendering. Only the numeric arm has an oracle to match.
+			`weight=${typeof weight === "number" ? javaDoubleText(weight) : String(weight)} ` +
+			`for language range "${candidate.range}". ` +
+			`It must be between ${javaDoubleText(MINIMUM_WEIGHT)} and ${javaDoubleText(MAXIMUM_WEIGHT)}.`);
 
 	const range = candidate.range.toLowerCase();
 	checkLanguageRangeGrammar(range);
@@ -835,8 +854,65 @@ function normalizeAcceptLanguage(acceptLanguage) {
  * core's `LanguageRange` type"): a second definition here would be a second thing to keep in step.
  *
  * @typedef {import("../core/index.js").LanguageRange} LanguageRange
+ * @typedef {ReturnType<typeof createLocaleNegotiator>} LocaleNegotiator
+ *   Plan 3.4:882's `interface LocaleNegotiator extends LocaleMatcher` — the whole object
+ *   `createLocaleNegotiator` returns, where `LocaleMatcher` below is the two-method narrowing of it.
+ *   DERIVED from the factory rather than restated, so a method added to one and not the other is
+ *   impossible by construction; the allowlist has named it since M7 and `declared-surface.test.js`
+ *   has carried it in OWED ever since.
+ *
+
  * @typedef {Pick<ReturnType<typeof createLocaleNegotiator>, "matchFor" | "bestMatchFor">} LocaleMatcher
  */
+
+/**
+ * THE FAIL-SOFT GUARD CHAIN, EXTRACTED SO THERE IS EXACTLY ONE OF IT.
+ *
+ * Plan 3.4:929-932 gives `bestMatchForAcceptLanguage` and `forAcceptLanguage` the SAME five
+ * refusals — "absent, blank, malformed, over-4,096-code-unit, or over-32-expanded-range input" —
+ * and then makes them answer differently: the first returns the configured fallback TAG, the second
+ * carries an unmatched DIAGNOSTIC. Two doors, one predicate. Writing the chain twice is how a pair
+ * like that drifts, and this project has now paid for that shape at two loader doors (S10) and two
+ * manifest doors (S19), so the predicate moved here whole and each door supplies only its answer.
+ *
+ * `null` means "nothing usable was supplied"; an empty array is impossible, because
+ * `parseLanguageRanges` refuses an empty member rather than returning none.
+ *
+ * THE ORDER OF THE GUARDS IS OBSERVABLE and is Java's. The length cap applies to the RAW value,
+ * before `trim` and before normalization: a 4,097-character header of commas normalizes to `fr` and
+ * would answer `fr` if the cap ran later. And NOTHING IS EVER TRUNCATED — a 33-expanded-range header
+ * is refused whole, which is why plan 3.4:931 says "preferences are never truncated" and why a
+ * "keep the first 32" reading answers the corpus's 32-member sibling identically and this one wrongly.
+ *
+ * @param {string | null | undefined} acceptLanguage the raw, already-combined field value
+ * @returns {WeightedLanguageRange[] | null} the parsed members, or `null` for unusable input
+ */
+function usableAcceptLanguageRanges(acceptLanguage) {
+	if (acceptLanguage == null ||
+		typeof acceptLanguage !== "string" ||
+		acceptLanguage.length > MAXIMUM_ACCEPT_LANGUAGE_LENGTH ||
+		javaTrim(acceptLanguage) === "") return null;
+
+	const normalized = normalizeAcceptLanguage(acceptLanguage);
+
+	if (normalized === "") return null;
+
+	/** @type {WeightedLanguageRange[]} */
+	let ranges;
+
+	try {
+		ranges = parseLanguageRanges(normalized);
+	} catch (error) {
+		// Java catches `IllegalArgumentException | IndexOutOfBoundsException` — the parser's own
+		// refusals and nothing else. Narrowed to `RangeError` here for the same reason: a `TypeError`
+		// out of this module is a defect, and a blanket catch would answer the fallback and look like
+		// a recorded row passing.
+		if (!(error instanceof RangeError)) throw error;
+		return null;
+	}
+
+	return ranges.length > MAXIMUM_LANGUAGE_RANGES ? null : ranges;
+}
 
 /**
  * A matcher over one applicable locale configuration.
@@ -945,35 +1021,104 @@ export function createLocaleNegotiator(configuration) {
 		 * @returns {string} the best-matching supported locale, or the configured fallback
 		 */
 		bestMatchForAcceptLanguage: (acceptLanguage) => {
-			if (acceptLanguage == null ||
-				typeof acceptLanguage !== "string" ||
-				acceptLanguage.length > MAXIMUM_ACCEPT_LANGUAGE_LENGTH ||
-				javaTrim(acceptLanguage) === "") return fallbackLocale;
+			const ranges = usableAcceptLanguageRanges(acceptLanguage);
 
-			const normalized = normalizeAcceptLanguage(acceptLanguage);
-
-			if (normalized === "") return fallbackLocale;
-
-			/** @type {WeightedLanguageRange[]} */
-			let ranges;
-
-			try {
-				ranges = parseLanguageRanges(normalized);
-			} catch (error) {
-				// Java catches `IllegalArgumentException | IndexOutOfBoundsException` — the parser's own
-				// refusals and nothing else. Narrowed to `RangeError` here for the same reason: a
-				// `TypeError` out of this module is a defect, and a blanket catch would answer the
-				// fallback and look like a recorded row passing.
-				if (!(error instanceof RangeError)) throw error;
-				return fallbackLocale;
-			}
-
-			if (ranges.length > MAXIMUM_LANGUAGE_RANGES) return fallbackLocale;
-
-			// `bestMatchFor(List.of())` and `bestMatchFor(ranges)` are the same call in Java; the four
-			// exits above spell `List.of()` as the fallback directly, because an empty list is exactly
-			// what `noLocaleMatch` turns into `getFallbackLocale()` one line later.
-			return matchForLanguageRanges(ranges).locale ?? fallbackLocale;
+			// `bestMatchFor(List.of())` and `bestMatchFor(ranges)` are the same call in Java; the
+			// helper's five refusals spell `List.of()`, because an empty list is exactly what
+			// `noLocaleMatch` turns into `getFallbackLocale()` one line later.
+			return matchForLanguageRanges(ranges ?? []).locale ?? fallbackLocale;
 		},
 	});
 }
+
+/**
+ * PLAN 3.4:904-913's TWO OPTION HELPERS, and the sentence that explains why they exist at all is
+ * about the module GRAPH rather than about convenience:
+ *
+ *   ":933 — `forLanguageRanges` and `forAcceptLanguage` negotiate immediately and return core
+ *   `localeMatch` options, so the browser/root graph does not contain the whole-list solver."
+ *
+ * An application that wanted per-call whole-list negotiation without these would have to hand core a
+ * MATCHER and let core call it — which puts this module, its 806-class IANA closure and the range
+ * solver into every graph that can render. Negotiating eagerly and handing core a plain
+ * `localeMatch` keeps all of it on this side of the boundary. `test/pinned-data-only.test.js` names
+ * `negotiate/index.js` among the modules the root graph may not reach, because a byte ratchet would
+ * report the growth and not the reason.
+ *
+ * **NEITHER FUNCTION IMPORTS CORE**, and that is the same point one level down: `forLocaleMatch` in
+ * `lokalized/core` builds exactly this object, and importing it would drag core's 30-module graph
+ * into a 16-module subpath. The option shape is STRUCTURAL (plan 3.4:713 says so in as many words —
+ * "a `Strings` value created by one installed copy … remains usable by `lokalized/ssr` from
+ * another"), so constructing the literal here is the intended shape and not duplication to be
+ * tidied away. `test/negotiate-options.test.js` asserts the two literals are `deepEqual`, and
+ * `subpath:graphs` is what would notice the import.
+ */
+
+/**
+ * Negotiate a whole list STRICTLY and return the per-call options core consumes.
+ *
+ * Strict means what it means everywhere else in this module: a list longer than 32 members, or one
+ * holding a member `LanguageRange.parse` would refuse, throws `RangeError`. A caller that wants the
+ * request-handling contract instead wants `forAcceptLanguage`.
+ *
+ * @param {LocaleNegotiator} negotiator
+ * @param {Iterable<unknown>} ranges
+ * @returns {Readonly<{ localeMatch: import("../internal/locale.js").LocaleMatch }>}
+ */
+export function forLanguageRanges(negotiator, ranges) {
+	return Object.freeze({ localeMatch: negotiator.matchForLanguageRanges(ranges) });
+}
+
+/**
+ * Negotiate an `Accept-Language` field value FAIL-SOFT and return the per-call options core consumes.
+ *
+ * **THE UNMATCHED ANSWER IS A DIAGNOSTIC, NOT A FABRICATED MATCH, and plan 3.4:929-932 is precise
+ * about the difference.** Unusable input makes `bestMatchForAcceptLanguage` return the configured
+ * fallback TAG; it makes this return an unmatched result whose "own `locale` remains null", which
+ * core then consumes by using the configured fallback as the lookup locale. So the two doors agree
+ * on which catalog answers and disagree — deliberately — on what the caller can see about why.
+ * Handing back `{ locale: fallbackLocale, matchType: "exact" }` would be the fabrication this
+ * module's every `matchFor*` exists to refuse, and it would tell a page that the visitor asked for
+ * the language it is being served.
+ *
+ * The five refusals are `usableAcceptLanguageRanges`'s, shared verbatim with
+ * `bestMatchForAcceptLanguage` rather than restated. An empty range list is what produces the
+ * unmatched result: `matchForLanguageRanges([])` is Java's `matchFor(List.of())`, which is
+ * `noLocaleMatch`. Nothing here truncates — a 33-expanded-range header is refused whole, and the
+ * result's `requestedLanguageRanges` is EMPTY rather than the first 32.
+ *
+ * @param {LocaleNegotiator} negotiator
+ * @param {string | null | undefined} acceptLanguage the raw, already-combined field value
+ * @returns {Readonly<{ localeMatch: import("../internal/locale.js").LocaleMatch }>}
+ */
+export function forAcceptLanguage(negotiator, acceptLanguage) {
+	return Object.freeze({
+		localeMatch: negotiator.matchForLanguageRanges(usableAcceptLanguageRanges(acceptLanguage) ?? []),
+	});
+}
+
+/**
+ * PLAN 3.4:914-915's TWO IANA CONSTANTS, re-exported here because this is the subpath that owns the
+ * closure they describe.
+ *
+ * Plan 3.1's `negotiate` row promises a category in as many words — "re-exports core's
+ * `LanguageRange` type and IANA metadata" — and S28's category gate recorded the metadata half as
+ * UNDELIVERED with the reason "nothing to re-export, because core exports none". **That reason went
+ * stale the day M8's final batch landed the seven build-identity constants on `core`**, and nothing
+ * re-checked it: the staleness arm of that gate fires when a category gains a MEMBER, never when its
+ * excuse stops being true. Twelfth text on this project found asserting something that had ceased to
+ * hold. The entry is deleted with this export.
+ *
+ * THEY COME FROM `internal/runtime-metadata.js`, NOT FROM `core`, for the graph reason above: that
+ * module has zero imports of its own, so this costs the subpath one leaf. Both values are therefore
+ * the SAME constants core exports rather than a second copy, and `test/negotiate-options.test.js`
+ * asserts the equality so a future divergence is a red test rather than two plausible strings.
+ *
+ * `ianaRegistryDate` is `jdk-oracle:21.0.11` and is deliberately not date-shaped — maintainer
+ * decision A11, recorded because inventing a plausible `File-Date` for a registry snapshot that does
+ * not exist is the defect class this project has caught five times.
+ */
+export const ianaRegistryDate = RUNTIME_METADATA.ianaRegistryDate;
+
+/** @see {@link ianaRegistryDate} — the pinned closure's content fingerprint. */
+export const ianaDataFingerprint = RUNTIME_METADATA.ianaDataFingerprint;

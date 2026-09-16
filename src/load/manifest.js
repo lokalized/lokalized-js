@@ -36,8 +36,18 @@ import {
   readStrictUtf8,
   validateJsonNestingDepth,
 } from "../internal/json-parse.js";
-import { isKnownLanguageTag } from "../internal/locale-cldr.js";
-import { primaryLanguage } from "../internal/locale.js";
+import { canonicalLanguageTag, equivalentTags, isKnownLanguageTag } from "../internal/locale-cldr.js";
+import { compareTags, normalizedLanguageCode, primaryLanguage } from "../internal/locale.js";
+import { javaSplit } from "../internal/locale-jdk-tag.js";
+
+/**
+ * Java's list rendering, the one the direct door's identical diagnosis uses. Three lines of it are
+ * not worth an import across a subpath boundary — `lokalized/load` reaching into `core` for a
+ * string join would put core in load's module graph for no other reason.
+ *
+ * @param {readonly string[]} tags
+ */
+const javaList = (tags) => `[${tags.join(", ")}]`;
 import { jdkLocaleWellFormed } from "../internal/locale-jdk-tag.js";
 import { normalizeTag } from "../internal/locale.js";
 import { parseError, rethrowAsParseError } from "../internal/parse-diagnostics.js";
@@ -211,6 +221,57 @@ export function validateStringsManifest(input, options = {}) {
   }
 
   validateManifestTiebreakers(files, tiebreakers);
+
+  // PLAN 6.2:145 AT THE MANIFEST DOOR — "zero or still-ambiguous matches fail construction/MANIFEST
+  // VALIDATION". The sentence names BOTH doors and only the direct one implemented it.
+  //
+  // MEASURED BEFORE THE FIX: a manifest declaring `fallbackLocale: "und"` over files
+  // `und-bokmal` and `und-nynorsk` validated, planned, loaded and SERVED — `chain(m, "pt-BR")`
+  // ended `und-bokmal`, the subset door fetched that one file and nothing else, and the instance
+  // answered every unmatched request from a catalog nobody chose. The core guard that would have
+  // caught it is only reachable through the WHOLE-manifest door, which fetches both files first; the
+  // subset door never gave it the chance. So the divergence was not "a different message" — it was a
+  // `complete: true` load of a manifest the plan says must be refused.
+  //
+  // REFUSED HERE rather than inside `chain`/`fetchSet`, for the reason S11a recorded one door over:
+  // a check inside the planner degrades into one failure among many, and under `allow-partial` that
+  // is a successful load which silently skipped what the caller asked for. Validation is before I/O,
+  // like the fingerprint guard below it.
+  //
+  // The DIAGNOSIS is Java's, word for word with the direct door's — which locales collided, and that
+  // tiebreakers are how a caller resolves it. Only the CLASS differs, because a manifest-door refusal
+  // is a `ConfigurationError`: the phase taxonomy S23 gated says this door's failures are
+  // configuration, not resolution.
+  const declaredLocales = Object.keys(files).sort(compareTags);
+  const equivalentFallbacks = declaredLocales.filter((tag) => equivalentTags(tag, fallbackLocale));
+
+  if (equivalentFallbacks.length === 0)
+    throw configurationError(
+      `A manifest's fallbackLocale is '${fallbackLocale}' but no matching catalog was declared. ` +
+        `Known locales: ${javaList(declaredLocales)}`,
+    );
+
+  if (equivalentFallbacks.length > 1 && !equivalentFallbacks.includes(fallbackLocale)) {
+    // A tiebreaker for the fallback's own language resolves it, exactly as it does at the direct
+    // door. `validateManifestTiebreakers` has already required each list to be a permutation of that
+    // language's files, so the first member that is an equivalent is the elected one.
+    const languageCode = normalizedLanguageCode(javaSplit(canonicalLanguageTag(fallbackLocale))[0] ?? "");
+    const ordered = tiebreakers[languageCode];
+    const elected = ordered?.find((candidate) => equivalentFallbacks.includes(candidate));
+    // THE REMEDY IS SPELLING THE TAG EXACTLY, NOT A TIEBREAKER, and that is measured rather than
+    // assumed. `validateManifestTiebreakers` groups files by PRIMARY LANGUAGE and skips undetermined
+    // and private-use tags outright — "they carry no broad-language matching semantics, so two of
+    // them create no ambiguity for a tiebreaker to resolve" — so `primaryLanguage("und-bokmal")` is
+    // the empty string and a manifest tiebreaker keyed 'und' is itself refused ("declares tiebreakers
+    // for 'und' but no file for that language"). A message telling a publisher to add one would send
+    // them at a door that is locked. For a LANGUAGE-BEARING fallback the tiebreaker above is the
+    // remedy and is already mandatory, so this arm is reached only by the undetermined case.
+    if (elected === undefined)
+      throw configurationError(
+        `A manifest's fallbackLocale '${fallbackLocale}' is canonically equivalent to multiple ` +
+          `declared locales ${javaList(equivalentFallbacks)}; declare it as one of them exactly`,
+      );
+  }
 
   const manifest = /** @type {StringsManifestV1} */ (Object.freeze({
     formatVersion: /** @type {1} */ (1),

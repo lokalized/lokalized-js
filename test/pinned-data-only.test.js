@@ -123,8 +123,15 @@ test("the root graph carries no optional plural data", () => {
   // `data/iana-range-equivalents.js` joins the list at M7 A2: the 806-class IANA closure belongs to
   // `lokalized/negotiate` by plan 3.1, and the root graph carries only the reduced slice inlined in
   // `src/internal/locale.js`. Naming it here is what keeps it out — the byte ratchet would not.
+  //
+  // `negotiate/index.js` ITSELF joins at M9 S2, and the reason is a new import edge that did not
+  // exist before: plan 3.4:904-913's `forLanguageRanges` and `forAcceptLanguage` are per-call option
+  // helpers, which is exactly the shape somebody re-exports from the root for convenience. Plan
+  // 3.4:933 says why not — they exist "so the browser/root graph does not contain the whole-list
+  // solver" — and the closure entry above would catch that one import and not, say, a root that
+  // re-exported the helpers while the closure moved somewhere else.
   for (const forbidden of ["ordinal-rules.js", "cardinal-ranges.js", "data/ordinal.js", "data/ranges.js",
-    "data/iana-range-equivalents.js"])
+    "data/iana-range-equivalents.js", "negotiate/index.js"])
     assert.ok(
       ![...reached].some((file) => file.endsWith(forbidden)),
       `${forbidden} must not be reachable from the root entry point`,
@@ -160,7 +167,7 @@ test("the root graph carries no optional plural data", () => {
   // works if the renderer is the party that holds the identity. It carries no table — seven strings
   // — and `test/runtime-metadata.test.js` pins every one of them to `package.json` or a
   // `lokalized-spec` lock, so it cannot drift into being a second source of truth.
-  assert.equal(reached.size, 29, "the root module graph changed size");
+  assert.equal(reached.size, 31, "the root module graph changed size");
 
   // The exact set of generated tables the root pulls in. `scenario:0a`'s byte ratchet is a PROXY for
   // this invariant, and a weak one: it is re-recorded whenever hand-written code legitimately grows,

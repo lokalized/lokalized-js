@@ -25,11 +25,15 @@ import { normalizeTag } from "../internal/locale.js";
 import { fetchSet } from "./planning.js";
 import { validateStringsManifest } from "./manifest.js";
 import { hex, readBoundedStream, runPlan, wholeManifestPlan } from "./run-plan.js";
+import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-error.js";
 
 /** @typedef {import("./index.js").StringsManifestV1} StringsManifestV1 */
 /** @typedef {import("./index.js").FetchEntry} FetchEntry */
 
-const DEFAULT_REQUEST = Object.freeze({ mode: "cors", credentials: "same-origin" });
+// EXPORTED for `test/example-server.test.js`, which pairs it with the `crossorigin` attribute the
+// server example emits: plan 6.3:2180 makes the bare attribute and this default ONE claim in two
+// places, and nothing compared them until the examples landed.
+export const DEFAULT_REQUEST = Object.freeze({ mode: "cors", credentials: "same-origin" });
 
 export { StringsLoadingError } from "./run-plan.js";
 
@@ -43,17 +47,40 @@ export { StringsLoadingError } from "./run-plan.js";
  * added is the thing the clause actually asks for. The construction token mirrors `StringsParseError`
  * and `StringsLoadingError`.
  */
-export class DigestUnavailableError extends Error {
-  /** @param {symbol} token the internal construction token @param {string} message */
+  // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
+  // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
+export class DigestUnavailableError extends LokalizedError {
+  /**
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
+   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
+   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
+   * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
+   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * raiser below is what lets the module's own factory still build one, since a private constructor
+   * is callable only from inside the class body.
+   *
+   * @private @param {symbol} token the internal construction token @param {string} message */
   constructor(token, message) {
     if (token !== DIGEST_ERROR_TOKEN)
       throw new TypeError("DigestUnavailableError is not constructible; it is thrown by lokalized/load");
 
-    super(message);
+    super(LOKALIZED_ERROR_TOKEN, message);
     /** @type {"DigestUnavailableError"} */
     this.name = "DigestUnavailableError";
     /** @type {"DIGEST_UNAVAILABLE"} */
     this.code = "DIGEST_UNAVAILABLE";
+  }
+
+  /**
+   * The one construction path, because the constructor above is private. Its parameters are the
+   * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
+   * the token it takes first is never exported from this package.
+   *
+   * @param {symbol} token @param {string} message
+   */
+  static raise(token, message) {
+    return new DigestUnavailableError(token, message);
   }
 }
 
@@ -61,7 +88,7 @@ export class DigestUnavailableError extends Error {
 const DIGEST_ERROR_TOKEN = Symbol("lokalized.digest-unavailable-error");
 
 function digestUnavailable() {
-  return new DigestUnavailableError(DIGEST_ERROR_TOKEN,
+  return DigestUnavailableError.raise(DIGEST_ERROR_TOKEN,
     "WebCrypto is unavailable, so catalog digests cannot be verified. `lokalized/load` fails closed " +
     "rather than fetching bodies it cannot check; WebCrypto is secure-context gated, and a " +
     "trustworthy loopback origin counts as one.");

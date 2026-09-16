@@ -48,6 +48,7 @@ import { LANGUAGE_FORM_NAMES } from "./catalog.js";
 // preserves the failing exception's TYPE rather than flattening every cause into one class.
 import { ExpressionEvaluationError, expressionEvaluationError } from "./expression-tokenizer.js";
 import { cardinalCategoryFor, operandsFromDecimalText, operandsFromNumber } from "./plural.js";
+import { ResolutionError, invalidArgument, invalidState } from "./resolution-error.js";
 
 const PLACEHOLDER_START = "{{";
 const PLACEHOLDER_END = "}}";
@@ -97,7 +98,7 @@ class GeneratedExpansionBudget {
     this.consumedCharacters += characters;
 
     if (this.consumedCharacters > this.maximumCharacters)
-      throw new Error(
+      throw invalidState(
         `Generated placeholder expansion for key '${key}' exceeds the cumulative limit of ` +
           `${this.maximumCharacters} characters`,
       );
@@ -333,7 +334,7 @@ function interpolate(text, lookup, strict, maximumOutputCharacters = 0) {
 
     if (startsWith(text, index, PLACEHOLDER_END)) {
       if (strict)
-        throw new Error(
+        throw invalidArgument(
           `Unexpected placeholder closing delimiter '${PLACEHOLDER_END}' at index ${index}`,
         );
 
@@ -355,7 +356,7 @@ function interpolate(text, lookup, strict, maximumOutputCharacters = 0) {
     );
 
     if (placeholderEnd < 0) {
-      if (strict) throw new Error(`Unclosed placeholder starting at index ${placeholderStart}`);
+      if (strict) throw invalidArgument(`Unclosed placeholder starting at index ${placeholderStart}`);
 
       appendSequence(text.slice(placeholderStart));
       break;
@@ -365,7 +366,7 @@ function interpolate(text, lookup, strict, maximumOutputCharacters = 0) {
 
     if (!isValidIdentifier(name)) {
       if (strict)
-        throw new Error(
+        throw invalidArgument(
           `Malformed placeholder '${PLACEHOLDER_START}${name}${PLACEHOLDER_END}'. Placeholder names ` +
             "must start with a Unicode letter or underscore and contain only Unicode letters, " +
             "Unicode numbers, Unicode combining marks, underscores, or hyphens",
@@ -597,7 +598,7 @@ function operandsForValue(value) {
 
   if (tag === "decimal") {
     const text = /** @type {{ value: unknown }} */ (value).value;
-    if (typeof text !== "string") throw new Error("A decimal value must carry a decimal string");
+    if (typeof text !== "string") throw invalidArgument("A decimal value must carry a decimal string");
     return operandsFromDecimalText(text, {});
   }
 
@@ -606,7 +607,7 @@ function operandsForValue(value) {
       value
     );
     if (typeof record.value !== "string")
-      throw new Error("Plural operands must carry a decimal string");
+      throw invalidArgument("Plural operands must carry a decimal string");
     /** @type {{ visibleDecimalPlaces?: number, compactExponent?: number }} */
     const options = {};
     if (typeof record.visibleDecimalPlaces === "number")
@@ -616,7 +617,7 @@ function operandsForValue(value) {
     return operandsFromDecimalText(record.value, options);
   }
 
-  throw new Error(
+  throw invalidArgument(
     "must be a number, bigint, decimal, plural-operands, or an exact tagged language form " +
       `but was ${describeValue(value)}`,
   );
@@ -752,7 +753,7 @@ function javaSimpleNameOf(value) {
  * @returns {never}
  */
 function refusePluralValue(description, valueName, key, typeName, value) {
-  throw new Error(
+  throw invalidArgument(
     `${description} '${valueName}' in key '${key}' must be a Number, PluralOperands, or ` +
       `${typeName} but was ${javaSimpleNameOf(value) ?? describeValue(value)}`,
   );
@@ -814,7 +815,7 @@ function ordinalityNameForValue(value, context) {
   const classify = context.ordinalityNameFor;
 
   if (classify === undefined)
-    throw new Error(
+    throw invalidState(
       "ordinal classification requires the optional 'lokalized/data/ordinal' module; pass it as " +
         "createStrings({ pluralData: { ordinal: ordinalData } })",
     );
@@ -853,7 +854,7 @@ function phoneticNameForValue(value, valueName, context) {
   const { key } = context;
 
   if (typeof value !== "string")
-    throw new Error(
+    throw invalidArgument(
       // Java verbatim, INCLUDING the trailing class name wherever the port can name it. A verbatim
       // copy that then drops a vaguer noun into the one slot it could have filled is half a port —
       // and this site read `must be a Phonetic or CharSequence but was string`, Java class names on
@@ -873,7 +874,7 @@ function phoneticNameForValue(value, valueName, context) {
   // string with no key in it. A second, ungated spelling of a declared message is a divergence
   // waiting for the day the guard becomes reachable, so it is the declared string verbatim.
   if (resolver === undefined)
-    throw new Error(
+    throw invalidState(
       "No phoneticResolver was configured. Provide one via createStrings({ phoneticResolver })",
     );
 
@@ -883,7 +884,7 @@ function phoneticNameForValue(value, valueName, context) {
     context.maximumInterpolatedOutputCharacters ?? DEFAULT_MAXIMUM_INTERPOLATED_OUTPUT_CHARACTERS;
 
   if (value.length > maximum)
-    throw new Error(
+    throw invalidArgument(
       `Phonetic input for placeholder '${valueName}' in key '${key}' exceeds the maximum of ` +
         `${maximum} characters`,
     );
@@ -892,7 +893,7 @@ function phoneticNameForValue(value, valueName, context) {
   const resolvedName = taggedLanguageFormName(resolved, "phonetic");
 
   if (resolvedName === null)
-    throw new Error(
+    throw invalidArgument(
       resolved === null || resolved === undefined
         ? `PhoneticResolver returned null for placeholder '${valueName}' in key '${key}'`
         : `phoneticResolver returned a non-phonetic value for placeholder '${valueName}' in ` +
@@ -931,10 +932,10 @@ function selectLanguageForm(definition, lookup, context) {
     const endValue = lookup(end);
 
     if (startValue === null || startValue === undefined)
-      throw new Error(`Missing range start placeholder '${start}' for key '${key}'`);
+      throw invalidArgument(`Missing range start placeholder '${start}' for key '${key}'`);
 
     if (endValue === null || endValue === undefined)
-      throw new Error(`Missing range end placeholder '${end}' for key '${key}'`);
+      throw invalidArgument(`Missing range end placeholder '${end}' for key '${key}'`);
 
     // JAVA'S ACCEPT-SET TEST, ON BOTH ENDPOINTS, WITH JAVA'S OWN DESCRIPTION STRINGS.
     // `DefaultStrings.java:948-951` calls `cardinalityForValue` twice with `"Range start
@@ -953,7 +954,7 @@ function selectLanguageForm(definition, lookup, context) {
     const combine = context.rangeCardinalityNameFor;
 
     if (combine === undefined)
-      throw new Error(
+      throw invalidState(
         "cardinal-range classification requires the optional 'lokalized/data/ranges' module; pass " +
           "it as createStrings({ pluralData: { ranges: cardinalRangeData } })",
       );
@@ -973,14 +974,14 @@ function selectLanguageForm(definition, lookup, context) {
     const valueName = definition.value;
 
     if (valueName === null)
-      throw new Error(
+      throw invalidState(
         `Generated placeholder must define a value or range for key '${key}'`,
       );
 
     const value = lookup(valueName);
 
     if (value === null || value === undefined)
-      throw new Error(`Missing value for placeholder '${valueName}' in key '${key}'`);
+      throw invalidArgument(`Missing value for placeholder '${valueName}' in key '${key}'`);
 
     if (definition.axis === "cardinality" || definition.axis === "ordinality") {
       // JAVA'S ORDER, NOT A WRAPPER. `cardinalityForValue` / `ordinalityForValue`
@@ -1007,7 +1008,7 @@ function selectLanguageForm(definition, lookup, context) {
       const explicit = taggedLanguageFormName(value, definition.axis);
 
       if (explicit === null)
-        throw new Error(
+        throw invalidArgument(
           // Java's wording verbatim (`DefaultStrings.java:1008/1029/1050/1071/1092/1113/1134`, one
           // arm per nominal axis, all seven spelling `must be a %s but was %s`). The LEFT slot is
           // `Gender.class.getSimpleName()` and the port has had that exact spelling in
@@ -1027,7 +1028,7 @@ function selectLanguageForm(definition, lookup, context) {
   const translation = definition.translations.get(formName);
 
   if (translation === undefined)
-    throw new Error(
+    throw invalidState(
       missingFormMessage ?? `Missing ${typeName} translation for ${renderNameFor(formName)}`,
     );
 
@@ -1067,9 +1068,18 @@ function resolveExpressionTranslation(definition, values, context) {
         `Unable to evaluate generated-fragment expression '${alternative.expression}': ` +
         `${cause instanceof Error ? cause.message : String(cause)}`;
 
-      throw cause instanceof ExpressionEvaluationError
-        ? expressionEvaluationError(message, { cause })
-        : new Error(message, { cause });
+      // THREE ARMS AND DELIBERATELY NO FOURTH — `DefaultStrings.java:1226 / :1230 / :1234`, where an
+      // unrecognized value simply propagates. It reaches the enclosing placeholder boundary, whose
+      // arm 4 returns it; that is what produces plan 3.5:1147's "exactly two same-category wrappers",
+      // confirmed by execution on the pinned JDK.
+      if (cause instanceof ExpressionEvaluationError) throw expressionEvaluationError(message, { cause });
+      if (cause instanceof ResolutionError)
+        throw cause.code === "RESOLUTION_INVALID_STATE"
+          ? invalidState(message, { cause })
+          : invalidArgument(message, { cause });
+      if (cause instanceof TypeError || cause instanceof RangeError)
+        throw invalidArgument(message, { cause });
+      throw cause;
     }
 
     if (matched)
@@ -1098,7 +1108,7 @@ function evaluateAlternative(alternative, values, context) {
   const evaluate = context.evaluateExpression;
 
   if (evaluate === undefined)
-    throw new Error(
+    throw invalidState(
       "No compiled expression evaluator is available; alternatives cannot be selected",
     );
 
@@ -1135,7 +1145,9 @@ function evaluateAlternative(alternative, values, context) {
  * @param {PlaceholderBinding} binding
  * @param {string | null} selectionDescription
  * @param {unknown} cause
- * @returns {Error}
+ * @returns {unknown} an `Error` on arms 1-3; on ARM 4, whatever the application threw, UNCHANGED —
+ *   which is why this cannot be typed `Error`. Java stores an unrecognized application exception
+ *   unchanged (plan 2.5:249) and JavaScript lets an application throw a non-`Error` besides.
  */
 function contextualizePlaceholderFailure(key, placeholderName, binding, selectionDescription, cause) {
   const kind =
@@ -1146,9 +1158,29 @@ function contextualizePlaceholderFailure(key, placeholderName, binding, selectio
     `Unable to resolve generated placeholder '${placeholderName}' (${kind}) for key '${key}'; ` +
     `definition declared at ${binding.declaringPath}${selectionContext}: ${causeMessage}`;
 
-  return cause instanceof ExpressionEvaluationError
-    ? expressionEvaluationError(message, { cause })
-    : new Error(message, { cause });
+  // JAVA'S FOUR ARMS, IN JAVA'S ORDER — `DefaultStrings.java:1270 / :1273 / :1276 / :1281`. The port
+  // had the first and a catch-all; the two middle arms were a bare `Error`, which made them
+  // indistinguishable from the fourth. The fourth is the one that matters: an unrecognized
+  // APPLICATION exception is returned UNCHANGED, which plan 2.5:249 requires and which the port did
+  // not do — measured against the pinned JDK, Java returns the app object verbatim with a chain of
+  // length 1 while the port wrapped it.
+  //
+  // A FRESH ERROR OF THE MAPPED CODE, NEVER THE CAUSE'S OWN CLASS. Java constructs a plain
+  // `new IllegalArgumentException(message, cause)` at :1274, so a `NumberFormatException` comes out
+  // as a plain IAE with the subclass surviving only as `cause`. The comment above this function used
+  // to say the ladder "KEEPS THE FAILING EXCEPTION'S TYPE"; it keeps the CATEGORY.
+  if (cause instanceof ExpressionEvaluationError) return expressionEvaluationError(message, { cause });
+  // Arm 2/3 collapse into one line because the code travels WITH the cause: a library failure already
+  // carries the category Java would have re-derived, so re-deriving it here could only disagree.
+  if (cause instanceof ResolutionError)
+    return cause.code === "RESOLUTION_INVALID_STATE"
+      ? invalidState(message, { cause })
+      : invalidArgument(message, { cause });
+  // Plan 2.5:253-254 and 3.5:1134-1135 make these two RECOGNIZED, and they are the JS spellings of
+  // Java's invalid-value category — a `TypeError` or `RangeError` from a caller's own value.
+  if (cause instanceof TypeError || cause instanceof RangeError) return invalidArgument(message, { cause });
+  // ARM 4. Unchanged, unwrapped, exactly as Java hands it back.
+  return cause;
 }
 
 /**
@@ -1204,7 +1236,7 @@ function interpolateTemplate(
   budget,
 ) {
   if (depth > maximumDepth)
-    throw new Error(
+    throw invalidState(
       // `[q1, q2, q3]`, NOT `q1 -> q2 -> q3`. Java interpolates the path LIST here
       // (DefaultStrings.java:1322-1324, `%s` against a `List<String>`), so the separator is
       // `AbstractCollection.toString`'s. The arrow form belongs to the CYCLE diagnostic forty lines
@@ -1233,7 +1265,7 @@ function interpolateTemplate(
       const cycleStart = path.indexOf(name);
 
       if (cycleStart >= 0)
-        throw new Error(
+        throw invalidState(
           `Generated placeholder cycle for key '${context.key}': ` +
             `${[...path.slice(cycleStart), name].join(" -> ")}`,
         );
@@ -1293,7 +1325,7 @@ function interpolateTemplate(
   );
 
   if (result.unresolved.length > 0)
-    throw new Error(
+    throw invalidArgument(
       `Missing value for placeholder(s) [${result.unresolved.join(", ")}] in key '${context.key}'`,
     );
 
@@ -1417,7 +1449,7 @@ export function render(definition, placeholders, context) {
     const binding = bindings.get(name);
 
     if (binding === undefined)
-      throw new Error(
+      throw invalidState(
         `No effective definition was found for generated placeholder '${name}' in key '${context.key}'`,
       );
 

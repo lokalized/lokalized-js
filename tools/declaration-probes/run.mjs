@@ -36,6 +36,7 @@ import { tmpdir } from "node:os";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const core = JSON.stringify(join(root, "src/core/index.js"));
 const load = JSON.stringify(join(root, "src/load/index.js"));
+const nodeDoor = JSON.stringify(join(root, "src/node/index.js"));
 
 /** @type {{ name: string, compiles: boolean, why: string, source: string }[]} */
 const PROBES = [
@@ -47,6 +48,27 @@ const PROBES = [
 import type { LoadedStrings } from ${load};
 declare const record: LoadedStrings;
 export const s = createStrings({ loaded: record, locale: "fr-BE" });`,
+  },
+  {
+    name: "a record FROM THE LOADER flows into construction",
+    compiles: true,
+    why: "the probe above declares its own `LoadedStrings`; this one takes the loader's OWN return " +
+      "type, which is the only thing that can catch the loader widening a field. It did: measured " +
+      "2026-09-15, `run-plan.js` annotated its accumulator `Record<string, unknown>` and the whole " +
+      "load-then-construct pipeline failed with TS2322 for every TypeScript consumer",
+    source: `import { createStrings } from ${core};
+import { loadStrings } from ${load};
+declare const loaded: Awaited<ReturnType<typeof loadStrings>>;
+export const s = createStrings({ loaded, locale: "fr" });`,
+  },
+  {
+    name: "a record from the NODE whole-manifest loader flows into construction",
+    compiles: true,
+    why: "the same seam at the other door; its return type is declared separately and can widen alone",
+    source: `import { createStrings } from ${core};
+import { loadEntireManifestFromFiles } from ${nodeDoor};
+declare const loaded: Awaited<ReturnType<typeof loadEntireManifestFromFiles>>;
+export const s = createStrings({ loaded, locale: "fr" });`,
   },
   {
     name: "the direct door is callable",
@@ -70,6 +92,34 @@ export const s = createStrings({ loaded: record, strings: { en: {} }, fallbackLo
     why: "plan 3.5:1107 — the runtime values are public for catching and `instanceof`",
     source: `import { DigestUnavailableError } from ${load};
 export const f = (error: unknown) => error instanceof DigestUnavailableError ? error.code : null;`,
+  },
+  {
+    name: "a consumer cannot construct a library error",
+    compiles: false,
+    why: "plan 3.5:1107 — the declarations expose no constructor; emitted as `private constructor();`",
+    source: `import { ConfigurationError } from ${core};
+export const bad = new ConfigurationError("fake");`,
+  },
+  {
+    name: "a consumer cannot extend a library error",
+    compiles: false,
+    why: "plan 3.5:1107 — nor an extension signature; a private constructor refuses `extends` too",
+    source: `import { ConfigurationError } from ${core};
+export class Mine extends ConfigurationError {}`,
+  },
+  {
+    name: "one instanceof catches any library error",
+    compiles: true,
+    why: "plan 3.5:1092 exports LokalizedError as the base; before S35 there was no common ancestor",
+    source: `import { LokalizedError } from ${core};
+export const f = (error: unknown) => error instanceof LokalizedError ? error.code : null;`,
+  },
+  {
+    name: "the widest library error is catchable",
+    compiles: true,
+    why: "plan 3.5:1100 — 119 sites raise a ConfigurationError and none was catchable before S34",
+    source: `import { ConfigurationError } from ${core};
+export const f = (error: unknown) => error instanceof ConfigurationError ? error.code : null;`,
   },
   {
     name: "createStrings refuses a runtimeLimits option",

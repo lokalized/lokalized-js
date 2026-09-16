@@ -1,0 +1,34 @@
+{
+  "App.Title": "La librairie Lokalized du Canada",
+
+  "Locale.Direct": "Cette page est servie en {{served}}.",
+
+  "Locale.Notice": "Vous avez demande {{requested}}. Cette page est servie en {{served}}.",
+
+  "Cart.Items": {
+    "translation": "Votre panier compte {{count}} {{books}}.",
+    "placeholders": {
+      "books": {
+        "value": "count",
+        "translations": {
+          "CARDINALITY_ONE": "livre",
+          "CARDINALITY_OTHER": "livres"
+        }
+      }
+    }
+  },
+
+  "Greeting": {
+    "translation": "Bon retour, {{name}}. {{youAre}} dans votre liste de lecture.",
+    "placeholders": {
+      "youAre": {
+        "value": "readerGender",
+        "translations": {
+          "GENDER_MASCULINE": "Il est",
+          "GENDER_FEMININE": "Elle est",
+          "GENDER_COMMON": "Iels sont"
+        }
+      }
+    }
+  }
+}

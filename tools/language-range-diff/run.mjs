@@ -41,6 +41,10 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { oracleFieldProblems, recordingOracleRows } from "../oracle-field-coverage.mjs";
+
+/** Emitted by the oracle and deliberately not compared, each with the reason. Checked both ways. */
+const UNCOMPARED_ORACLE_FIELDS = {};
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -386,9 +390,23 @@ try {
   if (run.status !== 0) throw new Error(`oracle execution failed:\n${run.stderr}`);
 
   const { parseLanguageRanges } = await import("../../src/negotiate/index.js");
-  const rows = readFileSync(outPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  // THE GATE THAT WOULD HAVE CAUGHT S31's DEFECT, wired into the tool that had it. `errorType` was
+  // emitted on every refusal row from the day this tool was written and read by nothing; the fix
+  // above compares it now, and this makes the NEXT dropped column fail instead of waiting for
+  // someone to ablate the instrument. Proven retrospectively: reverting the comparison to
+  // `{ok, error}` makes this gate name `errorType` and exit 1.
+  const recorder = recordingOracleRows(
+    readFileSync(outPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)));
+  const rows = recorder.rows;
 
   let same = 0;
+/**
+ * Java's refusal class, mapped to the JS name the port raises for it. One entry, because Java raises
+ * one class here; an UNMAPPED type reaches the comparison verbatim and fails the run loudly rather
+ * than being waved through, which is the half that keeps this from rotting into an always-true test.
+ */
+const JS_CLASS_FOR_JAVA = { "java.lang.IllegalArgumentException": "RangeError" };
+
   const differences = [];
   /** @type {{input: string, wanted: unknown, actual: unknown, family: string}[]} */
   const defects = [];
@@ -402,9 +420,39 @@ try {
         ranges: parseLanguageRanges(row.in).map((member) => ({ range: member.range, weight: doubleText(member.weight) })),
       };
     } catch (error) {
-      actual = { ok: false, error: error instanceof Error ? error.message : String(error) };
+      actual = {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+        // THE REFUSAL CLASS, WHICH THIS RUNNER DROPPED. The oracle has emitted `errorType` — the
+        // exception's `getClass().getName()` — on every refusal row since it was written
+        // (`LanguageRangeDiff.java:56`), and nothing here read it: `wanted` was built as
+        // `{ok, error}` and `grep -c errorType run.mjs` answered 0. **Measured 2026-09-14: changing
+        // every `throw new RangeError(` in `src/negotiate/index.js` to `throw new TypeError(`, with
+        // every message byte-identical, left this run at 6037/6037 identical, exit 0.** That is the
+        // exact mirror of the defect `diff:lookup` once had — it emitted the class AND the message
+        // and dropped the MESSAGE; this one emitted both and dropped the CLASS.
+        //
+        // THE CONSEQUENCE IS AT THE PUBLIC DOOR, and was demonstrated rather than argued: the
+        // one-sided form of that rename (throw sites only, the two `instanceof RangeError` guards
+        // left behind — what a careless refactor actually produces) turns the negotiator's FAIL-SOFT
+        // Accept-Language handling into a thrown exception. `bestMatchForAcceptLanguage("fr;q=2")`
+        // answers `"en"` unablated and THROWS under it, which is the hazard the comment at
+        // `src/negotiate/index.js:967` names two lines above the guard, and M9's own fail-soft
+        // requirement. The behaviour is not unguarded — `test/negotiate.test.js` pins
+        // `{ name: "RangeError" }` and goes 10-of-32 red under the same ablation, inside `npm test` —
+        // but it was unguarded HERE, in the instrument whose subject it is.
+        //
+        // COMPARED AS A MAPPING, NOT ROW-AGAINST-ROW, and the difference matters: Java throws
+        // exactly ONE class across all 71 refusals in this 6,037-probe space, so an equality check on
+        // `errorType` would discriminate nothing. The project's standing rule is Java's SHAPE with
+        // the JS name, so the assertion is the PAIR — and the Java half is asserted too, which is
+        // what stops the mapping going stale if a future JDK throws something else.
+        errorClass: error instanceof Error ? error.constructor.name : "not an Error",
+      };
     }
-    const wanted = row.ok ? { ok: true, ranges: row.ranges } : { ok: false, error: row.error };
+    const wanted = row.ok
+      ? { ok: true, ranges: row.ranges }
+      : { ok: false, error: row.error, errorClass: JS_CLASS_FOR_JAVA[row.errorType] ?? `UNMAPPED:${row.errorType}` };
     const deliberate = Object.hasOwn(KNOWN_DIVERGENCES, row.in);
     const family = defectFamily(row.in);
     if (JSON.stringify(actual) === JSON.stringify(wanted)) {
@@ -457,7 +505,14 @@ try {
   }
   for (const input of stale)
     console.log(`STALE: ${JSON.stringify(input)} no longer diverges — remove it from its table`);
-  process.exit(differences.length === 0 && defects.length === 0 && stale.length === 0 ? 0 : 1);
+  const fieldProblems = oracleFieldProblems("language-range", recorder, UNCOMPARED_ORACLE_FIELDS);
+  if (fieldProblems.length) {
+    console.log(`\nORACLE FIELD COVERAGE (${fieldProblems.length}):`);
+    for (const problem of fieldProblems) console.log(`  ${problem}`);
+  }
+
+  process.exit(differences.length === 0 && defects.length === 0 && stale.length === 0
+    && fieldProblems.length === 0 ? 0 : 1);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

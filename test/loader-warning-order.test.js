@@ -793,11 +793,27 @@ test("C7 (shape): exactly one module assembles the cross-file warnings array", (
   const ASSEMBLY = /(?:\.\.\.|of\s+|push\(|sort\(|concat\(|unshift\(|splice\()[^\n]*\bwarnings\b|\bwarnings\s*\.\s*(?:push|sort|concat|unshift|splice)\(/;
   const assemblers = relative(union.filter((file) => ASSEMBLY.test(sourceOf(file))));
 
-  // AN EXACT SET, not a containment and not a count — a count accepts a swap. Two modules, one per
-  // half of the clause: `parse-file.js` produces ONE file's warnings in depth-first declaration
-  // order, `run-plan.js` concatenates the per-file blocks in fetch-plan order. A door that grew its
-  // own loop would necessarily spell one of those verbs and make this a three-element set.
-  assert.deepEqual(assemblers, ["src/internal/parse-file.js", "src/load/run-plan.js"]);
+  // AN EXACT SET, not a containment and not a count — a count accepts a swap. `parse-file.js`
+  // produces ONE file's warnings in depth-first declaration order and `run-plan.js` concatenates the
+  // per-file blocks in fetch-plan order; those two are the clause. A door that grew its own loop
+  // would necessarily spell one of the verbs above and show up here.
+  //
+  // **`src/parse/index.js` JOINED THE SET AT M9 S3 AND IS NOT A THIRD DOOR**, which is a distinction
+  // this regex cannot draw for itself: `mergeParsedStringsFiles` concatenates cross-file warnings
+  // because plan 3.6:1491 requires it to ("preserves warnings"), and it sits in both loader graphs
+  // only because both loaders parse. **The clause is about the LOADING PATH**, so the membership is
+  // admitted here and then narrowed by the assertion below, which says the thing the set alone no
+  // longer says: no loader reaches the merge at all. That is strictly more than the two-element set
+  // asserted, not less — the entry is not a relaxation.
+  assert.deepEqual(assemblers,
+    ["src/internal/parse-file.js", "src/load/run-plan.js", "src/parse/index.js"]);
+
+  // THE NARROWING. `mergeParsedStringsFiles` is an application-level assembly of already-parsed
+  // shards; a loader that called it would be assembling warnings a second way, which is exactly what
+  // the clause forbids. Derived by name from the loader graphs' own sources rather than assumed.
+  const callers = relative(union.filter((file) =>
+    !file.endsWith("src/parse/index.js") && /mergeParsedStringsFiles/.test(sourceOf(file))));
+  assert.deepEqual(callers, [], "a loader reaches the merge; the loading path now assembles warnings twice");
 
   // And the importers, derived the same way, so the shared runner is reached by both doors and by
   // nothing else in either graph.

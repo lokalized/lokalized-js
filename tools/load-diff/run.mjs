@@ -49,6 +49,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PROBES } from "./probes.mjs";
+import { oracleFieldProblems, recordingOracleRows } from "../oracle-field-coverage.mjs";
+
+/**
+ * Emitted by the Java oracle and deliberately NOT compared, each with the reason it cannot be.
+ * Checked in BOTH directions by `oracleFieldProblems`.
+ */
+const UNCOMPARED_ORACLE_FIELDS = {};
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
@@ -177,12 +184,13 @@ if (javaRun.status !== 0) {
   console.error(`the Java half failed:\n${javaRun.stderr}`);
   process.exit(2);
 }
-const javaByName = new Map(
-  javaRun.stdout.split("\n").filter(Boolean).map((line) => {
-    const row = JSON.parse(line);
-    return [row.name, row];
-  }),
-);
+// THE ORACLE'S OWN FIELDS, OBSERVED RATHER THAN ASSUMED — see tools/oracle-field-coverage.mjs. The
+// defect it guards against has been found in three separate differentials, always the same shape:
+// the Java side emits a column and the runner never reads it, so the tool is green over a real
+// divergence in the behaviour it was built to guard.
+const loadRecorder = recordingOracleRows(
+  javaRun.stdout.split("\n").filter(Boolean).map((line) => JSON.parse(line)));
+const javaByName = new Map(loadRecorder.rows.map((row) => [row.name, row]));
 
 const { readStringsFromDirectory } = await import(join(root, "src/node/index.js"));
 const { ordinalData } = await import(join(root, "src/data/ordinal.js"));
@@ -364,4 +372,11 @@ if (mismatches.length) {
   console.log(`  message and full ordered warning list agree with the oracle.`);
 }
 
-process.exit(mismatches.length === 0 && degenerate.length === 0 && unmapped.length === 0 ? 0 : 1);
+const fieldProblems = oracleFieldProblems("load", loadRecorder, UNCOMPARED_ORACLE_FIELDS);
+if (fieldProblems.length) {
+  console.log(`\nORACLE FIELD COVERAGE (${fieldProblems.length}):`);
+  for (const problem of fieldProblems) console.log(`  ${problem}`);
+}
+
+process.exit(mismatches.length === 0 && degenerate.length === 0 && unmapped.length === 0
+  && fieldProblems.length === 0 ? 0 : 1);

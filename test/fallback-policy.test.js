@@ -378,7 +378,11 @@ describe("createStrings({ onFailure })", () => {
     } catch (error) {
       // Reference identity, which is strictly stronger than any name or message comparison and is
       // what plan 3.5's "no additional wrapper is added" clause actually needs.
-      assert.equal(/** @type {any} */ (error).cause, boom);
+      // THE APPLICATION'S OBJECT ITSELF. This read `error.cause === boom` until the four-arm ladder
+      // landed; the comment above already said what the clause needs ("no additional wrapper is
+      // added"), and the port now satisfies it literally rather than by wrapping and exposing the
+      // original underneath. Java's arm 4 returns an unrecognized application exception unchanged.
+      assert.equal(error, boom);
     }
   });
 

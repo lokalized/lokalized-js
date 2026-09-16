@@ -80,6 +80,16 @@ jobs:
         run: npm run check
       - name: Emit declarations
         run: npm run types
+      # THE TWO STEPS BELOW WERE IN `verify` AND IN NEITHER LIST HERE — the third time this file's
+      # own warning about drift has come true, and the first time it happened to the newest gates
+      # rather than the oldest. `npm run declarations` (S29) and `npm run diff:check` (S31, below)
+      # were added to `verify` and never added here, so the only consumer-facing TypeScript channel
+      # and the differential record both ran on the authoring machine and nowhere else. Measured
+      # 2026-09-15 while wiring `check:examples`, which would have been the fourth.
+      - name: Type-check the executed examples as consumer TypeScript
+        run: npm run check:examples
+      - name: Consumer-shaped TypeScript declaration probes
+        run: npm run declarations
       # A SKIP IS A GATE THAT STOPPED GATING. Each corpus-driven test skips when the sibling spec
       # checkout is absent, which is right for a bare local clone and WRONG here: with the spec
       # checked out above, nothing may skip. Asserting that is what stops a silently shrinking suite
@@ -127,6 +137,12 @@ jobs:
       # the deterministic size/module figures and reports the noisy timings without gating them.
       - name: Behavioral conformance against the Java corpus
         run: npm run conformance
+      # The nine differentials need the pinned JDK, which CI provisions none of — but their RECORDED
+      # result does not, and `diff:check` is the half that re-checks it: a missing record, a recorded
+      # red, an unknown or omitted entry, or a differential whose TOOL has moved since its last Java
+      # run all fail here without Java.
+      - name: Differential record re-check
+        run: npm run diff:check
       - name: Scenario 0a static integration measurement
         run: npm run scenario:0a
       # M7 clause 19 as amended: the 2,000-key budgets are RECORDED and the recording is re-checked,
@@ -137,6 +153,11 @@ jobs:
       # that machine-dependent timings be re-recorded from whatever host happened to go red.
       - name: Scenario 2k performance and memory measurement
         run: npm run scenario:2k
+      # Plan 9.2:2818's scenario 6, in CI from its first commit — which is the whole of A3's and A7's
+      # proof obligation: both amendments turned on whether "recorded" meant machine-re-checked, and
+      # both found a real gap the moment someone asked. It needs no JDK and no browser.
+      - name: Scenario 6 edge/server negotiation measurement
+        run: npm run scenario:6
       # A clause may not be recorded PROVEN without a gate that exists on disk AND an ablation that
       # was actually performed. M8's close-out was otherwise going to be a prose verdict table, and a
       # close-out that reads its own prose back to itself is this project's most-repeated defect.

@@ -1,0 +1,149 @@
+#!/usr/bin/env node
+// @ts-check
+/**
+ * THE NINE JAVA DIFFERENTIALS, AND THE RECORD THEY DID NOT HAVE.
+ *
+ * Every other instrument in this repository leaves an artifact a later run re-checks: conformance
+ * ratchets its passing-ID set, `scenario:0a` ratchets modules and source bytes, `scenario:2k` gates
+ * a catalog digest, `subpath:graphs` ratchets per-subpath size, the clause ledger IS an artifact.
+ * **The differentials leave nothing.** MEASURED 2026-09-14: all nine `writeFileSync` calls across
+ * the nine tools write PROBE INPUTS into a temporary working directory for the Java side, and not
+ * one of them records a result. So a green `diff:lookup` is a fact about whenever a human last typed
+ * the command, and nothing anywhere says when that was or what source it described.
+ *
+ * That matters more here than it would elsewhere, because **none of the nine runs in `npm run
+ * verify` or in CI** — they need the pinned JDK, which CI does not have — and several are the SOLE
+ * enforcement for defects the 2,363-case corpus is structurally blind to. `../CLAUDE.md` says so of
+ * one outright: "`test/attempted-locale-refusal.test.js`, `test/lookup-differential-findings.test.js`
+ * and `diff:lookup` are the whole enforcement".
+ *
+ * TWO COMMANDS, AND THE SPLIT IS THE POINT:
+ *
+ *   npm run diff:all      runs all nine against the real Java and REWRITES the record. Needs the JDK.
+ *   npm run diff:check    re-checks the record and needs no Java at all, so it runs inside `verify`
+ *                         and inside CI.
+ *
+ * WHAT `diff:check` GATES, and what it only reports:
+ *
+ *   - a MISSING record fails. Absence is never read as agreement — the rule `scenario:0a` already
+ *     applies to a missing graph.
+ *   - a recorded NONZERO exit fails. A differential that was red when it was last run cannot be left
+ *     recorded and forgotten.
+ *   - a TOOL whose digest has moved since the record fails. This is the arm that needs no Java and
+ *     cannot be argued with: editing a differential and not re-running it is exactly how an
+ *     instrument drifts away from what it claims to compare, and this project has twice found a
+ *     green differential that had gone inert on its own axis.
+ *   - PORT SOURCE that has moved since the record is REPORTED STALE and does not fail, on
+ *     `scenario:0a`'s browser-half reasoning: refreshing means running Java, which a CI box does not
+ *     have, and a gate that cannot be satisfied where it runs is a gate that gets disabled.
+ *
+ *   node tools/differentials.mjs --run | --check
+ */
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const recordPath = join(root, "measurements/differentials.json");
+
+/** The nine, in the order `../CLAUDE.md` names them. */
+const DIFFERENTIALS = ["load", "likely-subtag", "lookup", "direct-tag", "language-range",
+  "tokenizer", "parse", "interpolate", "phonetic"];
+
+/** Digest a directory's file CONTENT, sorted by path so the result is order-independent. */
+function digestTree(directory, filter = () => true) {
+  const hash = createHash("sha256");
+  const walk = (current) => {
+    for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const path = join(current, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (filter(path)) hash.update(path.slice(root.length)).update(readFileSync(path));
+    }
+  };
+  if (!existsSync(directory)) return null;
+  walk(directory);
+  return hash.digest("hex");
+}
+
+const toolDigest = (name) => digestTree(join(root, `tools/${name}-diff`));
+const sourceDigest = () => digestTree(join(root, "src"), (path) => path.endsWith(".js"));
+
+if (process.argv.includes("--run")) {
+  const record = { recordedAt: new Date().toISOString(), sourceSha256: sourceDigest(), differentials: {} };
+  let failed = 0;
+  for (const name of DIFFERENTIALS) {
+    let exit = 0;
+    let output = "";
+    try {
+      output = execFileSync("npm", ["run", `diff:${name}`], { cwd: root, encoding: "utf8", maxBuffer: 256e6 });
+    } catch (error) {
+      exit = /** @type {any} */ (error).status ?? -1;
+      output = `${/** @type {any} */ (error).stdout ?? ""}${/** @type {any} */ (error).stderr ?? ""}`;
+    }
+    // THE HEADLINE IS RECORDED VERBATIM, NOT PARSED INTO FIELDS — a parser here would be a second
+    // claim about nine tools that each phrase their summary differently, and this project has found
+    // ten texts asserting the inverse of what they described.
+    //
+    // The first draft took the LAST line carrying a ratio, and two of the nine then recorded prose:
+    // `diff:load` recorded an empty string and `diff:lookup` recorded a sentence out of a comment
+    // about how many sites it covers. So the patterns are ORDERED by how much of a summary they are,
+    // and an EMPTY headline FAILS the run — a record whose summary field is blank looks identical to
+    // one nobody checked.
+    // ORDERED BY HOW MUCH OF A SUMMARY EACH IS, and verified against all nine captured outputs
+    // rather than assumed: seven print a banner carrying a ratio, `phonetic` prints the ratio alone,
+    // `likely-subtag` prints a cell count (its banner has no numbers), and `load` prints "N identical".
+    const PATTERNS = [/differential.*\d+\s*\/\s*\d+/, /\d+\s*\/\s*\d+ identical/, /^\s*\d+ identical\b/,
+      /^\s*cells\s+\d+/, /\d+ probe\(s\) against/];
+    const lines = output.split("\n");
+    let headline = "";
+    for (const pattern of PATTERNS) {
+      const hit = lines.find((line) => pattern.test(line));
+      if (hit) { headline = hit; break; }
+    }
+    if (!headline.trim())
+      throw new Error(`diff:${name} printed no recognisable summary line; the record would carry an` +
+        ` empty headline, which is indistinguishable from a run nobody read`);
+    record.differentials[name] = { exit, headline: headline.trim().slice(0, 200), toolSha256: toolDigest(name) };
+    if (exit !== 0) failed++;
+    console.log(`  ${exit === 0 ? "ok  " : "FAIL"}  diff:${name.padEnd(14)} ${headline.trim().slice(0, 96)}`);
+  }
+  writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  console.log(`\nrecorded ${DIFFERENTIALS.length} differentials to measurements/differentials.json`);
+  process.exit(failed === 0 ? 0 : 1);
+}
+
+// --- --check: no Java, runs in verify and in CI ---------------------------------------------------
+if (!existsSync(recordPath)) {
+  console.error(`no record at measurements/differentials.json — run \`npm run diff:all\` on a host with the` +
+    `\npinned JDK. A missing record is NOT the same as agreement, which is why this fails rather than skips.`);
+  process.exit(1);
+}
+const record = JSON.parse(readFileSync(recordPath, "utf8"));
+const problems = [];
+for (const name of DIFFERENTIALS) {
+  const entry = record.differentials?.[name];
+  if (!entry) { problems.push(`diff:${name} has no recorded run`); continue; }
+  if (entry.exit !== 0) problems.push(`diff:${name} was recorded RED (exit ${entry.exit})`);
+  const digest = toolDigest(name);
+  if (digest !== entry.toolSha256)
+    problems.push(`diff:${name}'s tool has changed since it was last run against Java` +
+      ` (${String(entry.toolSha256).slice(0, 8)} -> ${String(digest).slice(0, 8)}); re-run \`npm run diff:all\``);
+}
+const extra = Object.keys(record.differentials ?? {}).filter((name) => !DIFFERENTIALS.includes(name));
+for (const name of extra) problems.push(`the record carries diff:${name}, which this tool does not name`);
+
+console.log(`differential record: ${DIFFERENTIALS.length} differentials, recorded ${record.recordedAt}`);
+const movedSource = record.sourceSha256 !== sourceDigest();
+if (movedSource)
+  console.log(`  STALE: src/ has moved since the record` +
+    ` (${String(record.sourceSha256).slice(0, 8)} -> ${String(sourceDigest()).slice(0, 8)}).` +
+    `\n  Reported, not gated: re-running needs the pinned JDK. \`npm run diff:all\` refreshes it.`);
+
+if (problems.length) {
+  console.error(`\nDIFFERENTIAL RECORD PROBLEMS (${problems.length}):`);
+  for (const problem of problems) console.error(`  ${problem}`);
+  process.exit(1);
+}
+console.log(`  ok: every differential recorded green, every tool unchanged since its run`);

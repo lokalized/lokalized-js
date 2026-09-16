@@ -15,7 +15,7 @@
  * that holds the key. Collapsing them is the single most tempting simplification here and it is
  * wrong.
  */
-import { configurationError } from "../internal/configuration-error.js";
+import { ConfigurationError, configurationError } from "../internal/configuration-error.js";
 import { optionsFromLoadedStrings } from "../internal/loaded-input.js";
 import {
   DEFAULT_BIDI_ISOLATION,
@@ -43,7 +43,10 @@ import {
   requireJdkWellFormedLocale,
 } from "../internal/locale-jdk-tag.js";
 import {
-  candidateChain,
+  CANDIDATE_CHAIN_MEMO_DISABLED,
+  CANDIDATE_CHAIN_MEMO_KEYS,
+  CANDIDATE_CHAIN_MEMO_SIZE,
+  candidateChainMemo,
   compareTags,
   matchFor,
   normalizedLanguageCode,
@@ -52,7 +55,11 @@ import {
   resolveTiebreakers,
 } from "../internal/locale.js";
 import { incompleteLanguageFormReporter } from "../internal/parse-warnings.js";
-import { PLURAL_DATA_RUNTIME, UnsupportedLocaleError } from "../internal/plural.js";
+import { PLURAL_DATA_RUNTIME, UnsupportedLocaleError, unsupportedLocaleError } from "../internal/plural.js";
+import { RUNTIME_METADATA } from "../internal/runtime-metadata.js";
+import { decode as decodePinnedDataProvenance } from "../data/provenance.js";
+import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-error.js";
+import { ResolutionError, invalidState, nullishThrow } from "../internal/resolution-error.js";
 
 /** @typedef {import("../internal/catalog.js").Definition} Definition */
 /** @typedef {import("../internal/parse-warnings.js").LocalizedStringWarning} LocalizedStringWarning */
@@ -321,7 +328,7 @@ function isFallbackFor(localeMatch, lookupLocale, resolvedLocale) {
  */
 // eslint-disable-next-line no-unused-vars -- the PhoneticResolver signature, not this body's needs.
 function THROWING_PHONETIC_RESOLVER(term, locale) {
-  throw new Error(
+  throw invalidState(
     "No phoneticResolver was configured. Provide one via createStrings({ phoneticResolver })",
   );
 }
@@ -650,8 +657,162 @@ function translationFailureFor(key, lookupLocale, localeMatch, attemptedLocales,
  */
 export { ExpressionEvaluationError };
 
-export class MissingTranslationError extends Error {
+/**
+ * RE-EXPORTED FROM CORE BECAUSE PLAN 3.5:1100 DECLARES IT THERE, and it is the widest of the nine.
+ *
+ * 119 call sites across `src/` raise one — from `core`, `load`, `ssr` and `node` — and until S34
+ * every one of them produced a plain `Error` with `name` assigned afterwards, so a consumer could
+ * match it only by string. Plan 3.1's `core errors` category is where it belongs, beside
+ * `MissingTranslationError` and `ExpressionEvaluationError`.
+ */
+export { ConfigurationError };
+
+/**
+ * THE LAST STRUCTURAL PIECE OF PLAN 3.5's ERROR SURFACE — `LokalizedError` at :1092 and
+ * `UnsupportedLocaleError` at :1094, with `LokalizedErrorCode` from plan 3.2:400.
+ *
+ * `LokalizedError` is the one that changes what a consumer can WRITE: every library error now
+ * extends it, so `catch (error) { if (error instanceof LokalizedError) … }` is one test for "this
+ * came from lokalized" where before there were seven classes and no common ancestor. That is the
+ * whole reason the plan exports a base at all.
+ *
+ * `UnsupportedLocaleError` gained the construction token, the `code` plan 3.5:1050 declares
+ * (`UNSUPPORTED_LOCALE`, which is in `LokalizedErrorCode` and was in the port nowhere), and the
+ * field name the plan uses — `locale`, not the port's private `localeTag`.
+ */
+export { LokalizedError, UnsupportedLocaleError };
+
+/**
+ * THE NINTH AND LAST OF PLAN 3.5's ERROR CLASSES, at :1096 — and the only one whose absence was a
+ * BEHAVIOUR gap rather than a declaration gap. Until it landed, Java's recognized invalid-value and
+ * invalid-state arms were bare `Error`s here, which made them indistinguishable from an unrecognized
+ * APPLICATION error — and so the port contextualized what Java returns verbatim. See
+ * `src/internal/resolution-error.js` for the four arms and how each code was derived.
+ */
+export { ResolutionError };
+
+/**
+ * @typedef {import("../internal/interpolate.js").Placeholders} Placeholders plan 3.2's placeholder
+ *   bag — a record or a `Map`, because plan 4.3 accepts a `Map` wherever a keyed record is taken.
+ */
+
+/** @typedef {import("../internal/lokalized-error.js").LokalizedErrorCode} LokalizedErrorCode */
+
+/**
+ * PLAN 3.7's TAGGED-VALUE TYPE FAMILY, delivered as a batch.
+ *
+ * The 61 constants have shipped since M5b; **their TYPES had not**, and the gap was not cosmetic.
+ * `src/index.js` built them by looping over the generated table into a
+ * `Record<string, Readonly<{ axis: string, name: string, … }>>`, so `tsc` emitted every one of the
+ * 61 as `Readonly<{…}> | undefined` with `axis` and `name` WIDENED TO `string`. Two consequences a
+ * consumer hits immediately, both measured before this block existed: reading
+ * `GENDER_FEMININE.axis` into a `"gender"` fails with TS2322, and the `| undefined` means a
+ * consumer must non-null-assert a frozen compile-time constant. A tagged union whose tag is
+ * `string` is not a tagged union.
+ *
+ * The unions below are GENERATED FROM `LANGUAGE_FORM_NAMES` — the same generated table the runtime
+ * loop reads — and `test/language-form-types.test.js` re-derives them from it on every run, so a
+ * table that gains a member and a union that does not is a red test rather than a silent widening.
+ *
+ * @template {LanguageFormAxis} A
+ * @template {LanguageFormName} N
+ * @template {string} R
+ * @typedef {Readonly<{ $lokalized: "language-form", axis: A, name: N, renderName: R }>}
+ *   TaggedLanguageFormValue plan 3.7's `TaggedLanguageFormValue<axis, name>`, with the third
+ *   parameter carrying `renderName` — the Java enum member's own name, which plan 3.7 forbids
+ *   deriving by stripping a prefix and which the corpus's `languageForms` case pins for all 61.
+ */
+
+/**
+ * @typedef {"GENDER_MASCULINE" | "GENDER_FEMININE" | "GENDER_COMMON" | "GENDER_NEUTER"} GenderFormName
+ *
+ * @typedef {"CASE_NOMINATIVE" | "CASE_ACCUSATIVE" | "CASE_GENITIVE" | "CASE_DATIVE"
+ *   | "CASE_INSTRUMENTAL" | "CASE_LOCATIVE" | "CASE_PREPOSITIONAL" | "CASE_VOCATIVE"
+ *   | "CASE_ABLATIVE"} GrammaticalCaseFormName
+ *
+ * @typedef {"DEFINITENESS_DEFINITE" | "DEFINITENESS_INDEFINITE" | "DEFINITENESS_CONSTRUCT"} DefinitenessFormName
+ *
+ * @typedef {"CLASSIFIER_GENERAL" | "CLASSIFIER_PERSON" | "CLASSIFIER_ANIMAL" | "CLASSIFIER_LONG_THIN"
+ *   | "CLASSIFIER_FLAT" | "CLASSIFIER_BOUND" | "CLASSIFIER_MACHINE" | "CLASSIFIER_VEHICLE"} ClassifierFormName
+ *
+ * @typedef {"FORMALITY_CASUAL" | "FORMALITY_INFORMAL" | "FORMALITY_FORMAL" | "FORMALITY_HUMBLE"
+ *   | "FORMALITY_HONORIFIC"} FormalityFormName
+ *
+ * @typedef {"CLUSIVITY_INCLUSIVE" | "CLUSIVITY_EXCLUSIVE"} ClusivityFormName
+ *
+ * @typedef {"ANIMACY_ANIMATE" | "ANIMACY_INANIMATE"} AnimacyFormName
+ *
+ * @typedef {"CARDINALITY_ZERO" | "CARDINALITY_ONE" | "CARDINALITY_TWO" | "CARDINALITY_FEW"
+ *   | "CARDINALITY_MANY" | "CARDINALITY_OTHER"} CardinalityFormName
+ *
+ * @typedef {"ORDINALITY_ZERO" | "ORDINALITY_ONE" | "ORDINALITY_TWO" | "ORDINALITY_FEW"
+ *   | "ORDINALITY_MANY" | "ORDINALITY_OTHER"} OrdinalityFormName
+ *
+ * @typedef {"PHONETIC_VOWEL" | "PHONETIC_CONSONANT" | "PHONETIC_H_SILENT" | "PHONETIC_H_ASPIRATED"
+ *   | "PHONETIC_S_IMPURE" | "PHONETIC_Z" | "PHONETIC_GN" | "PHONETIC_PS" | "PHONETIC_PN"
+ *   | "PHONETIC_X" | "PHONETIC_GLIDE_Y" | "PHONETIC_GLIDE_W" | "PHONETIC_STRESSED_A"
+ *   | "PHONETIC_SOLAR" | "PHONETIC_LUNAR" | "PHONETIC_OTHER"} PhoneticFormName
+ *
+ * @typedef {GenderFormName | GrammaticalCaseFormName | DefinitenessFormName | ClassifierFormName
+ *   | FormalityFormName | ClusivityFormName | AnimacyFormName | CardinalityFormName
+ *   | OrdinalityFormName | PhoneticFormName} LanguageFormName
+ *
+ * @typedef {"gender" | "grammatical-case" | "definiteness" | "classifier" | "formality" | "clusivity"
+ *   | "animacy" | "cardinality" | "ordinality" | "phonetic"} LanguageFormAxis
+ *
+ * @typedef {TaggedLanguageFormValue<LanguageFormAxis, LanguageFormName, string>} LanguageFormValue
+ *   Any of the 61, when a consumer does not care which axis.
+ *
+ * @typedef {TaggedLanguageFormValue<"phonetic", PhoneticFormName, string>} PhoneticValue
+ *   Plan 3.7's `PhoneticValue` — what a `PhoneticResolver` returns.
+ */
+
+/**
+ * PLAN 3.2:447-453's SEVEN BUILD-IDENTITY CONSTANTS, delivered in S30.
+ *
+ * The plan declares them at module scope — `const cldrVersion: string;` and six siblings — and the
+ * port had none of them. MEASURED across all nine published subpaths before this block existed: not
+ * one of the seven was exported anywhere. The VALUES were never missing; they live in
+ * `RUNTIME_METADATA` and reach a consumer only as members of the record `getLoadVerification()`
+ * returns, which means an application could not read the build's CLDR version without first
+ * constructing a `Strings` from a loaded manifest.
+ *
+ * TWO GATES FOUND THIS INDEPENDENTLY, which is why it is worth stating how. S28's category gate
+ * reported core's "CLDR/IANA runtime metadata" family as having no delivered member, working only
+ * from plan 3.1's prose categories. S29's plan-surface census named the seven, working from plan
+ * 3.2's signatures. Neither could see what the other saw, and they agreed.
+ *
+ * `localeDataMode` and `cardinalityMode` keep their LITERAL types rather than widening to `string`:
+ * plan 6.4's strict hydration discriminates on them, and a widened type would let a future
+ * host-`Intl` build satisfy this build's declaration.
+ */
+// The CLDR pair comes from the PINNED DATA artifact, not from the runtime record: `RUNTIME_METADATA`
+// carries the build's own identity, and these two are properties of the generated tables it reads.
+// `src/data/provenance.js` is already in core's graph through `internal/loaded-input.js`, so this
+// adds no module to the ratchet.
+export const cldrVersion = decodePinnedDataProvenance().cldrVersion;
+export const dataFingerprint = decodePinnedDataProvenance().dataFingerprint;
+export const behavioralVectorsVersion = RUNTIME_METADATA.behavioralVectorsVersion;
+export const localeDataMode = RUNTIME_METADATA.localeDataMode;
+export const cardinalityMode = RUNTIME_METADATA.cardinalityMode;
+export const ianaRegistryDate = RUNTIME_METADATA.ianaRegistryDate;
+export const ianaDataFingerprint = RUNTIME_METADATA.ianaDataFingerprint;
+
+
+  // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
+  // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
+export class MissingTranslationError extends LokalizedError {
   /**
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
+   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
+   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
+   * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
+   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * raiser below is what lets the module's own factory still build one, since a private constructor
+   * is callable only from inside the class body.
+   *
+   * @private
    * @param {symbol} token the internal construction token
    * @param {string} message
    * @param {TranslationFailure} failure
@@ -662,7 +823,7 @@ export class MissingTranslationError extends Error {
         "MissingTranslationError is not constructible; it is thrown by a throwing onFailure handler",
       );
 
-    super(message);
+    super(LOKALIZED_ERROR_TOKEN, message);
 
     /** @type {"MissingTranslationError"} */
     this.name = "MissingTranslationError";
@@ -671,23 +832,21 @@ export class MissingTranslationError extends Error {
     /** The frozen failure the handler saw, by reference. @type {TranslationFailure} */
     this.failure = failure;
   }
+
+  /**
+   * The one construction path, because the constructor above is private. Its parameters are the
+   * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
+   * the token it takes first is never exported from this package.
+   *
+   * @param {symbol} token @param {string} message @param {TranslationFailure} failure
+   */
+  static raise(token, message, failure) {
+    return new MissingTranslationError(token, message, failure);
+  }
 }
 
 /** Unexported by design: only this module can hand it to the constructor. */
 const MISSING_TRANSLATION_TOKEN = Symbol("lokalized.missing-translation-error");
-
-/**
- * A translation failure, carried out of the render/lookup path so the walk can decide what to do
- * with it. Not public: it becomes a `resolution-failure` result or is swallowed by fallback.
- */
-class ResolutionFailure extends Error {
-  /** @param {unknown} cause */
-  constructor(cause) {
-    super(cause instanceof Error ? cause.message : String(cause));
-    this.name = "ResolutionFailure";
-    this.cause = cause;
-  }
-}
 
 /**
  * Build a `Strings` from raw catalogs.
@@ -1007,6 +1166,7 @@ export function createStrings(options) {
   const supported = [...catalogs.keys()];
   const tiebreakers = safeTiebreakers(direct.tiebreakers);
 
+
   // `DefaultStrings.java:304-314`, and it runs BEFORE the tiebreaker rules below, exactly as Java
   // orders the two. Sorted by tag because the walk below and Java's diagnostic both read this list
   // in `Locale#toLanguageTag` order.
@@ -1039,6 +1199,36 @@ export function createStrings(options) {
     equivalentFallbackLocales,
     tiebreakers,
   );
+
+  /**
+   * PLAN 2.2:150's CANDIDATE-CHAIN MEMO, taken in M9 after being priced twice.
+   *
+   * "The candidate chain is a function of the lookup locale, not an instance constant. If it is
+   * memoized, each `Strings` instance uses a deterministic LRU keyed by normalized requested tag with
+   * at most 256 retained entries."
+   *
+   * **IT IS TAKEN BECAUSE THE MEASUREMENT SAYS WHERE THE COST IS, and the measurement corrected the
+   * reason the decision was deferred.** M7's close deferred plan 3.4:864's memo — caching the
+   * INSTANCE LOCALE's match result — to M9, on the maintainer's reasoning that "a cache belongs with
+   * the server/edge packaging that creates pressure for it". M9 built that packaging, and then
+   * counted which arm of `localeLookupFor` it uses: instrumented over 1,440 lookups across 100 SSR
+   * renders, 80 edge preserve-arm renders and 60 redirect-target renders, the instance-locale arm was
+   * hit **ZERO times**. The blessed memo is inert for the workload it was deferred to.
+   *
+   * The chain is not. It is recomputed on EVERY translation call through EVERY ingress — measured at
+   * 6 calls per SSR render over 4 distinct lookup tags, 8.8% of end-to-end server time. Memoized,
+   * with identical rendered output: supplied-match lookups 33,579 -> 3,738 ns (-88.9%), which is the
+   * arm the server and edge workloads actually use; per-call-locale 62,378 -> 32,794 (-47.4%);
+   * instance-locale 43,720 -> 23,855 (-45.4%).
+   *
+   * `localeLookupFor` is deliberately untouched: plan 3.4:865 says resolver and per-call locale
+   * values are "recomputed on every use", and that is about the MATCH. Caching the chain is a
+   * different permission with its own contract, and conflating them is what
+   * `test/cache-bounds.test.js`'s last test exists to catch.
+   */
+  const chainMemo = candidateChainMemo(
+    supported, fallbackLocale, tiebreakers,
+    /** @type {any} */ (options)[CANDIDATE_CHAIN_MEMO_DISABLED] !== true);
 
   // THE APPLICABLE CONFIGURATION — the selection channel's world, which for a manifest-backed
   // instance is WIDER than the catalogs it holds.
@@ -1157,7 +1347,7 @@ export function createStrings(options) {
         const compiled = compiledExpressions.get(alternative);
 
         if (compiled === undefined)
-          throw new Error("No compiled expression was found for this alternative");
+          throw invalidState("No compiled expression was found for this alternative");
 
         // The EVALUATION locale, not the requested one: `count == CARDINALITY_ONE` in a Polish
         // donor entry served to an English request must classify under Polish.
@@ -1450,7 +1640,7 @@ export function createStrings(options) {
       throw new TypeError("Placeholder names must not be null");
 
     // Channel two: the resolution walk.
-    const chain = candidateChain(lookupLocale, supported, fallbackLocale, tiebreakers);
+    const chain = chainMemo.chainFor(lookupLocale);
     /** @type {string[]} */
     const attempted = [];
     /** @type {unknown} */
@@ -1527,9 +1717,24 @@ export function createStrings(options) {
           rendered = true;
         } catch (error) {
           attemptFailureReason = "resolution-failure";
-          attemptCause = error;
+          // **A NULLISH THROW IS NORMALIZED HERE, and it is the one raiser with no Java counterpart
+          // at all** — plan 2.5:254-256 says Java cannot throw `null`, so there is no recorded
+          // behaviour to match and the corpus is silent. Plan 3.5:1136-1140 specifies it anyway,
+          // because JavaScript can: a resolver doing `throw null` reached
+          // `TranslationFailure.cause === null` on the pristine port, and core then read a null
+          // cause as "no resolution cause" and raised a `MissingTranslationError` from the throw
+          // response — an observable wrong answer, not a missing field.
+          //
+          // It carries NO own `cause` (there is nothing to carry) and always the invalid-state code,
+          // and `thrownValue` is present ONLY here — plan :1139 says every other `ResolutionError`
+          // omits it, which is what makes `"thrownValue" in error` a usable discriminator.
+          const cause = error === null || error === undefined
+            ? nullishThrow(error === null ? "null" : "undefined",
+              `A translation callback threw ${error === null ? "null" : "undefined"}`)
+            : error;
+          attemptCause = cause;
           // First cause wins, never the last: Java assigns `firstFallbackFailure` only while null.
-          if (firstFailureCause === null) firstFailureCause = error;
+          if (firstFailureCause === null) firstFailureCause = cause;
         }
 
         // Java's `Optional.empty()`: the entry exists, but no alternative matched and the selected
@@ -1809,11 +2014,17 @@ export function createStrings(options) {
     // threaded here for exactly that — so the two halves of the same ingress disagreed with each
     // other, which is what makes this a repair and not a widening. `getKeysForLocale` passes no role
     // because Java's `:2718` names none: it has one argument, and there is nothing to disambiguate.
-    if (catalog === undefined) throw new UnsupportedLocaleError(normalized, role);
+    if (catalog === undefined) throw unsupportedLocaleError(normalized, role);
     return [...catalog.keys()].sort();
   };
 
   return freeze({
+    // PLAN 2.2:152's TEST-ONLY PROBE. A symbol key, so `Object.keys` does not see it and a
+    // consumer cannot name it; a function returning a NUMBER, so no mutable cache state leaves with
+    // it. It is the only way the 256-entry ceiling, the deterministic eviction and the
+    // disabled-branch zero can be asserted at all.
+    [CANDIDATE_CHAIN_MEMO_SIZE]: () => chainMemo.size(),
+    [CANDIDATE_CHAIN_MEMO_KEYS]: () => chainMemo.keys(),
     get,
     t: get,
     getResult,
@@ -3038,7 +3249,7 @@ function throwForFailure(translationFailure) {
   const refusal = attemptedLocaleRefusal(translationFailure.attemptedLocales);
   if (refusal !== null) throw refusal;
 
-  throw new MissingTranslationError(
+  throw MissingTranslationError.raise(
     MISSING_TRANSLATION_TOKEN,
     `No match for '${translationFailure.key}' was found for locale ` +
       `'${translationFailure.lookupLocale}'.`,

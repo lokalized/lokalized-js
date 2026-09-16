@@ -43,6 +43,19 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { oracleFieldProblems, recordingOracleRows } from "../oracle-field-coverage.mjs";
+
+/** Emitted by the oracle and deliberately not compared, each with the reason. Checked both ways. */
+const UNCOMPARED_ORACLE_FIELDS = {
+  // `IllformedLocaleException#getMessage`'s offending SUBTAG, which the JDK names and the port does
+  // not: `normalizeTag` refuses with the whole tag — "Locale tag 'en-Latin-US' is not a well-formed
+  // IETF BCP 47 locale" — measured on four probes, none of which names `Latin`, `json`, `NY` or the
+  // comma. There is nothing on the port side to compare it TO. It is emitted because it is the
+  // JDK's own account of WHERE the tag failed, which is worth having in the row when a future probe
+  // disagrees; a use for it would be an anti-vacuity check that the ill-formed bucket exercises more
+  // than one subtag POSITION, and that is not written.
+  why: "the JDK names the offending subtag; the port's refusal names the whole tag and nothing else",
+};
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -394,7 +407,13 @@ try {
   if (run.status !== 0) throw new Error(`oracle execution failed:\n${run.stderr}`);
 
   const { normalizeTag } = await import("../../src/internal/locale.js");
-  const rows = readFileSync(outPath, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  const { jdkLanguageTag } = await import("../../src/internal/locale-jdk-tag.js");
+  // THE ORACLE'S OWN FIELDS, OBSERVED RATHER THAN ASSUMED. See tools/oracle-field-coverage.mjs: the
+  // "the oracle emits it and nothing reads it" defect has now been found in three separate tools,
+  // this one included, and reading a runner carefully is how all three survived.
+  const recorder = recordingOracleRows(
+    readFileSync(outPath, "utf8").trim().split("\n").map((line) => JSON.parse(line)));
+  const rows = recorder.rows;
 
   let wellFormedAgree = 0;
   let illFormedRefused = 0;
@@ -408,6 +427,8 @@ try {
   const illFormedAccepted = [];
   /** @type {{tag: string, java: string}[]} */
   const illFormedTruncated = [];
+  /** Java truncated an ill-formed tag and the port's model of the same JDK call disagreed. */
+  const illFormedTruncationDefects = [];
   /** @type {string[]} */
   const stale = [];
   /** @type {string[]} */
@@ -427,6 +448,21 @@ try {
       // The ill-formed bucket. Reported, never gated — except that the port must still REFUSE.
       if (refused) {
         illFormedRefused++;
+        // JAVA'S TRUNCATION IS COMPARED, NOT MERELY COLLECTED — the gap an adversarial sweep found
+        // on 2026-09-14 and the reason the field-coverage proxy above cannot be the whole gate.
+        // `row.normalized` IS read (the well-formed arm compares it), so "emitted and never touched"
+        // is satisfied while this bucket compared it to nothing: the oracle's answer went into an
+        // array, got PRINTED, and was never contradicted. Breaking `jdkLanguageTag` wholesale left
+        // the run exit 0 with a byte-identical headline.
+        //
+        // The port's counterpart is `jdkLanguageTag`, which models the same `forLanguageTag`
+        // truncation without throwing, and today reproduces every one of these answers verbatim.
+        // Recorded as a DEFECT rather than a difference when it disagrees, because agreement here is
+        // what `src/internal/locale-jdk-tag.js` exists to provide.
+        let portTruncation = null;
+        try { portTruncation = jdkLanguageTag(row.tag); } catch { portTruncation = "THREW"; }
+        if (portTruncation !== row.normalized)
+          illFormedTruncationDefects.push({ tag: row.tag, java: row.normalized, js: portTruncation });
         illFormedTruncated.push({ tag: row.tag, java: row.normalized });
       } else {
         illFormedAccepted.push({ tag: row.tag, java: row.normalized, js: /** @type {string} */ (actual) });
@@ -538,11 +574,26 @@ try {
   if (illFormedTruncated.length === 0 && illFormedAccepted.length === 0)
     console.log("STALE: no ill-formed probe reached the oracle — inputs() section (7) has gone empty");
 
+  if (illFormedTruncationDefects.length) {
+    console.log(`\nILL-FORMED TRUNCATION DEFECTS (${illFormedTruncationDefects.length}) — ` +
+      `jdkLanguageTag disagreed with the JDK's own forLanguageTag:`);
+    for (const defect of illFormedTruncationDefects.slice(0, 12))
+      console.log(`  ${defect.tag}\n    java ${JSON.stringify(defect.java)}\n    js   ${JSON.stringify(defect.js)}`);
+  }
+
+  const fieldProblems = oracleFieldProblems("direct-tag", recorder, UNCOMPARED_ORACLE_FIELDS);
+  if (fieldProblems.length) {
+    console.log(`\nORACLE FIELD COVERAGE (${fieldProblems.length}):`);
+    for (const problem of fieldProblems) console.log(`  ${problem}`);
+  }
+
   process.exit(
     differences.length === 0 &&
       defects.length === 0 &&
       illFormedAccepted.length === 0 &&
       stale.length === 0 &&
+      fieldProblems.length === 0 &&
+      illFormedTruncationDefects.length === 0 &&
       illFormedTruncated.length > 0
       ? 0
       : 1,

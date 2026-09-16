@@ -1,0 +1,36 @@
+{
+  "App.Title": "La libreria Lokalized",
+
+  "Locale.Direct": "Esta pagina se sirve en {{served}}.",
+
+  "Locale.Notice": "Pediste {{requested}}. Esta pagina se sirve en {{served}}.",
+
+  "Cart.Items": {
+    "translation": "Tu carrito tiene {{count}} {{books}}.",
+    "placeholders": {
+      "books": {
+        "value": "count",
+        "translations": {
+          "CARDINALITY_ONE": "libro",
+          "CARDINALITY_OTHER": "libros"
+        }
+      }
+    }
+  },
+
+  "Greeting": {
+    "translation": "Bienvenido de nuevo, {{name}}. {{youAre}} en tu lista de lectura.",
+    "placeholders": {
+      "youAre": {
+        "value": "readerGender",
+        "translations": {
+          "GENDER_MASCULINE": "El esta",
+          "GENDER_FEMININE": "Ella esta",
+          "GENDER_COMMON": "Elle esta"
+        }
+      }
+    }
+  },
+
+  "Checkout.Cta": "Pagar"
+}

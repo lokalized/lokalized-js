@@ -19,6 +19,14 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { oracleFieldProblems, recordingOracleRows } from "../oracle-field-coverage.mjs";
+
+/**
+ * Emitted by the Java oracle and deliberately NOT compared, each with the reason it cannot be.
+ * Checked in BOTH directions by `oracleFieldProblems`: an entry for a field the comparison does
+ * read fails, and so does one the oracle no longer emits.
+ */
+const UNCOMPARED_ORACLE_FIELDS = {};
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -76,7 +84,9 @@ try {
   if (run.status !== 0) throw new Error(`oracle execution failed:\n${run.stderr}`);
 
   const { extractTokens } = await import("../../src/internal/expression-tokenizer.js");
-  const rows = readFileSync(outPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const recorder = recordingOracleRows(
+    readFileSync(outPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)));
+  const rows = recorder.rows;
 
   let same = 0;
   const differences = [];
@@ -97,6 +107,14 @@ try {
     console.log(`\nDIFFERENCES (${differences.length}):`);
     for (const d of differences.slice(0, 12))
       console.log(`\n  ${JSON.stringify(d.input)}\n    java ${JSON.stringify(d.wanted)}\n    js   ${JSON.stringify(d.actual)}`);
+    process.exit(1);
+  }
+
+  // THE ORACLE'S OWN FIELDS, OBSERVED RATHER THAN ASSUMED — see tools/oracle-field-coverage.mjs.
+  const fieldProblems = oracleFieldProblems("tokenizer", recorder, UNCOMPARED_ORACLE_FIELDS);
+  if (fieldProblems.length) {
+    console.log(`\nORACLE FIELD COVERAGE (${fieldProblems.length}):`);
+    for (const problem of fieldProblems) console.log(`  ${problem}`);
     process.exit(1);
   }
 } finally {

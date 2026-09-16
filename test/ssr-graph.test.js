@@ -32,7 +32,15 @@ test("the SSR graph is exactly its own module plus the shared error factory", ()
   // already measured that gap once: `test/pinned-data-only.test.js`'s own comment records that the
   // byte ratchet is "a PROXY for this invariant, and a weak one". Two modules is small enough that
   // the exact list is the cheapest correct assertion.
-  assert.deepEqual(relative, ["src/internal/configuration-error.js", "src/ssr/index.js"]);
+  // `src/internal/lokalized-error.js` JOINS THE SET IN S35 AND THE PIN IS WIDENED DELIBERATELY, which
+  // is the only way this gate is allowed to move. It arrives through `configuration-error.js`, which
+  // was already here: plan 3.5:1092 exports `LokalizedError` as a catchable base, so every library
+  // error class now extends it, and a base class is by definition reachable from every one of them.
+  // It carries no data, no locale logic and no kernel — the proposition this test exists for ("the
+  // stamp takes nothing from the module that builds it") is untouched, and widening the pin by one
+  // module whose content is a class declaration is not the same as letting the set drift.
+  assert.deepEqual(relative,
+    ["src/internal/configuration-error.js", "src/internal/lokalized-error.js", "src/ssr/index.js"]);
 });
 
 test("nothing in the SSR graph can reach the locale kernel, the planner or the pinned data", () => {

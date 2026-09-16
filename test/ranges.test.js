@@ -229,7 +229,11 @@ test("a locale with no cardinal rules at all throws, rather than answering with 
   for (const locale of ["xx", "qqq", "zz"]) {
     assert.throws(
       () => cardinalityForRange(CARDINALITY_ONE, CARDINALITY_OTHER, locale),
-      (/** @type {any} */ error) => error.name === "UnsupportedLocaleError" && error.localeTag === locale,
+      // `locale`, NOT `localeTag`: S35 renamed the field to the one plan 3.5:1051 declares
+      // (`readonly locale: LocaleTag`) as part of making the class a package export. The old
+      // spelling was private in every sense — the class was exported from no subpath and this was
+      // the only reader.
+      (/** @type {any} */ error) => error.name === "UnsupportedLocaleError" && error.locale === locale,
       `${locale} should be unsupported`,
     );
     counts.edge += 1;

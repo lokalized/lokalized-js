@@ -144,6 +144,86 @@ const MAXIMUM_ALTERNATIVE_DEPTH = 128;
  * by stripping a prefix off the constant — plan section 3.7 forbids that derivation. The corpus's
  * `languageForms` case carries all 61 authoritative tuples and proves this table exact.
  */
+/**
+ * THE 61 CONSTANTS' EXACT TYPES, one property each, generated from `LANGUAGE_FORM_NAMES` below.
+ *
+ * It lives HERE rather than beside the constants in `src/index.js` because a module-scope
+ * `@typedef` in a published entry point is EMITTED as a public type — measured in S29 — and this
+ * map is an implementation detail plan 3.7 never names. `src/index.js` references it inline, which
+ * is the form that does not export. No module joins any graph: the root already reaches this file
+ * for `LANGUAGE_FORM_NAMES` itself.
+ *
+ * @template {import("../core/index.js").LanguageFormAxis} A
+ * @template {import("../core/index.js").LanguageFormName} N
+ * @template {string} R
+ * @typedef {import("../core/index.js").TaggedLanguageFormValue<A, N, R>} TaggedLanguageFormValue
+ */
+
+/**
+ * @typedef {object} LanguageForms
+ * @property {TaggedLanguageFormValue<"gender", "GENDER_MASCULINE", "MASCULINE">} GENDER_MASCULINE
+ * @property {TaggedLanguageFormValue<"gender", "GENDER_FEMININE", "FEMININE">} GENDER_FEMININE
+ * @property {TaggedLanguageFormValue<"gender", "GENDER_COMMON", "COMMON">} GENDER_COMMON
+ * @property {TaggedLanguageFormValue<"gender", "GENDER_NEUTER", "NEUTER">} GENDER_NEUTER
+ * @property {TaggedLanguageFormValue<"grammatical-case", "CASE_NOMINATIVE", "NOMINATIVE">} CASE_NOMINATIVE
+ * @property {TaggedLanguageFormValue<"grammatical-case", "CASE_ACCUSATIVE", "ACCUSATIVE">} CASE_ACCUSATIVE
+ * @property {TaggedLanguageFormValue<"grammatical-case", "CASE_GENITIVE", "GENITIVE">} CASE_GENITIVE
+ * @property {TaggedLanguageFormValue<"grammatical-case", "CASE_DATIVE", "DATIVE">} CASE_DATIVE
+ * @property {TaggedLanguageFormValue<"grammatical-case", "CASE_INSTRUMENTAL", "INSTRUMENTAL">} CASE_INSTRUMENTAL
+ * @property {TaggedLanguageFormValue<"grammatical-case", "CASE_LOCATIVE", "LOCATIVE">} CASE_LOCATIVE
+ * @property {TaggedLanguageFormValue<"grammatical-case", "CASE_PREPOSITIONAL", "PREPOSITIONAL">} CASE_PREPOSITIONAL
+ * @property {TaggedLanguageFormValue<"grammatical-case", "CASE_VOCATIVE", "VOCATIVE">} CASE_VOCATIVE
+ * @property {TaggedLanguageFormValue<"grammatical-case", "CASE_ABLATIVE", "ABLATIVE">} CASE_ABLATIVE
+ * @property {TaggedLanguageFormValue<"definiteness", "DEFINITENESS_DEFINITE", "DEFINITE">} DEFINITENESS_DEFINITE
+ * @property {TaggedLanguageFormValue<"definiteness", "DEFINITENESS_INDEFINITE", "INDEFINITE">} DEFINITENESS_INDEFINITE
+ * @property {TaggedLanguageFormValue<"definiteness", "DEFINITENESS_CONSTRUCT", "CONSTRUCT">} DEFINITENESS_CONSTRUCT
+ * @property {TaggedLanguageFormValue<"classifier", "CLASSIFIER_GENERAL", "GENERAL">} CLASSIFIER_GENERAL
+ * @property {TaggedLanguageFormValue<"classifier", "CLASSIFIER_PERSON", "PERSON">} CLASSIFIER_PERSON
+ * @property {TaggedLanguageFormValue<"classifier", "CLASSIFIER_ANIMAL", "ANIMAL">} CLASSIFIER_ANIMAL
+ * @property {TaggedLanguageFormValue<"classifier", "CLASSIFIER_LONG_THIN", "LONG_THIN">} CLASSIFIER_LONG_THIN
+ * @property {TaggedLanguageFormValue<"classifier", "CLASSIFIER_FLAT", "FLAT">} CLASSIFIER_FLAT
+ * @property {TaggedLanguageFormValue<"classifier", "CLASSIFIER_BOUND", "BOUND">} CLASSIFIER_BOUND
+ * @property {TaggedLanguageFormValue<"classifier", "CLASSIFIER_MACHINE", "MACHINE">} CLASSIFIER_MACHINE
+ * @property {TaggedLanguageFormValue<"classifier", "CLASSIFIER_VEHICLE", "VEHICLE">} CLASSIFIER_VEHICLE
+ * @property {TaggedLanguageFormValue<"formality", "FORMALITY_CASUAL", "CASUAL">} FORMALITY_CASUAL
+ * @property {TaggedLanguageFormValue<"formality", "FORMALITY_INFORMAL", "INFORMAL">} FORMALITY_INFORMAL
+ * @property {TaggedLanguageFormValue<"formality", "FORMALITY_FORMAL", "FORMAL">} FORMALITY_FORMAL
+ * @property {TaggedLanguageFormValue<"formality", "FORMALITY_HUMBLE", "HUMBLE">} FORMALITY_HUMBLE
+ * @property {TaggedLanguageFormValue<"formality", "FORMALITY_HONORIFIC", "HONORIFIC">} FORMALITY_HONORIFIC
+ * @property {TaggedLanguageFormValue<"clusivity", "CLUSIVITY_INCLUSIVE", "INCLUSIVE">} CLUSIVITY_INCLUSIVE
+ * @property {TaggedLanguageFormValue<"clusivity", "CLUSIVITY_EXCLUSIVE", "EXCLUSIVE">} CLUSIVITY_EXCLUSIVE
+ * @property {TaggedLanguageFormValue<"animacy", "ANIMACY_ANIMATE", "ANIMATE">} ANIMACY_ANIMATE
+ * @property {TaggedLanguageFormValue<"animacy", "ANIMACY_INANIMATE", "INANIMATE">} ANIMACY_INANIMATE
+ * @property {TaggedLanguageFormValue<"cardinality", "CARDINALITY_ZERO", "ZERO">} CARDINALITY_ZERO
+ * @property {TaggedLanguageFormValue<"cardinality", "CARDINALITY_ONE", "ONE">} CARDINALITY_ONE
+ * @property {TaggedLanguageFormValue<"cardinality", "CARDINALITY_TWO", "TWO">} CARDINALITY_TWO
+ * @property {TaggedLanguageFormValue<"cardinality", "CARDINALITY_FEW", "FEW">} CARDINALITY_FEW
+ * @property {TaggedLanguageFormValue<"cardinality", "CARDINALITY_MANY", "MANY">} CARDINALITY_MANY
+ * @property {TaggedLanguageFormValue<"cardinality", "CARDINALITY_OTHER", "OTHER">} CARDINALITY_OTHER
+ * @property {TaggedLanguageFormValue<"ordinality", "ORDINALITY_ZERO", "ZERO">} ORDINALITY_ZERO
+ * @property {TaggedLanguageFormValue<"ordinality", "ORDINALITY_ONE", "ONE">} ORDINALITY_ONE
+ * @property {TaggedLanguageFormValue<"ordinality", "ORDINALITY_TWO", "TWO">} ORDINALITY_TWO
+ * @property {TaggedLanguageFormValue<"ordinality", "ORDINALITY_FEW", "FEW">} ORDINALITY_FEW
+ * @property {TaggedLanguageFormValue<"ordinality", "ORDINALITY_MANY", "MANY">} ORDINALITY_MANY
+ * @property {TaggedLanguageFormValue<"ordinality", "ORDINALITY_OTHER", "OTHER">} ORDINALITY_OTHER
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_VOWEL", "VOWEL">} PHONETIC_VOWEL
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_CONSONANT", "CONSONANT">} PHONETIC_CONSONANT
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_H_SILENT", "H_SILENT">} PHONETIC_H_SILENT
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_H_ASPIRATED", "H_ASPIRATED">} PHONETIC_H_ASPIRATED
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_S_IMPURE", "S_IMPURE">} PHONETIC_S_IMPURE
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_Z", "Z">} PHONETIC_Z
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_GN", "GN">} PHONETIC_GN
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_PS", "PS">} PHONETIC_PS
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_PN", "PN">} PHONETIC_PN
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_X", "X">} PHONETIC_X
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_GLIDE_Y", "GLIDE_Y">} PHONETIC_GLIDE_Y
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_GLIDE_W", "GLIDE_W">} PHONETIC_GLIDE_W
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_STRESSED_A", "STRESSED_A">} PHONETIC_STRESSED_A
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_SOLAR", "SOLAR">} PHONETIC_SOLAR
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_LUNAR", "LUNAR">} PHONETIC_LUNAR
+ * @property {TaggedLanguageFormValue<"phonetic", "PHONETIC_OTHER", "OTHER">} PHONETIC_OTHER
+ */
+
 export const LANGUAGE_FORM_NAMES = /** @type {[LanguageFormAxis, string, string[]][]} */ ([
   ["gender", "GENDER_", ["MASCULINE", "FEMININE", "COMMON", "NEUTER"]],
   [

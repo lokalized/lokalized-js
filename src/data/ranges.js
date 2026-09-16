@@ -55,6 +55,7 @@ import {
   cardinalRuleLocaleTags,
   createRuleTable,
   hasCardinalRulesForLocale,
+  unsupportedLocaleError,
 } from "../internal/plural.js";
 import { decode as decodeCardinalRanges } from "./cardinal-ranges.js";
 import { decode as decodeProvenance } from "./provenance.js";
@@ -387,7 +388,7 @@ export function cardinalityForRange(start, end, locale) {
   // the endpoints are: `if (!cardinalRulesForLocale(locale).isPresent()) throw ...`. An unsupported
   // locale must throw even for a pair that would have fallen through to the end.
   // `UnsupportedLocaleException(locale)` reports `locale.toLanguageTag()`, not the raw input.
-  if (!hasCardinalRulesForLocale(locale)) throw new UnsupportedLocaleError(jdkLanguageTag(locale));
+  if (!hasCardinalRulesForLocale(locale)) throw unsupportedLocaleError(jdkLanguageTag(locale));
 
   const groupIndex = RANGE_TABLE.indexForLocale(locale);
   if (groupIndex < 0) return valueAt(endIndex);

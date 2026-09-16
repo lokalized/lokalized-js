@@ -35,6 +35,7 @@
 import { decode as decodeRightToLeftScripts } from "../data/rtl.js";
 import { likelySubtagFor } from "./locale-cldr.js";
 import { parseJdkTag } from "./locale-jdk-tag.js";
+import { invalidState } from "./resolution-error.js";
 
 const LEFT_TO_RIGHT_ISOLATE = "⁦";
 const RIGHT_TO_LEFT_ISOLATE = "⁧";
@@ -223,7 +224,7 @@ function isIsolated(value) {
  * @returns {Error}
  */
 export function outputLimitExceeded(maximumCharacters) {
-  return new Error(`Interpolated output exceeds the maximum of ${maximumCharacters} characters`);
+  return invalidState(`Interpolated output exceeds the maximum of ${maximumCharacters} characters`);
 }
 
 /**

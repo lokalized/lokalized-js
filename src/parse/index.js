@@ -43,7 +43,7 @@ import { EXPRESSION_LIMIT_CEILINGS, compile as compileExpression } from "../inte
  * @param {string} expression
  */
 import { normalizeTag } from "../internal/locale.js";
-import { StringsParseError, rethrowAsParseError } from "../internal/parse-diagnostics.js";
+import { StringsParseError, parseError, rethrowAsParseError } from "../internal/parse-diagnostics.js";
 import { incompleteLanguageFormReporter } from "../internal/parse-warnings.js";
 import { PLURAL_DATA_RUNTIME } from "../internal/plural.js";
 
@@ -55,6 +55,16 @@ const freeze = Object.freeze;
 
 /** @typedef {import("../internal/catalog.js").Definition} Definition */
 /** @typedef {import("../internal/catalog.js").ParseLimits} StringsLoadingLimits */
+/**
+ * @typedef {Pick<StringsLoadingLimits, "maximumLocalizedStringsFiles" | "maximumTranslationNodes"
+ *   | "maximumWarnings">} ParsedCatalogLimits plan 4.1's three limits that apply to an ALREADY-PARSED
+ *   catalog. The raw boundaries — input bytes, reader characters, JSON nesting — have no text left to
+ *   bound by the time one exists, which is the distinction the name carries.
+ */
+
+/** @typedef {import("../internal/catalog.js").PlaceholderDefinition} PlaceholderDefinition */
+/** @typedef {import("../internal/catalog.js").LocalizedStringNodeInput} LocalizedStringNodeInput */
+
 /** @typedef {import("../internal/parse-warnings.js").LocalizedStringWarning} LocalizedStringWarning */
 
 /**
@@ -190,3 +200,229 @@ export function defineCatalog(inputs) {
   );
 }
 
+
+/**
+ * STRUCTURAL EQUALITY OF A VALIDATED MODEL — and the shape of it was MEASURED on the pinned JDK
+ * rather than read off plan 2.3's sentence, which does not say what it looks like it says.
+ *
+ * The plan describes the dedup rule as deduplicating "definitions whose complete validated model
+ * (including commentary and declaration order, excluding origin/warning metadata) is structurally
+ * equal". Read plainly, "declaration order" makes a placeholder map authored `{z, a}` unequal to one
+ * authored `{a, z}`. **Java says otherwise, and Java is the specification.** Measured 2026-09-15
+ * against `lokalized-java` 3.0.0's own `LocalizedString#equals` on the pinned JDK:
+ *
+ *     placeholder map insertion order `{z,a}` vs `{a,z}`          EQUAL
+ *     LinkedHashMap vs HashMap for the same entries               EQUAL
+ *     translations-by-language-form order MASC,FEM vs FEM,MASC    EQUAL
+ *     alternatives order [x,y] vs [y,x]                           NOT EQUAL
+ *     alternatives same order (the control)                       EQUAL
+ *     commentary null vs "note"                                   NOT EQUAL
+ *     no placeholders vs an EMPTY placeholder map                 EQUAL
+ *
+ * The mechanism is visible at `LocalizedString.java:168-181`: `placeholderDefinitions` is compared
+ * with `Objects.equals` on a `Map`, which is order-insensitive, while `alternatives` is a `List`
+ * walked BY INDEX. So "declaration order" is the ALTERNATIVES' order and nothing else, and a
+ * comparison that also honoured map order would be STRICTLY STRICTER THAN JAVA — refusing a merge of
+ * two shards a Java deployment would accept. That is the same defect class as validating load-time
+ * expressions against runtime defaults, one file up.
+ *
+ * **ARRAYS ORDER-SENSITIVE, KEYED RECORDS ORDER-INSENSITIVE, AND NO FIELD LIST ANYWHERE.** The walk
+ * is generic on purpose: a hand-written list of compared fields is a claim that goes stale the day
+ * the model grows a member, and this project has already measured that exact silence once — widening
+ * `catalogIdentityInputFor` changed no fingerprint and no behaviour, and only an exact key-set
+ * assertion could see it. Here a new field participates by construction.
+ *
+ * The values compared are the parser's CANONICAL PROJECTION, which is what makes the last row above
+ * a non-issue: `parseStrings` drops an empty `placeholders` map rather than emitting one, so two
+ * genuinely parsed definitions cannot differ that way. A HAND-BUILT `ParsedStringsFile` that is not
+ * canonical may therefore report a conflict where its canonical twin would merge — which fails
+ * CLOSED, with a diagnostic naming both origins, and is stated here rather than left to be found.
+ *
+ * @param {unknown} left @param {unknown} right @returns {boolean}
+ */
+function structurallyEqual(left, right) {
+  if (Object.is(left, right)) return true;
+  if (left === null || right === null || typeof left !== "object" || typeof right !== "object")
+    return false;
+
+  const leftArray = Array.isArray(left);
+  if (leftArray !== Array.isArray(right)) return false;
+
+  if (leftArray) {
+    const other = /** @type {readonly unknown[]} */ (right);
+    return left.length === other.length
+      && left.every((value, index) => structurallyEqual(value, other[index]));
+  }
+
+  const leftKeys = Object.keys(left);
+  const rightRecord = /** @type {Record<string, unknown>} */ (right);
+  if (leftKeys.length !== Object.keys(rightRecord).length) return false;
+  return leftKeys.every((key) =>
+    Object.hasOwn(rightRecord, key)
+    && structurallyEqual(/** @type {Record<string, unknown>} */ (left)[key], rightRecord[key]));
+}
+
+/** The source label a merge reports when a diagnostic is about the merge itself. */
+const MERGE_SOURCE = "<merged>";
+
+/**
+ * @param {unknown} file @param {number} index
+ * @returns {ParsedStringsFile}
+ */
+function requireParsedStringsFile(file, index) {
+  const candidate = /** @type {Partial<ParsedStringsFile>} */ (file);
+  if (candidate === null || typeof candidate !== "object"
+    || candidate.$lokalized !== "parsed-strings-file"
+    || typeof candidate.locale !== "string"
+    || !Array.isArray(candidate.sources) || !Array.isArray(candidate.strings)
+    || !Array.isArray(candidate.warnings)
+    || candidate.originsByKey === null || typeof candidate.originsByKey !== "object")
+    throw parseError(
+      `${MERGE_SOURCE}: input ${index} is not a parsed strings file`,
+      { source: MERGE_SOURCE });
+  return /** @type {ParsedStringsFile} */ (file);
+}
+
+/**
+ * MERGE EXACT-LOCALE SHARDS — plan 2.3:172-190 and 3.6:1477-1496.
+ *
+ * An application whose translations are split by route or namespace parses each shard separately and
+ * merges before construction; V1 manifests and the runtime loader model ONE assembled resource per
+ * locale, so the splitting is the application's and the assembly happens here.
+ *
+ * **THE LOCALE RULE IS EXACT AND THE PLAN SAYS WHY IN ONE EXAMPLE.** "Matching primary language,
+ * likely script, or `equivalent(a, b)` is insufficient. For example, `pt` and `pt-PT` must remain
+ * separate because their cardinal rules differ for `0`, `0.0`, and `1.5`." An entry is evaluated
+ * under the locale of the file that supplied it, so merging across two tags silently re-evaluates
+ * half the catalog under the wrong plural rules. Tags are NORMALIZED first — `en-us` and `en-US` are
+ * one locale — and then compared exactly.
+ *
+ * **LAST-WRITE-WINS IS FORBIDDEN (plan 2.3:190).** A repeated key is either the same definition,
+ * which unions its origins, or a conflict, which is refused with both origins named. There is no
+ * third behaviour, and the absence of one is the point: shards that disagree are an authoring bug
+ * that a silent winner turns into a mystery at render time.
+ *
+ * **WHAT IT REVALIDATES, AND WHAT IT CANNOT.** Plan 3.6:1493-1496: "Raw input-byte, reader-character,
+ * total-byte, and JSON-nesting limits are enforceable only where the original string/bytes or stream
+ * is observed; normalized `ParsedStringsFile` values do not pretend to reconstruct them from lost
+ * whitespace, escapes, or BOMs." So the three limits that survive are the model ones, and the merged
+ * catalog is walked once against them rather than each input being re-charged: after dedup the merged
+ * set IS what exists, and charging the pre-dedup sum would refuse a merge of two identical shards at
+ * a budget the result fits inside.
+ *
+ * @param {readonly ParsedStringsFile[]} files the shards, in the order their sources should appear
+ * @param {{ limits?: ParsedCatalogLimits }} [options]
+ * @returns {ParsedStringsFile}
+ * @throws {StringsParseError} on no input, a locale disagreement, a conflicting repeated key, a
+ *   value that is not a parsed strings file, or a limit the merged catalog exceeds
+ */
+export function mergeParsedStringsFiles(files, options) {
+  if (!Array.isArray(files) || files.length === 0)
+    throw parseError(`${MERGE_SOURCE}: merging requires at least one parsed strings file`,
+      { source: MERGE_SOURCE });
+
+  const inputs = files.map(requireParsedStringsFile);
+  const session = new LoadingSession(options?.limits);
+
+  // THE FILE BUDGET IS CHARGED PER INPUT, IN CALLER ORDER, so the refusal names the shard that
+  // crossed it rather than the merge.
+  for (const file of inputs) session.beginFile(file.sources[0] ?? MERGE_SOURCE);
+
+  /** @type {string | null} */
+  let locale = null;
+  for (const file of inputs) {
+    const normalized = normalizeTag(file.locale);
+    if (locale === null) locale = normalized;
+    else if (normalized !== locale)
+      throw parseError(
+        `${MERGE_SOURCE}: every input must be authored for one exact locale, but '${locale}' and ` +
+        `'${normalized}' were both supplied. Matching primary language or script is not enough — ` +
+        `plural and language-form selection depend on the exact tag.`,
+        { source: MERGE_SOURCE });
+  }
+
+  /** @type {string[]} */
+  const sources = [];
+  /** @type {Map<string, { definition: LocalizedStringInput, origins: string[] }>} */
+  const merged = new Map();
+  /** @type {LocalizedStringWarning[]} */
+  const warnings = [];
+
+  for (const file of inputs) {
+    sources.push(...file.sources);
+    warnings.push(...file.warnings);
+
+    for (const definition of file.strings) {
+      const key = definition.key;
+      const origins = originsFor(file, key);
+      const held = merged.get(key);
+
+      if (held === undefined) {
+        merged.set(key, { definition, origins: [...origins] });
+        continue;
+      }
+
+      if (!structurallyEqual(held.definition, definition))
+        throw parseError(
+          `${MERGE_SOURCE}: key '${key}' is defined differently in ` +
+          `${javaList(held.origins)} and ${javaList([...origins])}. Merging shards never picks a ` +
+          `winner; make the definitions identical or give them different keys.`,
+          { source: MERGE_SOURCE });
+
+      for (const origin of origins) if (!held.origins.includes(origin)) held.origins.push(origin);
+    }
+  }
+
+  // THE WARNING BUDGET APPLIES TO WHAT IS CARRIED, not to anything re-emitted: the merge produces no
+  // warnings of its own, and re-running the parser's warning hooks over already-parsed values would
+  // duplicate every one of them.
+  for (const warning of warnings) session.warn(warning);
+
+  // Model revalidation and the translation-node budget in one walk, through the same door
+  // `defineCatalog` uses — so a fabricated input meets the file rules rather than a second dialect
+  // of them, and the output is canonical whatever the inputs were.
+  /** @type {Map<string, Definition>} */
+  let definitions;
+  try {
+    definitions = parseModelCatalog([...merged.values()].map((entry) => entry.definition), {
+      source: MERGE_SOURCE,
+      limits: options?.limits,
+      validateExpression: validateExpressionAtLoad,
+    });
+  } catch (error) {
+    rethrowAsParseError(error, MERGE_SOURCE);
+  }
+
+  /** @type {Map<Definition, Omit<WholeMessageAlternativeInput, "expression">>} */
+  const memo = new Map();
+  /** @type {Record<string, readonly string[]>} */
+  const originsByKey = Object.create(null);
+  for (const [key, entry] of merged) originsByKey[key] = freeze([...entry.origins]);
+
+  return freeze({
+    $lokalized: /** @type {const} */ ("parsed-strings-file"),
+    locale: /** @type {string} */ (locale),
+    sources: freeze(sources),
+    strings: freeze(
+      [...definitions].map(([key, definition]) => freeze({ key, ...projectNode(definition, memo) })),
+    ),
+    originsByKey: freeze(originsByKey),
+    warnings: freeze(warnings),
+  });
+}
+
+/**
+ * A key's origins, falling back to the file's own source list.
+ *
+ * `originsByKey` is null-prototype and a fabricated input may simply omit a key from it; the file's
+ * sources are then the honest answer, because that IS where the definition came from.
+ *
+ * @param {ParsedStringsFile} file @param {string} key @returns {readonly string[]}
+ */
+function originsFor(file, key) {
+  const declared = Object.hasOwn(file.originsByKey, key) ? file.originsByKey[key] : undefined;
+  return Array.isArray(declared) && declared.length > 0 ? declared : file.sources;
+}
+
+/** `java.util.List#toString` — the bracketed, comma-space form every diagnostic here uses. */
+const javaList = (/** @type {readonly string[]} */ values) => `[${values.join(", ")}]`;

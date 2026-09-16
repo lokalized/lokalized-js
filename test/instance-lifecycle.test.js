@@ -630,6 +630,18 @@ test("the export-name sweep flags the shapes it exists to catch, and clears the 
 
   for (const name of ["createStrings", "forLocale", "chooseBrowserLocale", "parseStrings", "loadStrings"])
     assert.doesNotMatch(name, MUTATOR_SHAPED, `${name} must not be flagged`);
+
+  // THE ERROR-CLASS EXEMPTION, tested rather than asserted. It must apply to a real Error subclass
+  // and to nothing else — a plain function or object with the same name shape keeps its flag.
+  const isErrorClass = (/** @type {unknown} */ value) =>
+    typeof value === "function" && Object.prototype.isPrototypeOf.call(Error, value);
+  class ConfigurationSomething extends Error {}
+  assert.ok(isErrorClass(ConfigurationSomething), "a real Error subclass is exempt");
+  assert.ok(!isErrorClass(function configureLocale() {}), "a plain function is not");
+  assert.ok(!isErrorClass({ name: "configureLocale" }), "an object is not");
+  assert.ok(!isErrorClass(class NotAnError {}), "a class that does not extend Error is not");
+  assert.match("ConfigurationError", MUTATOR_SHAPED,
+    "the regex still matches it; the exemption is what clears it, and that distinction is the point");
 });
 
 test("no published subpath exports a locale setter, and every exported object is frozen", async () => {
@@ -651,7 +663,15 @@ test("no published subpath exports a locale setter, and every exported object is
     const namespace = await import(new URL(pkg.exports[subpath].import, new URL("../", import.meta.url)).href);
     for (const [name, value] of Object.entries(namespace)) {
       ++swept;
-      if (MUTATOR_SHAPED.test(name)) flagged.push(`${subpath}:${name}`);
+      // AN ERROR CLASS IS NOT A DOOR ONTO SHARED STATE, and `ConfigurationError` — which plan
+      // 3.5:1100 declares and S34 delivered — starts with "Config" and so trips a prefix heuristic
+      // that is about SETTERS. The exemption is by VALUE rather than by widening the regex, because
+      // the regex is negative-tested above and loosening it would retire real coverage: a function
+      // named `configureLocale` is still flagged, and so is any non-Error value whatever its name.
+      // `Object.prototype.isPrototypeOf.call(Error, value)` is true only for a class that actually
+      // extends Error, so a plain function called `ConfigurationSomething` gets no exemption.
+      const isErrorClass = typeof value === "function" && Object.prototype.isPrototypeOf.call(Error, value);
+      if (MUTATOR_SHAPED.test(name) && !isErrorClass) flagged.push(`${subpath}:${name}`);
       // A mutable exported object is as good a door onto shared state as a setter is, and it carries
       // no setter-shaped name at all.
       if (typeof value === "object" && value !== null && !Object.isFrozen(value))

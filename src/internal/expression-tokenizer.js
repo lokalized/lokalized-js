@@ -1,3 +1,5 @@
+import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "./lokalized-error.js";
+
 // @ts-check
 
 /**
@@ -153,11 +155,23 @@ const EXPRESSION_ERROR_TOKEN = Symbol("lokalized.ExpressionEvaluationError");
  * @param {string} message @param {{ cause?: unknown }} [options]
  */
 export function expressionEvaluationError(message, options) {
-  return new ExpressionEvaluationError(EXPRESSION_ERROR_TOKEN, message, options);
+  return ExpressionEvaluationError.raise(EXPRESSION_ERROR_TOKEN, message, options);
 }
 
-export class ExpressionEvaluationError extends Error {
+  // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
+  // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
+export class ExpressionEvaluationError extends LokalizedError {
   /**
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
+   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
+   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
+   * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
+   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * raiser below is what lets the module's own factory still build one, since a private constructor
+   * is callable only from inside the class body.
+   *
+   * @private
    * @param {symbol} token the internal construction token
    * @param {string} message
    * @param {{ cause?: unknown }} [options]
@@ -166,11 +180,22 @@ export class ExpressionEvaluationError extends Error {
     if (token !== EXPRESSION_ERROR_TOKEN)
       throw new TypeError("ExpressionEvaluationError is not constructible; it is thrown by lokalized");
 
-    super(message, options);
+    super(LOKALIZED_ERROR_TOKEN, message, options);
     /** @type {string} */
     this.name = "ExpressionEvaluationError";
     /** @type {"EXPRESSION_EVALUATION"} */
     this.code = "EXPRESSION_EVALUATION";
+  }
+
+  /**
+   * The one construction path, because the constructor above is private. Its parameters are the
+   * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
+   * the token it takes first is never exported from this package.
+   *
+   * @param {symbol} token @param {string} message @param {{ cause?: unknown }} [options]
+   */
+  static raise(token, message, options) {
+    return new ExpressionEvaluationError(token, message, options);
   }
 }
 

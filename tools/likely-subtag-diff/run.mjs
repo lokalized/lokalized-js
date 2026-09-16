@@ -56,6 +56,14 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { oracleFieldProblems, recordingOracleRows } from "../oracle-field-coverage.mjs";
+
+/**
+ * Emitted by the Java oracle and deliberately NOT compared, each with the reason it cannot be.
+ * Checked in BOTH directions by `oracleFieldProblems`: an entry for a field the comparison does
+ * read fails, and so does one the oracle no longer emits.
+ */
+const UNCOMPARED_ORACLE_FIELDS = {};
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -344,7 +352,9 @@ try {
     }
   };
 
-  const rows = readFileSync(outPath, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  const recorder = recordingOracleRows(
+    readFileSync(outPath, "utf8").trim().split("\n").map((line) => JSON.parse(line)));
+  const rows = recorder.rows;
 
   let wellFormedProbes = 0;
   let illFormedProbes = 0;
@@ -466,6 +476,12 @@ try {
   }
 
   if (exitCode === 0) console.log("\nOK: every likely-subtag consumer agrees with lokalized-java over the probe space.");
+  const fieldProblems = oracleFieldProblems("likely-subtag", recorder, UNCOMPARED_ORACLE_FIELDS);
+  if (fieldProblems.length) {
+    console.log(`\nORACLE FIELD COVERAGE (${fieldProblems.length}):`);
+    for (const problem of fieldProblems) console.log(`  ${problem}`);
+    exitCode = 1;
+  }
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

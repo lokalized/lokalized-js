@@ -276,6 +276,10 @@ const PURPOSE = {
   // was normalized to avoid — recorded here rather than left for a size review to rediscover.
   "src/internal/loaded-input.js": ["validates a LoadedStrings before construction accepts it", "loaded branch only"],
   "src/internal/configuration-error.js": ["the shared ConfigurationError factory", "always"],
+  "src/internal/lokalized-error.js":
+    ["the base class every library error extends, and the LokalizedErrorCode union", "always"],
+  "src/internal/resolution-error.js":
+    ["the library's own failures during resolution, and Java's four contextualizing arms", "always"],
   "src/data/provenance.js": ["the pinned CLDR version and data fingerprint core compares against", "loaded branch only"],
   "src/internal/runtime-metadata.js": ["this build's producer/IANA/corpus identity, which the SSR stamp must take from the RENDERER rather than from its own copy", "loaded branch only"],
   "src/internal/locale-cldr.js": ["CLDR canonicalization and alias application", "always"],

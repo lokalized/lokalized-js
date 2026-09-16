@@ -1877,3 +1877,104 @@ export function candidateChain(lookupTag, supported, fallbackLocale, tiebreakers
 
 	return chain;
 }
+
+/**
+ * THE TWO TEST-ONLY SYMBOLS PLAN 2.2:152-153 REQUIRES, and they live here because this is the module
+ * that owns `candidateChain` — the thing they describe.
+ *
+ * ":152 — disabling the cache is also conforming. A test-only probe reports the retained entry count
+ * without exposing mutable cache state." Both halves are needed by the TESTS and by nothing else:
+ * the enabled branch has to be provably bounded and the disabled branch has to be provably empty, and
+ * neither can be asserted from outside without a way in.
+ *
+ * **THEY ARE SYMBOLS, NOT STRINGS, AND THAT IS WHAT KEEPS THEM OUT OF THE PUBLIC SURFACE.** A string
+ * option key would be reachable by anyone who read the source and would sit in
+ * `CreateStringsOptions` or be silently ignored; a symbol exported only from `src/internal/` cannot
+ * be named by a consumer at all, and `plan-surface`/`declared-surface` see nothing to demand. The
+ * probe answers a NUMBER — the retained entry count — so no mutable state escapes with it.
+ */
+export const CANDIDATE_CHAIN_MEMO_DISABLED = Symbol("lokalized.test.candidateChainMemoDisabled");
+
+/** @see {@link CANDIDATE_CHAIN_MEMO_DISABLED} — reads the retained entry count, and nothing else. */
+export const CANDIDATE_CHAIN_MEMO_SIZE = Symbol("lokalized.test.candidateChainMemoSize");
+
+/**
+ * A FROZEN SNAPSHOT of the retained keys, in eviction order — oldest first.
+ *
+ * **A SECOND PROBE RATHER THAN A WIDER FIRST ONE, because the plan asks two things in two
+ * sentences.** :152 wants a probe that "reports the retained entry count without exposing mutable
+ * cache state", and `CANDIDATE_CHAIN_MEMO_SIZE` is exactly that. :153 then requires the enabled tests
+ * to assert "the 256-entry ceiling AND DETERMINISTIC EVICTION" — and a count cannot witness an
+ * order: after any sweep the size is 256 whichever entry was discarded. So the order is a separate
+ * observation, and it is a frozen copy rather than the live `Map`, so nothing mutable escapes here
+ * either.
+ */
+export const CANDIDATE_CHAIN_MEMO_KEYS = Symbol("lokalized.test.candidateChainMemoKeys");
+
+
+/** Plan 2.2:151 — "at most 256 retained entries". */
+export const CANDIDATE_CHAIN_MEMO_LIMIT = 256;
+
+/**
+ * A deterministic LRU over `candidateChain`, per `Strings` instance — plan 2.2:150-152.
+ *
+ * **WHY IT IS SAFE TO KEY ON THE TAG ALONE, which is the only question that matters here.**
+ * `candidateChain(tag, supported, fallbackLocale, tiebreakers)` takes four arguments and this caches
+ * on one. The other three are INSTANCE CONSTANTS: `supported` is `[...catalogs.keys()]` and
+ * `tiebreakers` is `safeTiebreakers(direct.tiebreakers)`, both computed once inside `createStrings`,
+ * and `fallbackLocale` with them. They are also the RESOLUTION channel rather than the selection one
+ * — S9's separation — so a partial manifest load cannot widen them mid-instance either.
+ *
+ * **AND WHY IT MAY NOT EXTEND ONE STEP FURTHER.** Plan 3.4:865 — "Resolver and per-call locale values
+ * are normalized and recomputed on every use" — is about the MATCH, not the chain, and this caches
+ * the chain only. The distinction is the whole reason `localeLookupFor` is untouched: a memo that
+ * also skipped `matchFor` for a per-call locale would serve a stale DIAGNOSTIC, and
+ * `test/cache-bounds.test.js`'s last test is aimed at exactly that.
+ *
+ * LRU BY INSERTION ORDER: a hit deletes and re-sets, so `Map` iteration order is recency order and
+ * the oldest key is always `keys().next()`. Deterministic, which :153 asks for by name — there is no
+ * clock, no random victim and no approximate counter here.
+ *
+ * The cached array is FROZEN. Nothing in `src/` mutates a chain today, and a future line that did
+ * would otherwise corrupt every later lookup silently; frozen, it throws at the mutation instead.
+ * Both branches freeze, so enabled and disabled differ in retained entries and in nothing else.
+ *
+ * @param {readonly string[]} supported
+ * @param {string} fallbackLocale
+ * @param {Parameters<typeof candidateChain>[3]} tiebreakers
+ * @param {boolean} enabled
+ * @returns {{ chainFor: (normalizedTag: string) => readonly string[], size: () => number,
+ *   keys: () => readonly string[] }}
+ */
+export function candidateChainMemo(supported, fallbackLocale, tiebreakers, enabled) {
+	if (!enabled)
+		return {
+			chainFor: (normalizedTag) =>
+				Object.freeze(candidateChain(normalizedTag, supported, fallbackLocale, tiebreakers)),
+			size: () => 0,
+			keys: () => Object.freeze([]),
+		};
+
+	/** @type {Map<string, readonly string[]>} */
+	const entries = new Map();
+
+	return {
+		keys: () => Object.freeze([...entries.keys()]),
+		chainFor: (normalizedTag) => {
+			const hit = entries.get(normalizedTag);
+			if (hit !== undefined) {
+				entries.delete(normalizedTag);
+				entries.set(normalizedTag, hit);
+				return hit;
+			}
+
+			const computed = Object.freeze(
+				candidateChain(normalizedTag, supported, fallbackLocale, tiebreakers));
+			entries.set(normalizedTag, computed);
+			if (entries.size > CANDIDATE_CHAIN_MEMO_LIMIT)
+				entries.delete(/** @type {string} */ (entries.keys().next().value));
+			return computed;
+		},
+		size: () => entries.size,
+	};
+}

@@ -67,44 +67,80 @@
     },
     {
       "reason": "S29: createStrings gains the OPTION UNION plan 3.2:565-588 declares. The port had only the direct arm and read the loaded member through an any cast, so createStrings({ loaded, locale }) -- M8's flagship call -- failed to typecheck for a TypeScript consumer (TS2353). Both arms now spell the other's members never, so a mixed call is refused too. Growth is the two typedefs and the prose recording the defect."
+    },
+    {
+      "reason": "S30: plan 3.2:447-453's seven build-identity constants now export from lokalized/core (cldrVersion, dataFingerprint, behavioralVectorsVersion, localeDataMode, cardinalityMode, ianaRegistryDate, ianaDataFingerprint). The values already existed in RUNTIME_METADATA and the pinned provenance module, both already in core's graph, so no module is added; the growth is the seven bindings and the docblock recording that two independent gates found them missing."
+    },
+    {
+      "reason": "S34: ConfigurationError becomes a real token-guarded class and exports from lokalized/core. Plan 3.5:1100 declares it; 119 call sites across core, load, ssr and node raised a plain Error with name assigned afterwards, catchable only by string. No module added; the growth is the class, the token, the factory and the prose recording the third instance of this shape."
+    },
+    {
+      "reason": "S35: plan 3.5:1092's LokalizedError base class lands in src/internal/lokalized-error.js, and all seven library error classes now extend it, so one instanceof answers 'did this come from lokalized'. +1 module in every graph that can fail — which is every graph, because a base class is reachable from every error that extends it. UnsupportedLocaleError also gained the token, the UNSUPPORTED_LOCALE code plan 3.5:1050 declares, and the plan's field name (locale, not localeTag)."
+    },
+    {
+      "reason": "BATCH: plan 3.7's tagged-value type family (15 names) plus seven more promised symbols land, and the 61 language-form constants gain exact per-constant types. They were emitted as Readonly<{...}> | undefined with axis and name widened to string, because src/index.js built them by looping into a Record; a consumer had to non-null-assert a frozen compile-time constant and could not name the axis. No module joins any graph — the 61-key map lives in internal/catalog.js, which every graph already reaches. The growth is JSDoc."
+    },
+    {
+      "reason": "Decision batch D1-D10: the manifest door now refuses zero-candidate and ambiguous fallbacks at validation (plan 6.2:145, both arms, before any per-file plan exists); every library error constructor is private or protected so the declarations expose no constructor or extension signature (plan 3.5:1107); dead ResolutionFailure class deleted. Growth is the two refusal arms, the seven static raisers and the prose recording each decision."
+    },
+    {
+      "reason": "D8: plan 3.5's ninth and last error class lands. ResolutionError carries Java's two recognized resolution categories, ~28 leaf raisers across three files take their codes from the executed oracle, and both contextualizing ladders now have Java's arms in Java's order — including ARM 4, which returns an unrecognized APPLICATION exception unchanged, as plan 2.5:249 requires and the port did not do. +1 module (src/internal/resolution-error.js), reachable from every graph that can fail."
+    },
+    {
+      "reason": "M9 examples: run-plan.js gained the annotation record that makes a loader result assignable to createStrings({ loaded }), plus the comment recording how it was found"
+    },
+    {
+      "reason": "M9 S2: lokalized/negotiate gains plan 3.4:904-915's forLanguageRanges, forAcceptLanguage and the two IANA constants, which pull in the zero-import internal/runtime-metadata.js leaf (15 -> 16 modules)"
+    },
+    {
+      "reason": "M9 S3: src/parse/index.js gains plan 3.6:1477's mergeParsedStringsFiles, the last promised-and-undelivered name, with the Java-measured equality predicate; parse/load/node all reach that module"
+    },
+    {
+      "reason": "M9 S5: plan 2.2:150's candidate-chain LRU lands in src/internal/locale.js (the memo factory and its two test-only probe symbols) and src/core/index.js (construction and the probe); every subpath reaches the locale kernel"
+    },
+    {
+      "reason": "M9 S6: src/load/fetch-loader.js exports DEFAULT_REQUEST so test/example-server.test.js can pair the loader's CORS mode with the preload's bare crossorigin attribute — plan 6.3:2180 makes those one claim in two places"
+    },
+    {
+      "reason": "M9 S8: src/negotiate/index.js renders a refused weight with javaDoubleText on the object door, matching the header door and Java's Double.toString; the comment records the measurement that found it"
     }
   ],
   "subpaths": {
     "lokalized": {
-      "modules": 29,
-      "bytes": 822785
+      "modules": 31,
+      "bytes": 869917
     },
     "lokalized/core": {
-      "modules": 28,
-      "bytes": 814540
+      "modules": 30,
+      "bytes": 859668
     },
     "lokalized/parse": {
-      "modules": 26,
-      "bytes": 636787
+      "modules": 28,
+      "bytes": 678785
     },
     "lokalized/load": {
-      "modules": 36,
-      "bytes": 712304
+      "modules": 38,
+      "bytes": 766979
     },
     "lokalized/ssr": {
-      "modules": 2,
-      "bytes": 20279
+      "modules": 3,
+      "bytes": 27279
     },
     "lokalized/negotiate": {
-      "modules": 15,
-      "bytes": 392110
+      "modules": 16,
+      "bytes": 411107
     },
     "lokalized/node": {
-      "modules": 39,
-      "bytes": 744183
+      "modules": 41,
+      "bytes": 796048
     },
     "lokalized/data/ordinal": {
-      "modules": 31,
-      "bytes": 842280
+      "modules": 33,
+      "bytes": 889430
     },
     "lokalized/data/ranges": {
-      "modules": 31,
-      "bytes": 847149
+      "modules": 33,
+      "bytes": 894303
     }
   }
 }

@@ -62,16 +62,15 @@ const OWED = /** @type {Record<string, { owner: string, why: string }>} */ ({
   // provenance object carried two, so the generator now emits all five rather than the declaration
   // asserting fields the runtime does not have.
   //
-  // `parse:mergeParsedStringsFiles` is the tenth and is different in kind: it is a FUNCTION promised
-  // publicly with no implementation anywhere. It moves to M9 rather than being dropped, because the
-  // allowlist is generated from the plan and dropping a name needs a plan edit.
-  // Recorded AS FOUND, not assigned. These are types for runtime that already ships (`Strings`,
-  // `OrdinalData`, `DataProvenance`) or, in one case, a function that was allowlisted and never
-  // written: `mergeParsedStringsFiles` has ZERO implementation anywhere in `src/`. Whether a closed
-  // milestone is reopened for them or a later one adopts them is the maintainer's call. What this
-  // table does is stop them being invisible, which they were until this test existed.
-  "parse:mergeParsedStringsFiles": { owner: "M9", why: "allowlisted with ZERO implementation anywhere in src/; the maintainer chose to implement rather than drop it (2026-09-11), and the allowlist is generated from the plan so dropping it would need a plan edit" },
-  "negotiate:LocaleNegotiator": { owner: "M9", why: "plan 3.5 puts the negotiator in M9" },
+  // `parse:mergeParsedStringsFiles` WAS the tenth and was different in kind: a FUNCTION promised
+  // publicly with no implementation anywhere, found by this table in S5 and carried for four
+  // milestones. **It shipped in M9 S3 and its entry is deleted, which is the record.** It was the
+  // LAST of the ten, so the table now holds only what later milestones owe.
+  //
+  // Recorded AS FOUND, not assigned. The rest are types for runtime that already ships (`Strings`,
+  // `OrdinalData`, `DataProvenance`). Whether a closed milestone is reopened for them or a later one
+  // adopts them is the maintainer's call. What this table does is stop them being invisible, which
+  // they were until this test existed.
   // --- M8's own remaining to-build list ---------------------------------------------------------
   // The six `load` TYPES landed in S5, `chain`/`fetchSet` in S7, and the two SSR functions in S10;
   // their entries are deleted, which is the record of it. Both planning functions were deliberately

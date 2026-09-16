@@ -207,10 +207,13 @@ describe("`throwExceptionFor` validates the attempted locales when it has no cau
     assert.throws(
       () => strings.get("Hello", { term: "x" }, { locale: "en-US-x-lvariant-POSIX" }),
       (/** @type {unknown} */ error) =>
-        error instanceof Error &&
-        !(error instanceof TypeError) &&
-        error.cause === sentinel &&
-        error.message.startsWith("Unable to resolve generated placeholder 'a'"),
+        // THE SENTINEL ITSELF, not a wrapper carrying it. This read
+        // `error.cause === sentinel && error.message.startsWith("Unable to resolve generated
+        // placeholder 'a'")` until the four-arm ladder landed: the port contextualized an
+        // unrecognized APPLICATION error, and Java does not — arm 4 returns it unchanged, measured
+        // on the pinned JDK as chain length 1 with the app's class and message intact.
+        error === sentinel &&
+        /** @type {Error} */ (error).cause === undefined,
     );
   });
 

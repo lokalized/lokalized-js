@@ -34,6 +34,25 @@
  */
 
 /**
+ * @typedef {"reject" | "allow-partial"} PartialFailurePolicy plan 6.2's policy, read at
+ *   `run-plan.js:236` as a bare string against an untyped literal until this named it. An
+ *   adversarial pass classified it RENAMED; the plan-surface gate's "a RENAMED disposition names a
+ *   spelling the port actually has" test refused, because there was no spelling at all.
+ *
+ * @typedef {object} LoadStringsOptions plan 6.2's subset-loader option bag.
+ * @property {typeof globalThis.fetch} [fetch] the transport. An injected reader is explicitly free to
+ *   ignore the signal (plan 6.2:2098-2100), which is why the loader owns cancellation rather than
+ *   delegating it.
+ * @property {AbortSignal} [signal]
+ * @property {Readonly<{ mode?: "cors" | "same-origin", credentials?: "omit" | "same-origin" | "include" }>} [request]
+ * @property {PartialFailurePolicy} [partialFailure] default `"reject"`.
+ * @property {import("../parse/index.js").StringsLoadingLimits} [limits]
+ */
+
+/**
+ * The manifest a browser or edge runtime loads from.
+
+/**
  * The manifest a browser or edge runtime loads from.
  *
  * Plan section 6.1 (`interface StringsManifestV1`). `formatVersion` is the literal `1` rather than a

@@ -186,9 +186,12 @@ test("clause 75: the newly exported classes are CATCHABLE and NOT CONSTRUCTIBLE"
   const { DigestUnavailableError } = await import("../src/load/index.js");
   const { ExpressionEvaluationError, createStrings } = await import("../src/core/index.js");
 
+  const { ConfigurationError } = await import("../src/core/index.js");
+
   for (const [label, ErrorClass, code] of /** @type {[string, any, string][]} */ ([
     ["DigestUnavailableError", DigestUnavailableError, "DIGEST_UNAVAILABLE"],
     ["ExpressionEvaluationError", ExpressionEvaluationError, "EXPRESSION_EVALUATION"],
+    ["ConfigurationError", ConfigurationError, "CONFIGURATION"],
   ])) {
     assert.equal(typeof ErrorClass, "function", `${label} must be exported as a value, not a type`);
     assert.ok(Object.prototype.isPrototypeOf.call(Error, ErrorClass), `${label} extends Error`);
@@ -216,6 +219,72 @@ test("clause 75: the newly exported classes are CATCHABLE and NOT CONSTRUCTIBLE"
   assert.ok(thrown instanceof ExpressionEvaluationError,
     "a real construction failure must be catchable through the exported class");
   assert.equal(/** @type {any} */ (thrown).code, "EXPRESSION_EVALUATION");
+
+  // THE WIDEST OF THE THREE, and the control that matters most: 119 sites across core, load, ssr and
+  // node raise a ConfigurationError, and until S34 every one produced a plain `Error` with `name`
+  // assigned afterwards — matchable by string and by nothing else. Driven through a PUBLIC door.
+  // THE PROBE WAS WRONG ON ITS FIRST ATTEMPT AND THE CONTROL SAID SO — the third time this session.
+  // `runtimeLimits` is refused by `createStrings` with a bare `RangeError`, not through
+  // `configurationError()`, so it never reached the class under test. Measured across four public
+  // construction refusals: the runtimeLimits refusal, a missing fallback catalog and an invalid
+  // tiebreaker list all raise `RangeError`; only the `loaded`-beside-`strings` conflict routes
+  // through `configurationError()`.
+  //
+  // **THAT SPLIT IS WORTH A MAINTAINER'S EYE AND IS RECORDED RATHER THAN CHANGED HERE.** Plan
+  // 3.5:1119 puts "Configuration/catalog construction failure" under `ConfigurationError` with code
+  // `CONFIGURATION`, and core's own construction refusals do not use it; the 119 `configurationError()`
+  // sites are concentrated in `load`, `node`, `ssr` and `internal`. Re-routing core's would change a
+  // PUBLIC error type on paths the corpus arbitrates under the standing "Java's SHAPE with the JS
+  // name" rule, which is not a proof slice's call.
+  const configFailure = (() => {
+    try {
+      createStrings(/** @type {any} */ ({
+        loaded: {}, strings: { en: { K: "v" } }, fallbackLocale: "en", locale: "en",
+      }));
+      return null;
+    } catch (error) { return error; }
+  })();
+  assert.ok(configFailure instanceof ConfigurationError,
+    "the loaded/direct conflict must be catchable as the class plan 3.5:1100 declares");
+  assert.equal(/** @type {any} */ (configFailure).code, "CONFIGURATION");
+  assert.equal(/** @type {any} */ (configFailure).name, "ConfigurationError",
+    "name and code are unchanged by the swap, which is what keeps the fourteen string matchers working");
+});
+
+test("clause 75: EVERY exported library error extends the base, and the base is not constructible", async () => {
+  // WRITTEN BECAUSE TWO ABLATIONS DID NOT FIRE. Making `StringsLoadingError` extend `Error` again,
+  // and separately deleting the base's own token guard, both left the whole suite green — so the two
+  // propositions `LokalizedError` exists FOR were asserted nowhere. A base class whose subclasses
+  // need not extend it is a class, not a hierarchy, and that is exactly the difference plan 3.5:1092
+  // exports it to provide.
+  const core = await import("../src/core/index.js");
+  const parse = await import("../src/parse/index.js");
+  const load = await import("../src/load/index.js");
+  const { LokalizedError } = core;
+  const exported = { ...core, ...parse, ...load };
+
+  const EXPORTED_ERRORS = ["ConfigurationError", "DigestUnavailableError", "ExpressionEvaluationError",
+    "MissingTranslationError", "StringsLoadingError", "StringsParseError", "UnsupportedLocaleError"];
+
+  const detached = [];
+  for (const name of EXPORTED_ERRORS) {
+    const ErrorClass = /** @type {any} */ (exported)[name];
+    assert.equal(typeof ErrorClass, "function", `${name} must be exported as a value`);
+    if (!Object.prototype.isPrototypeOf.call(LokalizedError, ErrorClass)) detached.push(name);
+  }
+  assert.deepEqual(detached, [],
+    "these are exported library errors that do NOT extend LokalizedError, so an instanceof check " +
+    "against the base — the one question it exists to answer — is false for them");
+
+  // ANTI-VACUITY: the sweep must have seen the real set, or an empty list satisfies it.
+  assert.equal(EXPORTED_ERRORS.length, 7, "seven subclasses plus the base is plan 3.5's eight exported");
+  assert.ok(Object.prototype.isPrototypeOf.call(Error, LokalizedError), "and the base is a real Error");
+
+  // THE BASE'S OWN GUARD. Without it a consumer fabricates a library error that every instanceof in
+  // an application believes — the thing the token exists to prevent, one level above the seven.
+  assert.throws(() => new /** @type {any} */ (LokalizedError)("fake"), /not constructible/);
+  assert.throws(() => { class Mine extends LokalizedError {} ; new /** @type {any} */ (Mine)("fake"); },
+    /not constructible/, "and subclassing it outside the package fails at instantiation");
 });
 
 test("clause 75: plan 3.5 declares nine of these, and the record says which are still owed", async () => {
@@ -234,12 +303,24 @@ test("clause 75: plan 3.5 declares nine of these, and the record says which are 
     "DigestUnavailableError", "ConfigurationError"];
 
   assert.deepEqual(DECLARED.filter((name) => exported.has(name)).sort(),
-    ["DigestUnavailableError", "ExpressionEvaluationError", "MissingTranslationError",
-      "StringsLoadingError", "StringsParseError"],
-    "five of plan 3.5's nine error classes are exported; changing that must change this record");
+    ["ConfigurationError", "DigestUnavailableError", "ExpressionEvaluationError",
+      "LokalizedError", "MissingTranslationError", "ResolutionError", "StringsLoadingError",
+      "StringsParseError", "UnsupportedLocaleError"],
+    "ALL NINE of plan 3.5's error classes are exported as of decision D8. `LokalizedError` is the " +
+    "base every one of them extends, which is what makes `instanceof LokalizedError` a single test " +
+    "for 'this came from lokalized'; `ResolutionError` was the last, and the only one whose absence " +
+    "changed BEHAVIOUR rather than only the surface.");
 
   // The three that have no class at all, measured rather than assumed — `UnsupportedLocaleError`
   // exists in `src/internal/plural.js` and is a DIFFERENT case from these, so it is named apart.
-  assert.deepEqual(DECLARED.filter((name) => !exported.has(name)).sort(),
-    ["ConfigurationError", "LokalizedError", "ResolutionError", "UnsupportedLocaleError"]);
+  // THE LAST ONE IS BLOCKED, AND NOT ON AN EXPORT DECISION. `src/internal/interpolate.js` records
+  // that `ResolutionError` "has not landed (plan open question 4)", and the consequence is live
+  // rather than cosmetic: Java's `IllegalArgumentException` (a placeholder never supplied) and
+  // `IllegalStateException` (a language-form translation missing the selected member) are both
+  // plain `Error`s here, which makes them INDISTINGUISHABLE from Java's fourth arm — an
+  // unrecognized APPLICATION error, which Java returns verbatim rather than contextualizing.
+  // Shipping the class without deciding that question would put a class in the surface that nothing
+  // raises, which is worse than the gap.
+  assert.deepEqual(DECLARED.filter((name) => !exported.has(name)).sort(), [],
+    "nothing plan 3.5 declares is undelivered; if this list grows, a class was removed");
 });

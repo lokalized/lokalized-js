@@ -459,7 +459,23 @@ const resolverCalls = [];
  * instead of being quietly compared as equal.
  */
 const RESOLVER_THREW = {
-  "java.lang.IllegalStateException": "Error",
+  // **MAPPED TO `RangeError` BY A MAINTAINER DECISION (2026-09-14), AND THE REASON IT NEEDED ONE IS
+  // THAT IT LOOKS LIKE THE THING THIS FILE POLICES.** `RangeError` is in the ladder's RECOGNIZED set,
+  // so choosing it keeps 33 cases green — and "a rule widened until cases pass" is exactly what
+  // `../CLAUDE.md` tells reviewers to check `git diff tools/conformance.mjs` for. It was put to the
+  // maintainer with both forks priced (40 FAILED keeping `Error`, 7 with this) and decided.
+  //
+  // WHY IT IS THE RIGHT ANSWER AND NOT MERELY THE GREEN ONE: Java RECOGNIZES an application
+  // `IllegalStateException` and CONTEXTUALIZES it — that is arm 3 of
+  // `DefaultStrings.java:1276`, not arm 4. For the port to reproduce that, the thing its resolver
+  // stub throws has to be something the port's own ladder recognizes, and plan 2.5:253-254 makes
+  // `TypeError` and `RangeError` precisely that set. Leaving it `Error` would make the port take
+  // ARM 4 where Java takes arm 3 — a real divergence, dressed up as a stricter mapping.
+  //
+  // THE HONEST COST, recorded rather than buried: JavaScript has no `IllegalStateException`, so this
+  // is the project's standing "Java's SHAPE with the JS name" rule applied to a class Java treats as
+  // recoverable. A reader who wants the other fork can find it priced in `M8-STATUS.md` A19.
+  "java.lang.IllegalStateException": "RangeError",
 };
 
 /**
@@ -498,8 +514,19 @@ const POLICY_THREW = {
  */
 const CAUSE_NAME = {
   "com.lokalized.ExpressionEvaluationException": "ExpressionEvaluationError",
-  "java.lang.IllegalStateException": "Error",
-  "java.lang.IllegalArgumentException": "Error",
+  // BOTH JAVA CLASSES MAP TO ONE JS NAME, AND THAT IS THE PLAN'S SHAPE, NOT A COLLAPSE THIS TABLE
+  // CHOSE. Plan 3.5:1058-1063 declares ONE class, `ResolutionError`, with TWO codes; `causeNameOf`
+  // reads `.name`, so the two Java classes cannot be told apart on this channel however the port
+  // raises them.
+  //
+  // **THE NOTE BELOW THIS TABLE USED TO SAY THE SEVEN BOTH-TYPES ROWS WOULD START DISCRIMINATING
+  // "the day the error hierarchy lands". IT DOES NOT FOLLOW, AND IT IS MEASURED:** with the hierarchy
+  // landed, collapsing every `RESOLUTION_INVALID_STATE` into `RESOLUTION_INVALID_ARGUMENT` at every
+  // raiser leaves this report BYTE-IDENTICAL. The corpus cannot see the CODE at all — only a runner
+  // that compares `code` could, and none does. Every proposition about which code a site carries is
+  // therefore unit-test-only, and the file should not let a reader credit the corpus with gating it.
+  "java.lang.IllegalStateException": "ResolutionError",
+  "java.lang.IllegalArgumentException": "ResolutionError",
 };
 
 /**
@@ -808,7 +835,18 @@ function phoneticResolverFor(spec) {
       break;
     case "throw": {
       const message = spec.message ?? "phonetic resolver failed deliberately";
-      delegate = () => { throw new Error(message); };
+      // **`RangeError`, NOT `Error`, BY THE MAINTAINER DECISION RECORDED AT `RESOLVER_THREW` ABOVE.**
+      // The corpus records these throws as `java.lang.IllegalStateException`, which Java RECOGNIZES
+      // and CONTEXTUALIZES at `DefaultStrings.java:1276` — arm 3, not arm 4. The port's ladder
+      // recognizes `TypeError` and `RangeError` (plan 2.5:253-254), so a stub throwing a bare `Error`
+      // makes the port take ARM 4 where Java takes arm 3 and hand the object back unwrapped. That is
+      // a real divergence, and it is the one the faithful four-arm ladder introduced.
+      //
+      // THIS IS THE LINE A REVIEWER SHOULD LOOK AT, so it says so: it is the runner's own stub, and
+      // choosing a class that happens to be in the recognized set is how a rule gets widened until
+      // cases pass. It was priced both ways before it was changed — 40 FAILED keeping `Error`, 7 with
+      // this — and put to the maintainer rather than taken here.
+      delegate = () => { throw new RangeError(message); };
       break;
     }
     default:
@@ -2086,7 +2124,38 @@ function causeNamesFor(failure, expected) {
   return sameSiteAsConstructedThrow ? ERROR_NAME[causeType] : null;
 }
 
-function expectedFailures(expected) {
+/**
+ * The APPLICATION'S OWN OBJECT, propagating unwrapped — plan 3.5's "zero wrappers" row.
+ *
+ * A SIBLING OF `causeNamesFor`'s rule, and structural for the same reason: it keys on what the corpus
+ * RECORDS, never on a case id. When Java added no wrapper, the retained cause IS the object the
+ * application threw, and the recorded Java class therefore names the APPLICATION'S exception rather
+ * than a library error — so `RESOLVER_THREW`, which declares what the runner's own stub throws,
+ * governs instead of `CAUSE_NAME`, which maps Java's LIBRARY classes.
+ *
+ * "Java added no wrapper" is decided by comparing the recorded `causeMessage` against the fixture's
+ * configured resolver throw message. Equal means the message travelled verbatim; a contextualized
+ * failure carries the composed "Unable to resolve…" or "Unable to evaluate…" sentence instead. That
+ * is derivable from the fixture and the row, which is what keeps this from being a carve-out.
+ *
+ * IT EXISTS BECAUSE THE FOUR-ARM LADDER MADE THE PORT CORRECT AND LEFT THE RUNNER BEHIND. Before the
+ * ladder the port wrapped an application error the way it wrapped everything, so this row compared
+ * equal for the wrong reason. Now the port hands it back unwrapped, exactly as Java does, and only
+ * the runner's class mapping disagreed.
+ *
+ * @param {any} failure @param {any} fixture
+ */
+function unwrappedApplicationThrow(failure, fixture) {
+  const thrownMessage = fixture?.phoneticResolver?.behavior === "throw"
+    ? fixture.phoneticResolver.message ?? "phonetic resolver failed deliberately"
+    : null;
+  if (thrownMessage === null || failure?.causeMessage !== thrownMessage) return null;
+  const causeType = failure?.causeType ?? null;
+  return causeType !== null && causeType in RESOLVER_THREW ? RESOLVER_THREW[causeType] : null;
+}
+
+/** @param {any} expected @param {any} [fixture] absent where the caller has none; the rule above then does not apply */
+function expectedFailures(expected, fixture) {
   return (expected.failures ?? []).map((failure) => ({
     key: failure.key,
     reason: adaptEnum(failure.reason),
@@ -2094,7 +2163,9 @@ function expectedFailures(expected) {
     attemptedLocales: failure.attemptedLocales,
     message: failure.message,
     placeholderNames: failure.placeholderNames,
-    causeType: causeNamesFor(failure, expected)?.join(" or ") ?? adaptCauseType(failure.causeType),
+    causeType: causeNamesFor(failure, expected)?.join(" or ")
+      ?? unwrappedApplicationThrow(failure, fixture)
+      ?? adaptCauseType(failure.causeType),
     localeMatchResult: expectedMatchProjection(failure.localeMatchResult),
     matchObjectIdenticalToResult: failure.matchObjectIdenticalToResult,
   }));
@@ -3054,7 +3125,7 @@ function runCase(testCase, fixture) {
       const wanted = {
         ...expectedResultProjection(expected.result),
         resolverCalls: expectedResolverCalls(expected),
-        failures: expectedFailures(expected),
+        failures: expectedFailures(expected, fixture),
         policyCalls: expectedPolicyCalls(expected),
         supplierCalls: expectedSupplierCalls(expected),
       };
@@ -3122,7 +3193,7 @@ function runCase(testCase, fixture) {
       const wanted = {
         translation: expected.translation,
         resolverCalls: expectedResolverCalls(expected),
-        failures: expectedFailures(expected),
+        failures: expectedFailures(expected, fixture),
         policyCalls: expectedPolicyCalls(expected),
         supplierCalls: expectedSupplierCalls(expected),
       };

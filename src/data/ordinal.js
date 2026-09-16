@@ -46,6 +46,7 @@ import {
   createRuleTable,
   hasCardinalRulesForLocale,
   operandsForPluralValue,
+  unsupportedLocaleError,
 } from "../internal/plural.js";
 import { decode as decodeOrdinalRules } from "./ordinal-rules.js";
 import { decode as decodeProvenance } from "./provenance.js";
@@ -212,7 +213,7 @@ export const ordinalData = freeze({
     ordinalCategoryForOperands: (operands, locale) => {
       const index = ordinalGroupIndexFor(locale);
 
-      if (index < 0) throw new UnsupportedLocaleError(jdkLanguageTag(locale));
+      if (index < 0) throw unsupportedLocaleError(jdkLanguageTag(locale));
 
       return ORDINAL_TABLE.countFor(index, operands);
     },
@@ -286,7 +287,7 @@ export function ordinalityForNumber(value, locale) {
   const index = ordinalGroupIndexFor(locale);
 
   // `UnsupportedLocaleException(locale)` reports `locale.toLanguageTag()`, not the raw input.
-  if (index < 0) throw new UnsupportedLocaleError(jdkLanguageTag(locale));
+  if (index < 0) throw unsupportedLocaleError(jdkLanguageTag(locale));
 
   return ordinalityForCount(ORDINAL_TABLE.countFor(index, operands));
 }

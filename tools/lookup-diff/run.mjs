@@ -1252,6 +1252,33 @@ try {
   for (const line of run.stdout.split("\n")) {
     if (!line) continue;
     const fields = line.split("\t");
+    // THE TOTAL COLUMN COUNT, WHICH THE ARITY GATE BELOW CANNOT SEE — and the gap was measured
+    // rather than suspected. S33 recorded the hazard for the three positional-TSV differentials in
+    // one sentence ("a COLUMN added on the Java side and never unpacked is invisible") and named a
+    // pinned column count as the owed instrument. Measured 2026-09-15 by appending one constant
+    // column to every row `LookupDiff.java` emits, on BOTH kinds independently: the whole report came
+    // back BYTE-IDENTICAL, exit 0, with the marker appearing nowhere in it. The ablation was proved
+    // to LAND rather than assumed — instrumented, the first probe row carried 82 fields with the
+    // marker last against the control's 81 — because "byte-identical" and "the mutation never
+    // reached the runner" are otherwise indistinguishable, which this project has already banked once.
+    //
+    // WHY THE GATE BELOW MISSES IT: it reads each SLICE's length and never `fields.length`, and every
+    // slice `[4+7i, 11+7i)` stays exactly 7 long when the line grows at the END. It catches a column
+    // added or removed MID-row, which shifts every later slice; it cannot catch a trailing one. The
+    // two checks are complementary and both are kept.
+    //
+    // DERIVED, NOT PINNED: `4 + PROBE_SHAPES.length * 7` is the same arithmetic the gate below
+    // already prints in its own error message, so adding a shape moves both together and a literal
+    // cannot go stale behind the layout.
+    const expectedFields = fields[0] === "C" ? 5 : 4 + PROBE_SHAPES.length * 7;
+    if (fields.length !== expectedFields)
+      throw new Error(
+        `the oracle emitted ${fields.length} column(s) on a '${fields[0]}' row where ` +
+          `${expectedFields} are read — LookupDiff.java and run.mjs have drifted. A column added at ` +
+          `the END of a row is invisible to the per-outcome arity check below, which is why this one ` +
+          `counts the whole line.`,
+      );
+
     if (fields[0] === "C") {
       // CLASS AND MESSAGE BOTH KEPT. They were emitted in separate fields by the oracle and the
       // message was DROPPED here — so the run compared the BUILT/REFUSED boolean and nothing else,

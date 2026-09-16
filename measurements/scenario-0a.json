@@ -8,21 +8,21 @@
   "node": [
     {
       "label": "root + raw-text catalog",
-      "modules": 29,
-      "sourceBytes": 822785,
-      "importMs": 0.284,
-      "constructionMs": 0.1124,
-      "firstRenderMs": 0.3426,
-      "retainedBytes": 69376
+      "modules": 31,
+      "sourceBytes": 869917,
+      "importMs": 0.278,
+      "constructionMs": 0.1102,
+      "firstRenderMs": 0.3843,
+      "retainedBytes": 80024
     },
     {
       "label": "core + parsed equivalent",
-      "modules": 28,
-      "sourceBytes": 814540,
-      "importMs": 0.651,
-      "constructionMs": 0.3807,
-      "firstRenderMs": 0.3302,
-      "retainedBytes": 410496
+      "modules": 30,
+      "sourceBytes": 859668,
+      "importMs": 0.713,
+      "constructionMs": 0.4173,
+      "firstRenderMs": 0.3332,
+      "retainedBytes": 452056
     }
   ],
   "rebaselines": [
@@ -346,6 +346,59 @@
       "growth": [
         "root + raw-text catalog: source graph grew 818655 -> 822785 bytes",
         "core + parsed equivalent: source graph grew 810410 -> 814540 bytes"
+      ]
+    },
+    {
+      "reason": "S30: the seven build-identity constant exports. Module count unchanged at 29/28 — src/data/provenance.js was already in core's graph via internal/loaded-input.js.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 822785 -> 825006 bytes",
+        "core + parsed equivalent: source graph grew 814540 -> 816761 bytes"
+      ]
+    },
+    {
+      "reason": "S34: the ConfigurationError class and export. Module count unchanged at 29/28.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 825006 -> 827410 bytes",
+        "core + parsed equivalent: source graph grew 816761 -> 819165 bytes"
+      ]
+    },
+    {
+      "reason": "S35: the LokalizedError base. Module count 29->30 root, 28->29 core: a base class every error extends is reachable from every graph. Plan 3.5:1092 exports it for catching.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 827410 -> 833326 bytes",
+        "root + raw-text catalog: module count grew 29 -> 30",
+        "core + parsed equivalent: source graph grew 819165 -> 825081 bytes",
+        "core + parsed equivalent: module count grew 28 -> 29"
+      ]
+    },
+    {
+      "reason": "BATCH: the tagged-value type family and seven promised symbols. Types only; module count unchanged at 30/29.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 833326 -> 846406 bytes",
+        "core + parsed equivalent: source graph grew 825081 -> 836157 bytes"
+      ]
+    },
+    {
+      "reason": "Decision batch D1-D10. Module count unchanged at 30/29.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 846406 -> 851702 bytes",
+        "core + parsed equivalent: source graph grew 836157 -> 841453 bytes"
+      ]
+    },
+    {
+      "reason": "D8: the ResolutionError class. Module count 30->31 root, 29->30 core: a resolution error is reachable from every render path.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 851702 -> 862263 bytes",
+        "root + raw-text catalog: module count grew 30 -> 31",
+        "core + parsed equivalent: source graph grew 841453 -> 852014 bytes",
+        "core + parsed equivalent: module count grew 29 -> 30"
+      ]
+    },
+    {
+      "reason": "M9 S5: the candidate-chain memo. Module counts unchanged (31/30) — the memo lives in modules both graphs already reach; source grew by the factory and its docblock.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 862263 -> 869917 bytes",
+        "core + parsed equivalent: source graph grew 852014 -> 859668 bytes"
       ]
     }
   ],

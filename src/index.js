@@ -24,6 +24,17 @@ export { createStrings } from "./core/index.js";
 // not have to pull them in to pick a locale.
 export { chooseBrowserLocale, chooseLocaleForPreferredLanguages } from "./core/index.js";
 
+/**
+ * Plan 3.7 puts the tagged-value TYPES on `core` (plan 3.1s "tagged-value types" category) and the
+ * CONSTANTS on the root, so the root names the type through its owner rather than redeclaring it.
+ *
+ * @template {import("./core/index.js").LanguageFormAxis} A
+ * @template {import("./core/index.js").LanguageFormName} N
+ * @template {string} R
+ * @typedef {import("./core/index.js").TaggedLanguageFormValue<A, N, R>} TaggedLanguageFormValue
+ */
+
+/** @typedef {import("./core/index.js").LanguageFormValue} LanguageFormValue */
 const freeze = Object.freeze;
 
 /**
@@ -36,13 +47,31 @@ const freeze = Object.freeze;
  * Frozen and structurally recognized, so the values survive JSON, RSC, workers, structured clone,
  * and cross-realm boundaries.
  *
- * @type {Record<string, Readonly<{ $lokalized: "language-form", axis: string, name: string, renderName: string }>>}
+ * **THE TYPE IS EXACT PER CONSTANT, AND IT WAS NOT.** This was annotated
+ * `Record<string, Readonly<{ … axis: string, name: string … }>>`, and destructuring a `Record` is
+ * what put `| undefined` on all 61 emitted declarations while widening the two tag fields to
+ * `string`. Measured against a consumer before the fix: `const axis: "gender" =
+ * GENDER_FEMININE.axis` fails with TS2322, and every constant needed a non-null assertion. **A
+ * tagged union whose tag is `string` is not a tagged union**, which is the whole reason plan 3.7
+ * declares `TaggedLanguageFormValue<"gender", "GENDER_FEMININE">` rather than a shared shape.
+ *
+ * The runtime is UNCHANGED and still derives every value from `LANGUAGE_FORM_NAMES`; only the type
+ * is stated. The 61 lines below are generated from that same table, and
+ * `test/language-form-types.test.js` re-derives them from it on every run — so a table that gains a
+ * member and a map that does not is a red test rather than a constant the port exports untyped.
+ *
  */
-const LANGUAGE_FORMS = {};
+
+/** @type {import("./internal/catalog.js").LanguageForms} */
+const LANGUAGE_FORMS = /** @type {any} */ ({});
 for (const [axis, prefix, members] of LANGUAGE_FORM_NAMES)
   for (const member of members) {
     const name = `${prefix}${member}`;
-    LANGUAGE_FORMS[name] = freeze({
+    // THE FILL LOOP IS THE ONLY PLACE THAT INDEXES BY A COMPUTED NAME, and it is where the exact
+    // type has to be set aside: the keys come from the generated table at runtime and `tsc` cannot
+    // know they are the 61. The DECLARED type is what a consumer sees, and it is exact; this cast is
+    // scoped to the two lines that build the table, not to the export.
+    /** @type {any} */ (LANGUAGE_FORMS)[name] = freeze({
       $lokalized: /** @type {const} */ ("language-form"),
       axis,
       name,
@@ -119,7 +148,8 @@ export function pluralOperands(value, options) {
  * @returns {Readonly<{ $lokalized: "language-form", axis: string, name: string, renderName: string }>}
  */
 function cardinalityConstant(category) {
-  const constant = LANGUAGE_FORMS[`CARDINALITY_${category.toUpperCase()}`];
+  const constant = /** @type {Record<string, LanguageFormValue | undefined>} */ (
+    /** @type {unknown} */ (LANGUAGE_FORMS))[`CARDINALITY_${category.toUpperCase()}`];
   if (constant === undefined) throw new RangeError(`Unsupported CLDR plural category '${category}'`);
   return constant;
 }

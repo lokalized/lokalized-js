@@ -142,8 +142,16 @@ describe("the retained cause is rethrown by identity", () => {
       // and fail here, which is why the conformance runner compares identity on this arm too.
       assert.equal(e, handed, "the retained cause itself, not a copy of it");
       assert.ok(!(e instanceof MissingTranslationError));
-      // The original survives underneath, unwrapped a second time.
-      assert.equal(/** @type {any} */ (e).cause, resolverThrew);
+      // **THE APPLICATION'S OBJECT, NOT A WRAPPER AROUND IT — this line used to read
+      // `assert.equal(e.cause, resolverThrew)`.** Until the four-arm ladder landed, the port wrapped
+      // an unrecognized application error the way it wrapped its own, so the thrown object was a
+      // contextualizing `Error` whose `.cause` was the app's. Java does not do that: arm 4 of
+      // `DefaultStrings.java:1281` returns the cause UNCHANGED, and executed on the pinned JDK an
+      // application exception comes back with its class and message intact and a chain of LENGTH 1.
+      // Plan 2.5:249 requires it. So the strongest available assertion is now available: the thrown
+      // object IS the object the resolver threw.
+      assert.equal(e, resolverThrew, "arm 4 returns the application's own error unchanged");
+      assert.equal(/** @type {any} */ (e).cause, undefined, "and adds nothing underneath it");
       return true;
     });
   });
@@ -154,7 +162,12 @@ describe("the retained cause is rethrown by identity", () => {
     assert.throws(() => throwingResolverStrings(() => THROW_EXCEPTION).get("Article", { term: "apple" }),
       (/** @type {any} */ e) => {
         assert.ok(!(e instanceof MissingTranslationError));
-        assert.match(e.message, /^Unable to resolve generated placeholder 'a'/);
+        // THE RESOLVER'S OWN MESSAGE, because the resolver throws a plain `Error` and arm 4 returns
+        // it unchanged. This asserted the CONTEXTUALIZING prefix until the four-arm ladder landed —
+        // a prefix Java does not add to an unrecognized application exception. The proposition the
+        // test is for is unchanged and still discriminating: swapping the two arms of
+        // `throwForFailure` makes this a `MissingTranslationError` and the line above goes red.
+        assert.equal(e.message, "resolver refused");
         return true;
       });
   });

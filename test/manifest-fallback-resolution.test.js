@@ -31,7 +31,13 @@
  *    the fingerprint with the implementation's own `computeCatalogIdentity`, and every manifest probe
  *    asserts the manifest VALIDATES before it asserts anything about resolution.
  *
- * **SIX ROWS BELOW ARE MARKED `DIVERGENCE` AND PIN BEHAVIOUR THE CLAUSE DOES NOT ASK FOR.** They are
+ * **SIX ROWS BELOW ARE MARKED `DIVERGENCE` AND PIN BEHAVIOUR THE CLAUSE DOES NOT ASK FOR — and two
+ * more were, until the maintainer decided them (D3).** C6 and C7 now assert the REFUSAL the clause
+ * asks for at the manifest door: a zero-candidate fallback and a still-ambiguous one both fail
+ * validation before any per-file plan exists, so neither reaches a network request. The two that
+ * remain are the tests whose own NAMES carry the word — C8 and C11 — so this count cannot drift out
+ * of step with the file without a test name drifting too. (The first draft of this sentence told you
+ * to count them with a grep, and the grep matched the sentence itself.) They are
  * written the way `DECLARED_MESSAGE_DIVERGENCES` is written: the divergence is REQUIRED to exist, so
  * a fix cannot land silently and a reader cannot mistake the pin for agreement. Each says what the
  * clause requires and what the port does instead. No src/ file was changed to write this file.
@@ -241,12 +247,19 @@ test("clause 8 C2: equivalence is CLDR canonical equality, not shared primary la
   assert.equal(control.getLocaleConfiguration().fallbackLocale, "de-AT");
   assert.equal(control.get("Greeting"), "DE-AT!");
 
-  // THE MANIFEST TWIN OF THE NEGATIVE ROW. See C6 for why the manifest door does not REFUSE this
-  // manifest; what is asserted here is the equivalence verdict the planner reaches, which is the
-  // half the widened relation would change.
-  const m = validates(manifest(["de-AT", "fr"], "de"));
-  assert.deepEqual(localesOf(fetchSet(m, "pt-BR")), [],
-    "'de' is equivalent to nothing here, so no fallback file is planned");
+  // THE MANIFEST TWIN OF THE NEGATIVE ROW, and since C6's fix it REFUSES at the door rather than
+  // planning an empty fetch set. The equivalence verdict is still what is asserted — a relation
+  // widened to shared primary language would make the fallback equivalent to de-AT and this manifest
+  // would validate — but the verdict is now a refusal instead of an absence, which is the whole
+  // point of moving the check to the door.
+  const manifestRefusal = thrown(() => validateStringsManifest(manifest(["de-AT", "fr"], "de")));
+  assert.equal(manifestRefusal?.name, "ConfigurationError");
+  assert.equal(manifestRefusal?.message,
+    "A manifest's fallbackLocale is 'de' but no matching catalog was declared. " +
+    "Known locales: [de-AT, fr]");
+
+  // THE MANIFEST CONTROL, mirroring the direct one above: the same two files with an electable
+  // fallback validate and plan, so the refusal is the equivalence verdict and not the fixture.
   const controlManifest = validates(manifest(["de-AT", "fr"], "de-AT"));
   assert.deepEqual(localesOf(fetchSet(controlManifest, "pt-BR")), ["de-AT"]);
 });
@@ -366,41 +379,39 @@ test("clause 8 C5: the OBVIOUS ambiguity fixture proves the neighbouring guard, 
 // Both are DIVERGENCES today. Measured 2026-09-13; no src/ file was changed.
 // ---------------------------------------------------------------------------------------------
 
-test("clause 8 C6: DIVERGENCE — a zero-candidate fallback passes every manifest door and refuses only after a full load", async () => {
-  // THE CLAUSE (:145) and plan 6.2:2072 ("Manifest schema/semantic/fingerprint/runtime-data mismatch
-  // rejects with ConfigurationError BEFORE a per-file plan exists") together require a refusal at the
-  // door. What happens instead is pinned below, for TWO fixtures whose zero-ness has different
-  // causes: unrelated languages, and an equivalence verdict. The second is what makes a
-  // primary-language-widened relation visible at this door at all.
-  for (const [label, m] of /** @type {[string, any][]} */ ([
-    ["unrelated languages", validates(manifest(["fr", "es"], "de"))],
-    ["an equivalence verdict", validates(manifest(["de-AT", "fr"], "de"))],
+test("clause 8 C6: a zero-candidate fallback is REFUSED at the manifest door, before any I/O", async () => {
+  // WAS A DIVERGENCE UNTIL THE MAINTAINER DECIDED IT (D3). The clause (:145) and plan 6.2:2072
+  // ("Manifest schema/semantic/fingerprint/runtime-data mismatch rejects with ConfigurationError
+  // BEFORE a per-file plan exists") together require a refusal at the door, and the port planned an
+  // empty fetch set instead, then refused only after fetching every catalog.
+  //
+  // TWO FIXTURES WHOSE ZERO-NESS HAS DIFFERENT CAUSES, kept from the divergence row because the
+  // second is what makes a primary-language-widened relation visible at this door at all.
+  for (const [label, tags, expected] of /** @type {[string, string[], string][]} */ ([
+    ["unrelated languages", ["fr", "es"], "[es, fr]"],
+    ["an equivalence verdict", ["de-AT", "fr"], "[de-AT, fr]"],
   ])) {
-    assert.doesNotThrow(() => validateStringsManifest(m), label);
-    assert.doesNotThrow(() => parseStringsManifest(JSON.stringify(m)), label);
-    // PLANNING performs full validation too (plan 6.2:1893-1895), so a door-stage refusal would
-    // surface here as a throw. It does not: the chain ends on a candidate that names no file.
-    assert.deepEqual(localesOf(fetchSet(m, "pt-BR")), [], label);
-    assert.equal([...chain(m, "pt-BR")].at(-1), "de", label);
+    const refusal = thrown(() => validateStringsManifest(manifest(tags, "de")));
+    assert.equal(refusal?.name, "ConfigurationError", label);
+    assert.equal(refusal?.message,
+      `A manifest's fallbackLocale is 'de' but no matching catalog was declared. Known locales: ${expected}`,
+      label);
+    // THE PARSE DOOR TOO: a manifest arriving as text must not slip past the check that its
+    // already-decoded twin fails, which is the shape S23 gated one phase over.
+    assert.equal(thrown(() => parseStringsManifest(JSON.stringify(manifest(tags, "de"))))?.name,
+      "ConfigurationError", label);
   }
 
-  // AND THE WHOLE PIPELINE FETCHES EVERY CATALOG FIRST. The refusal that does arrive is core's, with
-  // the DIRECT door's wording, after the network cost the door-stage rule exists to avoid.
-  const m = validates(manifest(["fr", "es"], "de"));
+  // AND NOTHING IS READ. The refusal the clause asks for is worth having precisely because it costs
+  // no network: the loader never reaches a per-file plan, so a recording transport sees zero calls.
   const transport = recordingFetch();
-  const loaded = await loadEntireManifest(m, { fetch: transport.impl });
-  assert.equal(transport.calls.length, 2,
-    "DIVERGENCE: the clause's door-stage refusal would have read nothing");
-  assert.equal(loaded.complete, true);
-  const late = thrown(() => createStrings({ loaded, locale: "pt-BR" }));
-  assert.equal(late?.name, "RangeError",
-    "DIVERGENCE: plan 6.2:2072 names a ConfigurationError from the manifest door");
-  assert.equal(late?.message,
-    "Specified fallback locale is 'de' but no matching localized strings locale was found. " +
-    "Known locales: [es, fr]");
+  const failed = await rejected(() => loadEntireManifest(manifest(["fr", "es"], "de"), { fetch: transport.impl }));
+  assert.equal(failed?.name, "ConfigurationError");
+  assert.equal(transport.calls.length, 0,
+    "the whole point of a door-stage refusal: before the fix this fetched every catalog first");
 
   // THE CONTROL: the identical manifest with a resolvable fallback validates, plans and loads, so
-  // every pin above is attributable to the fallback tag alone.
+  // every refusal above is attributable to the fallback tag alone.
   const control = validates(manifest(["fr", "es"], "fr"));
   assert.equal(localeConfigurationForManifest(control).fallbackLocale, "fr");
   assert.deepEqual(localesOf(fetchSet(control, "pt-BR")), ["fr"]);
@@ -408,40 +419,50 @@ test("clause 8 C6: DIVERGENCE — a zero-candidate fallback passes every manifes
     createStrings({ strings: catalogsFor(["fr", "es"]), fallbackLocale: "fr", locale: "pt-BR" }));
 });
 
-test("clause 8 C7: DIVERGENCE — an ambiguous fallback silently elects the first equivalent at the manifest door", async () => {
-  // THE SHARPEST ROW IN THE FILE. `owed-init.refusal.fallback-equivalent-to-multiple-catalogs` exists
-  // precisely to stop a port quietly electing one of two equivalents; the corpus reaches only the
-  // direct door, and at the manifest door the port does exactly that. Asserting VALIDATION alone
-  // would miss it — an implementation that refused in `validateStringsManifest` and still elected
-  // inside `chain`/`fetchSet` would pass a validation-only test — so the PLAN is asserted too.
-  const m = validates(manifest(["und-bokmal", "und-nynorsk"], "und"));
-  assert.doesNotThrow(() => validateStringsManifest(m),
-    "DIVERGENCE: :145 requires a still-ambiguous fallback to fail manifest validation");
-  assert.doesNotThrow(() => parseStringsManifest(JSON.stringify(m)));
-  assert.deepEqual([...chain(m, "pt-BR")], ["pt-BR", "pt", "und-bokmal"],
-    "DIVERGENCE: the first member of the tag-sorted equivalent set is elected silently");
-  assert.deepEqual(localesOf(fetchSet(m, "pt-BR")), ["und-bokmal"]);
+test("clause 8 C7: an ambiguous fallback is REFUSED at the manifest door, not silently elected", async () => {
+  // THE SHARPEST ROW IN THE FILE, and it was the sharpest DIVERGENCE until D3.
+  // `owed-init.refusal.fallback-equivalent-to-multiple-catalogs` exists precisely to stop a port
+  // quietly electing one of two equivalents; the corpus reaches only the direct door, and at the
+  // manifest door the port did exactly that — `chain(m, "pt-BR")` ended `und-bokmal`, the subset
+  // door fetched that one file, and the instance answered every unmatched request from a catalog
+  // nobody chose. A `complete: true` load of a manifest the plan says must be refused.
+  const ambiguous = manifest(["und-bokmal", "und-nynorsk"], "und");
+  const refusal = thrown(() => validateStringsManifest(ambiguous));
+  assert.equal(refusal?.name, "ConfigurationError");
+  assert.equal(refusal?.message,
+    "A manifest's fallbackLocale 'und' is canonically equivalent to multiple declared locales " +
+    "[und-bokmal, und-nynorsk]; declare it as one of them exactly");
 
-  // AND IT PRODUCES A WORKING INSTANCE. The lookup-subset door fetches only the elected file, so the
-  // ambiguity never reaches the core guard that would have caught it: a `complete: true` load serving
-  // every unmatched request from a catalog nobody chose.
+  // ASSERTING VALIDATION ALONE WOULD MISS THE OLD DEFECT, which is why the planner is asserted too:
+  // an implementation that refused in `validateStringsManifest` and still elected inside
+  // `chain`/`fetchSet` would pass a validation-only test. Both doors perform full validation.
+  assert.equal(thrown(() => [...chain(ambiguous, "pt-BR")])?.name, "ConfigurationError");
+  assert.equal(thrown(() => fetchSet(ambiguous, "pt-BR"))?.name, "ConfigurationError");
+  assert.equal(thrown(() => parseStringsManifest(JSON.stringify(ambiguous)))?.name, "ConfigurationError");
+
+  // AND NO FILE IS READ. Before the fix the subset door fetched exactly one — the elected one.
   const transport = recordingFetch();
-  const subset = await loadStrings(m, "pt-BR", { fetch: transport.impl });
-  assert.equal(transport.calls.length, 1, "only the elected equivalent is ever read");
-  assert.match(String(transport.calls[0]), /und-bokmal\.json$/);
-  const instance = createStrings({ loaded: subset, locale: "pt-BR" });
-  assert.equal(instance.getLocaleConfiguration().fallbackLocale, "und-bokmal");
-  assert.equal(instance.get("Greeting"), "UND-BOKMAL!",
-    "DIVERGENCE: a manifest the clause says must be refused serves translations");
+  const failed = await rejected(() => loadStrings(ambiguous, "pt-BR", { fetch: transport.impl }));
+  assert.equal(failed?.name, "ConfigurationError");
+  assert.equal(transport.calls.length, 0);
 
-  // THE WHOLE-MANIFEST DOOR reaches the core guard only because it fetches BOTH files first.
-  const whole = await loadEntireManifest(m, { fetch: recordingFetch().impl });
-  const late = thrown(() => createStrings({ loaded: whole, locale: "und" }));
-  assert.match(String(late?.message), /canonically equivalent to multiple loaded locales/);
+  // THE REMEDY THE MESSAGE NAMES ACTUALLY WORKS, which is the half that keeps a refusal from being a
+  // dead end. Spelling the fallback as one of the two validates and plans that file.
+  //
+  // A TIEBREAKER IS NOT THE REMEDY HERE AND THE MESSAGE DOES NOT CLAIM IT IS — measured:
+  // `validateManifestTiebreakers` skips undetermined tags when grouping by primary language, so a
+  // manifest tiebreaker keyed 'und' is refused with "no file for that language". The message was
+  // reworded after this fixture caught it pointing at a locked door.
+  const resolved = validates(manifest(["und-bokmal", "und-nynorsk"], "und-nynorsk"));
+  assert.deepEqual(localesOf(fetchSet(resolved, "pt-BR")), ["und-nynorsk"]);
+  assert.match(String(thrown(() => validateStringsManifest(
+    manifest(["und-bokmal", "und-nynorsk"], "und", { und: ["und-nynorsk", "und-bokmal"] })))?.message),
+    /no file for that language/,
+    "a tiebreaker keyed on the undetermined tag is itself refused, which is why the message says otherwise");
 
   // THE CONTROL, which also retires the zh-123 worry about `und-*` keys: one equivalent resolves
   // through arm 2 at this door, so the rows above are about ambiguity and not about undetermined
-  // tags being refused (or accepted) somewhere upstream.
+  // tags being refused somewhere upstream.
   const control = validates(manifest(["und-bokmal", "fr"], "und"));
   assert.deepEqual(localesOf(fetchSet(control, "pt-BR")), ["und-bokmal"]);
 });

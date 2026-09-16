@@ -61,7 +61,7 @@
  *   5. a CLASS METHOD                  — `parseModule` collected only FunctionDeclaration and
  *                                        VariableStatement bindings, so a consumer inside a class
  *                                        was invisible. `src/` declares at least ten top-level
- *                                        classes (`MissingTranslationError`, `ResolutionFailure`,
+ *                                        classes (`MissingTranslationError`, `ConfigurationError`,
  *                                        `LoadingSession`, `NodeBudget`, `JsonReader`, …), so this
  *                                        is an idiom here, not a corner.
  *   6. a TOP-LEVEL STATEMENT that is not a declaration — `globalThis.__leak = likelySubtagFor("ar")`
@@ -84,11 +84,22 @@
  * This is the shape `tools/graph-size.mjs` uses for UNCLASSIFIED modules and `tools/conformance.mjs`
  * uses for no-counterpart claims: derive, compare, exit non-zero naming the thing.
  *
- * THE MEASUREMENT ITSELF IS NOT HERE. `npm run diff:likely-subtag` compares every consumer below
- * against the real `lokalized-java` on the pinned JDK; this file only proves the list it checks is
- * the whole list. It runs inside `npm run verify` precisely because it needs nothing but `src/` —
- * the differential needs a JDK and a built `lokalized-java` and so, like its seven siblings, stays
- * out of `verify` and must be named separately.
+ * THE MEASUREMENT ITSELF IS NOT HERE, AND THIS PARAGRAPH USED TO OVERSTATE HOW MUCH OF IT EXISTS.
+ * It read "`npm run diff:likely-subtag` compares EVERY CONSUMER BELOW against the real
+ * `lokalized-java`". **It compares FIVE of the 38 consumers this file derives** — the five TABLE
+ * READS, which is what its own headline says ("35,281 probes x 5 consumers") and what the citation
+ * table thirty lines down says too, so the file contradicted itself in the same docblock. The
+ * eleventh text on this project found asserting the inverse of what it described, and the first one
+ * inside a tool that exists to stop exactly that.
+ *
+ * What is true: this file proves the derived list is the whole list, and each entry's `evidence`
+ * citation names the instrument that covers THAT entry — which is `diff:likely-subtag` for 16 of the 38
+ * (counted from the `evidence` fields, not from memory: an adversarial verifier reported 15 and
+ * was itself wrong), `diff:lookup` for the ones only an end-to-end walk can see, and the corpus for the
+ * rest. It runs inside `npm run verify` precisely because it needs nothing but `src/`; the
+ * differential needs a JDK and a built `lokalized-java`, so it stays out of `verify` and is named
+ * separately — and since S31 its RESULT is recorded in `measurements/differentials.json`, which
+ * `npm run diff:check` re-checks without a JDK.
  */
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { existsSync } from "node:fs";
@@ -128,6 +139,29 @@ const TABLE = "src/data/likely-subtags.js";
  * @type {Record<string, {what: string, evidence: string[]}>}
  */
 const INVENTORY = {
+  /* ---- the manifest door's fallback resolution, added by decision D3 --------------------- */
+
+  "src/load/manifest.js::validateStringsManifest::equivalentTags": {
+    what: "Decides which DECLARED catalogs a manifest's fallbackLocale names, so validation can " +
+      "refuse zero matches and still-ambiguous ones before any per-file plan exists (plan " +
+      "6.2:145, the half that says MANIFEST VALIDATION). Until D3 the manifest door had neither " +
+      "arm: a fallback equivalent to two catalogs was silently elected and the subset loader " +
+      "served every unmatched request from a catalog nobody chose. The relation is CLDR canonical " +
+      "equality, and widening it to shared primary language is exactly what the negative row in " +
+      "`test/manifest-fallback-resolution.test.js` falsifies.",
+    evidence: ["test:manifest-fallback-resolution.test.js", "corpus:owed-init"],
+  },
+  "src/load/manifest.js::validateStringsManifest::canonicalLanguageTag": {
+    what: "Derives the language code the manifest tiebreaker for an ambiguous fallback would be " +
+      "keyed under, so the ambiguity arm consults the same order the direct door does. NOT gated " +
+      "against Java: Java has no manifest, so there is no counterpart to compare. What IS gated " +
+      "is that the resulting message names a remedy that works — the first draft told publishers " +
+      "to add a tiebreaker for an undetermined tag, which `validateManifestTiebreakers` itself " +
+      "refuses, and a fixture caught it.",
+    evidence: ["test:manifest-fallback-resolution.test.js",
+      "NONE: Java has no manifest door, so this decision has no Java counterpart to differ from"],
+  },
+
   /* ---- the two DIRECT READS, the only places the table itself is consulted ---------------- */
 
   "src/internal/locale-cldr.js::likelySubtagFor::LIKELY_SUBTAGS": {

@@ -88,12 +88,34 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     // because catching it is the point: a `THROW_EXCEPTION` failure response with no retained cause
     // raises one, and a consumer who cannot name the class can only match on a message.
     ["core", "MissingTranslationError", "core errors"],
+    // PLAN 3.2:447-453's SEVEN BUILD-IDENTITY CONSTANTS, delivered in S30 under the category plan
+    // 3.1 gives core for exactly them. TWO GATES FOUND THEM MISSING INDEPENDENTLY: S28's category
+    // check, which reported this family as having NO delivered member and could only see plan 3.1's
+    // prose; and S29's plan-surface census, which named all seven and could only see plan 3.2's
+    // signatures. Before this the values reached a consumer only as members of the record
+    // `getLoadVerification()` returns, so an application could not read the build's CLDR version
+    // without first constructing a `Strings` from a loaded manifest.
+    ["core", "cldrVersion", "CLDR/IANA runtime metadata"],
+    ["core", "dataFingerprint", "CLDR/IANA runtime metadata"],
+    ["core", "behavioralVectorsVersion", "CLDR/IANA runtime metadata"],
+    ["core", "localeDataMode", "CLDR/IANA runtime metadata"],
+    ["core", "cardinalityMode", "CLDR/IANA runtime metadata"],
+    ["core", "ianaRegistryDate", "CLDR/IANA runtime metadata"],
+    ["core", "ianaDataFingerprint", "CLDR/IANA runtime metadata"],
     // THE SAME CATEGORY, AND THE SAME REASON, DELIVERED IN S29. Plan 3.5:1092-1100 declares NINE
     // error classes as package exports; the port shipped three. This is one of the six that were
     // declared and undelivered — not a widening of the surface, which is what the record had called
     // it. Its constructor takes the internal token, so it is catchable and not constructible, which
     // is exactly what :1107-1108 asks of every name in that block.
     ["core", "ExpressionEvaluationError", "core errors"],
+    // The third of the same family, and the widest: 119 sites raise one. S34.
+    ["core", "ConfigurationError", "core errors"],
+    // The base and the seventh, S35. `LokalizedError` is what makes "did this come from lokalized"
+    // a single `instanceof`; plan 3.5:1092 exports it for exactly that.
+    ["core", "LokalizedError", "core errors"],
+    ["core", "UnsupportedLocaleError", "core errors"],
+    // The ninth and last of plan 3.5's nine, landed by decision D8.
+    ["core", "ResolutionError", "core errors"],
     ["core", "cardinalityForNumber", "cardinal classifiers/support probes"],
     ["core", "cardinalityForOperands", "cardinal classifiers/support probes"],
     ["core", "supportedCardinalitiesForLocale", "cardinal classifiers/support probes"],
@@ -112,6 +134,22 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     // that split, and `bestMatchForAcceptLanguage` on the negotiator would be the only door left --
     // which is the fail-soft one, and answers the fallback where the recorded behavior throws.
     ["negotiate", "parseLanguageRanges", "range parser/factory/option helpers"],
+    // PLAN 3.4:904-913's TWO OPTION HELPERS — the third word of the category, delivered in M9 S2.
+    // They are on this subpath and not on core for a graph reason plan 3.4:933 states outright:
+    // they "negotiate immediately and return core `localeMatch` options, so the browser/root graph
+    // does not contain the whole-list solver". `test/pinned-data-only.test.js` names
+    // `negotiate/index.js` among the modules the root may not reach, which is what makes that
+    // sentence enforceable rather than advisory.
+    ["negotiate", "forLanguageRanges", "range parser/factory/option helpers"],
+    ["negotiate", "forAcceptLanguage", "range parser/factory/option helpers"],
+    // PLAN 3.4:914-915's TWO IANA CONSTANTS, under the metadata half of `negotiate`'s re-export
+    // category. S28 recorded that half as UNDELIVERED because core exported none; M8's final batch
+    // landed all seven build-identity constants on core and NOTHING RE-CHECKED THE REASON -- the
+    // staleness arm of that gate fires when a category gains a member, never when its excuse stops
+    // being true. These two are re-exported from `internal/runtime-metadata.js` rather than from
+    // core, because importing core here would put a 30-module graph behind a 16-module subpath.
+    ["negotiate", "ianaRegistryDate", "re-exports core's `LanguageRange` type and IANA metadata"],
+    ["negotiate", "ianaDataFingerprint", "re-exports core's `LanguageRange` type and IANA metadata"],
     // M8's port of `LocalizedStringLoader.loadFromFilesystem`, under the `node` owner's declared
     // "directory loader" category. It is deliberately NOT the plan's `loadStringsFromDirectory`,
     // and the two are different functions rather than two names for one: the plan's is

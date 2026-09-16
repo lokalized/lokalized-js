@@ -1,3 +1,5 @@
+import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "./lokalized-error.js";
+
 // @ts-check
 
 /**
@@ -22,8 +24,20 @@
  * factory-only export, because it also refuses `class Mine extends StringsParseError` at
  * instantiation time rather than merely discouraging it.
  */
-export class StringsParseError extends Error {
+  // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
+  // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
+export class StringsParseError extends LokalizedError {
   /**
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
+   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
+   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
+   * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
+   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * raiser below is what lets the module's own factory still build one, since a private constructor
+   * is callable only from inside the class body.
+   *
+   * @private
    * @param {symbol} token the internal construction token
    * @param {string} message
    * @param {{ source: string, line?: number | null, column?: number | null, path?: string | null, cause?: unknown }} details
@@ -32,7 +46,7 @@ export class StringsParseError extends Error {
     if (token !== CONSTRUCTION_TOKEN)
       throw new TypeError("StringsParseError is not constructible; it is thrown by lokalized/parse");
 
-    super(message, details.cause === undefined ? undefined : { cause: details.cause });
+    super(LOKALIZED_ERROR_TOKEN, message, details.cause === undefined ? undefined : { cause: details.cause });
 
     /** @type {"StringsParseError"} */
     this.name = "StringsParseError";
@@ -47,6 +61,18 @@ export class StringsParseError extends Error {
     /** The bounded JSON path, or null when the failure is not located in the document. @type {string | null} */
     this.path = details.path ?? null;
   }
+
+  /**
+   * The one construction path, because the constructor above is private. Its parameters are the
+   * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
+   * the token it takes first is never exported from this package.
+   *
+   * @param {symbol} token @param {string} message
+   * @param {Parameters<typeof parseError>[1] & { cause?: unknown }} details
+   */
+  static raise(token, message, details) {
+    return new StringsParseError(token, message, details);
+  }
 }
 
 /** Unexported by design: only this package can hand it to the constructor. */
@@ -58,7 +84,7 @@ const CONSTRUCTION_TOKEN = Symbol("lokalized.strings-parse-error");
  * @returns {StringsParseError}
  */
 export function parseError(message, details) {
-  return new StringsParseError(CONSTRUCTION_TOKEN, message, details);
+  return StringsParseError.raise(CONSTRUCTION_TOKEN, message, details);
 }
 
 /**

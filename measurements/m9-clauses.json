@@ -1,0 +1,403 @@
+{
+  "formatVersion": 1,
+  "milestone": "M9",
+  "note": "Derived from plan v7's M9 row (:2925) and the plan sections it governs — 3.4 (the negotiate surface), 6.3/6.4/6.5 (the examples, preload and cache correctness), 2.3/3.6 (the exact-locale merge) and 9.2 (scenario 6). A clause is PROVEN only where a gate exists on disk AND an ablation was performed with its red named; 'nothing contradicts it' is not a verdict. This ledger is NOT a ratchet: a verdict may move in either direction, and freezing it would make the honest direction the expensive one.",
+  "tally": {
+    "PROVEN": 31,
+    "DEFERRED": 2,
+    "NOT-PROVEN": 1
+  },
+  "clauses": [
+    {
+      "id": 1,
+      "statement": "RFC 4647 whole-list matching passes stable IDs: every `matchFor(List)` case in the corpus is arbitrated against recorded Java.",
+      "verdict": "PROVEN",
+      "slice": "M9 S6",
+      "gates": [
+        "npm run conformance",
+        "test/negotiate.test.js",
+        "test/negotiate-options.test.js"
+      ],
+      "ablation": "M9 S6: 24 ablations of the whole-list solver were designed by six blind lenses and MEASURED, each in its own throwaway copy with the control proved green first (2117 passed / exit 0) and re-proved after restore. 23 turned corpus cases RED, from 1 to 78 FAILED: the strict unmatched result 77, the fallbackLocale field on a no-match 78, consideredLocales on a no-match 77, the equivalence insert position 46, the derived diagnostic 42, advancing past an unmatched range 38, effectiveWeight 37, tiebreaker declared order 28, tier order 23, class order 22, cascade order 20, the weight governor 11, prefix truncation 10, the equal-weight tie order 9, the insertion point 7, wildcard matchType 7, the requested-range echo order 6, class weight 5, the dedup key 3, leading and non-initial wildcards 2 each, the singleton stop 1, fallback candidate election 1.",
+      "evidenceLine": "The earlier NOT-PROVEN was the S8 shape: a green channel with no perturbation recorded. 23 of 24 ablations now name their reds, with sample failing ids per row. THE TWENTY-FOURTH IS THE FINDING AND IS RECORDED RATHER THAN DROPPED: deleting `.sort(compareTags)` from `sortedSupportedTags` leaves conformance BYTE-IDENTICAL at 2117/0 — and the agent did not stop at the zero. Instrumented, that function is called 3,111 times during a conformance run and the input order differs from sorted ZERO times, on two full runs: every fixture's catalog set is already authored sorted. Replayed through an ingress that does not pre-sort, 116 cases would move. The property IS gated, by the test suite rather than the corpus: the same ablation reds `reports consideredLocales as the deduplicated, tag-sorted supported set`, `matchFor against the corpus`, and the M9 S2 delegation probe — 3 tests, with conformance unmoved."
+    },
+    {
+      "id": 2,
+      "statement": "q-values are parsed exactly as `Locale.LanguageRange.parse` does, including the weight check running before the grammar check.",
+      "verdict": "PROVEN",
+      "slice": "M7 A4",
+      "gates": [
+        "npm run conformance",
+        "test/negotiate.test.js"
+      ],
+      "ablation": "M9 S2 C3: moving the 4,096 code-unit cap from the RAW value to the normalized one reds `applies the 4,096 code-unit cap to the RAW value, before normalization` in test/negotiate.test.js — a pre-existing gate, not one written for the ablation.",
+      "evidenceLine": "21/21 `acceptLanguage` corpus cases plus `test/negotiate.test.js`'s guard-order rows. The ablation is recorded in planning/M9-STATUS.md's S2 table and named the red it produced."
+    },
+    {
+      "id": 3,
+      "statement": "Fail-soft headers: absent, blank, malformed, over-4,096-code-unit and over-32-expanded-range input all answer the configured fallback rather than throwing.",
+      "verdict": "PROVEN",
+      "slice": "M9 S2",
+      "gates": [
+        "test/negotiate-options.test.js",
+        "test/negotiate.test.js"
+      ],
+      "ablation": "M9 S2 C1: making `forAcceptLanguage` fabricate a fallback MATCH instead of carrying an unmatched diagnostic reds 14 tests. C4: giving `bestMatchForAcceptLanguage` a private guard chain missing the 32-range cap reds the cross-door test.",
+      "evidenceLine": "Five refusal classes, one shared predicate (`usableAcceptLanguageRanges`), and a cross-door invariant asserting both doors agree on which catalog answers over every probe — with an anti-vacuity check that the probe set selects more than one locale."
+    },
+    {
+      "id": 4,
+      "statement": "Validity: the strict doors refuse a list longer than 32 expanded ranges, and NOTHING is ever truncated.",
+      "verdict": "PROVEN",
+      "slice": "M9 S2",
+      "gates": [
+        "test/negotiate-options.test.js",
+        "npm run conformance"
+      ],
+      "ablation": "M9 S2 C2: truncating to 32 instead of refusing reds the over-32 fail-soft test, which asserts `requestedLanguageRanges` is EMPTY rather than the first 32. C7: making `forLanguageRanges` fail-soft reds the strictness tests.",
+      "evidenceLine": "The corpus pins the pair from the other side: `accept-language.limit.thirty-three-expanded-ranges` falls back while `browser-chooser.limit.alias-expansion-crosses-thirty-two` throws on the same header, and the 32-member sibling is accepted WHOLE. A port that truncates answers one row right and the other wrong."
+    },
+    {
+      "id": 5,
+      "statement": "The pinned IANA closure is the only source of range equivalence; strict negotiation never calls a host registry parser.",
+      "verdict": "PROVEN",
+      "slice": "M7 A4",
+      "gates": [
+        "test/pinned-data-only.test.js",
+        "npm run size:graph"
+      ],
+      "ablation": "M9 S2 C9: re-exporting a negotiate helper from the root reds `the root graph carries no optional plural data` and the new `negotiate/index.js` entry in the forbidden list. The closure has been named there since M7 A2.",
+      "evidenceLine": "`src/data/iana-range-equivalents.js` is loaded in exactly one module, and `test/pinned-data-only.test.js` names both it and (since M9 S2) the solver itself among the modules the root graph may not reach."
+    },
+    {
+      "id": 6,
+      "statement": "`LocaleNegotiator.matchFor(locale)` delegates to, or differentially equals, core's automatic single-locale operation.",
+      "verdict": "PROVEN",
+      "slice": "M9 S2",
+      "gates": [
+        "test/negotiate-options.test.js"
+      ],
+      "ablation": "M9 S2 C11: reversing `consideredLocales` in the negotiator's own `matchFor` reds both delegation probes. C10 DID NOT FIRE first — dropping the tiebreaker list changed nothing over a `{en, fr, fr-CA}` probe space — and a second configuration `{en, fr-CA, fr-FR}`, where `matchFor(\"fr\")` must ELECT, makes it red.",
+      "evidenceLine": "20 tags x 2 configurations compared byte-for-byte against `strings.getDirectLocaleContext(tag).localeMatch`, with the probe space asserted to reach all four match types and both doors asserted to refuse an ill-formed tag with the same class AND message — three `x-lvariant` tags Java ANSWERS as the control. This closes the M9 scope map's blocker 4."
+    },
+    {
+      "id": 7,
+      "statement": "An unmodified Java 3.0.0 / JDK21 lane proves exhaustive expansion and order equality before JS stops relying on a host registry.",
+      "verdict": "PROVEN",
+      "slice": "npm run diff:language-range",
+      "gates": [
+        "npm run diff:language-range",
+        "npm run diff:check"
+      ],
+      "ablation": "S31: renaming every `RangeError` the negotiator throws to `TypeError`, messages byte-identical, left the differential at 6037/6037 exit 0 — it dropped the refusal CLASS. Fixed as a mapping; the same rename now exits 1 with 71 unexplained.",
+      "evidenceLine": "6,037/6,037 identical over a probe space derived from the JDK's OWN equivalence keys by reflection, which is what caught four missing closure classes and re-pinned the artifact 802 -> 806. Its RESULT is re-checked without a JDK by `diff:check`, which is in verify and (since M9 S1) in CI."
+    },
+    {
+      "id": 8,
+      "statement": "Any intentional difference from Java requires a new contract rather than a silent divergence.",
+      "verdict": "PROVEN",
+      "slice": "M7",
+      "gates": [
+        "npm run conformance",
+        "tools/conformance.mjs"
+      ],
+      "ablation": "M7: `DECLARED_MESSAGE_DIVERGENCES` was negative-tested both ways — an undeclared divergence fails the run and so does a declaration that has stopped diverging, with a passing control between them.",
+      "evidenceLine": "243/263 cause messages GATED. The Java message selects the row, the JS message is pinned exactly, and a stale declaration fails."
+    },
+    {
+      "id": 9,
+      "statement": "`forLanguageRanges(negotiator, ranges)` negotiates STRICTLY and returns core's per-call options.",
+      "verdict": "PROVEN",
+      "slice": "M9 S2",
+      "gates": [
+        "test/negotiate-options.test.js"
+      ],
+      "ablation": "M9 S2 C7: making it fail-soft reds `a list longer than 32 throws rather than truncating` and the strict-door contrast test.",
+      "evidenceLine": "Asserted equal to `forLocaleMatch(negotiator.matchForLanguageRanges(ranges))` built independently, because this module does not import core."
+    },
+    {
+      "id": 10,
+      "statement": "`forAcceptLanguage(negotiator, value)` is fail-soft and carries an UNMATCHED diagnostic whose own `locale` remains null; core consumption uses the configured fallback as the lookup locale.",
+      "verdict": "PROVEN",
+      "slice": "M9 S2",
+      "gates": [
+        "test/negotiate-options.test.js"
+      ],
+      "ablation": "M9 S2 C1: fabricating a fallback match reds 14 tests, including the assertion that core's `getResult` reports `lookupLocale: \"en\"` while `localeMatch.locale` stays null.",
+      "evidenceLine": "Plan 3.4:930-931 verbatim. The diagnostic keeps a distinction a fabricated match destroys: `de` is unmatched with ONE requested range, `fr;q=2` unmatched with NONE."
+    },
+    {
+      "id": 11,
+      "statement": "Both helpers negotiate immediately, so the browser/root graph does not contain the whole-list solver.",
+      "verdict": "PROVEN",
+      "slice": "M9 S2",
+      "gates": [
+        "test/negotiate-options.test.js",
+        "test/pinned-data-only.test.js"
+      ],
+      "ablation": "M9 S2 C8: importing `forLocaleMatch` from core into `src/negotiate/index.js` reds `negotiate does not reach core`. C9: re-exporting a helper from the root reds `the root graph does not reach negotiate`.",
+      "evidenceLine": "Both directions gated, neither by a byte ratchet: the root may not reach the solver, and the solver may not reach core."
+    },
+    {
+      "id": 12,
+      "statement": "`ianaRegistryDate` and `ianaDataFingerprint` are exported on `lokalized/negotiate` and are the values core reports.",
+      "verdict": "PROVEN",
+      "slice": "M9 S2",
+      "gates": [
+        "test/negotiate-options.test.js",
+        "test/allowlist-type-surface.test.js"
+      ],
+      "ablation": "M9 S2 C5: replacing them with literals reds both constant tests.",
+      "evidenceLine": "Re-exported from `internal/runtime-metadata.js` — a zero-import leaf — rather than from core, so the subpath pays one module. S28's UNDELIVERED category entry for negotiate's IANA half was deleted, which is the record."
+    },
+    {
+      "id": 13,
+      "statement": "`LocaleNegotiator` is declared and is DERIVED from the factory, so the runtime and the declaration cannot disagree.",
+      "verdict": "PROVEN",
+      "slice": "M8 batch",
+      "gates": [
+        "test/declared-surface.test.js",
+        "npm run types"
+      ],
+      "ablation": "M8's batch: the declaration is `ReturnType<typeof createLocaleNegotiator>`, so a method added to one and not the other is impossible by construction; `declared-surface.test.js`'s OWED entry was deleted when it landed, and that gate reds when a promised name is undelivered (proven in M9 S3 E13).",
+      "evidenceLine": "`types/negotiate/index.d.ts` declares it, and `LocaleMatcher` is a `Pick` of the same type."
+    },
+    {
+      "id": 14,
+      "statement": "The edge example converts the request header to a match and loads only that locale's manifest subset.",
+      "verdict": "PROVEN",
+      "slice": "M9 S1",
+      "gates": [
+        "test/example-edge.test.js"
+      ],
+      "ablation": "M9 S1 A5: loading the whole manifest instead of the subset reds 23 tests. The subset assertion checks the fetch list equals `fetchSet(manifest, selected)` exactly, with an anti-vacuity assert that the plan is a PROPER subset.",
+      "evidenceLine": "Recorded in planning/M9-STATUS.md's S1 ablation table."
+    },
+    {
+      "id": 15,
+      "statement": "The redirect arm answers a locale-keyed url whose target re-renders in direct-locale mode, discarding the whole-list match.",
+      "verdict": "PROVEN",
+      "slice": "M9 S1",
+      "gates": [
+        "test/example-edge.test.js"
+      ],
+      "ablation": "M9 S1 A3: making the redirect target peek at `Accept-Language` reds `the TARGET discards the match`. B1: dropping `Vary` from the redirect reds the redirect test. B2: loading catalogs before redirecting reds its call-count assertion.",
+      "evidenceLine": "Two different headers at the same target url produce byte-identical responses and no `Vary`."
+    },
+    {
+      "id": 16,
+      "statement": "The match-preserving arm keys the response by an opaque fingerprint of the COMPLETE supplied match and every match-dependent rendering input.",
+      "verdict": "PROVEN",
+      "slice": "M9 S1",
+      "gates": [
+        "test/example-edge.test.js",
+        "examples/app/cache-policy.js"
+      ],
+      "ablation": "M9 S1 A2: dropping `requestedLanguageRanges` from the key projection reds the field-coverage test and the collision pair. B3/B4: dropping the catalog fingerprint or the view model each reds its own test.",
+      "evidenceLine": "Field coverage is DERIVED by execution: the match is handed to the key derivation through the recording proxy S32 built for the differentials, and a field the match carries that the key never reads fails."
+    },
+    {
+      "id": 17,
+      "statement": "It never keys match-preserving HTML by selected locale alone.",
+      "verdict": "PROVEN",
+      "slice": "M9 S1",
+      "gates": [
+        "test/example-edge.test.js"
+      ],
+      "ablation": "M9 S1 A1: keying by `match.locale` alone reds 5, led by `two headers with an identical narrow context are owed different bytes`. A8/D4: a view that ignores the requested ranges reds the same pair, which is what makes the fixture load-bearing rather than decorative.",
+      "evidenceLine": "`fr-CH` and `fr-BE` both select `fr` by the same `cldr-fallback` match type, so the selected locale, the match type and the whole serialized SSR stamp are identical — and the rendered pages are not."
+    },
+    {
+      "id": 18,
+      "statement": "A match-preserving response carries the corresponding `Vary` or private-cache policy.",
+      "verdict": "PROVEN",
+      "slice": "M9 S1",
+      "gates": [
+        "test/example-edge.test.js",
+        "test/example-server.test.js"
+      ],
+      "ablation": "M9 S1 D2: dropping `Vary` from the match-preserving response reds 12. A13: dropping it from the server's negotiated document reds `it varies on Accept-Language`, whose sibling asserts the header genuinely changes the bytes.",
+      "evidenceLine": "The server takes plan 6.4's `Vary` strategy and the edge takes the explicit-key strategy, so both shipped arms are exercised."
+    },
+    {
+      "id": 19,
+      "statement": "No Node-only code is in the edge worker's module graph.",
+      "verdict": "PROVEN",
+      "slice": "M9 S1",
+      "gates": [
+        "test/example-graphs.test.js"
+      ],
+      "ablation": "M9 S1 A9: importing `node:url` in the worker reds `reaches no Node built-in`. A10: making the SHARED view import `lokalized/node` reds both graph rules.",
+      "evidenceLine": "The server example's graph is the anti-vacuity control: it legitimately reaches `node:http` and `src/node/`, so a walk that could not see them there could not see them in the worker either."
+    },
+    {
+      "id": 20,
+      "statement": "The edge example requires and exercises Fetch, response streams, `AbortController`, `TextDecoder` and WebCrypto.",
+      "verdict": "PROVEN",
+      "slice": "M9 S6",
+      "gates": [
+        "test/example-edge-capabilities.test.js",
+        "test/example-edge.test.js",
+        "test/example-server.test.js"
+      ],
+      "ablation": "M9 S6: each capability is REMOVED from the global object in its own child process, before the worker's module graph is imported, and the request must then fail rather than render. Seven rows red (TextDecoder, TextEncoder, ReadableStream, Response, Request, AbortController, AbortSignal); WebCrypto fails CLOSED with the library's own DigestUnavailableError; removing global `fetch` with NO injected transport changes the failure from `fetch failed` to `transport is not a function`. The control renders in the same harness, and an eighth row proves an injected transport does not hide the other four.",
+      "evidenceLine": "The earlier NOT-PROVEN rested on the argument that a graph using neither `TextDecoder` nor `fetch` 'would fail to run at all rather than fail a named test' — which is an argument that the property is untestable, and it was wrong: it is testable by removing the capability and requiring the failure. ATTRIBUTION IS STATED RATHER THAN IMPLIED: the WebCrypto row belongs unambiguously to `lokalized/load` and the `fetch` row to the worker's own `env.fetch ?? fetch`; the other rows are attributed to the DEPLOYMENT, because with `ReadableStream` absent a `Response` cannot carry a body at all and no probe can separate worker from loader from transport."
+    },
+    {
+      "id": 21,
+      "statement": "The edge example is smoke-tested in at least one named worker runtime, FROM the packed artifact.",
+      "verdict": "DEFERRED",
+      "slice": "M-R",
+      "gates": [],
+      "ablation": "",
+      "evidenceLine": "Blocker 1 of the M9 scope map, and it is a sequencing contradiction rather than missing work: plan :2344 assigns the smoke test to M9, :2341-2343 defines it as running from the packed build, and M8's amendment A5 deferred that build to M-R, which comes AFTER M9. One of the three has to move and that is the maintainer's. Until then the Node-only prohibition is enforced structurally by clause 19."
+    },
+    {
+      "id": 22,
+      "statement": "The server example negotiates ONCE per request, stamps the result, and preloads exact digest-bound immutable files.",
+      "verdict": "PROVEN",
+      "slice": "M9 S1",
+      "gates": [
+        "test/example-server.test.js"
+      ],
+      "ablation": "M9 S1 A12: constructing a `Strings` per request reds the instance-lifecycle rule, checked through the TypeScript AST because a rebuilding server renders identically. A14: publishing at `<locale>.json` reds `digest-bound and served immutable`. B5: dropping `crossorigin` reds the preload attribute test.",
+      "evidenceLine": "`createStrings` is asserted to be called from `startBookshop` and nowhere else; assets are served `public, max-age=31536000, immutable` and the manifest deliberately is not."
+    },
+    {
+      "id": 23,
+      "statement": "The preloaded url is EXACTLY the url the client later fetches, in the same order.",
+      "verdict": "PROVEN",
+      "slice": "M9 S1",
+      "gates": [
+        "test/example-server.test.js"
+      ],
+      "ablation": "M9 S1 A11: preloading a url that is not the digest-bound one reds all three preload seam tests.",
+      "evidenceLine": "The server computes its links from `fetchSet` — the loader's own planner — and the test compares them against the client's recorded `requestedFiles` AND against what actually left the client, url for url and in order. Two halves that are each green alone and had never been compared."
+    },
+    {
+      "id": 24,
+      "statement": "One network request per catalog: the preload is reused rather than merely followed by a successful second fetch.",
+      "verdict": "NOT-PROVEN",
+      "slice": "M9 S1",
+      "gates": [
+        "test/example-server.test.js"
+      ],
+      "ablation": "",
+      "evidenceLine": "What is asserted and gated is that the client fetches each catalog EXACTLY ONCE, that the preloaded url is the one it fetches, and — added in M9 S6 — that the loader's `DEFAULT_REQUEST` is `{mode: 'cors', credentials: 'same-origin'}`, the anonymous mode the emitted bare `crossorigin` declares. Plan 6.3:2179-2183 names FOUR things that must match for a preload to be reused; three are now checked and the fourth, whether the browser actually reuses the entry, is a BROWSER property Node cannot observe. Held rather than claimed, on the same reasoning that keeps 0a's browser half out of `verify`."
+    },
+    {
+      "id": 25,
+      "statement": "A server keeps an immutable instance per catalog version and selects the locale per call, never by rebuilding.",
+      "verdict": "PROVEN",
+      "slice": "M9 S1",
+      "gates": [
+        "test/example-server.test.js"
+      ],
+      "ablation": "M9 S1 A12: inserting a per-request `createStrings` call reds the AST rule, which asserts the ONLY enclosing scope of a `createStrings` call in the server example is `startBookshop`.",
+      "evidenceLine": "A behavioural test cannot see this — a server that rebuilt per request renders identically and passes every other assertion in the file — so the property is checked where it is visible, on `test/ssr-graph.test.js`'s precedent."
+    },
+    {
+      "id": 26,
+      "statement": "Merging requires at least one input and ONE exact normalized locale across every input; matching primary language, likely script or equivalence is insufficient.",
+      "verdict": "PROVEN",
+      "slice": "M9 S3",
+      "gates": [
+        "test/merge-parsed-files.test.js"
+      ],
+      "ablation": "M9 S3 E6: comparing by primary language reds 4. E5 DID NOT FIRE — comparing the locale RAW changed nothing, because `parseStrings` normalizes at its own door — and a hand-built `ParsedStringsFile` spelled `EN-us`, with an `EN-gb` control, is the input that reaches the merge's own normalizer.",
+      "evidenceLine": "`pt`/`pt-PT` refused with both tags named; `nb`/`no`, `en`/`en-US` and `zh-Hans`/`zh-Hant` refused; `iw`/`he` merged, because normalization is CLDR-canonical."
+    },
+    {
+      "id": 27,
+      "statement": "A repeated key is deduplicated when its complete validated model is structurally equal and REFUSED otherwise, with the exact prior and new origins. Last-write-wins is forbidden.",
+      "verdict": "PROVEN",
+      "slice": "M9 S3",
+      "gates": [
+        "test/merge-parsed-files.test.js"
+      ],
+      "ablation": "M9 S3 E1: skipping the equality check — last-write-wins — reds 6. E2: honouring keyed-record ORDER reds the placeholder-order merge. E3: ignoring ARRAY order reds the alternatives conflict. E4: a hand-written `key`+`translation` field list reds 4.",
+      "evidenceLine": "The predicate's SHAPE was measured against `lokalized-java` 3.0.0's own `LocalizedString#equals` on the pinned JDK: placeholder-map and translations-map order EQUAL, alternatives order NOT EQUAL, commentary compared. A predicate honouring map order would be strictly stricter than Java."
+    },
+    {
+      "id": 28,
+      "statement": "The merge preserves the ordered flattened source list, unions per-key origins, preserves warnings, and its own output can be merged again without losing diagnostics.",
+      "verdict": "PROVEN",
+      "slice": "M9 S3",
+      "gates": [
+        "test/merge-parsed-files.test.js"
+      ],
+      "ablation": "M9 S3 E7: not unioning origins reds 6. E8: deduplicating `sources` reds the three-shard test. E11: dropping warnings reds 3.",
+      "evidenceLine": "`merge([merge(a,b), c])` is asserted deepEqual to `merge([a,b,c])` on strings, origins and sources, with the shared key's origins surviving the second pass."
+    },
+    {
+      "id": 29,
+      "statement": "It applies the file, node and warning aggregate limits and does NOT pretend to reconstruct the raw byte, character or JSON-nesting bounds.",
+      "verdict": "PROVEN",
+      "slice": "M9 S3",
+      "gates": [
+        "test/merge-parsed-files.test.js"
+      ],
+      "ablation": "M9 S3 E10: never charging the file budget reds the limits test. E12: never applying the warning budget reds its own. E9: skipping model revalidation reds 18.",
+      "evidenceLine": "Each limit has a control that must still succeed, and a merge handed `maximumJsonNestingDepth: 1`, `maximumInputBytes: 1` and `maximumReaderCharacters: 1` must NOT refuse."
+    },
+    {
+      "id": 30,
+      "statement": "Scenario 6 — edge/server full-range negotiation atop the shared validity/IANA closure — is frozen, recorded, and re-checked by a machine.",
+      "verdict": "PROVEN",
+      "slice": "M9 S4",
+      "gates": [
+        "npm run scenario:6",
+        "tools/scenario-6.mjs",
+        "measurements/scenario-6.json"
+      ],
+      "ablation": "M9 S4, six ablations, all firing with a clean control: a changed fixture byte, a changed recipe with the revision unmoved, a graph that grew, a missing artifact, requests-per-render that grew, and a re-pinned IANA closure each exit non-zero naming their own term.",
+      "evidenceLine": "Frozen at M9 S4 rather than before M9 started, which plan 9.2:2818 asked for; the deviation is recorded in the artifact's own note. No thresholds, by the A3/A4 precedent. In `verify` and in CI from its first commit, which is the proof obligation both of those amendments created."
+    },
+    {
+      "id": 31,
+      "statement": "Every symbol the plan declares — by plan 3.1's table and by signature across its eleven other sections — is delivered or carries a falsifiable disposition.",
+      "verdict": "PROVEN",
+      "slice": "M9 S3",
+      "gates": [
+        "test/declared-surface.test.js",
+        "test/plan-surface.test.js",
+        "test/allowlist-type-surface.test.js"
+      ],
+      "ablation": "M9 S3 E13: implementing `mergeParsedStringsFiles` without EXPORTING it reds both surface gates, naming `parse:mergeParsedStringsFiles`. The first attempt was a false negative because the copy's `types/*.d.ts` predated the mutation — S25's rule, applied.",
+      "evidenceLine": "Both OWED tables are empty: `declared-surface` held thirteen names on 2026-09-10, `plan-surface` held thirty. Promised-but-undelivered: 0."
+    },
+    {
+      "id": 32,
+      "statement": "`diff:language-range`, M9's closing condition, leaves a machine-re-checkable record even where no JDK is available.",
+      "verdict": "PROVEN",
+      "slice": "S31 / M9 S1",
+      "gates": [
+        "npm run diff:check",
+        "measurements/differentials.json"
+      ],
+      "ablation": "S31, six ablations all firing: a missing record, a recorded RED, an omitted entry, an invented one, and a differential whose TOOL digest moved since its last Java run each fail without Java. The tool-digest arm fired for real when `diff:language-range` changed.",
+      "evidenceLine": "Blocker 3 of the M9 scope map asked whether \"recorded\" meant machine-re-checked. It does, and M9 S1 closed the other half by adding `diff:check` to CI, where it had never run — it was in `verify` and in neither CI list."
+    },
+    {
+      "id": 33,
+      "statement": "The pinned IANA/JDK-compatibility closure is generated from a registry snapshot recording `File-Date` and source SHA-256, with explicit JDK-compatibility override rows.",
+      "verdict": "DEFERRED",
+      "slice": "maintainer",
+      "gates": [],
+      "ablation": "",
+      "evidenceLine": "Blocker 2 of the M9 scope map, measured rather than inferred: `ianaRegistryFileDate` is null, `source` is `jdk-oracle`, `jdkCompatibilityOverrides` is empty. The port-vs-JDK axis is real and green (clause 7); the REGISTRY axis does not exist. Either the JDK is accepted as the sole authority in writing or the snapshot is acquired — maintainer decision A11 already chose `jdk-oracle:21.0.11` for the stamp field, which is evidence of intent but is not the same decision."
+    },
+    {
+      "id": 34,
+      "statement": "The blessed `localeLookupFor` memo (plan 3.4:864) is taken or permanently declined, and any cache that is taken meets plan 2.2:150-156 — per-instance deterministic LRU keyed by normalized requested tag, at most 256 retained entries, a test-only probe, a conforming disabled branch, and a 4,096 -> 40,960 heap protocol on both branches.",
+      "verdict": "PROVEN",
+      "slice": "M9 S5",
+      "gates": [
+        "test/candidate-chain-memo.test.js",
+        "test/cache-bounds.test.js"
+      ],
+      "ablation": "M9 S5, seven ablations: removing the 256 ceiling reds 4; FIFO instead of LRU reds the re-touch test; the disabled branch caching anyway reds its own; a module-scope map shared across instances reds 4; not freezing the cached chain reds the freeze test in either branch. TWO DID NOT FIRE FIRST: keying on the caller's raw spelling (because `forLocale` normalizes at its own door, so the probe tested that helper — the raw option object reaches the key, and the mutation then reds) and the freeze (no behavioural test can see it, so the property is asserted directly).",
+      "evidenceLine": "3.4's memo is DECLINED PERMANENTLY on a measurement: instrumented over 1,440 lookups across 100 SSR renders, 80 edge preserve-arm renders and 60 redirect targets, the instance-locale arm it caches was hit ZERO times, so it is inert for the server/edge packaging the deferral cited. Plan 2.2:150's candidate-chain LRU was taken instead — 6 recomputations per SSR render over 4 distinct tags, 8.8% of end-to-end server time; memoized, supplied-match lookups 33,579 -> 3,738 ns (-88.9%). Conformance byte-identical at 2,117/0 across the change."
+    }
+  ]
+}

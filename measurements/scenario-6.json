@@ -1,0 +1,88 @@
+{
+  "scenario": "6",
+  "revision": 1,
+  "frozenAt": "2026-09-15",
+  "note": "No thresholds, by the precedent of M7 clause 19 as amended (A3) and M8's A4: recorded and ratcheted where a ratchet exists, reported where none does. Frozen at M9 S4 rather than before M9 started, which plan 9.2:2818 asked for; the deviation is the record.",
+  "recipe": {
+    "scenario": "6",
+    "description": "edge/server full-range negotiation atop the shared validity/IANA closure",
+    "environment": "node",
+    "iterations": 9,
+    "fixture": "examples/catalogs",
+    "variants": [
+      {
+        "label": "edge worker",
+        "entry": "examples/edge/worker.js"
+      },
+      {
+        "label": "server renderer",
+        "entry": "examples/server/server.js"
+      }
+    ],
+    "headers": [
+      "fr-CA",
+      "fr-CH",
+      "fr-CA,fr;q=0.9,en;q=0.1",
+      "de",
+      "iw,he;q=0.5",
+      "fr;q=2"
+    ],
+    "method": "median of 9; graph figures from tools/example-graph-walk.mjs; requests counted over an in-memory transport serving the published manifest and catalogs"
+  },
+  "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+  "fixtureSha256": "59754a7dc591b630a415a803707046be4e46d444bfe4301a4aac59d5c6de6184",
+  "closureClasses": 806,
+  "closureBytes": 23482,
+  "node": [
+    {
+      "label": "edge worker",
+      "modules": 47,
+      "sourceBytes": 1098953,
+      "nodeBuiltinEdges": 0,
+      "ianaClosureBytes": 23482,
+      "importMs": 0.4975
+    },
+    {
+      "label": "server renderer",
+      "modules": 54,
+      "sourceBytes": 1169916,
+      "nodeBuiltinEdges": 10,
+      "ianaClosureBytes": 23482,
+      "importMs": 17.604
+    }
+  ],
+  "negotiateMsPerHeader": 0.06835,
+  "firstRenderMs": 0.9593,
+  "retainedBytes": -14352,
+  "requestsPerRender": {
+    "fr-CA": 4,
+    "fr-CH": 4,
+    "fr-CA,fr;q=0.9,en;q=0.1": 4,
+    "de": 2,
+    "iw,he;q=0.5": 2,
+    "fr;q=2": 2
+  },
+  "rebaselines": [
+    {
+      "reason": "M9 S5: plan 2.2:150's candidate-chain LRU. Both example graphs reach the locale kernel, so both grew by the memo factory and its docblock; module counts, the closure and requests-per-render are unchanged.",
+      "growth": [
+        "edge worker: source graph grew 1089504 -> 1097158 bytes",
+        "server renderer: source graph grew 1160467 -> 1168121 bytes"
+      ]
+    },
+    {
+      "reason": "M9 S6: the DEFAULT_REQUEST export and its comment in src/load/fetch-loader.js, which both example graphs reach through lokalized/load",
+      "growth": [
+        "edge worker: source graph grew 1097158 -> 1097426 bytes",
+        "server renderer: source graph grew 1168121 -> 1168389 bytes"
+      ]
+    },
+    {
+      "reason": "M9 S8: the javaDoubleText weight rendering in src/negotiate/index.js, which both example graphs reach through lokalized/negotiate",
+      "growth": [
+        "edge worker: source graph grew 1097426 -> 1098953 bytes",
+        "server renderer: source graph grew 1168389 -> 1169916 bytes"
+      ]
+    }
+  ]
+}

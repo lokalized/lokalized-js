@@ -28,6 +28,7 @@
 import { decode as decodeCardinalRules } from "../data/cardinal.js";
 import { canonicalLanguageTag, hasUndeterminedLanguage } from "./locale-cldr.js";
 import { jdkLanguageTag, parseJdkTag } from "./locale-jdk-tag.js";
+import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "./lokalized-error.js";
 
 /**
  * CLDR plural operands.
@@ -97,23 +98,67 @@ export const PLURAL_DATA_RUNTIME = Symbol.for("lokalized.plural-data-runtime.v1"
  * `UnsupportedLocaleError` and its wording for this surface, and that is a recorded maintainer
  * decision (M7 decision 3) — what was owed here is the ROLE, not Java's spelling of it.
  */
-export class UnsupportedLocaleError extends Error {
+/**
+ * The only way to raise one. Five sites across `core`, `plural`, `data/ordinal` and `data/ranges`
+ * do, so the token cannot sit beside a single call site the way `DIGEST_ERROR_TOKEN` does.
+ *
+ * @param {string} localeTag @param {"source" | "target"} [role]
+ */
+export function unsupportedLocaleError(localeTag, role) {
+  return UnsupportedLocaleError.raise(LOKALIZED_ERROR_TOKEN, localeTag, role);
+}
+
+export class UnsupportedLocaleError extends LokalizedError {
   /**
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
+   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
+   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
+   * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
+   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * raiser below is what lets the module's own factory still build one, since a private constructor
+   * is callable only from inside the class body.
+   *
+   * @private
+   * @param {symbol} token the internal construction token
    * @param {string} localeTag
    * @param {"source" | "target"} [role] which argument the tag came from, when the caller passed more
    *   than one and the sentence would otherwise be ambiguous
    */
-  constructor(localeTag, role) {
+  constructor(token, localeTag, role) {
+    if (token !== LOKALIZED_ERROR_TOKEN)
+      throw new TypeError("UnsupportedLocaleError is not constructible; it is thrown by lokalized");
+
     super(
+      LOKALIZED_ERROR_TOKEN,
       role === undefined
         ? `Unsupported locale '${localeTag}' was provided`
         : `Unsupported ${role} locale '${localeTag}' was provided`,
     );
     this.name = "UnsupportedLocaleError";
-    /** @type {string} */
-    this.localeTag = localeTag;
+    /**
+     * PLAN 3.5:1049-1051 NAMES THIS FIELD `locale`, and the port called it `localeTag` — a private
+     * spelling, because the class was exported from no subpath until S35 and one test read it. The
+     * plan's name wins now that a consumer can see it: `interface UnsupportedLocaleError extends
+     * LokalizedError { readonly code: "UNSUPPORTED_LOCALE"; readonly locale: LocaleTag; }`.
+     * @type {string}
+     */
+    this.locale = localeTag;
+    /** @type {"UNSUPPORTED_LOCALE"} */
+    this.code = "UNSUPPORTED_LOCALE";
     /** @type {"source" | "target" | undefined} */
     this.role = role;
+  }
+
+  /**
+   * The one construction path, because the constructor above is private. Its parameters are the
+   * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
+   * the token it takes first is never exported from this package.
+   *
+   * @param {symbol} token @param {string} localeTag @param {"source" | "target"} [role]
+   */
+  static raise(token, localeTag, role) {
+    return new UnsupportedLocaleError(token, localeTag, role);
   }
 }
 
@@ -1121,7 +1166,7 @@ export function cardinalCategoryFor(operands, localeTag) {
   const index = CARDINAL_TABLE.indexForLocale(localeTag);
 
   // `UnsupportedLocaleException(locale)` reports `locale.toLanguageTag()`, not the raw input.
-  if (index < 0) throw new UnsupportedLocaleError(jdkLanguageTag(localeTag));
+  if (index < 0) throw unsupportedLocaleError(jdkLanguageTag(localeTag));
 
   return /** @type {CardinalCategory} */ (CARDINAL_TABLE.countFor(index, operands));
 }

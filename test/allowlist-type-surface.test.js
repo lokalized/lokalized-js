@@ -46,6 +46,27 @@ const OWNERS_BY_SUBPATH = /** @type {Record<string, string[]>} */ ({
  */
 const CATEGORIZED_TYPES = /** @type {[string, string, string][]} */ ([
   // core — the options and result shapes `createStrings` and a lookup traffic in.
+  // PLAN 3.7's TAGGED-VALUE FAMILY, delivered as a batch. S28's category gate had reported
+  // "tagged-value types" as having NO delivered member; these are it. The 61 constants shipped in
+  // M5b and their types did not, which left every one emitted as `… | undefined` with the two tag
+  // fields widened to `string`.
+  ["core", "TaggedLanguageFormValue", "tagged-value types"],
+  ["core", "LanguageFormValue", "tagged-value types"],
+  ["core", "PhoneticValue", "tagged-value types"],
+  ["core", "LanguageFormName", "tagged-value types"],
+  ["core", "LanguageFormAxis", "tagged-value types"],
+  ["core", "GenderFormName", "tagged-value types"],
+  ["core", "GrammaticalCaseFormName", "tagged-value types"],
+  ["core", "DefinitenessFormName", "tagged-value types"],
+  ["core", "ClassifierFormName", "tagged-value types"],
+  ["core", "FormalityFormName", "tagged-value types"],
+  ["core", "ClusivityFormName", "tagged-value types"],
+  ["core", "AnimacyFormName", "tagged-value types"],
+  ["core", "CardinalityFormName", "tagged-value types"],
+  ["core", "OrdinalityFormName", "tagged-value types"],
+  ["core", "PhoneticFormName", "tagged-value types"],
+  // Plan 3.2:400's union, delivered in S35 with the error hierarchy that uses it.
+  ["core", "LokalizedErrorCode", "core errors"],
   ["core", "CreateStringsOptions", "construction/translation/result types"],
   // ITS TWO ARMS, ADDED IN S29. Plan 3.2:565-588 declares `CreateStringsOptions` as
   // `DirectCreateStringsOptions | LoadedCreateStringsOptions`; the port had only the direct shape and
@@ -80,6 +101,14 @@ const CATEGORIZED_TYPES = /** @type {[string, string, string][]} */ ([
   ["parse", "LocalizedStringWarning", "parsed/model/warning/limit types"],
   ["parse", "StringsLoadingLimits", "parsed/model/warning/limit types"],
   ["parse", "Definition", "parsed/model/warning/limit types"],
+  // Delivered as a batch with the tagged-value family. Each was promised by a signature the
+  // allowlist could never see, because it is generated from plan section 3.1's table alone.
+  ["core", "Placeholders", "construction/translation/result types"],
+  ["parse", "ParsedCatalogLimits", "parsed/model/warning/limit types"],
+  ["parse", "PlaceholderDefinition", "parsed/model/warning/limit types"],
+  ["parse", "LocalizedStringNodeInput", "parsed/model/warning/limit types"],
+  ["load", "PartialFailurePolicy", "manifest/load option and failure types"],
+  ["load", "LoadStringsOptions", "manifest/load option and failure types"],
   // load — the per-file diagnosis its failures carry.
   ["load", "LoadFailure", "manifest/load option and failure types"],
   // ssr — its single category, named for exactly these.
@@ -127,33 +156,22 @@ const UNCATEGORIZED = /** @type {Record<string, string>} */ ({
  * `declared-surface.test.js`'s `OWED`, and found the same way: by building the gate and reading what
  * it named. Each goes STALE and FAILS the moment a member is classified, so the backlog cannot rot.
  *
+ * **ONE ENTRY IS ALREADY GONE, AND ITS DELETION IS THE RECORD.** `core|CLDR/IANA runtime metadata`
+ * was here from S28 until S30 delivered plan 3.2:447-453's seven build-identity constants; the
+ * staleness check below caught it on the first run after the export landed, which is the whole
+ * contract this table carries.
+ *
  * RECORDED AS FOUND, NOT ASSIGNED, where the owning milestone is closed — S5's precedent for the
  * same discovery one level up, when 28 allowlisted NAMES turned out to be declared nowhere.
  */
 const UNDELIVERED_CATEGORIES = /** @type {Record<string, { owner: string, why: string }>} */ ({
-  "core|tagged-value types": {
-    owner: "UNASSIGNED",
-    why:
-      "`decimal` and `pluralOperands` ship as FUNCTIONS and are named symbols, but the shapes they " +
-      "RETURN are exported nowhere, so a consumer cannot name the value they are handed. Plan 3.7 " +
-      "defines those wire shapes and the corpus uses them by name. M5b owned them and is closed.",
-  },
-  "core|CLDR/IANA runtime metadata": {
-    owner: "M9",
-    why:
-      "MEASURED: zero runtime exports and zero types matching iana/cldr/metadata on `./core`. The " +
-      "IANA identity exists only as `ianaRegistryDate`/`ianaDataFingerprint` FIELDS inside " +
-      "`getLoadVerification()`'s return, with no standalone export. `DataProvenance` and " +
-      "`SourceDataProvenance` are named symbols covering the CLDR half; the IANA half has nothing. " +
-      "M9's plan row names the pinned IANA closure, which is where this belongs.",
-  },
-  "negotiate|re-exports core's `LanguageRange` type and IANA metadata": {
-    owner: "M9",
-    why:
-      "The `LanguageRange` half IS delivered -- it is a named symbol on `negotiate` and the delivery " +
-      "gate covers it. The IANA-metadata half has nothing to re-export, because core exports none " +
-      "(see the entry above). One category, two promises, one kept.",
-  },
+  // `negotiate|re-exports core's LanguageRange type and IANA metadata` WAS HERE and is deleted by
+  // M9 S2, which is the record of it closing. Worth keeping the reason it survived as long as it
+  // did: its `why` said "the IANA-metadata half has nothing to re-export, because core exports
+  // none", and that stopped being true the day M8's final batch landed the seven build-identity
+  // constants. **The staleness arm below fires when a category gains a MEMBER, never when an entry's
+  // excuse stops holding** — so a table entry can go on describing a world that ended, which is this
+  // project's most-repeated defect wearing the one costume the gate does not check for.
   "node|re-exports applicable shared load types": {
     owner: "M8",
     why:

@@ -4,7 +4,7 @@
  * CACHE BOUNDS UNDER ADVERSARIAL TAGS — the M7 row's "cache bounds survive adversarial tags".
  *
  * WHAT IS ACTUALLY CACHED, enumerated rather than assumed. M7-PLAN.md's C2 row says "no tag-keyed
- * cache exists today"; that is stale, and this file is the correction. Exactly three things in
+ * cache exists today"; that is stale, and this file is the correction. Exactly FOUR things in
  * `src/` GROW AT RUNTIME — re-derived by reading every module-scope `Map`/`Set` in the package and
  * every closure that outlives a call, not by trusting an earlier list — and only the third was added
  * by M7. (The other memos in the port are per-CALL and retain nothing between calls: `projectNode`'s
@@ -32,13 +32,29 @@
  *      caller input: its keys are prefixes found in the pinned 806-class IANA closure, so its size
  *      is bounded by the artifact and an attacker cannot add a key. It carries no eviction and needs
  *      none; that is a property of the key space, and it is asserted below rather than argued.
+ *   4. `src/core/index.js`'s `chainMemo` — added by M9 S5, plan 2.2:150's blessed candidate-chain
+ *      LRU. ONE PER `Strings` INSTANCE, keyed on the normalized lookup tag, which IS caller input —
+ *      so it carries a hard 256-entry ceiling with strict-LRU eviction, and its whole contract is
+ *      gated by `test/candidate-chain-memo.test.js`, including a 4,096-tag sweep, the surviving key
+ *      order, a disabled branch that retains zero, and a 4,096 -> 40,960 heap protocol with the same
+ *      unbounded control this file uses.
  *
- * AND WHAT IS DELIBERATELY NOT CACHED. Plan 3.4 blesses exactly one cache — "a constant instance
- * locale may cache that result" — and the port does not take it: `localeLookupFor` calls `matchFor`
- * on every lookup through every ingress. The permission is not an obligation, and declining it makes
- * the plan's harder half ("resolver and per-call locale values are normalized and recomputed on
- * every use") true by construction rather than by discipline. The last test here is what would catch
- * a future instance-level cache that quietly extended itself to the resolver.
+ * AND WHAT IS DELIBERATELY NOT CACHED — which is a DIFFERENT permission from the one M9 took, and
+ * the two were conflated until the measurement separated them. Plan 3.4:864 blesses caching the
+ * automatic direct result for "a constant instance locale"; plan 2.2:150 separately blesses
+ * memoizing the candidate CHAIN. M9 S5 took the second and DECLINED THE FIRST PERMANENTLY.
+ *
+ * The decline is a measurement rather than a preference. M7's close deferred 3.4's memo to M9 on the
+ * maintainer's reasoning that "a cache belongs with the server/edge packaging that creates pressure
+ * for it"; M9 built that packaging and then counted which arm of `localeLookupFor` it uses.
+ * Instrumented over 1,440 lookups — 100 SSR renders, 80 edge preserve-arm renders, 60 redirect
+ * targets — **the instance-locale arm was hit ZERO times**. The server's lookups are 80%
+ * supplied-match and 20% per-call locale; the edge's are 100% one or the other. So the deferred memo
+ * is inert for the workload it was deferred to, and taking it would buy nothing while making the
+ * plan's harder half ("resolver and per-call locale values are normalized and recomputed on every
+ * use") a matter of discipline rather than construction. `localeLookupFor` still calls `matchFor` on
+ * every lookup through every ingress, and the last test here is what catches a future cache that
+ * quietly extended itself to the resolver.
  *
  * WHAT DECLINING IT COSTS, AND WHY THAT IS DEFERRED RATHER THAN UNKNOWN. Priced by ablation against
  * a scratch copy of `src/` carrying that one memo — identical rendered output, identical catalog
@@ -46,11 +62,12 @@
  * full walk goes 81,575 -> 32,941 ns/lookup (-59.6%) and the direct hit 44,360 -> 24,128 (-45.6%).
  * `tools/scenario-2k.mjs`'s header carries the same table from the first measurement.
  *
- * **DEFERRED TO M9 by the maintainer on 2026-09-09 — deferred, NOT declined.** It was offered at
- * M7's close with the measurement attached and the answer was that a cache belongs with the
- * server/edge packaging that would create pressure for it, not with the resolution core. So this
- * comment is a standing price, not a standing verdict: if M9 takes the memo, the tests below are
- * what have to keep passing, and the third one is aimed at exactly the way taking it could go wrong.
+ * **DEFERRED TO M9 by the maintainer on 2026-09-09, and DECLINED BY M9 S5 on the measurement above.**
+ * The price recorded here was real and is left standing, but it is a price on arms the server and
+ * edge packaging does not use. Worth noting for anyone re-reading it: the chain memo M9 DID take
+ * moves the instance-locale arm 43,720 -> 23,855 ns on its own, so a large part of what this table
+ * measured was the chain rather than the match. The tests below are what have to keep passing either
+ * way, and the last one is aimed at exactly the way taking 3.4's memo could go wrong.
  *
  * THE PROBE HAS A CONTROL THAT MUST EXCEED THE THRESHOLD. A memory assertion with no failing control
  * "passes" on any machine where the sweep is cheap for unrelated reasons, which is this project's

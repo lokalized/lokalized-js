@@ -40,6 +40,7 @@
 import { resolveLimits } from "../internal/catalog.js";
 import { parseStrings } from "../parse/index.js";
 import { localeConfigurationForManifest, validateStringsManifest } from "./manifest.js";
+import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-error.js";
 
 const MAXIMUM_ACTIVE_READS = 8;
 
@@ -52,8 +53,20 @@ const MAXIMUM_ACTIVE_READS = 8;
  * ONE CLASS FOR BOTH DOORS, deliberately: a caller that catches `StringsLoadingError` around a load
  * should not have to know whether the bytes came from the network or the disk.
  */
-export class StringsLoadingError extends Error {
+  // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
+  // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
+export class StringsLoadingError extends LokalizedError {
   /**
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
+   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
+   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
+   * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
+   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * raiser below is what lets the module's own factory still build one, since a private constructor
+   * is callable only from inside the class body.
+   *
+   * @private
    * NOT CONSTRUCTIBLE BY A CONSUMER, and the token is what makes that enforceable rather than
    * advisory — it also refuses `class Mine extends StringsLoadingError` at instantiation time.
    * `StringsParseError` has had exactly this shape since M5; this class shipped without it, so a
@@ -66,12 +79,23 @@ export class StringsLoadingError extends Error {
     if (token !== LOADING_ERROR_TOKEN)
       throw new TypeError("StringsLoadingError is not constructible; it is thrown by the loaders");
 
-    super(message);
+    super(LOKALIZED_ERROR_TOKEN, message);
     this.name = "StringsLoadingError";
     /** @type {string} */
     this.code = "STRINGS_LOADING";
     /** @type {readonly any[]} */
     this.failures = Object.freeze([...failures]);
+  }
+
+  /**
+   * The one construction path, because the constructor above is private. Its parameters are the
+   * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
+   * the token it takes first is never exported from this package.
+   *
+   * @param {symbol} token @param {string} message @param {readonly any[]} failures
+   */
+  static raise(token, message, failures) {
+    return new StringsLoadingError(token, message, failures);
   }
 }
 
@@ -84,7 +108,7 @@ const LOADING_ERROR_TOKEN = Symbol("lokalized.strings-loading-error");
  * @param {string} message @param {readonly any[]} failures
  */
 export function loadingError(message, failures) {
-  return new StringsLoadingError(LOADING_ERROR_TOKEN, message, failures);
+  return StringsLoadingError.raise(LOADING_ERROR_TOKEN, message, failures);
 }
 
 /** @param {ArrayBuffer | Uint8Array} buffer */
@@ -244,9 +268,16 @@ export async function runPlan(manifest, plan, options, transport) {
       failures,
     );
 
-  /** @type {Record<string, unknown>} */
+  // **THESE TWO ANNOTATIONS ARE WHAT MAKES THE LOADER'S RESULT ASSIGNABLE TO `createStrings`.**
+  // They read as placeholders and were: `Record<string, unknown>` and `unknown[]` widened the two
+  // fields `LoadedStrings` declares most precisely, so `createStrings({ loaded })` — the whole point
+  // of the loaded branch — failed to typecheck with TS2322 for every caller, while every test in
+  // this repository stayed green because every test is JavaScript. Found 2026-09-15 by compiling
+  // `examples/` under `--strict`, which is the first consumer-shaped TypeScript in the repo to call
+  // the two doors in sequence rather than hand-writing a `LoadedStrings` to stand in for one.
+  /** @type {Record<string, import("../parse/index.js").ParsedStringsFile>} */
   const catalogs = Object.create(null);
-  /** @type {unknown[]} */
+  /** @type {import("../internal/parse-warnings.js").LocalizedStringWarning[]} */
   const warnings = [];
   for (const row of results) {
     if (!row || !row.ok) continue;
