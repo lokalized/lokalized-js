@@ -179,6 +179,16 @@ jobs:
       # the deterministic size/module figures and reports the noisy timings without gating them.
       - name: Behavioral conformance against the Java corpus
         run: npm run conformance
+
+      # M-R S10. Both read `measurements/conformance.json`, so they follow the run that writes it.
+      # `test/verify-ci-parity.test.js` is what makes this a rule rather than a habit: it compares
+      # this list to `verify`'s as a set AND in order, and it fired on the commit that added these
+      # two steps to `verify` alone.
+      - name: Divergence document is what the declared records produce
+        run: npm run divergences
+
+      - name: Release parity declaration is what this build produces
+        run: npm run parity
       # The nine differentials need the pinned JDK, which CI provisions none of — but their RECORDED
       # result does not, and `diff:check` is the half that re-checks it: a missing record, a recorded
       # red, an unknown or omitted entry, or a differential whose TOOL has moved since its last Java

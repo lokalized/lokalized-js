@@ -2539,8 +2539,7 @@ own origin, with request init `{ mode: "cors", credentials: "same-origin" }`.
 
 ### Loading from a browser without a bundler
 
-**The package ships a prebuilt browser distribution.** `package.json`'s `files` is `["src/",
-"types/", "dist/", "LICENSE", "NOTICE", "THIRD-PARTY-NOTICES.md", "README.md"]`, and `dist/browser/`
+**The package ships a prebuilt browser distribution.** `package.json`'s `files` is `["src/", "types/", "dist/", "LICENSE", "NOTICE", "THIRD-PARTY-NOTICES.md", "README.md", "measurements/lokalized-parity.json", "DIVERGENCES.md"]`, and `dist/browser/`
 holds the built form: one classic script, one single-file module root, and a module entry per
 optional subpath. Everything below loads it straight from a CDN with no build step of your own.
 

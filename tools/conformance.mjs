@@ -4051,6 +4051,30 @@ function classifyFailure(testCase, fixture, actual, wanted) {
 }
 
 // --- run ----------------------------------------------------------------------------------------
+/**
+ * **THE DECLARED-DIVERGENCE TABLES, MADE READABLE WITHOUT RUNNING THE SUITE.**
+ *
+ * `DIVERGENCES.md` (plan 8.5) is generated from these, and there were only two ways to reach them:
+ * move them into a shared module, or expose them. Moving won: it is the rule this project applies
+ * to `graph-walk.mjs` and `readme-blocks.mjs` — except here it LOSES, because reviewers read
+ * `git diff tools/conformance.mjs` specifically to catch a rule being weakened, and a 153-line
+ * relocation reads exactly like one. Six lines that move no rule are reviewable; a diff that
+ * shuffles every table is not.
+ *
+ * This prints and exits BEFORE any case runs, so `tools/divergences.mjs` pays a subprocess and this
+ * file stays the single owner of every table. A table added here and not listed below is invisible
+ * to the generated document, which is why the document asserts its own floor.
+ */
+if (process.argv.includes("--dump-divergences")) {
+  console.log(JSON.stringify({
+    NO_JS_COUNTERPART, BY_DESIGN_UNSUPPORTED, DECLARED_MESSAGE_DIVERGENCES,
+    DECLARED_CAUSE_MESSAGE_DIVERGENCES,
+    HOST_ENUMERATION_ORDER_DEPENDENT: Object.fromEntries(HOST_ENUMERATION_ORDER_DEPENDENT),
+  }, null, 2));
+  process.exit(0);
+}
+
+
 const corpusBytes = readFileSync(corpusPath);
 const corpus = JSON.parse(corpusBytes.toString("utf8"));
 const cases = corpus.cases.filter((c) => !familyFilter || c.id.startsWith(familyFilter));

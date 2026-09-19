@@ -150,6 +150,35 @@ try {
         `the packed artifact is ${squeezed}`);
   }
 
+  /* 7. the parity declaration and the divergence document, as the tarball carries them */
+  //
+  // **PLAN 8.5 WANTS BYTE IDENTITY BETWEEN THE TESTED AND PUBLISHED COPIES, and there is no
+  // published copy yet.** What IS checkable today is the half that will still matter after the
+  // first publish: the copy inside the tarball must equal the working tree's, and the working
+  // tree's must equal what regenerating produces. A report that ships describing a DIFFERENT build
+  // than the one in the tarball is the failure mode worth catching, and `prepack` generating it
+  // last is what makes the two agree — this asserts that rather than trusting the ordering.
+  for (const path of ["measurements/lokalized-parity.json", "DIVERGENCES.md"]) {
+    if (!files.includes(path)) { problems.push(`${path} is not in the packed tarball`); continue; }
+    const packedCopy = readFileSync(join(installed, path), "utf8");
+    const treeCopy = readFileSync(join(root, path), "utf8");
+    if (packedCopy !== treeCopy)
+      problems.push(`${path} in the tarball is not byte-identical to the working tree's copy`);
+  }
+  // The parity declaration must describe THIS package: its own recorded version and commit are
+  // compared to the tarball's, so a stale report cannot ride along with a newer build.
+  {
+    const parity = JSON.parse(readFileSync(join(installed, "measurements/lokalized-parity.json"), "utf8"));
+    const manifest = JSON.parse(readFileSync(join(installed, "package.json"), "utf8"));
+    if (parity.fields.implementationVersion !== manifest.version)
+      problems.push(`the packed parity declaration reports version ${parity.fields.implementationVersion} ` +
+        `and the packed package.json says ${manifest.version}`);
+    if (!parity.strictPartition?.met)
+      problems.push("the packed parity declaration reports the strict required partition as NOT met");
+    if (parity.undetermined.some((/** @type {any} */ u) => !u.reason && !u.blocker))
+      problems.push("the packed parity declaration carries an undetermined field with no reason and no blocker");
+  }
+
   /* anti-vacuity */
   if (specifiers.length < 9) problems.push(`only ${specifiers.length} specifier(s) were imported`);
   if (files.filter((/** @type {string} */ p) => p.endsWith(".js")).length < 50)
