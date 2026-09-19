@@ -39,6 +39,7 @@ import { computeCatalogIdentity } from "../src/load/index.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
 import { loadEntireManifest, StringsLoadingError } from "../src/load/fetch-loader.js";
 import { sha256Hex } from "../src/internal/sha256.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
 const bodyFor = (/** @type {string} */ tag) => JSON.stringify({ [`Key.${tag}`]: `hello ${tag}` });
@@ -48,7 +49,7 @@ function draftManifest(overrides = {}) {
     [tag, { url: `${tag}.json`, sha256: sha256Hex(utf8.encode(bodyFor(tag))) }]));
   return /** @type {any} */ ({
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
-    cldrVersion: pinnedProvenance().cldrVersion, dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale: "en", baseUrl: "https://cdn.example/v1/", files, tiebreakers: {},
     ...overrides,
   });

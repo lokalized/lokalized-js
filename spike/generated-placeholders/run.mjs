@@ -99,4 +99,22 @@ if (failed.length) {
   }
 }
 
+// THE OUT-OF-SCOPE COUNT IS AN EXIT TERM, and until 2026-09-17 it was not.
+//
+// This run exited on `failed.length` alone, so a case leaving `passed` for `out of scope` was a
+// SILENT downgrade at exit 0 — and the absorber above is broad: any mismatch whose entry JSON
+// contains `"range"` anywhere is recorded out of scope rather than compared. That is this project's
+// central rule ("never move a case to passed by weakening an attribution rule") running backwards,
+// and it is the same hole `tools/conformance.mjs`'s own header records having had: a count computed,
+// printed, and named in no exit term.
+//
+// A CEILING rather than an equality, at today's three, so that CLOSING one stays free.
+const MAXIMUM_OUT_OF_SCOPE = 3;
+if (outOfScope.length > MAXIMUM_OUT_OF_SCOPE) {
+  console.error(`\n${outOfScope.length} case(s) are out of scope and this spike had ` +
+    `${MAXIMUM_OUT_OF_SCOPE}. A case that stops being compared is a case that stops being proven; ` +
+    `lower the ceiling deliberately if one was genuinely closed, and say which.`);
+  process.exit(1);
+}
+
 process.exit(failed.length === 0 ? 0 : 1);

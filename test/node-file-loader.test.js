@@ -25,10 +25,11 @@ import { computeCatalogIdentity } from "../src/load/index.js";
 import { catalogIdentityInputFor } from "../src/load/identity.js";
 import { loadEntireManifest, loadStrings } from "../src/load/fetch-loader.js";
 import {
-  loadEntireManifestFromFiles, loadStringsFromFiles, readStringsManifest,
+  loadEntireManifestFromFiles, loadStringsFromDirectory, loadStringsFromFiles, readStringsManifest,
 } from "../src/node/index.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
 import { sha256Hex } from "../src/internal/sha256.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
 const root = mkdtempSync(join(tmpdir(), "lokalized-files-"));
@@ -57,7 +58,7 @@ function directoryManifest(tags, flaws = {}) {
   }
   const draft = {
     formatVersion: 1, catalogVersion: "2026.09.11", catalogFingerprint: "0".repeat(64),
-    cldrVersion: pinnedProvenance().cldrVersion, dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale: "en", baseUrl: pathToFileURL(`${directory}/`).href, files, tiebreakers: {},
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
@@ -148,18 +149,37 @@ test("a non-file: URL is refused BEFORE the reader is invoked even once", async 
   assert.equal(ok.length, 2);
 });
 
-test("network options are refused rather than ignored, before any read", async () => {
-  const { manifest } = directoryManifest(["en"]);
-  for (const networkOnly of ["fetch", "request"]) {
-    const calls = [];
-    await assert.rejects(
-      () => loadEntireManifestFromFiles(manifest, /** @type {any} */ ({
-        [networkOnly]: () => { throw new Error("unreachable"); },
-        readFile: async (url) => { calls.push(url); return utf8.encode(bodyFor("en")); },
-      })),
-      new RegExp(`\`${networkOnly}\` is not an option of the Node file loaders`));
-    assert.deepEqual(calls, []);
-  }
+test("network options are refused rather than ignored, before any read — at EVERY file door", async () => {
+  // **THIS LOOPED OVER ONE DOOR AND THE REMEDY IS SHARED BY FOUR.** Measured by ablation: deleting
+  // the `refuseNetworkOptions` call at `loadStringsFromDirectory` left the suite at exit 0 — the
+  // refusal survived through the generic unknown-option guard, but its TAILORED SENTENCE, the one
+  // that tells an HTTP caller where to go instead, was replaced in silence and nothing noticed.
+  // A generic "does not take the option(s) [fetch]" is a worse answer to a real question.
+  const { directory, manifest } = directoryManifest(["en"]);
+  const manifestPath = join(directory, "network-options-manifest.json");
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+  const reader = (/** @type {string[]} */ calls) =>
+    async (/** @type {string} */ url) => { calls.push(url); return utf8.encode(bodyFor("en")); };
+
+  /** @type {[string, (options: any) => Promise<unknown>][]} */
+  const DOORS = [
+    ["loadEntireManifestFromFiles", (o) => loadEntireManifestFromFiles(manifest, o)],
+    ["loadStringsFromFiles", (o) => loadStringsFromFiles(manifest, "en", o)],
+    ["readStringsManifest", (o) => readStringsManifest(manifestPath, o)],
+    ["loadStringsFromDirectory", (o) =>
+      loadStringsFromDirectory(directory, { catalogVersion: "v1", fallbackLocale: "en", ...o })],
+  ];
+
+  for (const [name, door] of DOORS)
+    for (const networkOnly of ["fetch", "request"]) {
+      /** @type {string[]} */
+      const calls = [];
+      await assert.rejects(
+        () => door({ [networkOnly]: () => { throw new Error("unreachable"); }, readFile: reader(calls) }),
+        new RegExp(`\`${networkOnly}\` is not an option of the Node file loaders`),
+        `${name} must keep the tailored remedy for \`${networkOnly}\`, not fall back to the generic refusal`);
+      assert.deepEqual(calls, [], `${name}: the refusal must precede every read`);
+    }
 });
 
 // ------------------------------------------------------------- failures

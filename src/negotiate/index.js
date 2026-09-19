@@ -488,8 +488,16 @@ function javaDoubleText(value) {
  * 5. THE WEIGHT CHECK RUNS BEFORE THE GRAMMAR CHECK, so `fr;q=1.5` reports the weight and never
  *    reaches `range=`, and a NON-NUMERIC weight has its own wording with the raw text QUOTED.
  *
+ * FROZEN ON THE WAY OUT, members included. Plan 3.4:900 declares this door
+ * `readonly LanguageRange[]` where `LanguageRange` is `Readonly<{ range, weight }>`, and plan :345
+ * makes every returned array frozen; the port returned a plain array of plain objects, so a caller
+ * could `sort` or `push` the list the library handed them. The freeze is at the RETURN rather than
+ * per member, because `list` is built by `splice` — the insertion position IS the contract here
+ * (member order is compared field for field) and a frozen array cannot be spliced into.
+ *
  * @param {string} header an `Accept-Language` field value, or a single language range
- * @returns {WeightedLanguageRange[]} the parsed members, in `LanguageRange.parse`'s own order
+ * @returns {readonly WeightedLanguageRange[]} the parsed members, in `LanguageRange.parse`'s own
+ *   order
  * @throws {RangeError} `IllegalArgumentException`, with Java's message
  */
 export function parseLanguageRanges(header) {
@@ -558,7 +566,9 @@ export function parseLanguageRanges(header) {
 		}
 	}
 
-	return list;
+	for (const member of list) Object.freeze(member);
+
+	return Object.freeze(list);
 }
 
 /**
@@ -637,11 +647,7 @@ function pinnedRangeEquivalents(range) {
 	}
 }
 
-/**
- * @typedef {object} WeightedLanguageRange
- * @property {string} range
- * @property {number} weight
- */
+/** @typedef {import("../internal/locale.js").WeightedLanguageRange} WeightedLanguageRange */
 
 /**
  * The applicable locale configuration a negotiator matches against — the exact shape
@@ -652,10 +658,24 @@ function pinnedRangeEquivalents(range) {
  * therefore name a locale it also supports, and is refused below when it does not, rather than
  * silently negotiating against a fallback no catalog answers to.
  *
- * @typedef {object} LocaleConfiguration
- * @property {string} fallbackLocale
- * @property {readonly string[]} supportedLocales
- * @property {Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]>} [tiebreakers]
+ * **THE THREE MEMBERS ARE `readonly`, AND THIS COPY WAS THE ONE THAT WAS NOT.** The registry states
+ * it three times (BOOT-M0-0296 through BOOT-M0-0298) and `lokalized/core` already declared its own
+ * copy wrapped. Measured by `tools/readonly-surface.mjs` on its first run: the SAME public name was
+ * readonly through `lokalized/core` and writable through `lokalized/negotiate`, so which subpath a
+ * consumer imported from decided whether their editor stopped them. That is S28's asymmetry, and it
+ * is exactly why that tool probes every subpath a name is published on rather than the first one.
+ *
+ * The SHAPE still differs from core's deliberately and is left alone: here `tiebreakers` is optional
+ * and may be a `ReadonlyMap`, because `createLocaleNegotiator({ fallbackLocale, supportedLocales })`
+ * with no tiebreakers at all is the ordinary call. Narrowing it to core's required-record form to
+ * make the two identical would refuse that call, which is a real consumer pattern and one the
+ * declaration probes themselves use.
+ *
+ * @typedef {Readonly<{
+ *   fallbackLocale: string,
+ *   supportedLocales: readonly string[],
+ *   tiebreakers?: Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]>,
+ * }>} LocaleConfiguration
  */
 
 /**
@@ -885,7 +905,8 @@ function normalizeAcceptLanguage(acceptLanguage) {
  * "keep the first 32" reading answers the corpus's 32-member sibling identically and this one wrongly.
  *
  * @param {string | null | undefined} acceptLanguage the raw, already-combined field value
- * @returns {WeightedLanguageRange[] | null} the parsed members, or `null` for unusable input
+ * @returns {readonly WeightedLanguageRange[] | null} the parsed members, or `null` for unusable
+ *   input
  */
 function usableAcceptLanguageRanges(acceptLanguage) {
 	if (acceptLanguage == null ||
@@ -897,7 +918,7 @@ function usableAcceptLanguageRanges(acceptLanguage) {
 
 	if (normalized === "") return null;
 
-	/** @type {WeightedLanguageRange[]} */
+	/** @type {readonly WeightedLanguageRange[]} */
 	let ranges;
 
 	try {
@@ -948,7 +969,15 @@ export function createLocaleNegotiator(configuration) {
 	/**
 	 * `DefaultStrings#matchFor(List<LanguageRange>)`, over any number of members.
 	 *
-	 * @param {Iterable<unknown>} ranges
+	 * **THE ELEMENT TYPE IS THE RANGE, NOT `unknown`** — BOOT-M0-0447. Typed `Iterable<unknown>` the
+	 * declaration admitted `[1, 2, 3]`, so a caller learned at run time what the compiler could have
+	 * told them. It stays an ITERABLE rather than becoming `readonly LanguageRange[]`, because the
+	 * runtime spreads whatever it is handed and a `Set` is a legal argument; and `weight` is optional
+	 * here where `LanguageRange` requires it, because `languageRangeFrom` below defaults an absent
+	 * weight to the maximum. Narrowing to the published record would have refused `[{ range: "fr" }]`,
+	 * which works today.
+	 *
+	 * @param {Iterable<Readonly<{ range: string, weight?: number }>>} ranges
 	 * @returns {import("../internal/locale.js").LocaleMatch}
 	 */
 	const matchForLanguageRanges = (ranges) => {
@@ -997,7 +1026,8 @@ export function createLocaleNegotiator(configuration) {
 			matchFor(requestedLocale(locale), supportedLocales, fallbackLocale, tiebreakers).locale
 			?? fallbackLocale,
 		matchForLanguageRanges,
-		/** @param {Iterable<unknown>} ranges */
+		/** BOOT-M0-0449, the same element type as its sibling above.
+		 * @param {Iterable<Readonly<{ range: string, weight?: number }>>} ranges */
 		bestMatchForLanguageRanges: (ranges) => matchForLanguageRanges(ranges).locale ?? fallbackLocale,
 		/**
 		 * `LocaleMatcher#bestMatchForAcceptLanguage` (`:117-139`), the FAIL-SOFT request-handling door.
@@ -1061,8 +1091,11 @@ export function createLocaleNegotiator(configuration) {
  * holding a member `LanguageRange.parse` would refuse, throws `RangeError`. A caller that wants the
  * request-handling contract instead wants `forAcceptLanguage`.
  *
+ * BOOT-M0-0457 asks for a `readonly LanguageRange[]` here; an `Iterable` of the same element
+ * accepts one and keeps the `Set` a caller may already hold.
+ *
  * @param {LocaleNegotiator} negotiator
- * @param {Iterable<unknown>} ranges
+ * @param {Iterable<Readonly<{ range: string, weight?: number }>>} ranges
  * @returns {Readonly<{ localeMatch: import("../internal/locale.js").LocaleMatch }>}
  */
 export function forLanguageRanges(negotiator, ranges) {

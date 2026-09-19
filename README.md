@@ -14,7 +14,10 @@ by description.
 npm install lokalized
 ```
 
-Requires Node 22+ or any modern browser. **Zero dependencies.** ESM only.
+Requires Node 20+ or any modern browser. **Zero dependencies.** ESM only.
+Node 20 reached end of life on 2026-04-30 and the floor names it because a great many projects
+still run it — nothing here needs a newer runtime, and CI proves that on a `20` leg. Choose it
+deliberately.
 
 Every code sample below is executed by `npm run check:readme`, and every output it claims is
 asserted — so a sample that has gone stale fails the build rather than misleading you.
@@ -332,15 +335,53 @@ strings.get("Hi", undefined, { locale: "fr-CH" });   // => "Bonjour"
 strings.get("Hi", undefined, { locale: "de" });      // => "Hello"
 ```
 
+**That `undefined` is a slot, not a placeholder for nothing in particular.** `get` takes three
+arguments in this order — the key, the *values* your translation interpolates, and the *options* that
+decide which locale answers:
+
+```
+strings.get(key, values, options)
+```
+
+The two are separate bags, and putting a locale in the first one is the mistake worth knowing about,
+because **it does not fail — it quietly serves the instance's locale instead**:
+
+<!-- example: matching -->
+
+```js
+strings.get("Hi", undefined, { locale: "fr" });        // => "Bonjour"
+
+// Both of these are wrong, and neither says so:
+strings.get("Hi", { locale: "fr" });                   // => "Hello"
+strings.get("Hi", undefined, "fr");                    // => "Hello"
+```
+
+A misplaced `locale` is not a typo the library can see: it is a value in the wrong bag, and the bag
+is a real parameter. An unrecognised *member* of an options object IS caught — see
+[Every door refuses an option it does not recognise](#every-door-refuses-an-option-it-does-not-recognise)
+— but that cannot help here, because `locale` is a member every one of these doors knows.
+
 ### Ambiguity is refused, not guessed
 
 That `tiebreakers` entry is not optional. With both `fr` and `fr-CA` loaded, a request for plain `fr`
 is ambiguous — and rather than pick one, **construction fails and tells you what to declare**:
 
-```
-RangeError: You must specify tiebreaker locales via createStrings({ tiebreakers }) to resolve
-ambiguity for language code 'fr' because localized strings exist for the following locale[s]:
-[fr, fr-CA]
+<!-- example: ambiguity -->
+
+```js
+import { createStrings } from "lokalized";
+
+const ambiguous = () => createStrings({
+  strings: { fr: { Hi: "Bonjour" }, "fr-CA": { Hi: "Salut" } },
+  fallbackLocale: "fr",
+  locale: "fr",
+});
+
+let refusal = "";
+try { ambiguous(); } catch (error) { refusal = `${error.name}: ${error.message}`; }
+
+refusal;
+// => "RangeError: You must specify tiebreaker locales via createStrings({ tiebreakers }) to resolve ambiguity for language code 'fr' because localized strings exist for the following locale[s]: [fr, fr-CA]"
 ```
 
 The same reflex runs throughout: a configuration that could silently serve the wrong language is
@@ -372,27 +413,287 @@ const strings = createStrings({
 strings.get("Cart.Items", { count: 2 });   // => "Votre panier contient 2 livres."
 ```
 
+**Read that `warnings` array.** Destructuring it and moving on is the natural thing to write and it
+is how an incomplete catalog ships: the load succeeds, every number you test renders, and one input
+you did not test returns the key. These four catalogs are clean, which is a fact worth asserting
+rather than assuming —
+
+<!-- example: directory -->
+
+```js
+warnings.map((warning) => warning.type);   // => []
+```
+
+— and the cheapest policy is to refuse to start when they are not. See
+[How many forms a language needs](#how-many-forms-a-language-needs-is-not-two-and-not-a-thing-to-guess),
+which is the gap these warnings most often report.
+
 Each file is named for its locale — `en.json`, `fr-CA.json`. Loading is bounded: file count, total
 bytes, translation nodes and warnings all have limits, so a hostile or corrupt directory fails
 closed rather than exhausting memory.
 
+`examples/catalogs` is this document's own four-file set, printed in full under
+[The catalogs these samples use](#the-catalogs-these-samples-use) — every directory sample below
+reads it, so you can reproduce their output exactly. Point the path at your own directory instead
+and nothing else changes.
+
+### The same load, when the catalogs are not clean
+
+The array above is empty because `examples/catalogs` is complete, which makes the check read like a
+formality. This is what a gap looks like. The catalog below is French and declares two forms —
+`CARDINALITY_ONE` and `CARDINALITY_OTHER` — which is the shape an English example teaches and which
+French does not have:
+
+<!-- catalog: examples/incomplete-catalog/fr.json -->
+
+```json
+{
+  "Books": {
+    "translation": "{{count}} {{books}}",
+    "placeholders": {
+      "books": {
+        "value": "count",
+        "translations": {
+          "CARDINALITY_ONE": "livre",
+          "CARDINALITY_OTHER": "livres"
+        }
+      }
+    }
+  },
+
+  "Photos": {
+    "translation": "{{count}} {{photos}}",
+    "placeholders": {
+      "photos": {
+        "value": "count",
+        "translations": {
+          "CARDINALITY_ONE": "photo",
+          "CARDINALITY_OTHER": "photos"
+        }
+      }
+    }
+  }
+}
+```
+
+`readStringsFromDirectory` takes an **`onWarning`** observer, called once per warning as the file is
+parsed. It arrives alongside the returned `warnings` array rather than instead of it, so a caller
+that wants to log or count as it goes does not have to wait for the load to finish:
+
+<!-- example: onwarning -->
+
+```js
+import { readStringsFromDirectory } from "lokalized/node";
+
+const streamed = [];
+const { warnings } = readStringsFromDirectory("examples/incomplete-catalog", {
+  onWarning: (warning) => { streamed.push(warning); },
+});
+
+streamed.map((warning) => warning.type);
+// => ["INCOMPLETE_CARDINALITY_TRANSLATIONS", "INCOMPLETE_CARDINALITY_TRANSLATIONS"]
+
+streamed.length === warnings.length;   // => true
+```
+
+Each one names the locale, the key, the placeholder and exactly which forms are missing, which is
+enough to write the line a build log should carry without opening the catalog:
+
+<!-- example: onwarning -->
+
+```js
+const describe = (warning) =>
+  `${warning.locale} ${warning.key}.${warning.placeholder} wants ${warning.missingLanguageForms.join(", ")}`;
+
+streamed.map(describe);
+// => ["fr Books.books wants CARDINALITY_MANY", "fr Photos.photos wants CARDINALITY_MANY"]
+
+streamed[0].source.endsWith("examples/incomplete-catalog/fr.json");   // => true
+```
+
+Use it. A warning is not a failure and will not stop your process, so the decision to stop is yours
+to write down:
+
+<!-- example: onwarning -->
+
+```js
+const refuseToBoot = warnings.length === 0
+  ? null
+  : `${warnings.length} incomplete catalog translation(s); refusing to start`;
+
+refuseToBoot;   // => "2 incomplete catalog translation(s); refusing to start"
+```
+
+**And there is one case where the observer is the only route to a warning at all.** Warnings stream:
+everything delivered before an abort stays delivered, and the load that aborts returns no record to
+read them from. The warning budget is the cheapest way to see it — cap it below what this directory
+produces, and the load throws after the first warning has already been handed over:
+
+<!-- example: onwarning -->
+
+```js
+const beforeTheAbort = [];
+let refused = null;
+
+try {
+  readStringsFromDirectory("examples/incomplete-catalog", {
+    limits: { maximumWarnings: 1 },
+    onWarning: (warning) => { beforeTheAbort.push(warning); },
+  });
+} catch (error) {
+  refused = error.constructor.name;
+}
+
+refused;   // => "StringsParseError"
+beforeTheAbort.map((warning) => warning.key);   // => ["Books"]
+```
+
+`createStrings` and `parseStrings` take the same `onWarning` option, with the same shape and the same
+timing. **The network and manifest loaders do not** — `loadStrings`, `loadEntireManifest` and their
+Node-file siblings hand their warnings back on the record they return, as `loaded.warnings`, and
+passing them an `onWarning` is refused by name rather than ignored. After construction every route
+converges: `strings.getWarnings()` reports what the instance was built from, whichever door it came
+through.
+
 ### Over the network (browser, edge, or server)
 
 `lokalized/load` fetches only the catalogs a given locale needs, verifies each against a SHA-256
-digest recorded in a manifest, and hands back a record you pass straight to `createStrings`:
+digest recorded in a manifest, and hands back a record you pass straight to `createStrings`.
+
+In production the origin below is your CDN. Here it is six lines of `node:http` serving this
+document's own catalogs, so that every line that follows is executed rather than illustrated:
+
+<!-- example: network -->
+
+```js
+import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
+
+let published = "";
+const served = [];
+const broken = new Map();   // the failure sample at the end of this section breaks the CDN on purpose
+const server = createServer((request, response) => {
+  const name = new URL(request.url, "http://cdn.example").pathname.slice(1);
+  served.push(name);
+  if (broken.has(name)) return response.end(broken.get(name));
+  response.end(name === "manifest.json" ? published : readFileSync(`examples/catalogs/${name}`));
+}).listen(0);
+const origin = `http://127.0.0.1:${server.address().port}`;
+```
+
+The manifest is generated once, at publish time, from the directory of catalogs. It is the list of
+files, the URL each is published at, and the digest of the bytes each one must contain:
+
+<!-- example: network -->
+
+```js
+import { createStringsManifestFromDirectory } from "lokalized/node";
+
+const manifest = await createStringsManifestFromDirectory("examples/catalogs", {
+  catalogVersion: "2026-09-17",
+  fallbackLocale: "en",
+  publicationBaseUrl: `${origin}/`,
+  tiebreakers: { fr: ["fr", "fr-CA"] },
+});
+published = JSON.stringify(manifest);
+
+Object.keys(manifest.files);             // => ["en", "es", "fr", "fr-CA"]
+manifest.files["fr-CA"].url;             // => "fr-CA.json"
+manifest.files["fr-CA"].decodedBytes;    // => 876
+manifest.files["fr-CA"].sha256.length;   // => 64
+```
+
+`tiebreakers` is not optional here: the generator applies the rule construction applies, so a
+directory holding both `fr.json` and `fr-CA.json` is refused at publish time rather than at load
+time. For a fetched instance the manifest is the only door tiebreakers can enter through.
+
+At runtime — in a browser, an edge worker, or a server — you fetch the manifest and hand it to the
+loader:
+
+<!-- example: network -->
 
 ```js
 import { createStrings } from "lokalized/core";
 import { loadStrings, parseStringsManifest } from "lokalized/load";
 
-const manifest = parseStringsManifest(await (await fetch("/i18n/manifest.json")).text());
-const loaded = await loadStrings(manifest, "fr-CA");
+const fetched = parseStringsManifest(await (await fetch(`${origin}/manifest.json`)).text());
+const loaded = await loadStrings(fetched, "fr-CA");
+
+Object.keys(loaded.catalogs);   // => ["fr-CA", "fr", "en"]
+loaded.complete;                // => true
 
 const strings = createStrings({ loaded, locale: "fr-CA" });
+
+strings.get("Cart.Items", { count: 2 });   // => "Votre panier compte 2 livres."
 ```
 
-`lokalized/node` has the same doors over the filesystem, and
-`createStringsManifestFromDirectory` generates the manifest at publish time.
+**Three catalogs arrive for one locale, not four.** `fr-CA` needs `fr-CA`, its parent `fr` and the
+fallback `en`. `es` is published and never requested, which is the whole point of a manifest — and
+it is worth asserting rather than assuming, because the result is identical either way:
+
+<!-- example: network -->
+
+```js
+served;                                          // => ["manifest.json", "fr-CA.json", "fr.json", "en.json"]
+served.filter((name) => name === "es.json");     // => []
+```
+
+**And a CDN serving the wrong bytes fails closed with the locale named**, rather than rendering
+someone else's words. Worth executing rather than asserting, because the interesting part is *which*
+check catches it. Change a single letter in one catalog, keeping its length identical, and the
+digest is what refuses — a body of a different length never gets that far, because the manifest also
+declares each file's decoded size and that is checked first:
+
+<!-- example: network -->
+
+```js
+const honest = readFileSync("examples/catalogs/fr.json", "utf8");
+const swapped = honest.replace("livre", "livrE");
+
+swapped.length === honest.length;   // => true
+
+broken.set("fr.json", swapped);
+const refused = await loadStrings(fetched, "fr-CA").then(() => null, (error) => error);
+
+[refused.name, refused.code];                              // => ["StringsLoadingError", "STRINGS_LOADING"]
+refused.failures.map(({ locale, stage }) => [locale, stage]);   // => [["fr", "digest"]]
+```
+
+The default is all-or-nothing: one bad file and nothing loads. An edge deployment that would rather
+serve a degraded page than none can say so, and is told exactly what it lost:
+
+<!-- example: network -->
+
+```js
+const partial = await loadStrings(fetched, "fr-CA", { partialFailure: "allow-partial" });
+
+partial.complete;                 // => false
+Object.keys(partial.catalogs);    // => ["fr-CA", "en"]
+```
+
+`fr` is gone and `fr-CA` plus the `en` fallback remain, so a French-Canadian visitor still gets a
+page — in French where `fr-CA.json` has the key and in English where it does not. `complete` is how
+you decide whether that is acceptable; it is never decided for you.
+
+**And the subset is a subset.** This instance was planned from `fr-CA` alone, so asking it for a
+locale outside that chain is refused rather than answered from a catalog nobody chose:
+
+<!-- example: network -->
+
+```js
+const outside = (() => {
+  try { return strings.get("Cart.Items", { count: 2 }, { locale: "es" }); }
+  catch (error) { return error.code; }
+})();
+
+outside;   // => "CONFIGURATION"
+
+server.close();
+```
+
+Call `loadEntireManifest` instead of `loadStrings` when you want every declared locale in one
+instance. `lokalized/node` has the same doors over the filesystem, for a server that reads its
+catalogs from disk rather than over HTTP.
 
 ---
 
@@ -423,6 +724,30 @@ options.localeMatch.matchType;                // => "exact"
 
 strings.get("Hi", undefined, forAcceptLanguage(negotiator, "fr-CH"));   // => "Bonjour"
 ```
+
+**`matchType` has eight values and the declaration names them**, as the exported type
+`LocaleMatchType` on `lokalized/core`. They are `exact`, `canonical`, `cldr-fallback`,
+`likely-subtag`, `extended-range`, `primary-language`, `wildcard` and `none`. In TypeScript a
+`switch` over them exhausts, so leaving one out is a compile error rather than a branch you find in
+production. Six of the eight come out of ordinary headers:
+
+<!-- example: negotiate -->
+
+```js
+const wide = createLocaleNegotiator({
+  supportedLocales: ["en", "fr", "fr-CA", "he", "zh-Hant", "de-DE"],
+  fallbackLocale: "en",
+});
+const typeOf = (header) => forAcceptLanguage(wide, header).localeMatch.matchType;
+
+[typeOf("fr-CA"), typeOf("fr-FR"), typeOf("de-AT"), typeOf("*"), typeOf("zh")];
+// => ["exact", "cldr-fallback", "likely-subtag", "wildcard", "none"]
+```
+
+Only `none` means nothing matched — everything else served the visitor something, and the one you
+most want to notice is `wildcard`, where the visitor expressed no preference at all. `none` is also
+the case where `localeMatch.locale` is `null` rather than a tag, so a page that binds `<html lang>`
+straight from it emits `lang="null"`.
 
 **Header handling is fail-soft.** A malformed header is a thing browsers and bots really send, so it
 never throws — it produces an *unmatched* result that renders in your configured fallback while still
@@ -509,6 +834,155 @@ strings.getWarnings().map((warning) => warning.type);
 
 English needs `CARDINALITY_OTHER` too. The catalog still loads — a warning is not a failure — but the
 gap is reported rather than discovered by a user.
+
+### How many forms a language needs is not two, and not a thing to guess
+
+The example above is English, where the answer happens to be two. **It is two for English and for
+almost nothing else you will ship.** Ask the library rather than inferring the pattern from a sample:
+
+<!-- example: cardinal-forms -->
+
+```js
+import { cardinalityForNumber, supportedCardinalitiesForLocale } from "lokalized";
+
+supportedCardinalitiesForLocale("fr").map((form) => form.name);
+// => ["CARDINALITY_ONE", "CARDINALITY_MANY", "CARDINALITY_OTHER"]
+
+supportedCardinalitiesForLocale("en").length;   // => 2
+supportedCardinalitiesForLocale("ja").map((form) => form.name);   // => ["CARDINALITY_OTHER"]
+supportedCardinalitiesForLocale("cy").length;   // => 6
+```
+
+French has a third form, and a French catalog that declares only `CARDINALITY_ONE` and
+`CARDINALITY_OTHER` — the shape the English example teaches — is incomplete. Nothing about it looks
+wrong: it renders correctly for 1 and for 2, which is what anybody tests.
+
+<!-- example: cardinal-forms -->
+
+```js
+import { createStrings } from "lokalized";
+
+const strings = createStrings({
+  strings: {
+    fr: {
+      Books: {
+        translation: "{{n}} {{b}}",
+        placeholders: { b: { value: "n", translations: { CARDINALITY_ONE: "livre", CARDINALITY_OTHER: "livres" } } },
+      },
+    },
+  },
+  fallbackLocale: "fr",
+  locale: "fr",
+});
+
+strings.get("Books", { n: 2 });   // => "2 livres"
+```
+
+And then, for a number a test rarely reaches, it returns the key:
+
+<!-- example: cardinal-forms -->
+
+```js
+cardinalityForNumber(1000000, "fr").name;   // => "CARDINALITY_MANY"
+
+strings.get("Books", { n: 1000000 });   // => "Books"
+```
+
+**The load said so, and the sample above threw the message away.** That is what the `warnings` this
+section opened with are for:
+
+<!-- example: cardinal-forms -->
+
+```js
+strings.getWarnings().map((warning) => warning.type);
+// => ["INCOMPLETE_CARDINALITY_TRANSLATIONS"]
+
+strings.getWarnings()[0].missingLanguageForms;   // => ["CARDINALITY_MANY"]
+```
+
+A warning is not a failure and will not stop your process, so nothing forces you to read one. Reading
+them at startup and refusing to boot on a non-empty list is the practice this library's own warnings
+are shaped for — the message names the file, the key, the placeholder and the missing form.
+
+### Ordinals and ranges are opt-in, and the option has a name
+
+Cardinality data ships on the default path. **Ordinal data and cardinal-range data do not** — they are
+separate subpaths so that a page which never renders "3rd" does not download the table that knows how.
+A catalog that selects on `ORDINALITY_*`, or uses a `range` placeholder, therefore refuses to
+construct until you hand the data in. This is the one place a catalog that needs no configuration at
+all in lokalized-java needs some here.
+
+<!-- example: optin -->
+
+```js
+import { createStrings } from "lokalized";
+import { ordinalData } from "lokalized/data/ordinal";
+
+const catalog = {
+  en: {
+    Place: {
+      translation: "You finished {{p}}.",
+      placeholders: { p: { value: "n", translations: {
+        ORDINALITY_ONE: "{{n}}st", ORDINALITY_TWO: "{{n}}nd", ORDINALITY_FEW: "{{n}}rd", ORDINALITY_OTHER: "{{n}}th",
+      } } },
+    },
+  },
+};
+
+const strings = createStrings({
+  strings: catalog,
+  fallbackLocale: "en",
+  locale: "en",
+  pluralData: { ordinal: ordinalData },
+});
+
+[1, 2, 3, 4].map((n) => strings.get("Place", { n }));
+// => ["You finished 1st.", "You finished 2nd.", "You finished 3rd.", "You finished 4th."]
+```
+
+Leave `pluralData` out and construction refuses rather than rendering something wrong — and the
+refusal names the option, so this is a minute lost rather than an afternoon:
+
+<!-- example: optin -->
+
+```js
+let refusal = "";
+try {
+  createStrings({ strings: catalog, fallbackLocale: "en", locale: "en" });
+} catch (error) {
+  refusal = error.message;
+}
+
+refusal.includes("pluralData: { ordinal: ordinalData }");   // => true
+refusal.includes("lokalized/data/ordinal");   // => true
+```
+
+A range placeholder is the other half. It names two value keys instead of one and takes
+`pluralData: { ranges: cardinalRangeData }` from `lokalized/data/ranges`:
+
+<!-- example: optin -->
+
+```js
+import { cardinalRangeData } from "lokalized/data/ranges";
+
+const stay = createStrings({
+  strings: {
+    en: {
+      Nights: {
+        translation: "Your stay is {{r}}.",
+        placeholders: { r: { range: { start: "from", end: "to" }, translations: {
+          CARDINALITY_ONE: "{{from}}-{{to}} night", CARDINALITY_OTHER: "{{from}}-{{to}} nights",
+        } } },
+      },
+    },
+  },
+  fallbackLocale: "en",
+  locale: "en",
+  pluralData: { ranges: cardinalRangeData },
+});
+
+stay.get("Nights", { from: 1, to: 3 });   // => "Your stay is 1-3 nights."
+```
 
 `getMissingKeys(sourceLocale, targetLocale)` answers the other half: which keys a translator still
 owes you.
@@ -699,10 +1173,22 @@ limits.maximumWarnings;                // => 1000
 Object.keys(limits).length;            // => 7
 ```
 
+**Four of the seven are budgets for the WHOLE LOAD, not for each file**: `maximumTotalInputBytes`,
+`maximumLocalizedStringsFiles`, `maximumTranslationNodes` and `maximumWarnings` accumulate across
+every catalog a single load reads. The other three — `maximumInputBytes`, `maximumReaderCharacters`,
+`maximumJsonNestingDepth` — bound one file at a time, which is what they are for.
+
+Until recently the manifest-based loaders charged all seven per file, so the same setting meant one
+thing through `readStringsFromDirectory` and another through `loadStrings`. **If you load through a
+manifest and sit close to a default, that load can now be refused where it used to succeed** — six
+locales of two hundred keys each, all of them warning, crosses the default budget of 1,000 warnings
+even with no `limits` option set. The directory loader always refused that; now both do. A failure
+names the file at which the running total crossed, in the order the files were planned.
+
 **These seven are yours to tighten**, under the option name each door uses — `parseStrings(src,
 { limits })`, `createStrings({ loadingLimits })`, `readStringsFromDirectory(dir, { limits })`,
-`loadStrings(manifest, locale, { limits })`. Note that `createStrings` spells it `loadingLimits`, and
-a `limits` key there is **silently ignored** rather than refused:
+`loadStrings(manifest, locale, { limits })`. `createStrings` spells it `loadingLimits`, and a
+`limits` key there is refused — by a message that names the spelling that works:
 
 <!-- example: limits-name -->
 
@@ -721,8 +1207,66 @@ const build = (options) => {
 // Two translation nodes against a budget of one. Only one of these spellings is read.
 build({ loadingLimits: { maximumTranslationNodes: 1 } });
 // => "localized strings load exceeds the aggregate maximum of 1 translation nodes"
-build({ limits: { maximumTranslationNodes: 1 } });   // => "constructed"
+
+// The wrong spelling is refused, and the message names the right one rather than just saying no.
+// (`hint` trims the surrounding sentence so the line below is the part worth reading.)
+const hint = (options) => build(options).replace(/^.*?\. /, "").replace(/\. It takes.*$/, "");
+
+hint({ limits: { maximumTranslationNodes: 1 } });
+// => "`limits` is not the option name here; `loadingLimits` is"
 ```
+
+**And it is a mirror**, which is the part worth remembering: `parseStrings` spells the same concept
+`limits`, and refuses `loadingLimits` in the other direction.
+
+<!-- example: limits-name -->
+
+```js
+import { parseStrings } from "lokalized/parse";
+
+const parse = (options) => {
+  try {
+    parseStrings(JSON.stringify({ A: "a", B: "b" }), { locale: "en", ...options });
+    return "parsed";
+  } catch (error) {
+    return error.message.split(":").pop().trim();
+  }
+};
+
+parse({ limits: { maximumTranslationNodes: 1 } });
+// => "localized strings load exceeds the aggregate maximum of 1 translation nodes"
+
+parse({ loadingLimits: { maximumTranslationNodes: 1 } }).replace(/^.*?\. /, "").replace(/\. It takes.*$/, "");
+// => "`loadingLimits` is not the option name here; `limits` is"
+```
+
+### Every door refuses an option it does not recognise
+
+That is a property of the whole surface, not a quirk of the limits: **all twelve public functions
+that take an options object refuse an unknown member**, with a `ConfigurationError` that names the
+offending key. Where the mistake is one a reader actually makes, the message also names the spelling
+that works:
+
+| door | you may reach for | it is | what used to happen instead |
+|---|---|---|---|
+| `createStrings` | `limits` | `loadingLimits` | construction ran under the defaults |
+| `parseStrings`, `readStringsFromDirectory` | `loadingLimits` | `limits` | same, in the other direction |
+| `loadStrings`, `loadEntireManifest` | `transport` | `fetch` | **your injected transport was ignored and the load went to the real network** |
+| `createStringsManifestFromDirectory` | `baseUrl` | `publicationBaseUrl` | the manifest was published with the source directory's own `file://` path, which the Fetch door then refuses |
+
+The last two are why this changed. Neither failed at the call, so neither looked like a typo: one
+produced a network error from a URL you never typed, the other produced a manifest that validated,
+fingerprinted identically to the correct one, and was refused much later somewhere else.
+
+The refusal recurses one level into `limits`, which is the other place a name can be dropped — an
+unknown budget is refused, and so is a container the seven budgets cannot be read out of. A
+`ReadonlyMap` is the one to know about: `tiebreakers` accepts one and `limits` does not, so the same
+budget spelled as a Map used to be dropped in silence while the plain object refused.
+
+**A key present with an `undefined` value is still refused.** `{ fetch: maybeUndefined }` is the same
+misspelling as `{ fetch: fn }`, and a value-sensitive rule would let the dangerous case through on
+exactly the days the value happened to be unset. If you spread a wider config object into a door, spread
+the members it takes.
 
 `maximumInputBytes` and `maximumReaderCharacters` are two doors rather than two names for one budget.
 A byte cap is inert on string input and a character cap is inert on byte input.
@@ -1040,6 +1584,59 @@ Number formatting for a reader of Arabic or Persian is yours to do, with the hos
 for the host is what makes two machines disagree.
 
 ---
+
+### Accessibility, and where this library's part ends
+
+Most of what this library offers an accessibility-conscious page is above, under headings that do
+not say the word: `lang` is **per key**, because the locale that supplied the text is not always the
+one you asked for; `dir` is yours to compute and there is deliberately no API for it; and
+interpolated values are wrapped in isolates so a right-to-left sentence does not reorder an
+identifier. This section exists so that a reader searching for the word finds them, and so the
+boundary is stated rather than inferred.
+
+**Everything else is yours, and the surface says so rather than the prose:**
+
+<!-- example: a11y -->
+
+```js
+const subpaths = [
+  "lokalized", "lokalized/core", "lokalized/parse", "lokalized/load", "lokalized/ssr",
+  "lokalized/negotiate", "lokalized/node", "lokalized/data/ordinal", "lokalized/data/ranges",
+];
+const names = [];
+for (const subpath of subpaths) names.push(...Object.keys(await import(subpath)));
+
+names.filter((name) => /aria|role|focus|announce|live|label/i.test(name));   // => []
+names.filter((name) => /format|escape|sanitiz|html/i.test(name));   // => []
+```
+
+No ARIA attribute, no live-region announcement, no focus management, no date or number formatting,
+and no markup of any kind — it returns a string and never touches your DOM. It does not set `lang`
+either; it tells you what to set it to.
+
+**The one thing worth knowing that is not obvious: the isolate characters travel with the string.**
+They are invisible, they are part of the value, and they reach wherever you put it — an `aria-label`,
+a `document.title`, a `<title>`, a cache key, an analytics event:
+
+<!-- example: a11y -->
+
+```js
+import { createStrings } from "lokalized";
+
+const strings = createStrings({ strings: { ar: { M: "س {{v}}" } }, fallbackLocale: "ar", locale: "ar" });
+const rendered = strings.get("M", { v: "AB" });
+
+rendered.length;                  // => 6
+[...rendered].length - 2;         // => 4
+rendered === "س AB";              // => false
+rendered.includes("س AB");        // => false
+rendered.replace(/[\u2066-\u2069]/g, "") === "س AB";   // => true
+```
+
+That is correct for anything a browser lays out, and it is a trap for anything that compares,
+truncates or hashes. **Strip the isolates for comparison, never for display** — removing them from
+what a user sees is the reordering bug they exist to prevent. What a screen reader announces for
+these characters is the reader's business and is not something this document has measured.
 
 ## One instance, many requests
 
@@ -1562,6 +2159,44 @@ provenance string that two deployments must agree on, and nothing more.
 
 ---
 
+### React Server Components, and what can cross the boundary
+
+A server component passing props to a client component is a serialization boundary, and this library
+has exactly one rule about those, stated in full under
+[What crosses a boundary](#what-crosses-a-boundary): **the instance does not cross, the data does.**
+Compiled expressions are closures, so `structuredClone` refuses a `Strings` outright and
+`JSON.stringify` empties it to `{}` without an error — which is the one to watch for, because it is
+the shape a framework's props serializer produces.
+
+So a server component sends catalog data, or a manifest, and the client component constructs its own
+instance from what it was handed. **Re-fetching is one option, not a requirement** — the props are
+enough:
+
+<!-- example: rsc -->
+
+```js
+import { createStrings } from "lokalized";
+
+const catalog = { en: { Hi: "Hello, {{name}}" }, fr: { Hi: "Bonjour, {{name}}" } };
+const server = createStrings({ strings: catalog, fallbackLocale: "en", locale: "fr" });
+
+// Whatever the framework does to props, it is a JSON round trip at worst:
+const props = JSON.parse(JSON.stringify({ catalog, locale: "fr" }));
+const client = createStrings({ strings: props.catalog, fallbackLocale: "en", locale: props.locale });
+
+client.get("Hi", { name: "Ada" }) === server.get("Hi", { name: "Ada" });   // => true
+```
+
+Values cross too, and stay themselves: a tagged language form is recognised **structurally**, so it
+survives the trip and still selects — see
+[Language forms are values, not strings](#language-forms-are-values-not-strings), where that is
+executed against a clone, a `structuredClone` and a JSON round trip.
+
+For the server-rendered page itself, the stamp is the narrower hand-off and it is a different
+question from this one: see [Server rendering and the client hand-off](#server-rendering-and-the-client-hand-off).
+A stamp tells a client whether the catalogs it already holds still match the server's build; it
+carries no translations and is not a substitute for sending the data.
+
 ## Caching a localized page
 
 A page rendered from `Accept-Language` is not keyed by its URL. It is keyed by whatever the
@@ -1902,6 +2537,374 @@ WebCrypto — the library carries its own synchronous SHA-256. Only verifying a 
 it. For a `connect-src` policy: a subset load is one GET per catalog in the chain, on the manifest's
 own origin, with request init `{ mode: "cors", credentials: "same-origin" }`.
 
+### Loading from a browser without a bundler
+
+**The package ships a prebuilt browser distribution.** `package.json`'s `files` is `["src/",
+"types/", "dist/", "LICENSE", "NOTICE", "THIRD-PARTY-NOTICES.md", "README.md"]`, and `dist/browser/`
+holds the built form: one classic script, one single-file module root, and a module entry per
+optional subpath. Everything below loads it straight from a CDN with no build step of your own.
+
+The host in these examples is jsDelivr, which serves any published npm package at
+`https://cdn.jsdelivr.net/npm/<package>@<version>/<path>` — no account, no configuration. It was
+chosen over unpkg on one measurement that decides it for this package: **unpkg does not serve
+brotli**, and the second column of the size table below is brotli. Substitute your own host freely;
+the paths are what matter. **`lokalized` is not on the registry yet, so these URLs resolve once it
+is published** — until then, use the `./node_modules/…` form, which needs no network at all.
+
+**Pin an exact version. Never `latest`.** A moving target is a catalog format and a pinned CLDR
+snapshot changing under a page you already shipped, and this library's whole premise is that two
+machines answer identically.
+
+#### A plain script tag
+
+No modules, no import map, no build step — `lokalized.global.js` is a classic script that defines
+one global:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/lokalized.global.js"></script>
+<script>
+  const strings = lokalized.createStrings({
+    strings: { en: { Hi: "Hello {{name}}" }, fr: { Hi: "Bonjour {{name}}" } },
+    fallbackLocale: "en",
+    locale: "fr",
+  });
+
+  document.body.textContent = strings.get("Hi", { name: "Ada" });   // Bonjour Ada
+</script>
+```
+
+It is **one file containing every browser-safe subpath**, with the root's names on the global itself
+and the rest namespaced — `lokalized.negotiate.createLocaleNegotiator`, `lokalized.load.loadStrings`,
+`lokalized.ssr.createSsrStamp`, `lokalized.core.LokalizedError`,
+`lokalized.data.ordinal.ordinalityForNumber`. `lokalized.createStrings` and
+`lokalized.core.createStrings` are the same function object, because one bundle means one copy.
+
+One file rather than one per subpath is a measurement, not a preference: a bundler cannot code-split
+a classic script, so eight separate globals would each carry their own copy of the pinned CLDR
+tables — around four times this file's total on the wire, two independent locale tables in memory,
+and `instanceof` broken between them.
+
+#### A module, by URL
+
+An import map exists only so you can write the bare specifier `lokalized`. If you are willing to
+write the URL, you need no map at all:
+
+<!-- example: browser-quickstart -->
+
+```html
+<script type="module">
+  import { createStrings } from "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/lokalized.js";
+
+  const strings = createStrings({
+    strings: { en: { Hi: "Hello {{name}}" }, fr: { Hi: "Bonjour {{name}}" } },
+    fallbackLocale: "en",
+    locale: "fr",
+  });
+
+  const greeting = strings.get("Hi", { name: "Ada" });   // => "Bonjour Ada"
+
+  document.body.textContent = greeting;
+</script>
+```
+
+`dist/browser/lokalized.js` is the **single-file root**: it carries the core, the expression
+evaluator, the parser, the cardinal rules and the pinned locale data, and it imports nothing at all,
+so that page is one request.
+
+#### An import map, if you want the bare specifier
+
+**To serve the copy you already have**, point the eight specifiers at your install — this needs no
+network, and it is the form to start with:
+
+```html
+<script type="importmap">
+{
+  "imports": {
+    "lokalized":                "./node_modules/lokalized/dist/browser/lokalized.js",
+    "lokalized/core":           "./node_modules/lokalized/dist/browser/core.js",
+    "lokalized/parse":          "./node_modules/lokalized/dist/browser/parse.js",
+    "lokalized/load":           "./node_modules/lokalized/dist/browser/load.js",
+    "lokalized/ssr":            "./node_modules/lokalized/dist/browser/ssr.js",
+    "lokalized/negotiate":      "./node_modules/lokalized/dist/browser/negotiate.js",
+    "lokalized/data/ordinal":   "./node_modules/lokalized/dist/browser/data/ordinal.js",
+    "lokalized/data/ranges":    "./node_modules/lokalized/dist/browser/data/ranges.js"
+  }
+}
+</script>
+```
+
+The same eight over the network:
+
+```html
+<script type="importmap">
+{
+  "imports": {
+    "lokalized":                "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/lokalized.js",
+    "lokalized/core":           "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/core.js",
+    "lokalized/parse":          "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/parse.js",
+    "lokalized/load":           "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/load.js",
+    "lokalized/ssr":            "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/ssr.js",
+    "lokalized/negotiate":      "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/negotiate.js",
+    "lokalized/data/ordinal":   "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/data/ordinal.js",
+    "lokalized/data/ranges":    "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/data/ranges.js"
+  }
+}
+</script>
+```
+
+Each of the eight has to be spelled out either way: a trailing-slash shortcut such as
+`"lokalized/": "./node_modules/lokalized/dist/browser/"` does not reproduce them, because the
+subpaths are `exports` names rather than file paths — `lokalized/core` is `dist/browser/core.js`,
+losing a directory level, while `lokalized/data/ordinal` keeps one as `dist/browser/data/ordinal.js`.
+
+**`dist/browser/` is reachable by path, not by specifier.** It is deliberately absent from
+`package.json`'s `exports`, so `import "lokalized/dist/browser/lokalized.js"` is
+`ERR_PACKAGE_PATH_NOT_EXPORTED` in Node and in every bundler. That is the right answer for them:
+a bundler should read `lokalized` and tree-shake the source. A browser fetching the path works,
+which is what these maps and URLs do.
+
+#### Do not mix the root with another subpath
+
+The root is a single file that imports nothing, which is what makes it one request — and it
+therefore **shares nothing with the other seven**. Loading `lokalized` beside
+`lokalized/negotiate` downloads most of the locale kernel twice, gives you two independent copies of
+the pinned tables, and makes `instanceof` fail across them, exactly as two installed copies do — the
+`files` column below counts each entry on its own for that reason. The other seven DO share chunks
+with each other, so `lokalized/core` beside `lokalized/load` is one copy.
+
+So pick one of these, rather than combining them:
+
+| you need | use | cost |
+|---|---|---|
+| to render, nothing else | the single-file root | 1 request |
+| more than one subpath, no build step | the classic script | 1 request, everything |
+| more than one subpath, with a bundler | `import "lokalized"` and let it tree-shake | see the table below |
+
+`lokalized/core` is **not** a smaller drop-in for the root: of the root's 70 exports and core's 21,
+only three are common. `forLocaleMatch` and every error class are core-only; the 61 language-form
+constants and the plural helpers are root-only.
+
+#### Four more things about these maps, each measured in a browser
+
+- **`lokalized/node` is deliberately absent, and adding it breaks the page.** It is the one subpath
+  that reaches Node built-ins — `node:crypto`, `node:fs`, `node:fs/promises`, `node:path` and
+  `node:url` — so it has no browser build at all and the bundler refuses to produce one. The other
+  eight all load: the root
+  exports 70 names, `core` 21, `load` 10, `negotiate` 6, `parse` 5, `data/ordinal` 5, `ssr` 2 and
+  `data/ranges` 2, and whole-list `Accept-Language` negotiation runs unchanged.
+- **The visitor's own languages are `chooseBrowserLocale(configuration)`**, the one function in this
+  library that reads `navigator`. It takes the configuration and nothing else, reading
+  `navigator.languages` itself; `chooseLocaleForPreferredLanguages(configuration, languages)` is the
+  same choice with the list passed in, which is what a server or a test uses. **Take the
+  configuration from the instance rather than writing it out**, because the two drift and the drift
+  is silent: a hand-kept `supportedLocales` naming a locale your catalogs do not have returns that
+  locale, and the page then labels itself `lang="de"` while rendering the English fallback. In a host
+  with no `navigator` at all this fails silently too — you get the fallback language, correctly
+  labelled and not what the visitor asked for.
+- **The page must be served over HTTP**, including during development. Opening the `.html` file
+  directly gives it an opaque origin, and a browser refuses ES-module imports there — the classic
+  script above is the one route that does load from `file://`.
+- **Include only the subpaths you use.** Each entry is just a name the browser can resolve; it costs
+  nothing until something imports it.
+
+**If the page already has an import map, merge into its `imports` member** rather than adding a
+second block. Two maps on one page do both apply in current Chromium — measured — but one map is the
+form every browser that supports them at all accepts, and merging keeps a single place where a
+specifier is resolved.
+
+
+### What the digests protect
+
+Each catalog is verified against a SHA-256 the **manifest** declares, and the manifest declares a
+`catalogFingerprint` computed over those digests. That chain detects corruption and drift — a
+truncated body, a stale CDN object, a catalog that moved without its manifest. **It is not
+authenticity.** Nothing in this library verifies the manifest itself, so an attacker who can replace
+the manifest *and* the files is inside the chain:
+
+<!-- example: security-digests -->
+
+```js
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createStrings } from "lokalized/core";
+import { loadEntireManifest } from "lokalized/load";
+import { createStringsManifestFromDirectory } from "lokalized/node";
+
+// Two payees, deliberately the same number of octets — a shorter body is refused by the declared
+// byte count before any hash is computed, which would prove nothing about the digest.
+const publish = async (payee) => {
+  const directory = mkdtempSync(join(tmpdir(), "lokalized-trust-"));
+  const body = JSON.stringify({ "Pay.To": payee });
+  writeFileSync(join(directory, "en.json"), body);
+  const manifest = await createStringsManifestFromDirectory(directory, {
+    catalogVersion: "v1", fallbackLocale: "en", publicationBaseUrl: "https://cdn.example/v1/",
+  });
+  rmSync(directory, { recursive: true, force: true });
+  return { manifest, bytes: new TextEncoder().encode(body) };
+};
+
+const honest = await publish("pay alice.example");
+const attacker = await publish("pay molly.example");
+const serving = (bytes) => async () => new Response(bytes);
+
+const attempt = async (manifest, bytes) => {
+  try {
+    const loaded = await loadEntireManifest(manifest, { fetch: serving(bytes) });
+    return { served: createStrings({ loaded, locale: "en" }).get("Pay.To") };
+  } catch (error) {
+    return { refused: error.failures?.map((failure) => `${failure.locale}:${failure.stage}`) ?? error.name };
+  }
+};
+
+await attempt(honest.manifest, honest.bytes);        // => { served: "pay alice.example" }
+await attempt(honest.manifest, attacker.bytes);      // => { refused: ["en:digest"] }
+
+// And the case the chain does NOT cover: the manifest is the trust root, and it is not verified.
+await attempt(attacker.manifest, attacker.bytes);    // => { served: "pay molly.example" }
+```
+
+So two things, and the library supplies neither:
+
+- **Serve the manifest from an origin you trust, over `https`.** The chain starts there, and this is
+  what makes it worth anything.
+- **Or pin the identity out of band.** The forged manifest cannot reproduce the real one's
+  fingerprint, so a value your build carries separately is a check the transport cannot forge:
+
+<!-- example: security-digests -->
+
+```js
+const PUBLISHED_AT_BUILD_TIME = honest.manifest.catalogFingerprint;
+
+const pinned = async (manifest, bytes) => {
+  const loaded = await loadEntireManifest(manifest, { fetch: serving(bytes) });
+  const strings = createStrings({ loaded, locale: "en" });
+  return strings.getCatalogIdentity().catalogFingerprint === PUBLISHED_AT_BUILD_TIME
+    ? strings.get("Pay.To")
+    : "refused: this is not the catalog this build was released with";
+};
+
+await pinned(honest.manifest, honest.bytes);       // => "pay alice.example"
+await pinned(attacker.manifest, attacker.bytes);
+// => "refused: this is not the catalog this build was released with"
+```
+
+Stripping or blanking a digest is not an easier route — the manifest's own `catalogFingerprint` is
+computed over them, so editing one invalidates the manifest before any body is fetched. The
+regenerate-everything attack above is the only one that works, and only against an untrusted channel.
+
+### When the data behind two builds disagrees
+
+A manifest is published by one build of this library and read by another — your server generates it,
+your browser loads it, and the two are the same release right up until the day they are not. The
+manifest records the pinned data its publisher was built against, and **a reader on different data
+refuses it rather than serving subtly different plurals.**
+
+The build's own identity is on `lokalized/core`, not on the root:
+
+<!-- example: mismatch -->
+
+```js
+import { cardinalityMode, cldrVersion, localeDataMode } from "lokalized/core";
+
+[typeof cldrVersion, localeDataMode, cardinalityMode];   // => ["string", "pinned", "exact"]
+```
+
+Four kinds of disagreement are refused, all as a `ConfigurationError` and all **before a single file
+is planned or fetched** — schema, semantic, fingerprint, and the runtime data itself:
+
+<!-- example: mismatch -->
+
+```js
+import { createStringsManifestFromDirectory, loadEntireManifestFromFiles } from "lokalized/node";
+
+const manifest = await createStringsManifestFromDirectory("examples/catalogs", {
+  catalogVersion: "1",
+  fallbackLocale: "en",
+  tiebreakers: { fr: ["fr", "fr-CA"] },
+});
+
+const refusal = async (mutate) => {
+  const copy = JSON.parse(JSON.stringify(manifest));
+  mutate(copy);
+  try { await loadEntireManifestFromFiles(copy); return "loaded"; }
+  catch (error) { return `${error.name}/${error.code}`; }
+};
+
+// schema, semantic, fingerprint, runtime data — one answer for all four:
+const schema = await refusal((m) => { m.formatVersion = 99; });
+const semantic = await refusal((m) => { m.fallbackLocale = "de"; });
+const fingerprint = await refusal((m) => { m.catalogFingerprint = "0".repeat(64); });
+const runtimeData = await refusal((m) => { m.cldrVersion = "47.1"; });
+
+new Set([schema, semantic, fingerprint, runtimeData]);   // => new Set(["ConfigurationError/CONFIGURATION"])
+```
+
+And the runtime-data refusal names **both** sides, so the answer to "which half is stale?" is in the
+error rather than in a support ticket:
+
+<!-- example: mismatch -->
+
+```js
+const message = async (mutate) => {
+  const copy = JSON.parse(JSON.stringify(manifest));
+  mutate(copy);
+  try { await loadEntireManifestFromFiles(copy); return ""; }
+  catch (error) { return error.message; }
+};
+
+const stale = await message((m) => { m.cldrVersion = "47.1"; });
+
+[stale.includes("published against CLDR 47.1"), stale.includes(cldrVersion)];   // => [true, true]
+```
+
+`catalogVersion` and `tiebreakers` are inside the `catalogFingerprint`, so editing either by hand is
+caught as a fingerprint mismatch rather than going unnoticed.
+
+**A manifest carries all seven identity fields, and so does the SSR stamp. A `LoadedStrings` record
+carries two.** The manifest used to carry two as well, and the consequence was sharp enough to be
+worth remembering: two builds differing only in their pinned IANA closure published manifests that
+were indistinguishable and loaded each other's without complaint. Range equivalence and whole-list
+matching come from that closure, so the two builds could negotiate the same visitor to different
+catalogs while every file digest matched. The manifest door now compares all seven **before any
+I/O**, and the mismatch is refused with a sentence naming which pair disagreed.
+
+The record is the one that still carries two, and the gap is narrower than it looks: a record a
+loader produced came through a manifest that was already checked on all seven. It matters only for a
+record you build by hand, which the public type permits.
+
+<!-- example: mismatch -->
+
+```js
+import { createStrings } from "lokalized/core";
+import { createSsrStamp } from "lokalized/ssr";
+
+const identity = [
+  "cldrVersion", "dataFingerprint", "behavioralVectorsVersion",
+  "localeDataMode", "cardinalityMode", "ianaRegistryDate", "ianaDataFingerprint",
+];
+const carries = (value) => identity.filter((field) => JSON.stringify(value).includes(field)).length;
+
+const loaded = await loadEntireManifestFromFiles(manifest);
+const strings = createStrings({ loaded, locale: "fr-CA" });
+const stamp = createSsrStamp(strings, { kind: "locale", locale: "fr-CA" });
+
+[carries(manifest), carries(loaded), carries(stamp)];   // => [7, 2, 7]
+```
+
+`getLoadVerification()` reports all seven, and the five a RECORD does not carry come from **the build
+reading it**, not from the build that wrote it — so for a hand-built record it describes agreement on
+two fields and local truth about five. Load through a manifest and all seven were compared on the way
+in. Use it to report what you are running; for what produced your catalogs, the manifest is the
+surface that was checked.
+
+**What is deliberately *not* a data mismatch is the URL.** `baseUrl` and the per-file urls are
+excluded from the catalog identity on purpose — it is what lets one catalog set be served from two
+origins and still identify as the same data, which the
+[one deployment, two manifests](#what-crosses-a-boundary) sample relies on. Point a manifest at a
+directory that is not there and you get a `StringsLoadingError` naming the files, not a
+`ConfigurationError`: the data did not disagree, the fetch failed.
+
 ### Two copies of the library break `instanceof`
 
 If a bundler fails to dedupe — a server bundle plus a client bundle, or two versions in one tree —
@@ -1935,25 +2938,62 @@ const failure = (() => {
 
 ### What it costs a browser
 
-Measured with esbuild 0.24.2 against this checkout, minified and gzipped, as a snapshot rather than a
-promise:
+<!-- bundle-table:start -->
+**What a bundler leaves in your app.** Measured by `npm run check:bundle`, which bundles the
+package `npm publish` would upload with esbuild 0.28.2 for a browser, minifies it,
+and compresses it the way a CDN serves it — so these are tree-shaken figures for the import
+written in the first column, not the size of any file this package ships. For that, see the
+second table. Both columns are re-derived on every run, so they describe this commit.
 
-| import | minified | gzipped |
+| import | minified | brotli |
 |---|---|---|
-| `createStrings` from `lokalized` | 317,336 | 100,591 |
-| `lokalized/negotiate` | 243,276 | 78,651 |
-| `lokalized/ssr` | 5,693 | 2,075 |
-| one language-form constant alone | 2,359 | 1,004 |
-| root + negotiate + ssr + load together | 369,380 | 117,933 |
+| `import { createStrings } from "lokalized"` | 184,716 | 54,718 |
+| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 109,035 | 34,083 |
+| `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,630 | 2,002 |
+| `import { GENDER_FEMININE } from "lokalized"` | 2,350 | 914 |
+| the four above, in one bundle | 242,342 | 67,730 |
+<!-- bundle-table:end -->
+
+<!-- dist-table:start -->
+Measured by `npm run check:bundle` from the `dist/browser/` directory inside the packed
+tarball — the files themselves, not a re-bundle of the source they were built from. `files` is
+what a browser fetches for that entry: the entry plus every chunk it imports.
+
+| load | files | raw | brotli |
+|---|---|---|---|
+| `lokalized` | 1 | 187,717 | 55,518 |
+| `lokalized/core` | 7 | 186,889 | 55,401 |
+| `lokalized/parse` | 5 | 163,059 | 49,356 |
+| `lokalized/load` | 7 | 181,470 | 54,493 |
+| `lokalized/ssr` | 2 | 7,186 | 2,246 |
+| `lokalized/negotiate` | 3 | 110,170 | 34,585 |
+| `lokalized/data/ordinal` | 8 | 193,597 | 57,038 |
+| `lokalized/data/ranges` | 8 | 196,125 | 57,075 |
+| `lokalized.global.js`, the classic script | 1 | 263,217 | 72,021 |
+<!-- dist-table:end -->
+
+**What a no-build page downloads.** The table above is what a bundler produces from the source; this
+one is the `dist/browser/` files themselves, which is what the import maps and direct URLs above
+fetch. The two differ for the root by about three thousand bytes, and the difference is real rather
+than noise: a published entry point has to carry its own `export` statement and a sourcemap comment,
+and it cannot tree-shake against an import it has never seen.
+
+The second column is brotli rather than gzip because brotli is what a modern CDN negotiates first,
+and because it is the one that can be checked: the same bundle compresses to the same brotli byte on
+every Node this was tried on, while gzip moves with both the host's zlib build and the compression
+level — and on one machine the level spread is wider than the version spread, so a gzipped size is
+not a property of this package until you name a compressor and a level. Gzip is also appreciably
+larger, so a figure quoted in it overstates what a visitor on a modern CDN actually downloads. It is
+not printed here, because a number nothing re-derives is how this section came to be wrong before.
 
 Three things are worth reading off that table. **Half of the root bundle is one pinned CLDR table** —
-gutting `likely-subtags` takes the same bundle from 317,336 to 159,721 minified bytes, which is the
-price of resolving `fr-CH` to `fr` without asking the host. **The tables are shared, not
-duplicated**: adding three more subpaths to the root costs 52,044 bytes, not another whole copy. And
-**`lokalized/ssr` carries no pinned data at all**, which is what lets the stamp module sit in a page
-that does no matching.
+replacing `likely-subtags` with an empty one takes the same bundle from 184,716 to 161,787 minified
+bytes, which is the price of resolving `fr-CH` to `fr` without asking the host. **The tables are
+shared, not duplicated**: adding three more subpaths to the root costs 57,626 bytes, not another
+whole copy. And **`lokalized/ssr` carries no pinned data at all**, which is what lets the stamp
+module sit in a page that does no matching.
 
-`lokalized/data/ordinal` adds 5,348 minified bytes and `lokalized/data/ranges` 8,052 — and neither is
+`lokalized/data/ordinal` adds 5,778 minified bytes and `lokalized/data/ranges` 8,327 — and neither is
 reachable from `lokalized`, so you pay for them only by importing them.
 
 The package is ESM-only, because the export map declares no CommonJS condition — dynamic `import()`
@@ -1972,9 +3012,8 @@ attempt("lokalized/negotiate");   // => "ERR_PACKAGE_PATH_NOT_EXPORTED"
 Object.keys(await import("lokalized/ssr"));   // => ["createSsrStamp", "validateSsrStamp"]
 ```
 
-`sideEffects` is
-declared `false` and bundlers honour it — deleting that field makes a single-constant import 90×
-larger.
+`sideEffects` is declared `false` and bundlers honour it — removing that field takes the
+single-constant import from 2,350 to 78,540 minified bytes, 33× larger.
 
 ---
 
@@ -1982,6 +3021,13 @@ larger.
 
 **Your catalog files move over unchanged.** The JS port loads lokalized-java's own test catalogs
 byte-for-byte, extensionless filenames included. What changes is the wiring around them.
+
+One trap, and it is Java's too rather than this port's: a catalog file must be named with a BCP 47
+tag — `fr-CA.json`, with a hyphen — and **`Locale.toString()` produces `fr_CA`, which neither runtime
+will load.** Measured on JDK 21 against lokalized-java 3.0.0, a directory holding `pt_BR.json` is
+refused with the same sentence you get here: *File 'pt_BR.json' ends with .json but is not named with
+a valid IETF BCP 47 language tag.* If your deployment names files from `Locale.toString()`, it was
+already not loading them; if it names them from `toLanguageTag()`, they move over as promised.
 
 | lokalized-java | here |
 |---|---|
@@ -2020,12 +3066,199 @@ message;
 The **type** is a `RangeError` where Java raises `IllegalArgumentException` — JavaScript names with
 Java's shape. That is a mapping per site, not a general rule; check the error you actually catch.
 
-Five error classes carry a `code` and extend an exported `LokalizedError`, which Java has no
-equivalent of, so `catch (e) { if (e instanceof LokalizedError) … }` is one test for "this came from
-lokalized". It does **not** catch everything the library raises: argument refusals like the one above
-are plain `RangeError`s.
+Every library error class carries a `code` and extends an exported `LokalizedError`, which Java has
+no equivalent of, so `catch (e) { if (e instanceof LokalizedError) … }` is one test for "this came
+from lokalized". It does **not** catch everything the library raises: argument refusals like the one
+above are plain `RangeError`s.
+
+The count is derived rather than stated, because a number in prose is a claim nothing checks — this
+sentence said **five** until 2026-09-17, written before `ResolutionError` landed and never re-read:
+
+<!-- example: migration-errors -->
+
+```js
+import { LokalizedError } from "lokalized/core";
+
+const subpaths = [
+  "lokalized", "lokalized/core", "lokalized/parse", "lokalized/load", "lokalized/ssr",
+  "lokalized/negotiate", "lokalized/node", "lokalized/data/ordinal", "lokalized/data/ranges",
+];
+const classes = new Map();
+for (const subpath of subpaths)
+  for (const [name, value] of Object.entries(await import(subpath)))
+    if (typeof value === "function" && name.endsWith("Error")) classes.set(name, value);
+
+const subclasses = [...classes].filter(([, kind]) => kind.prototype instanceof LokalizedError);
+
+// A FLOOR, not an exact count, set at today's number — the same reason this sentence rotted once.
+subclasses.length >= 8;   // => true
+[...classes].some(([name]) => name === "LokalizedError");   // => true
+[...classes].every(([, kind]) => kind === LokalizedError || kind.prototype instanceof LokalizedError);
+// => true
+```
 
 ---
+
+## How this differs from i18next
+
+**For most applications i18next is the better choice, and this section is measured rather than
+argued.** Everything below was produced by running both libraries — `tools/i18next-diff/run.mjs`
+against i18next 26.4.2 on v24.18.0 — and recorded in `measurements/i18next.json`.
+`npm run diff:check` re-checks that record on every build, and it **fails if no probe finds i18next
+better**, because a comparison in which the competitor never wins is not a result.
+
+Of seven axes measured: i18next is better on four, stricter behaviour goes to lokalized on one, one
+is a genuine tie and one has no winner.
+
+
+### Shipping only the locale data you use
+
+Half of that download is one table: CLDR's likely-subtag map, 7,788 rows covering every language in
+the world. It is what turns `zh` into `zh-Hans-CN` so the right catalog answers, and what tells the
+renderer that `ar` is right-to-left.
+
+An application serving five locales reaches **four** of those rows. `tools/subset-likely-subtags.mjs`
+emits a table holding just those, and a bundler alias points the library's data module at it:
+
+```bash
+node node_modules/lokalized/tools/subset-likely-subtags.mjs --catalogs ./locales --out src/locale-data.js
+```
+
+```
+subset: 4 of 7788 rows (0.05%), 1064 bytes of source, for en, es, fr, fr-CA, ja
+```
+
+Then alias `lokalized/src/data/likely-subtags.js` to the generated file — `resolve.alias` in Vite and
+webpack, `alias` in esbuild, `@rollup/plugin-alias` in Rollup. Nothing else changes: the generated
+module has the same shape as the one it replaces, so there is no option to pass and no API to learn.
+
+**The rows are copied from the pinned table, not recomputed**, so wherever the subset has an answer
+it is the same answer — no host `Intl`, no CLDR version to drift against. And requests for languages
+you do not serve resolve identically too: maximizing a request can only change an answer if it could
+match a locale you serve, and those rows are always included. Measured over 424 requested tags,
+including the script, region and deprecated-code cases most likely to behave oddly: zero differences.
+
+The one thing to remember is to regenerate it when you add a locale. A stale subset silently loses
+maximization for the new one; the emitted file records the locale set and the source fingerprint in
+its header so a build can check.
+
+### Where i18next is better
+
+**It formats numbers, dates and currency inside a message; lokalized cannot.** Measured, German:
+
+| | i18next | lokalized |
+|---|---|---|
+| `"Summe: {{v, number}}"` | `Summe: 1.234.567,891` | `Summe: 1234567.891` |
+| `"Preis: {{v, currency(EUR)}}"` | `Preis: 1.234,50 €` | no formatter slot |
+
+This is not an oversight here — it is the pinned-data policy. `Intl` appears in **zero** of the
+54 files under `src/`, and a
+test fails the build on a bare reference to it, so that two machines on different ICU builds render
+identically. The cost is that you format values yourself before passing them in.
+
+**It escapes interpolated values by default.** Given `"Hi {{name}}"` and a name of
+`<script>x</script>`:
+
+| i18next | lokalized |
+|---|---|
+| `Hi &lt;script&gt;x&lt;&#x2F;script&gt;` | `Hi <script>x</script>` |
+
+lokalized exports nothing for escaping or sanitising on any subpath. If you interpolate
+user-supplied text into HTML, that is yours to handle.
+
+**Ordinals need one option in i18next and a second import here.** Both render
+`1st, 2nd, 3rd, 4th`. i18next takes
+`{ ordinal: true }` on the call; lokalized **refuses to construct** until you import
+`lokalized/data/ordinal` and pass `pluralData` — deliberate, so a page that never asks an ordinal
+question does not pay for the table, but plainly more work.
+
+**It starts faster.** Import, construct and render one string:
+**2.6 ms**
+against **14.7 ms**.
+lokalized decodes pinned CLDR tables at import; i18next asks the host and has nothing to decode.
+Reported, never gated — one machine, one run shape.
+
+**And it has a great deal this does not**: framework bindings, namespaces, language detection,
+backend plugins, key-to-key composition. lokalized has none of those and is not trying to.
+
+**The lokalized column of every table above is executed here**, so the side of this comparison that
+is this library's cannot drift from it. The i18next column comes from `measurements/i18next.json`,
+which `npm run diff:check` re-checks on every build:
+
+<!-- example: i18next -->
+
+```js
+import { createStrings } from "lokalized/core";
+
+const strings = createStrings({
+  strings: {
+    en: { hi: "Hi {{name}}", sum: "Summe: {{v}}" },
+    fr: { b: { translation: "{{count}} {{w}}", placeholders: { w: { value: "count",
+      translations: { CARDINALITY_ONE: "livre", CARDINALITY_OTHER: "livres" } } } } },
+  },
+  fallbackLocale: "en",
+  locale: "en",
+});
+
+// No escaping: an interpolated value is passed through exactly as given.
+strings.get("hi", { name: "<script>x</script>" });   // => "Hi <script>x</script>"
+
+// No formatter slot: the number arrives as JavaScript spells it, not as German does.
+strings.get("sum", { v: 1234567.891 });              // => "Summe: 1234567.891"
+```
+
+<!-- example: i18next -->
+
+```js
+import { forLocale } from "lokalized/core";
+
+// The French catalog above declares ONE and OTHER but not MANY, which French requires. At a count
+// that selects MANY the message cannot be resolved and the key comes back — visibly broken, which
+// is the half of this trade worth having.
+strings.get("b", { count: 1 }, forLocale("fr"));         // => "1 livre"
+strings.get("b", { count: 1000000 }, forLocale("fr"));   // => "b"
+```
+
+### Where this library is stricter
+
+**Plural rules come from data pinned in the package, not from the host.** i18next selects through
+`Intl.PluralRules`, so two machines on different ICU builds can disagree — and equally, i18next picks
+up CLDR corrections for free when the host updates. lokalized renders identically everywhere and goes
+stale until you update the package. Which you want is a real choice, not a ranking.
+
+With complete catalogs the two agree:
+**27 of
+27 cells identical** across
+a two-form, a three-form and a four-form language. Neither is better at plurals.
+
+### The one worth thinking about
+
+**A French catalog missing `CARDINALITY_MANY`, rendered at 1,000,000, with English behind it as the
+fallback.** Both libraries fail, differently:
+
+| | at 1 | at 1,000,000 | told before serving? |
+|---|---|---|---|
+| i18next | `1 livre` | `1000000 books` | only if you ask |
+| lokalized | `1 livre` | `b` | yes, at load |
+
+**i18next serves your French reader an English sentence and its missing-key handler does not fire**,
+because a translation *was* found. The page looks fine and is in the wrong language. lokalized renders
+the raw key — obviously broken, obviously wrong. Before serving, lokalized warns at load naming the
+exact missing form; i18next will tell you which suffixes a language needs if you ask
+(`pluralResolver.getSuffixes("fr")` returns
+`['_one', '_many', '_other']`), so the
+same check is a few lines away.
+
+**Neither is silent by nature. The difference is which failure you would rather ship** — and this
+library shipped the wrong-language version of exactly this bug for months, because the sample code
+reading its own catalogs threw the warnings away.
+
+### So: use i18next unless
+
+You need **parity with lokalized-java**, or rendering that **cannot vary with the host's ICU**, or the
+grammatical-form model (gender, case, definiteness) that this library has and i18next's `context` only
+approximates. Those are the reasons this exists. If none of them is your problem, i18next is a larger,
+faster-starting, better-supported library and you should use it.
 
 ## Entry points
 
@@ -2034,7 +3267,7 @@ Every entry point is a separate subpath so you only pay for what you import.
 | Import | What it is |
 |---|---|
 | `lokalized` | `createStrings`, the browser locale chooser, the plural classifiers, and all the language-form constants |
-| `lokalized/core` | The same `createStrings` plus per-call option helpers, the error classes, and build identity — no chooser |
+| `lokalized/core` | The same `createStrings` and chooser plus per-call option helpers, the error classes, and build identity — without the language-form constants |
 | `lokalized/parse` | `parseStrings`, `defineLocalizedString`, `defineCatalog`, `mergeParsedStringsFiles` |
 | `lokalized/load` | Manifest parsing, digest-verified fetching, catalog identity |
 | `lokalized/node` | Directory and file loaders, and the manifest generator |
@@ -2063,6 +3296,184 @@ exists. Where the two must differ, the difference is declared rather than incide
 Everything else — the expression language, the matching order, the fallback walk, the warnings, the
 limits — is the same library.
 
+## The catalogs these samples use
+
+Every sample above that loads from a directory reads `examples/catalogs`, and until now this document
+never showed you what was in it — so the outputs those samples assert were not reproducible from the
+document alone. Here are the four files, complete. Write them to `examples/catalogs/` (or anywhere
+else, and change the path in the sample) and every directory sample in this README runs as printed.
+
+They are a deliberately awkward set rather than a tidy one: `fr` and `fr-CA` are the ambiguity that
+makes a tiebreaker necessary, `fr-CA` overrides only some of `fr`'s keys so the per-key fallback walk
+has something to do, and `es` is a locale with no regional sibling to contrast with them.
+
+<!-- catalog: examples/catalogs/en.json -->
+
+```json
+{
+  "App.Title": "The Lokalized Bookshop",
+
+  "Locale.Direct": "This page is served in {{served}}.",
+
+  "Locale.Notice": "You asked for {{requested}}. This page is served in {{served}}.",
+
+  "Cart.Items": {
+    "translation": "Your cart holds {{count}} {{books}}.",
+    "placeholders": {
+      "books": {
+        "value": "count",
+        "translations": {
+          "CARDINALITY_ONE": "book",
+          "CARDINALITY_OTHER": "books"
+        }
+      }
+    }
+  },
+
+  "Greeting": {
+    "translation": "Welcome back, {{name}}. {{youAre}} on your own reading list.",
+    "placeholders": {
+      "youAre": {
+        "value": "readerGender",
+        "translations": {
+          "GENDER_MASCULINE": "He is",
+          "GENDER_FEMININE": "She is",
+          "GENDER_COMMON": "They are"
+        }
+      }
+    }
+  },
+
+  "Checkout.Cta": "Check out"
+}
+```
+
+<!-- catalog: examples/catalogs/es.json -->
+
+```json
+{
+  "App.Title": "La libreria Lokalized",
+
+  "Locale.Direct": "Esta pagina se sirve en {{served}}.",
+
+  "Locale.Notice": "Pediste {{requested}}. Esta pagina se sirve en {{served}}.",
+
+  "Cart.Items": {
+    "translation": "Tu carrito tiene {{count}} {{books}}.",
+    "placeholders": {
+      "books": {
+        "value": "count",
+        "translations": {
+          "CARDINALITY_ONE": "libro",
+          "CARDINALITY_MANY": "libros",
+          "CARDINALITY_OTHER": "libros"
+        }
+      }
+    }
+  },
+
+  "Greeting": {
+    "translation": "Bienvenido de nuevo, {{name}}. {{youAre}} en tu lista de lectura.",
+    "placeholders": {
+      "youAre": {
+        "value": "readerGender",
+        "translations": {
+          "GENDER_MASCULINE": "El esta",
+          "GENDER_FEMININE": "Ella esta",
+          "GENDER_COMMON": "Elle esta"
+        }
+      }
+    }
+  },
+
+  "Checkout.Cta": "Pagar"
+}
+```
+
+<!-- catalog: examples/catalogs/fr.json -->
+
+```json
+{
+  "App.Title": "La librairie Lokalized",
+
+  "Locale.Direct": "Cette page est servie en {{served}}.",
+
+  "Locale.Notice": "Vous avez demande {{requested}}. Cette page est servie en {{served}}.",
+
+  "Cart.Items": {
+    "translation": "Votre panier contient {{count}} {{books}}.",
+    "placeholders": {
+      "books": {
+        "value": "count",
+        "translations": {
+          "CARDINALITY_ONE": "livre",
+          "CARDINALITY_MANY": "livres",
+          "CARDINALITY_OTHER": "livres"
+        }
+      }
+    }
+  },
+
+  "Greeting": {
+    "translation": "Bon retour, {{name}}. {{youAre}} dans votre liste de lecture.",
+    "placeholders": {
+      "youAre": {
+        "value": "readerGender",
+        "translations": {
+          "GENDER_MASCULINE": "Il est",
+          "GENDER_FEMININE": "Elle est",
+          "GENDER_COMMON": "Iels sont"
+        }
+      }
+    }
+  },
+
+  "Checkout.Cta": "Passer la commande"
+}
+```
+
+<!-- catalog: examples/catalogs/fr-CA.json -->
+
+```json
+{
+  "App.Title": "La librairie Lokalized du Canada",
+
+  "Locale.Direct": "Cette page est servie en {{served}}.",
+
+  "Locale.Notice": "Vous avez demande {{requested}}. Cette page est servie en {{served}}.",
+
+  "Cart.Items": {
+    "translation": "Votre panier compte {{count}} {{books}}.",
+    "placeholders": {
+      "books": {
+        "value": "count",
+        "translations": {
+          "CARDINALITY_ONE": "livre",
+          "CARDINALITY_MANY": "livres",
+          "CARDINALITY_OTHER": "livres"
+        }
+      }
+    }
+  },
+
+  "Greeting": {
+    "translation": "Bon retour, {{name}}. {{youAre}} dans votre liste de lecture.",
+    "placeholders": {
+      "youAre": {
+        "value": "readerGender",
+        "translations": {
+          "GENDER_MASCULINE": "Il est",
+          "GENDER_FEMININE": "Elle est",
+          "GENDER_COMMON": "Iels sont"
+        }
+      }
+    }
+  }
+}
+```
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+The package also embeds generated data derived from Unicode CLDR, under Unicode License v3, and ports the observable behaviour of a JSON reader the upstream Java implementation embeds. Both are described in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), which is published with the package.

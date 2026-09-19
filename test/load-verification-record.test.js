@@ -32,6 +32,7 @@ import { loadEntireManifest, loadStrings } from "../src/load/fetch-loader.js";
 import { RUNTIME_METADATA } from "../src/internal/runtime-metadata.js";
 import { sha256Hex } from "../src/internal/sha256.js";
 import { validateStringsManifest } from "../src/load/manifest.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
 const bodyFor = (/** @type {string} */ tag) => JSON.stringify({ [`Key.${tag}`]: `hello ${tag}` });
@@ -42,7 +43,7 @@ function manifest(tags = ["en", "fr", "de", "ja"]) {
     [tag, { url: `${tag}.json`, sha256: sha256Hex(utf8.encode(bodyFor(tag))) }]));
   const draft = {
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
-    cldrVersion: pinnedProvenance().cldrVersion, dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale: "en", baseUrl: "https://cdn.example/v1/", files, tiebreakers: {},
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
@@ -67,23 +68,43 @@ const serve = (/** @type {readonly string[]} */ absent = []) => async (/** @type
 // Clause 5 — the manifest carries NO IANA field, and the record's IANA identity is the RENDERER'S.
 // ---------------------------------------------------------------------------------------------
 
-test("clause 5: the manifest format carries no IANA field, and one offered is not adopted", () => {
-  // Two halves. First, a validated manifest has no IANA key at all — the format does not have the
-  // concept, which is why the renderer has to supply it.
+test("clause 5: the manifest format carries the IANA identity, and a DISAGREEING one is refused", () => {
+  // **THIS TEST USED TO ASSERT THE OPPOSITE, and the inversion is the point rather than a
+  // regression.** Until M-D S33 it read "the manifest format carries no IANA field": a validated
+  // manifest had no key matching /iana/i, and a publisher who offered one had it silently DROPPED.
+  // M-D S27 measured what that cost — an SSR stamp carries seven build-identity fields and a
+  // manifest carried two, so two builds differing only in their pinned IANA closure published
+  // INDISTINGUISHABLE manifests and loaded each other's catalogs without complaint. The maintainer
+  // closed the format gap, so the old assertion is now false by design.
+  //
+  // What it asserted was also weaker than it looked. "An offered field is dropped" is nearly
+  // vacuous when the format defines no such field — there was nothing for the fingerprint to adopt
+  // and nothing for a comparison to disagree with. Now that the field EXISTS, both halves below
+  // discriminate something a wrong implementation would get wrong.
   const validated = validateStringsManifest(manifest());
-  const ianaKeys = Object.keys(validated).filter((key) => /iana/i.test(key));
-  assert.deepEqual(ianaKeys, [], `a manifest must carry no IANA field; found ${ianaKeys.join(", ")}`);
+  assert.deepEqual(Object.keys(validated).filter((key) => /iana/i.test(key)).sort(),
+    ["ianaDataFingerprint", "ianaRegistryDate"],
+    "the manifest format carries the IANA identity; that is what makes two closures distinguishable");
+  assert.equal(validated.ianaRegistryDate, RUNTIME_METADATA.ianaRegistryDate);
+  assert.equal(validated.ianaDataFingerprint, RUNTIME_METADATA.ianaDataFingerprint);
 
-  // Second, and this is the half a "no such key" assertion alone would miss: a publisher who ADDS
-  // one must not have it adopted. It is dropped rather than carried, so the projection the
-  // fingerprint is computed over cannot be widened by a field the format does not define.
-  const offered = /** @type {any} */ ({ ...manifest(), ianaRegistryDate: "2026-01-01" });
-  offered.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(offered)).catalogFingerprint;
-  const revalidated = validateStringsManifest(offered);
-  assert.equal(/** @type {any} */ (revalidated).ianaRegistryDate, undefined,
-    "an offered IANA field must not survive validation");
-  assert.equal(revalidated.catalogFingerprint, validateStringsManifest(manifest()).catalogFingerprint,
-    "and it must not change the identity, or the format would carry it after all");
+  // FIRST HALF: a manifest claiming a DIFFERENT IANA identity is REFUSED — not dropped, not
+  // believed. Dropping it was the old behaviour and it is exactly the silent-acceptance this
+  // change exists to end.
+  const disagreeing = /** @type {any} */ ({ ...manifest(), ianaRegistryDate: "jdk-oracle:17.0.1" });
+  disagreeing.catalogFingerprint =
+    computeCatalogIdentity(catalogIdentityInputFor(disagreeing)).catalogFingerprint;
+  assert.throws(() => validateStringsManifest(disagreeing), /published against IANA jdk-oracle:17\.0\.1/,
+    "a manifest from a different IANA closure must be refused, before any I/O");
+
+  // SECOND HALF, AND IT IS THE EXCLUSION TEST FOR THE NEW FIELDS: the build identity is compared
+  // field by field and is NOT folded into the catalog fingerprint. That separation is deliberate —
+  // plan 6.1's projection is five members about the TRANSLATIONS, and `src/load/identity.js`'s own
+  // header says the fingerprint is "deliberately not of how they were served". Folding build
+  // identity in would also make an honest build mismatch indistinguishable from the TAMPER message
+  // `test/manifest-trust-boundary.test.js` gates, which is strictly worse than the gap being closed.
+  assert.equal(disagreeing.catalogFingerprint, validated.catalogFingerprint,
+    "changing the IANA identity must not move the catalog fingerprint; the two axes are separate");
 });
 
 test("clause 5: the record's IANA identity comes from the RENDERER, not from the loaded record", async () => {

@@ -46,19 +46,21 @@ export class StringsParseError extends LokalizedError {
     if (token !== CONSTRUCTION_TOKEN)
       throw new TypeError("StringsParseError is not constructible; it is thrown by lokalized/parse");
 
-    super(LOKALIZED_ERROR_TOKEN, message, details.cause === undefined ? undefined : { cause: details.cause });
+    super(LOKALIZED_ERROR_TOKEN, "STRINGS_PARSE", message,
+      details.cause === undefined ? undefined : { cause: details.cause });
 
     /** @type {"StringsParseError"} */
     this.name = "StringsParseError";
-    /** @type {"STRINGS_PARSE"} */
-    this.code = "STRINGS_PARSE";
-    /** The caller-supplied label every diagnostic is prefixed with. @type {string} */
+    // BOOT-M0-0527 through BOOT-M0-0530 declare all four `readonly`, and `@readonly` is what emits
+    // the modifier from a JSDoc class field. They are set once here and never again; before this the
+    // declaration let a consumer rewrite the location of a diagnostic they had been handed.
+    /** The caller-supplied label every diagnostic is prefixed with. @type {string} @readonly */
     this.source = details.source;
-    /** One-based, or null when the failure is not lexical. @type {number | null} */
+    /** One-based, or null when the failure is not lexical. @type {number | null} @readonly */
     this.line = details.line ?? null;
-    /** One-based, or null when the failure is not lexical. @type {number | null} */
+    /** One-based, or null when the failure is not lexical. @type {number | null} @readonly */
     this.column = details.column ?? null;
-    /** The bounded JSON path, or null when the failure is not located in the document. @type {string | null} */
+    /** The bounded JSON path, or null when the failure is not located in the document. @type {string | null} @readonly */
     this.path = details.path ?? null;
   }
 

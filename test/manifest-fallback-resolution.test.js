@@ -68,6 +68,7 @@ import {
   validateStringsManifest,
 } from "../src/load/index.js";
 import { sha256Hex } from "../src/internal/sha256.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
 
@@ -96,8 +97,7 @@ function manifest(tags, fallbackLocale, tiebreakers = {}, overrides = {}) {
     formatVersion: 1,
     catalogVersion: overrides.catalogVersion ?? "v1",
     catalogFingerprint: "0".repeat(64),
-    cldrVersion: pinnedProvenance().cldrVersion,
-    dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale,
     baseUrl: "https://cdn.example/v1/",
     files,

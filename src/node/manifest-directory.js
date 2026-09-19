@@ -25,10 +25,11 @@
  */
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { configurationError } from "../internal/configuration-error.js";
+import { configurationError, refuseUnknownOptions } from "../internal/configuration-error.js";
 import { resolveLimits } from "../internal/catalog.js";
 import { sha256Hex } from "../internal/sha256.js";
 import { decode as pinnedProvenance } from "../data/provenance.js";
+import { RUNTIME_METADATA } from "../internal/runtime-metadata.js";
 import { computeCatalogIdentity } from "../load/identity.js";
 import { catalogIdentityInputFor } from "../load/identity.js";
 import { requireManifestTag, validateStringsManifest } from "../load/manifest.js";
@@ -100,6 +101,12 @@ function publicationBase(supplied, directory) {
   return base;
 }
 
+/** Every member the generator reads, measured with a recording proxy over the options object. */
+const DIRECTORY_MANIFEST_OPTIONS = /** @type {const} */ ([
+  "catalogVersion", "fallbackLocale", "limits", "maximumDiscoveryEntries", "publicationBaseUrl",
+  "tiebreakers",
+]);
+
 /**
  * Generate a publishable `StringsManifestV1` from one directory of catalogs.
  *
@@ -110,6 +117,15 @@ function publicationBase(supplied, directory) {
 export async function createStringsManifestFromDirectory(directory, options) {
   if (options === null || typeof options !== "object")
     throw configurationError("createStringsManifestFromDirectory requires catalogVersion and fallbackLocale");
+  // AFTER the shape guard and BEFORE the required-member checks, which is the better diagnostic:
+  // `{ catalogversion: "v1", fallbackLocale: "en" }` names the misspelling rather than reporting
+  // that `catalogVersion` must be a non-empty string, which is true and unhelpful. `baseUrl` is the
+  // near miss that publishes a manifest carrying the source directory's own `file://` path —
+  // structurally valid, refused much later by the Fetch door, and identical in fingerprint either
+  // way, which is exactly why it survived to be found by a differential rather than by a caller.
+  refuseUnknownOptions("createStringsManifestFromDirectory", options, DIRECTORY_MANIFEST_OPTIONS,
+    { baseUrl: "publicationBaseUrl", loadingLimits: "limits" });
+
   if (typeof options.catalogVersion !== "string" || options.catalogVersion.length === 0)
     throw configurationError("`catalogVersion` must be a non-empty string");
   if (typeof options.fallbackLocale !== "string" || options.fallbackLocale.length === 0)
@@ -222,6 +238,17 @@ export async function createStringsManifestFromDirectory(directory, options) {
     // knows which data the catalogs were authored against.
     cldrVersion: pinnedProvenance().cldrVersion,
     dataFingerprint: pinnedProvenance().dataFingerprint,
+    // THE OTHER FIVE, from the renderer's own pinned identity for the same reason. These are what
+    // make two builds distinguishable when the CLDR pair agrees and the IANA closure does not —
+    // the gap M-D S27 measured, where a manifest carried two of the seven the SSR stamp carries.
+    // They are NOT generator OPTIONS: a caller who could supply them could publish a manifest
+    // claiming an identity its build does not have, which is the defect this closes rather than a
+    // feature. `test/runtime-metadata.test.js` pins every one against the artifact it names.
+    behavioralVectorsVersion: RUNTIME_METADATA.behavioralVectorsVersion,
+    localeDataMode: RUNTIME_METADATA.localeDataMode,
+    cardinalityMode: RUNTIME_METADATA.cardinalityMode,
+    ianaRegistryDate: RUNTIME_METADATA.ianaRegistryDate,
+    ianaDataFingerprint: RUNTIME_METADATA.ianaDataFingerprint,
     fallbackLocale,
     baseUrl: base.href,
     files,

@@ -26,6 +26,7 @@ import { test } from "node:test";
 import { createStrings, forLocale, forLocaleMatch } from "../src/core/index.js";
 import { parseStrings } from "../src/parse/index.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const catalogFor = (/** @type {string} */ tag) =>
   parseStrings(JSON.stringify({ Hi: `hello ${tag}` }), { locale: tag });
@@ -52,8 +53,7 @@ function loaded(shape) {
       tiebreakers: shape.tiebreakers ?? {},
     },
     catalogIdentity: { catalogVersion: "v1", catalogFingerprint: "a".repeat(64) },
-    cldrVersion: pinned.cldrVersion,
-    dataFingerprint: pinned.dataFingerprint,
+    ...BUILD_IDENTITY,
     loadingLimits: {},
     coverage: shape.coverage,
     requestedFiles: shape.plan.map((locale) => ({ locale })),

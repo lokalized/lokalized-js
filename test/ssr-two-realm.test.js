@@ -32,6 +32,7 @@ import { parseStrings } from "../src/parse/index.js";
 import { createSsrStamp as localCreateSsrStamp } from "../src/ssr/index.js";
 import { RUNTIME_METADATA } from "../src/internal/runtime-metadata.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const root = new URL("../", import.meta.url).pathname;
 
@@ -73,8 +74,7 @@ const loaded = () => ({
   fallbackLocale: "en",
   manifestLocaleConfiguration: { fallbackLocale: "en", supportedLocales: ["en", "fr"], tiebreakers: {} },
   catalogIdentity: { catalogVersion: "2026.09.11", catalogFingerprint: "a".repeat(64) },
-  cldrVersion: pinnedProvenance().cldrVersion,
-  dataFingerprint: pinnedProvenance().dataFingerprint,
+  ...BUILD_IDENTITY,
   loadingLimits: {},
   coverage: { kind: "entire-manifest" },
   requestedFiles: [{ locale: "en" }, { locale: "fr" }],

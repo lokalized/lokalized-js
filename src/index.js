@@ -19,7 +19,9 @@ export { createStrings } from "./core/index.js";
 // Plan 3.4: "The root graph instead exports a pure small chooser and a browser convenience." They
 // are core's symbols (allowlist owner `core`, `reExportedByRoot`) and they enter NO new module —
 // both live in `src/core/index.js`, which the root graph already reaches, so the 0a module count
-// stays 25 root / 24 core. That is the half of the ratchet that keeps `lokalized/negotiate` and its
+// does not move. (It said "stays 25 root / 24 core" until 2026-09-17; the proposition held and the
+// figure had not been re-read since M2.) That is the half of the ratchet that keeps
+// `lokalized/negotiate` and its
 // 806-class IANA table out of the browser graph, and the chooser exists precisely so a browser does
 // not have to pull them in to pick a locale.
 export { chooseBrowserLocale, chooseLocaleForPreferredLanguages } from "./core/index.js";
@@ -28,9 +30,12 @@ export { chooseBrowserLocale, chooseLocaleForPreferredLanguages } from "./core/i
  * Plan 3.7 puts the tagged-value TYPES on `core` (plan 3.1s "tagged-value types" category) and the
  * CONSTANTS on the root, so the root names the type through its owner rather than redeclaring it.
  *
+ * The third parameter defaults here too, or the root would publish a stricter arity than the
+ * subpath it forwards to — see core's own block for the registry statements that ask for it.
+ *
  * @template {import("./core/index.js").LanguageFormAxis} A
  * @template {import("./core/index.js").LanguageFormName} N
- * @template {string} R
+ * @template {string} [R=string]
  * @typedef {import("./core/index.js").TaggedLanguageFormValue<A, N, R>} TaggedLanguageFormValue
  */
 
@@ -117,7 +122,8 @@ export function decimal(value) {
  * alone does not — trailing zeros, or compact notation.
  *
  * @param {string} value
- * @param {{ visibleDecimalPlaces?: number, compactExponent?: number }} [options]
+ * @param {Readonly<{ visibleDecimalPlaces?: number, compactExponent?: number }>} [options]
+ *   BOOT-M0-0595 and BOOT-M0-0596
  */
 export function pluralOperands(value, options) {
   decimal(value); // reuse the grammar check

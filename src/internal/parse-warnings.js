@@ -24,14 +24,26 @@ import { supportedCardinalCategoriesFor } from "./plural.js";
 /** @typedef {import("./catalog.js").Definition} Definition */
 
 /**
- * @typedef {object} LocalizedStringWarning
- * @property {"INCOMPLETE_CARDINALITY_TRANSLATIONS" | "INCOMPLETE_ORDINALITY_TRANSLATIONS"} type
- * @property {string} source
- * @property {string} locale
- * @property {string} key the ROOT key, even for a warning raised inside an alternative
- * @property {string} placeholder
- * @property {readonly string[]} missingLanguageForms in declared form order, never hash order
- * @property {string} message
+ * One parse-time warning, as `getWarnings()` and every `onWarning` callback deliver it.
+ *
+ * `key` is the ROOT key, even for a warning raised inside an alternative, and
+ * `missingLanguageForms` is in declared form order, never hash order.
+ *
+ * **`Readonly<>` RATHER THAN A `@property` LIST, and the wrap is the requirement.** The registry
+ * states seven times — BOOT-M0-0259 through BOOT-M0-0265 — that each member is `readonly`, and
+ * JSDoc has no per-`@property` modifier that emits one, so the object type is written inline and
+ * wrapped. The library hands these records to consumer callbacks and freezes nothing about them, so
+ * before this the declaration invited a write the library never expected to see.
+ *
+ * @typedef {Readonly<{
+ *   type: "INCOMPLETE_CARDINALITY_TRANSLATIONS" | "INCOMPLETE_ORDINALITY_TRANSLATIONS",
+ *   source: string,
+ *   locale: string,
+ *   key: string,
+ *   placeholder: string,
+ *   missingLanguageForms: readonly string[],
+ *   message: string,
+ * }>} LocalizedStringWarning
  */
 
 /**

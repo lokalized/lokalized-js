@@ -68,6 +68,7 @@ import { catalogIdentityInputFor } from "../src/load/identity.js";
 import { createStrings } from "../src/core/index.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
 import { loadEntireManifest, loadStrings, StringsLoadingError } from "../src/load/fetch-loader.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
 /** An oracle INDEPENDENT of the port's own synchronous SHA-256, so a fixture digest is never self-certified. */
@@ -118,7 +119,7 @@ function manifestFor(bodies, { fallbackLocale = "en", decodedBytes } = {}) {
   }]));
   const draft = {
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
-    cldrVersion: pinnedProvenance().cldrVersion, dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale, baseUrl: "https://example.test/c/", files, tiebreakers: {},
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;

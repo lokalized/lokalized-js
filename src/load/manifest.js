@@ -52,6 +52,11 @@ import { jdkLocaleWellFormed } from "../internal/locale-jdk-tag.js";
 import { normalizeTag } from "../internal/locale.js";
 import { parseError, rethrowAsParseError } from "../internal/parse-diagnostics.js";
 import { catalogIdentityInputFor, computeCatalogIdentity } from "./identity.js";
+import { RUNTIME_METADATA } from "../internal/runtime-metadata.js";
+import { refuseUnknownOptions } from "../internal/configuration-error.js";
+
+/** Shared by the cldrVersion and behavioralVectorsVersion rules, which want the same shape. */
+const VERSION_SHAPE = /^\d+(?:\.\d+)*$/;
 
 /** @typedef {import("./index.js").StringsManifestV1} StringsManifestV1 */
 
@@ -119,8 +124,9 @@ export function requireManifestTag(tag, where) {
  * @param {Record<string, unknown>} manifest
  */
 function assertRuntimeCompatible(manifest) {
-  // The manifest's own declarations are still SHAPE-checked here; only the comparison is missing.
-  if (typeof manifest.cldrVersion !== "string" || !/^\d+(?:\.\d+)*$/.test(manifest.cldrVersion))
+  // SHAPE first, then the comparison: a manifest whose cldrVersion is not version-shaped is
+  // refused for THAT, so the mismatch message below never has to describe a malformed value.
+  if (typeof manifest.cldrVersion !== "string" || !VERSION_SHAPE.test(manifest.cldrVersion))
     throw configurationError(`A manifest's cldrVersion must be a CLDR version; received ${JSON.stringify(manifest.cldrVersion)}`);
   if (typeof manifest.dataFingerprint !== "string" || !HEX_64.test(manifest.dataFingerprint))
     throw configurationError("A manifest's dataFingerprint must be a full lowercase hexadecimal SHA-256");
@@ -134,6 +140,56 @@ function assertRuntimeCompatible(manifest) {
       `identity come from that data, so the catalogs would render differently even though the file ` +
       `plan matches.`,
     );
+
+  // THE OTHER FIVE OF THE SEVEN, and they are here because two was not enough. M-D S27 measured the
+  // asymmetry: an SSR stamp carries all seven build-identity fields and a manifest carried two, so
+  // **two builds differing only in their pinned IANA closure published indistinguishable manifests
+  // and loaded each other's catalogs without complaint.** Range equivalence and whole-list matching
+  // come from that closure, so the catalogs a visitor is served can be chosen differently by the two
+  // builds while every file digest matches.
+  //
+  // FIXED LITERALS FIRST, each its own test, because they are different facts. A manifest declaring
+  // `localeDataMode: "host"` came from an implementation that classifies through `Intl`; that is not
+  // a version disagreement and must not be reported as one.
+  if (manifest.localeDataMode !== "pinned")
+    throw configurationError(
+      `A manifest's localeDataMode must be "pinned"; received ${JSON.stringify(manifest.localeDataMode)}`);
+  if (manifest.cardinalityMode !== "exact")
+    throw configurationError(
+      `A manifest's cardinalityMode must be "exact"; received ${JSON.stringify(manifest.cardinalityMode)}`);
+
+  if (typeof manifest.behavioralVectorsVersion !== "string" ||
+    !VERSION_SHAPE.test(manifest.behavioralVectorsVersion))
+    throw configurationError(
+      `A manifest's behavioralVectorsVersion must be a version; ` +
+      `received ${JSON.stringify(manifest.behavioralVectorsVersion)}`);
+  // DELIBERATELY NOT DATE-SHAPED. The build's own value is `jdk-oracle:21.0.11`, a recorded
+  // maintainer decision resting on there being no registry snapshot to date. A `\d{4}-\d{2}-\d{2}`
+  // rule here would make the generator refuse its own output, and the wording says "identity string"
+  // so the message never teaches a shape the format does not have.
+  if (typeof manifest.ianaRegistryDate !== "string" || manifest.ianaRegistryDate.length === 0)
+    throw configurationError(
+      `A manifest's ianaRegistryDate must be a non-empty identity string; ` +
+      `received ${JSON.stringify(manifest.ianaRegistryDate)}`);
+  if (typeof manifest.ianaDataFingerprint !== "string" || !HEX_64.test(manifest.ianaDataFingerprint))
+    throw configurationError(
+      "A manifest's ianaDataFingerprint must be a full lowercase hexadecimal SHA-256");
+
+  // ONE SENTENCE OF ITS OWN, not appended to the CLDR one. The CLDR sentence earns its length by
+  // naming a consequence about RENDERING; these three govern NEGOTIATION, which is a different
+  // consequence — and keeping the two apart is also what keeps their ablations distinguishable.
+  if (manifest.behavioralVectorsVersion !== RUNTIME_METADATA.behavioralVectorsVersion ||
+    manifest.ianaRegistryDate !== RUNTIME_METADATA.ianaRegistryDate ||
+    manifest.ianaDataFingerprint !== RUNTIME_METADATA.ianaDataFingerprint)
+    throw configurationError(
+      `This manifest was published against IANA ${manifest.ianaRegistryDate} / ` +
+      `${String(manifest.ianaDataFingerprint).slice(0, 12)}… and vectors ` +
+      `${manifest.behavioralVectorsVersion}, and this build carries ` +
+      `${RUNTIME_METADATA.ianaRegistryDate} / ${RUNTIME_METADATA.ianaDataFingerprint.slice(0, 12)}… ` +
+      `and vectors ${RUNTIME_METADATA.behavioralVectorsVersion}. Range equivalence and whole-list ` +
+      `matching come from that closure, so the two builds can negotiate a visitor to different ` +
+      `catalogs even though every file digest matches.`,
+    );
 }
 
 /**
@@ -144,6 +200,7 @@ function assertRuntimeCompatible(manifest) {
  * @returns {Readonly<StringsManifestV1>}
  */
 export function validateStringsManifest(input, options = {}) {
+  refuseUnknownOptions("validateStringsManifest", options, ["limits"], { loadingLimits: "limits" });
   const limits = resolveLimits(options.limits);
 
   if (!isPlainRecord(input)) throw configurationError("A strings manifest must be an object");
@@ -279,6 +336,11 @@ export function validateStringsManifest(input, options = {}) {
     catalogFingerprint: input.catalogFingerprint,
     cldrVersion: input.cldrVersion,
     dataFingerprint: input.dataFingerprint,
+    behavioralVectorsVersion: input.behavioralVectorsVersion,
+    localeDataMode: /** @type {"pinned"} */ (input.localeDataMode),
+    cardinalityMode: /** @type {"exact"} */ (input.cardinalityMode),
+    ianaRegistryDate: input.ianaRegistryDate,
+    ianaDataFingerprint: input.ianaDataFingerprint,
     fallbackLocale,
     baseUrl: input.baseUrl,
     files: Object.freeze({ ...files }),
@@ -306,7 +368,9 @@ export function validateStringsManifest(input, options = {}) {
  * @returns {Readonly<{ fallbackLocale: string, supportedLocales: readonly string[], tiebreakers: Readonly<Record<string, readonly string[]>> }>}
  */
 export function localeConfigurationForManifest(manifest, options = {}) {
-  const validated = validateStringsManifest(manifest, options);
+  refuseUnknownOptions("localeConfigurationForManifest", options, ["limits"],
+    { loadingLimits: "limits" });
+  const validated = validateStringsManifest(manifest, { limits: options.limits });
   return Object.freeze({
     fallbackLocale: validated.fallbackLocale,
     // Sorted, so two manifests declaring the same locales in different orders produce the same
@@ -324,6 +388,12 @@ export function localeConfigurationForManifest(manifest, options = {}) {
  * @returns {Readonly<StringsManifestV1>}
  */
 export function parseStringsManifest(input, options = {}) {
+  // FIRST, ahead of every read and decode below: this is the one manifest door that does real input
+  // work, and `readCharacters`, `readStrictUtf8`, `normalizeCatalogText`, `validateJsonNestingDepth`
+  // and `parseJsonDocument` can each throw first and mask a misspelling.
+  refuseUnknownOptions("parseStringsManifest", options, ["limits", "source"],
+    { loadingLimits: "limits" });
+
   const source = options.source ?? DEFAULT_SOURCE;
   const limits = resolveLimits(options.limits);
 
@@ -367,7 +437,12 @@ export function parseStringsManifest(input, options = {}) {
       { source },
     );
 
-  return validateStringsManifest(/** @type {{ value: unknown }} */ (document).value, options);
+  // PROJECTED, NOT FORWARDED. `source` is this door's option and the validator does not take it, so
+  // handing the whole object over makes the validator refuse a call that is perfectly correct — a
+  // door refusing its own caller for using its own documented option. Measured: leaving this
+  // wholesale reds 289 tests, 25 of them on exactly that name.
+  return validateStringsManifest(/** @type {{ value: unknown }} */ (document).value,
+    { limits: options.limits });
 }
 
 /**

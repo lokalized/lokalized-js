@@ -19,6 +19,7 @@
  */
 
 import { isValidIdentifier, placeholderNamesIn } from "./interpolate.js";
+import { configurationError } from "./configuration-error.js";
 import {
   boundedDiagnosticValue,
   boundedJsonPath,
@@ -99,14 +100,24 @@ const MAXIMUM_ALTERNATIVE_DEPTH = 128;
  */
 
 /**
- * @typedef {object} ParseLimits
- * @property {number} [maximumInputBytes] per-resource, byte input only
- * @property {number} [maximumReaderCharacters] per-resource, text input only
- * @property {number} [maximumJsonNestingDepth]
- * @property {number} [maximumTotalInputBytes] aggregate, across a load
- * @property {number} [maximumLocalizedStringsFiles] aggregate, across a load
- * @property {number} [maximumTranslationNodes] aggregate, across a load
- * @property {number} [maximumWarnings] aggregate, across a load
+ * Plan 4.5's seven-field `StringsLoadingLimits`, which is the name both `lokalized/parse` and
+ * `lokalized/load` publish this type under. Four of the seven are AGGREGATE, across a whole load —
+ * `maximumTotalInputBytes`, `maximumLocalizedStringsFiles`, `maximumTranslationNodes` and
+ * `maximumWarnings` — and the two byte/character bounds are per-resource.
+ *
+ * BOOT-M0-0710 through BOOT-M0-0716 declare all seven `readonly`, and both published spellings were
+ * writable until this wrap. A limits object is supplied by a caller and read by the loader; nothing
+ * on either side writes a member back.
+ *
+ * @typedef {Readonly<{
+ *   maximumInputBytes?: number,
+ *   maximumReaderCharacters?: number,
+ *   maximumJsonNestingDepth?: number,
+ *   maximumTotalInputBytes?: number,
+ *   maximumLocalizedStringsFiles?: number,
+ *   maximumTranslationNodes?: number,
+ *   maximumWarnings?: number,
+ * }>} ParseLimits
  */
 
 /**
@@ -322,6 +333,17 @@ function has(object, member) {
 
 
 /**
+ * The seven budgets `resolveLimits` reads, in one place so the refusal above and the reads below
+ * cannot drift apart. `test/option-surface.test.js` re-derives this from the resolved record, so a
+ * budget added to one and not the other fails rather than becoming silently unrefusable.
+ */
+const LIMIT_NAMES = /** @type {readonly string[]} */ ([
+  "maximumInputBytes", "maximumReaderCharacters", "maximumJsonNestingDepth",
+  "maximumTotalInputBytes", "maximumLocalizedStringsFiles", "maximumTranslationNodes",
+  "maximumWarnings",
+]);
+
+/**
  * `LocalizedStringLoadingOptions.Builder`'s validation, which Java performs when the options are
  * BUILT — before a byte is read. A limit outside its range is refused, never clamped and never
  * ignored: clamping and ignoring are indistinguishable from the caller's side until a resource that
@@ -335,6 +357,44 @@ function has(object, member) {
  * @returns {Required<ParseLimits>}
  */
 export function resolveLimits(limits) {
+  // **THE CONTAINER'S SHAPE, AND IT WAS A LIVE DEFECT.** Every read below is `limits?.<name> ??
+  // DEFAULT`, which asks nothing about what `limits` IS. Measured before this landed:
+  // `limits: null`, `[]`, `"nonsense"`, `() => {}` and — the one that matters —
+  // `new Map([["maximumLocalizedStringsFiles", 1]])` were ALL silently accepted as the defaults.
+  //
+  // The Map case is not hypothetical. `createStringsManifestFromDirectory` takes `tiebreakers` as a
+  // plain record OR a `ReadonlyMap` (plan 3.2's TiebreakerMap), so a publisher who learned that from
+  // the sibling option and wrote `limits: new Map(...)` got a clean four-file manifest with their
+  // budget dropped, while the identical budget as an object REFUSED. One door, two opposite answers.
+  // That is S11b's finding verbatim — "a ReadonlyMap of tiebreakers was SILENTLY DROPPED, because a
+  // Map passes an object test and then meets `Object.entries`" — in the record declared closed.
+  if (limits !== undefined) {
+    // **`Object.prototype.toString`, NOT a prototype comparison, and the reason is measured.** The
+    // obvious spelling — `Object.getPrototypeOf(limits) !== Object.prototype` — reds
+    // `test/strings-serializability.test.js`'s two round-trip tests, because a record that has
+    // crossed a `vm` REALM is a perfectly ordinary plain object whose `Object.prototype` is a
+    // DIFFERENT object. Relaxing it to also admit a null prototype does not help; the realm case is
+    // neither. The brand check is realm-independent and still refuses every container whose members
+    // the reads below cannot see: `[object Map]`, `[object Array]`, `[object Function]`, a Date, a
+    // string. A null-prototype record — this library's own `Object.create(null)` idiom — reports
+    // `[object Object]` and is admitted, which is correct.
+    if (Object.prototype.toString.call(limits) !== "[object Object]")
+      throw configurationError(
+        "A limits option must be a plain object of the seven named budgets. A Map, an array or a " +
+        "class instance is not read and its budgets would be silently dropped");
+
+    // **THE UNKNOWN MEMBER, and this is the nested half of the twelve-door decision.** `resolveLimits`
+    // read seven named members and ignored every other key — M-D S17 found it as the fourth instance
+    // of the silently-ignored-option class, and noted that Java's `LoadDiff.optionsFrom` THROWS on
+    // one. Refusing here rather than at each door covers every caller at once and cannot drift:
+    // thirteen call sites across core, parse, load and node reach this one function.
+    const unknown = Object.keys(limits).filter((name) => !LIMIT_NAMES.includes(name));
+    if (unknown.length > 0)
+      throw configurationError(
+        `A limits option does not take [${unknown.join(", ")}]. It takes ` +
+        `[${[...LIMIT_NAMES].sort().join(", ")}]`);
+  }
+
   const resolved = {
     maximumInputBytes: limits?.maximumInputBytes ?? DEFAULT_MAXIMUM_INPUT_BYTES,
     maximumReaderCharacters: limits?.maximumReaderCharacters ?? DEFAULT_MAXIMUM_READER_CHARACTERS,
@@ -438,6 +498,40 @@ export class LoadingSession {
 
     ++this.warnings;
     if (onWarning) onWarning(warning);
+  }
+
+  /**
+   * CHARGE ANOTHER SESSION'S TOTALS INTO THIS ONE, through this class's own guarded methods.
+   *
+   * A sequential walk (`src/node/directory.js`) can thread one session and let the parser charge it
+   * as it goes. A CONCURRENT one cannot: `src/load/run-plan.js` runs up to eight parses at once, and a
+   * shared counter would make which file is blamed depend on completion order, where plan 6.2:2077
+   * fixes the failure list to fetch-plan order. So that runner parses each file against its own
+   * session and replays the measured contributions here, in plan order; its own header carries the
+   * rest of the reasoning.
+   *
+   * **IT REPLAYS RATHER THAN ADDS, and that is the whole reason this is a method here.** Summing the
+   * four fields at the call site would be a second implementation of four comparison rules and a
+   * second set of messages for one budget — so a reconciled refusal is byte-identical to the one the
+   * directory door raises over the same catalogs, and a fifth budget added above is replayed by
+   * whoever adds it rather than silently skipped.
+   *
+   * ONE RESIDUAL DIVERGENCE, stated rather than left to be found: within a file the parser charges
+   * nodes and warnings INTERLEAVED, and this replay charges all nodes then all warnings, so a
+   * contribution that would cross both can name a different budget than the streaming session would.
+   * Both refuse, at the same file. Agreeing would mean retaining an ordered charge log per file.
+   *
+   * @param {LoadingSession} contribution one resource's finished session
+   * @param {string} source the label this contribution's charges report
+   * @returns {void}
+   */
+  absorb(contribution, source) {
+    // Looped rather than assumed to be 1: a contribution is whatever session was handed to a parse,
+    // and a caller that parsed two resources into one has charged two files.
+    for (let file = 0; file < contribution.localizedStringsFiles; ++file) this.beginFile(source);
+    this.addInputBytes(contribution.inputBytes, source);
+    this.addTranslationNodes(contribution.translationNodes, source);
+    for (let warning = 0; warning < contribution.warnings; ++warning) this.warn({ source });
   }
 }
 
@@ -1256,11 +1350,17 @@ export function parseCatalogSource(input, context) {
 // -------------------------------------------------------------------------------------------------
 
 /**
- * @typedef {object} LocalizedStringNodeInput
- * @property {string} [translation]
- * @property {string} [commentary]
- * @property {unknown} [placeholders]
- * @property {unknown} [alternatives]
+ * BOOT-M0-0559 through BOOT-M0-0564. `placeholders` and `alternatives` stay `unknown` here on
+ * purpose — this is the door the programmatic `define` family enters through, and it accepts an
+ * arbitrary object graph that the walk below validates leaf by leaf rather than a shape the type
+ * system can state.
+ *
+ * @typedef {Readonly<{
+ *   translation?: string,
+ *   commentary?: string,
+ *   placeholders?: unknown,
+ *   alternatives?: unknown,
+ * }>} LocalizedStringNodeInput
  */
 
 /**

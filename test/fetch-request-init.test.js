@@ -60,6 +60,7 @@ import { loadEntireManifest, loadStrings } from "../src/load/fetch-loader.js";
 import { parseStrings } from "../src/parse/index.js";
 import { sha256Hex } from "../src/internal/sha256.js";
 import { wholeManifestPlan } from "../src/load/run-plan.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
 const bodyFor = (/** @type {string} */ tag) => JSON.stringify({ Greeting: `hello ${tag}` });
@@ -91,7 +92,7 @@ function manifest(tags, shape = {}) {
   }));
   const draft = {
     formatVersion: 1, catalogVersion: "1", catalogFingerprint: "0".repeat(64),
-    cldrVersion: pinnedProvenance().cldrVersion, dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     // https is mandatory: plan 6.1:1917-1918 makes the Fetch door refuse any other resolved scheme
     // before catalog I/O, and a `file:` fixture would land every test in the zero-call arm.
     fallbackLocale, baseUrl: "https://catalogs.example.test/v1/", files, tiebreakers,

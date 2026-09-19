@@ -15,7 +15,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ["22", "24", "current"]
+        # THE FIRST LEG IS THE FLOOR, and it is the only one that tests `engines.node`.
+        # A floor CI does not execute is a claim, not a measurement — the shape A3 and A7
+        # each found for real (scenario:2k in neither verify nor CI; CI running zero spec
+        # gates). Keep this equal to package.json's `engines.node` lower bound.
+        node: ["20", "22", "24", "current"]
     # Every corpus-driven gate resolves `../lokalized-spec` as a SIBLING of this checkout, so both
     # repositories are checked out side by side under the workspace. Without this the spec artifacts
     # are simply absent: `npm test` skipped 43 tests and crashed 5 files outright, and `conformance`
@@ -93,8 +97,41 @@ jobs:
       # class it has caught fourteen times.
       - name: Execute the README's samples and assert their claimed output
         run: npm run check:readme
+      # AND AGAIN FROM THE PUBLISHED PACKAGE, in a directory holding nothing but the tarball and the
+      # catalogs the README itself publishes. The step above runs the samples inside the repository,
+      # where the whole working tree is present; measured 2026-09-16, NINE of the 42 groups were green
+      # there and failed for anybody who had installed the package.
+      - name: Execute the same samples as a newcomer who installed the package
+        run: npm run check:readme:packed
+      # The README's bundler numbers, measured by a real bundler. Until 2026-09-17 the section
+      # `### What it costs a browser` opened "Measured with esbuild 0.24.2 against this checkout" and
+      # carried fourteen figures in markdown that `check:readme` is structurally blind to, attributed
+      # to a tool that existed nowhere in the repository — and every one of the fourteen was stale.
+      # esbuild is pinned to an exact version because its output is a pure function of its input and
+      # its version, which is what makes these numbers a ratchet rather than a snapshot.
+      - name: Bundler sizes and containment against the packed artifact
+        run: npm run check:bundle
       - name: Consumer-shaped TypeScript declaration probes
         run: npm run declarations
+      # The requirement registry states 179 times that some member, parameter or return value is
+      # `readonly`; this compiles one consumer-shaped probe per statement against the EMITTED
+      # declarations, resolved through the package's own `exports` map. It needs the sibling spec
+      # checkout above for the registry and exits 2 rather than passing when it is absent.
+      - name: Registry readonly statements against the shipped declarations
+        run: npm run check:readonly
+      # Plan 6.3's no-build browser distribution, built by the pinned esbuild (amendment A20) and
+      # checked against the prohibitions that prose puts on the BROWSER GRAPH — no Node built-ins,
+      # no bare specifiers, no top-level await, no dynamic import — plus the repo-wide eval/Intl
+      # rules, which until M-R S6 walked `src/` and would have passed any artifact whatsoever. It
+      # builds into a temp directory; `prepack` is what writes `dist/` for the tarball.
+      - name: Browser distribution and its prohibitions
+        run: npm run check:dist
+      # Plan 8.5's release verification, run against `npm pack` and — unlike every other gate here —
+      # against the tarball INSTALLED into a clean project, which is the only resolution a consumer
+      # actually gets. The browser half is recorded in measurements/release-rehearsal.json and
+      # compared without a browser, on scenario:0a's rule that a green run must not need a person.
+      - name: Release verification against the installed tarball
+        run: npm run check:release
       # A SKIP IS A GATE THAT STOPPED GATING. Each corpus-driven test skips when the sibling spec
       # checkout is absent, which is right for a bare local clone and WRONG here: with the spec
       # checked out above, nothing may skip. Asserting that is what stops a silently shrinking suite
@@ -148,6 +185,14 @@ jobs:
       # run all fail here without Java.
       - name: Differential record re-check
         run: npm run diff:check
+      # THE SAME SHAPE, ONE LIBRARY OVER. The README's i18next comparison is measured by running BOTH
+      # libraries, and i18next is an oracle this package may not depend on — it has zero dependencies
+      # and `test/package-shape.test.js` enforces that — exactly as the JDK is an oracle CI does not
+      # carry. So `diff:i18next` runs it with i18next installed and `check:i18next` re-checks the
+      # record here without it: a missing record, a probe that did not execute both sides, a tool
+      # edited since its last real run, or a census in which the COMPETITOR NEVER WINS all fail.
+      - name: i18next comparison record re-check
+        run: npm run check:i18next
       - name: Scenario 0a static integration measurement
         run: npm run scenario:0a
       # M7 clause 19 as amended: the 2,000-key budgets are RECORDED and the recording is re-checked,
@@ -163,6 +208,20 @@ jobs:
       # both found a real gap the moment someone asked. It needs no JDK and no browser.
       - name: Scenario 6 edge/server negotiation measurement
         run: npm run scenario:6
+      # Plan 9.3's sixth measurement, "Node server concurrency with per-call locales", which had no
+      # recorded scenario until M-D S23 — the only numbers for it lived in a README sentence. What
+      # runs here is the CORRECTNESS half: every interleaved request must see only its own locale,
+      # and the negative control must come back WRONG or nothing interleaved. The milliseconds are
+      # reported and never gated, so this is safe on a shared CI runner.
+      - name: Scenario concurrency (per-call locales under interleaving)
+        run: npm run scenario:concurrency
+      # Plan 9.3's "construction PEAK memory", which retained-memory figures are not. Peak is found
+      # by bisecting --max-old-space-size in a child process, because a sampler on the same thread
+      # cannot observe a synchronous operation's own peak. The caps are REPORTED; what is gated here
+      # is that the largest catalog costs more than the runtime's own floor, without which the run
+      # would be measuring node and looking exactly like a result.
+      - name: Scenario peak construction memory
+        run: npm run scenario:peak-memory
       # A clause may not be recorded PROVEN without a gate that exists on disk AND an ablation that
       # was actually performed. M8's close-out was otherwise going to be a prose verdict table, and a
       # close-out that reads its own prose back to itself is this project's most-repeated defect.
@@ -180,12 +239,13 @@ jobs:
       # re-check behind the claim. That is the same shape as clause 19's proof obligation, found the
       # same way, and it is fixed here rather than argued around.
       #
-      # SIX OF THE ELEVEN RUN HERE. The exclusions are measured, not assumed, and each is named so a
+      # SIX OF THE TWELVE RUN HERE. The exclusions are measured, not assumed, and each is named so a
       # reader does not mistake this for the whole suite:
-      #   check:allowlist, check:surface, check:registry  — resolve the PLAN through
+      #   check:allowlist, check:surface, check:registry, check:documentation-topics — resolve the PLAN through
       #     scripts/planning-path.mjs and exit 2 with a remedy when it is absent. The planning
       #     directory is deliberately outside every checkout and is not pushed, so these cannot run
-      #     in CI by design. Measured: exit 2 with LOKALIZED_PLANNING_DIR unset.
+      #     in CI by design. Measured 2026-09-17: each exits 2 with LOKALIZED_PLANNING_DIR pointing
+      #     nowhere, check:documentation-topics included.
       #   check:vectors, check:iana                       — drive the pinned JDK against
       #     lokalized-java, which this workflow does not check out or build. Measured: exit 1 naming
       #     the JDK path. They fail LOUDLY rather than skipping, which is why they are excluded here
@@ -208,7 +268,9 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          # THE FLOOR, deliberately: a fresh installer on the oldest supported runtime is
+          # exactly what a packed-artifact check is for. Tracks engines.node's lower bound.
+          node-version: "20"
       - run: npm ci || npm install
       - run: npm run types
       # Plan section 9.1: release verification runs against `npm pack`,

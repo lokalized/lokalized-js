@@ -51,16 +51,15 @@ export class ResolutionError extends LokalizedError {
     if (token !== RESOLUTION_ERROR_TOKEN)
       throw new TypeError("ResolutionError is not constructible; it is thrown by lokalized");
 
-    super(LOKALIZED_ERROR_TOKEN, message, options?.cause === undefined ? undefined : { cause: options.cause });
+    super(LOKALIZED_ERROR_TOKEN, code, message,
+      options?.cause === undefined ? undefined : { cause: options.cause });
     /** @type {"ResolutionError"} */
     this.name = "ResolutionError";
-    /** @type {"RESOLUTION_INVALID_ARGUMENT" | "RESOLUTION_INVALID_STATE"} */
-    this.code = code;
     // PRESENT ONLY ON THE NULLISH LEAF, not merely undefined elsewhere. Plan 3.5:1136-1140 says
     // "every other `ResolutionError` omits `thrownValue`", and `"thrownValue" in error` is the
     // natural discriminator — an always-present key valued `undefined` would defeat it.
     if (options?.thrownValue !== undefined) {
-      /** @type {"null" | "undefined" | undefined} */
+      /** BOOT-M0-0524. @type {"null" | "undefined" | undefined} @readonly */
       this.thrownValue = options.thrownValue;
     }
   }

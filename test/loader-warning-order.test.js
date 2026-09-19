@@ -74,6 +74,7 @@ import { ordinalData } from "../src/data/ordinal.js";
 import { parseStrings } from "../src/parse/index.js";
 import { primaryLanguage } from "../src/internal/locale.js";
 import { sha256Hex } from "../src/internal/sha256.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
 
@@ -132,8 +133,7 @@ function manifestOver(bodies, {
     formatVersion: 1,
     catalogVersion: "clause-18",
     catalogFingerprint: "0".repeat(64),
-    cldrVersion: pinnedProvenance().cldrVersion,
-    dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale,
     baseUrl,
     files,
@@ -798,19 +798,32 @@ test("C7 (shape): exactly one module assembles the cross-file warnings array", (
   // per-file blocks in fetch-plan order; those two are the clause. A door that grew its own loop
   // would necessarily spell one of the verbs above and show up here.
   //
-  // **`src/parse/index.js` JOINED THE SET AT M9 S3 AND IS NOT A THIRD DOOR**, which is a distinction
-  // this regex cannot draw for itself: `mergeParsedStringsFiles` concatenates cross-file warnings
-  // because plan 3.6:1491 requires it to ("preserves warnings"), and it sits in both loader graphs
-  // only because both loaders parse. **The clause is about the LOADING PATH**, so the membership is
-  // admitted here and then narrowed by the assertion below, which says the thing the set alone no
-  // longer says: no loader reaches the merge at all. That is strictly more than the two-element set
-  // asserted, not less — the entry is not a relaxation.
-  assert.deepEqual(assemblers,
-    ["src/internal/parse-file.js", "src/load/run-plan.js", "src/parse/index.js"]);
+  // **`src/parse/index.js` JOINED THE SET AT M9 S3 AND LEFT IT AGAIN WHEN THE AGGREGATE BUDGETS WERE
+  // RECONCILED**, and the departure is the point rather than an accident. It was in both loader
+  // graphs for one reason — `run-plan.js` parsed through `lokalized/parse`'s public door — and that
+  // door is precisely the one a multi-file loader may not use: `parseStrings` opens a FRESH
+  // `LoadingSession` per call and offers no way to supply one, which is what charged the four
+  // aggregate budgets per file at every manifest door. The runner now reaches the shared body in
+  // `src/internal/parse-file.js`, exactly as `src/node/directory.js` already did.
+  //
+  // So the set is back to the two modules the clause is really about: `parse-file.js` produces ONE
+  // file's warnings in depth-first declaration order and `run-plan.js` concatenates the per-file
+  // blocks in fetch-plan order. A door that grew its own loop would necessarily spell one of the
+  // verbs above and show up here.
+  assert.deepEqual(assemblers, ["src/internal/parse-file.js", "src/load/run-plan.js"]);
 
-  // THE NARROWING. `mergeParsedStringsFiles` is an application-level assembly of already-parsed
+  // AND THE DEPARTURE IS ASSERTED RATHER THAN LEFT TO BE READ OFF THE SET, because a reader of the
+  // line above cannot tell "the merge is unreachable from a loader" from "the regex stopped
+  // matching". This is strictly stronger than the narrowing it replaces: the merge used to be in the
+  // graph and merely uncalled.
+  assert.ok(!union.some((file) => file.endsWith("src/parse/index.js")),
+    "a loader graph reaches `lokalized/parse`'s door again — which is also the door whose fresh " +
+    "per-call LoadingSession is what made the aggregate budgets per-file");
+
+  // THE NARROWING, KEPT. `mergeParsedStringsFiles` is an application-level assembly of already-parsed
   // shards; a loader that called it would be assembling warnings a second way, which is exactly what
-  // the clause forbids. Derived by name from the loader graphs' own sources rather than assumed.
+  // the clause forbids. Derived by name from the loader graphs' own sources rather than assumed, so
+  // it still bites if the module returns for some other reason.
   const callers = relative(union.filter((file) =>
     !file.endsWith("src/parse/index.js") && /mergeParsedStringsFiles/.test(sourceOf(file))));
   assert.deepEqual(callers, [], "a loader reaches the merge; the loading path now assembles warnings twice");
@@ -884,38 +897,64 @@ test("M2/M3: the plan is TIEBREAKER-ordered, and a catalog-less candidate occupi
 });
 
 // -------------------------------------------------------------------------------------------
-// M4 — the warning budget, which the clause would govern if it had a cross-file counting order.
+// M4 — the warning budget, which DOES have a cross-file counting order, and it is plan order.
+//
+// **THIS ROW USED TO ASSERT THE OPPOSITE, AND ITS OWN COMMENT DESCRIBED THE FIXTURE THAT WOULD
+// DISCRIMINATE THE DESIGN THAT REPLACED IT.** It read "the warning budget is charged PER FILE here,
+// so it has no cross-file counting order", reasoning — correctly, about the code as it then stood —
+// that `parseStrings` opens a FRESH `LoadingSession` per call and the runner calls it once per file,
+// so "a budget of two admits two warnings from EACH of two files". That was a PIN ON A DEFECT rather
+// than a property: plan 3.2 requires the file, byte, node and warning budgets to apply "across all
+// raw and already-parsed catalogs", and `src/node/directory.js` had always done so. Measured before
+// the fix, at the same budget over the same two catalogs, the directory door REFUSED and every
+// manifest door LOADED.
+//
+// What the old comment got exactly right is the discriminating shape, and this row now uses it
+// verbatim: "with two files of two warnings each and a budget of three, a plan-order counter always
+// blames the second PLAN file while an arrival-order counter blames whichever settled second."
 // -------------------------------------------------------------------------------------------
 
-test("M4: the warning budget is charged PER FILE here, so it has no cross-file counting order", async () => {
-  // **DISPOSED OF BY MEASUREMENT RATHER THAN DECLINED ON A CITATION.** Plan 4.4:1563-1564 makes
-  // exceeding `maximumWarnings` a loading FAILURE rather than silent truncation, which settles
-  // truncation and says nothing about counting order — and counting order would be squarely "independent
-  // of request completion timing" if the counter spanned the plan: with two files of two warnings each
-  // and a budget of three, a plan-order counter always blames the second PLAN file while an
-  // arrival-order counter blames whichever settled second.
-  //
-  // It does not span the plan. `parseStrings` opens a FRESH `LoadingSession` per call and the manifest
-  // runner calls it once per file, so a budget of two admits two warnings from EACH of two files. With
-  // no cross-file counter there is no cross-file order for a schedule to perturb, and the row that
-  // would have probed one would have been probing a counter that does not exist.
+test("M4: the warning budget spans the load, and its counting order is plan order", async () => {
   const bodies = { en: twoWarners("e1", "e2"), fr: twoWarners("f1", "f2") };
   const m = manifestOver(bodies, { fallbackLocale: "en" });
 
-  const stub = gatedTransport(m, bodies, { open: true });
-  const loaded = await loadEntireManifest(m, { fetch: stub.fetch, limits: { maximumWarnings: 2 } });
-  assert.equal(loaded.complete, true);
-  assert.deepEqual(slots(loaded.warnings), ["en/e1", "en/e2", "fr/f1", "fr/f2"],
-    "four warnings under a budget of two: the counter is per file, not per load");
-
-  // THE CONTROL, without which the row above is satisfied by a budget that is never enforced at all.
-  // Both files bust a budget of one, and the resulting failures are themselves in PLAN order — the
-  // sibling rule at plan 6.2:2077, asserted here because this is the only fixture in the file that
-  // produces two failures.
-  const tight = gatedTransport(m, bodies, { open: true });
-  const error = await loadEntireManifest(m, { fetch: tight.fetch, limits: { maximumWarnings: 1 } })
+  // THE SCHEDULE IS REVERSED ON PURPOSE. Both reads start; `fr` is released first and therefore
+  // PARSES first, so its two warnings are counted first by any runner that counts on arrival. Plan
+  // order is [en, fr] — `wholeManifestPlan` sorts by normalized tag — so the two designs name
+  // different files, which is the only reason this fixture proves anything.
+  const stub = gatedTransport(m, bodies);
+  const pending = loadEntireManifest(m, { fetch: stub.fetch, limits: { maximumWarnings: 3 } })
     .then(() => null, (thrown) => thrown);
-  assert.ok(error, "a budget of one must refuse");
+  await stub.drain();
+  stub.release("fr");
+  await stub.drain();
+  stub.release("en");
+  const error = await pending;
+
+  assert.deepEqual(stub.settleLog, ["fr", "en"],
+    "the fixture must settle out of plan order, or an arrival-order counter passes vacuously");
+  assert.ok(error, "four warnings under a budget of three must refuse somewhere");
   assert.deepEqual(error.failures.map((/** @type {any} */ f) => [f.locale, f.stage]),
+    [["fr", "parse"]],
+    "the SECOND PLAN file is blamed, not the second to settle");
+  assert.match(error.failures[0].cause.message, /aggregate maximum of 3 warnings/,
+    "and it is the session's own sentence, not a second wording invented by the runner");
+
+  // THE CONTROL FOR THE COUNTER ITSELF: three warnings fit a budget of three, whatever order they
+  // arrive in. Without it the row above is satisfied by a budget that refuses everything.
+  const loose = gatedTransport(m, bodies, { open: true });
+  const ok = await loadEntireManifest(m, { fetch: loose.fetch, limits: { maximumWarnings: 4 } });
+  assert.equal(ok.complete, true);
+  assert.deepEqual(slots(ok.warnings), ["en/e1", "en/e2", "fr/f1", "fr/f2"]);
+
+  // AND THE PER-FILE HALF IS UNCHANGED BY THE FIX, which is what keeps the two kinds of refusal
+  // apart. Both files bust a budget of one ON THEIR OWN, so each is refused during its own parse and
+  // the load reports TWO failures — in PLAN order, the sibling rule at plan 6.2:2077. A load that had
+  // stopped bounding a single file and relied on reconciliation alone would report ONE.
+  const tight = gatedTransport(m, bodies, { open: true });
+  const perFile = await loadEntireManifest(m, { fetch: tight.fetch, limits: { maximumWarnings: 1 } })
+    .then(() => null, (thrown) => thrown);
+  assert.ok(perFile, "a budget of one must refuse");
+  assert.deepEqual(perFile.failures.map((/** @type {any} */ f) => [f.locale, f.stage]),
     [["en", "parse"], ["fr", "parse"]]);
 });

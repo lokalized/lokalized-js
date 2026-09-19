@@ -21,6 +21,7 @@
  */
 
 import { LoadingSession, parseCatalogSource, parseModelCatalog } from "../internal/catalog.js";
+import { refuseUnknownOptions } from "../internal/configuration-error.js";
 import {
   DEFAULT_SOURCE,
   parseStringsWithSession,
@@ -68,52 +69,94 @@ const freeze = Object.freeze;
 /** @typedef {import("../internal/parse-warnings.js").LocalizedStringWarning} LocalizedStringWarning */
 
 /**
- * @typedef {object} ParseStringsOptions
- * @property {string} locale the locale this resource represents
- * @property {string} [source] the label every diagnostic and warning reports; defaults to `<input>`
- * @property {StringsLoadingLimits} [limits]
- * @property {(warning: LocalizedStringWarning) => void} [onWarning]
- * @property {{ ordinal?: unknown, ranges?: unknown }} [pluralData] the OPTIONAL plural modules'
- *   exported data objects. Only `ordinal` is consulted, and only to report ordinality gaps: this
- *   module is in the ratcheted root graph and cannot import `lokalized/data/ordinal` for itself.
+ * `locale` is the locale this resource represents; `source` is the label every diagnostic and
+ * warning reports and defaults to `<input>`; `pluralData` takes the OPTIONAL plural modules'
+ * exported data objects, of which only `ordinal` is consulted and only to report ordinality gaps,
+ * because this module is in the ratcheted root graph and cannot import `lokalized/data/ordinal`
+ * for itself.
+ *
+ * **WRAPPED, PER BOOT-M0-0721 THROUGH BOOT-M0-0724.** `Readonly<>` on an OPTIONS type costs a caller
+ * nothing — a mutable object literal is still assignable to a readonly-membered parameter — and it
+ * says the true thing, which is that this door reads the options once and never writes them back.
+ *
+ * @typedef {Readonly<{
+ *   locale: string,
+ *   source?: string,
+ *   limits?: StringsLoadingLimits,
+ *   onWarning?: (warning: LocalizedStringWarning) => void,
+ *   pluralData?: Readonly<{ ordinal?: unknown, ranges?: unknown }>,
+ * }>} ParseStringsOptions
  */
 
 /**
- * @typedef {object} ParsedStringsFile
- * @property {"parsed-strings-file"} $lokalized
- * @property {string} locale
- * @property {readonly string[]} sources
- * @property {readonly LocalizedStringInput[]} strings
- * @property {Readonly<Record<string, readonly string[]>>} originsByKey
- * @property {readonly LocalizedStringWarning[]} warnings
+ * The parsed model of one strings file — BOOT-M0-0301 through BOOT-M0-0306, all six `readonly`.
+ *
+ * It is an OUTPUT of `parseStrings` and an INPUT to `mergeParsedStringsFiles`, so the wrap has to
+ * hold in both directions: a caller may still build one and hand it over, because readonly members
+ * accept a mutable source, and the arrays inside were already `readonly`.
+ *
+ * @typedef {Readonly<{
+ *   $lokalized: "parsed-strings-file",
+ *   locale: string,
+ *   sources: readonly string[],
+ *   strings: readonly LocalizedStringInput[],
+ *   originsByKey: Readonly<Record<string, readonly string[]>>,
+ *   warnings: readonly LocalizedStringWarning[],
+ * }>} ParsedStringsFile
  */
 
 /**
- * @typedef {object} LocalizedStringInput
- * @property {string} key
- * @property {string} [translation]
- * @property {string} [commentary]
- * @property {Readonly<Record<string, PlaceholderDefinitionInput>>} [placeholders]
- * @property {readonly WholeMessageAlternativeInput[]} [alternatives]
+ * BOOT-M0-0566 for `key`, and the four optional members with it.
+ *
+ * @typedef {Readonly<{
+ *   key: string,
+ *   translation?: string,
+ *   commentary?: string,
+ *   placeholders?: Readonly<Record<string, PlaceholderDefinitionInput>>,
+ *   alternatives?: readonly WholeMessageAlternativeInput[],
+ * }>} LocalizedStringInput
  */
 
 /**
- * @typedef {object} WholeMessageAlternativeInput
- * @property {string} expression
- * @property {string} [translation]
- * @property {string} [commentary]
- * @property {Readonly<Record<string, PlaceholderDefinitionInput>>} [placeholders]
- * @property {readonly WholeMessageAlternativeInput[]} [alternatives]
+ * BOOT-M0-0568 for `expression`.
+ *
+ * @typedef {Readonly<{
+ *   expression: string,
+ *   translation?: string,
+ *   commentary?: string,
+ *   placeholders?: Readonly<Record<string, PlaceholderDefinitionInput>>,
+ *   alternatives?: readonly WholeMessageAlternativeInput[],
+ * }>} WholeMessageAlternativeInput
  */
 
 /**
- * @typedef {{ kind: "language-form", value?: string, range?: Readonly<{ start: string, end: string }>,
- *   translations: Readonly<Record<string, string>> }
- *   | { kind: "expression", translation: string,
- *       alternatives?: readonly Readonly<{ expression: string, translation: string }>[] }
+ * The registry names the two arms separately — `LanguageFormTranslationInput` (BOOT-M0-0571 to
+ * BOOT-M0-0576) and `ExpressionTranslationInput` (BOOT-M0-0577 to BOOT-M0-0581) — where the port
+ * publishes the union under one name. Both arms are wrapped; the nested `range` and the
+ * expression-fragment alternatives already were.
+ *
+ * @typedef {Readonly<{ kind: "language-form", value?: string,
+ *     range?: Readonly<{ start: string, end: string }>,
+ *     translations: Readonly<Record<string, string>> }>
+ *   | Readonly<{ kind: "expression", translation: string,
+ *       alternatives?: readonly Readonly<{ expression: string, translation: string }>[] }>
  * } PlaceholderDefinitionInput
  */
 
+
+/**
+ * Every member `parseStrings` reads. `limits` is read at this door; `source`, `locale`, `pluralData`
+ * and `onWarning` are read in the shared body `parseStringsWithSession`, which this door hands its
+ * whole options object to.
+ *
+ * A recording proxy MISSES `onWarning` on a clean catalog, because it is read lazily inside the
+ * per-warning callback and a clean catalog produces none — the per-bucket blind spot this project
+ * has recorded for the same technique one layer up. It is in the set because a warning-producing
+ * fixture reaches it.
+ */
+const PARSE_STRINGS_OPTIONS = /** @type {const} */ ([
+  "locale", "source", "limits", "onWarning", "pluralData",
+]);
 
 /**
  * Parse one localized strings resource.
@@ -126,6 +169,11 @@ const freeze = Object.freeze;
  * @throws {StringsParseError} if the resource cannot be read, decoded, parsed, or validated
  */
 export function parseStrings(input, options) {
+  // BEFORE the session, which is constructed as an ARGUMENT below — so `resolveLimits`' RangeError
+  // fires before any body statement and would mask a call carrying both a bad limit and a typo.
+  refuseUnknownOptions("parseStrings", options, PARSE_STRINGS_OPTIONS,
+    { loadingLimits: "limits" });
+
   // A FRESH session per call: this door parses exactly one resource, so every aggregate budget is
   // that resource's alone. `lokalized/node`'s directory loader threads ONE session across a whole
   // directory instead, which is what the shared body exists for.
@@ -157,7 +205,9 @@ const DEFINE_SOURCE = "<defined>";
  *   - every keyed record in it is a frozen null-prototype object, so `__proto__` in a placeholder or
  *     translation map is an ordinary member.
  *
- * @param {unknown} input
+ * @param {LocalizedStringInput} input BOOT-M0-0582. It was `unknown` — which is honest about the
+ *   runtime, since the walk refuses anything it does not recognise, and silent at the one moment a
+ *   compiler could have spoken. The refusals all remain: a declared type is not a validation
  * @returns {Readonly<LocalizedStringInput>}
  * @throws {StringsParseError} if the value is not a valid localized string
  */
@@ -173,7 +223,8 @@ export function defineLocalizedString(input) {
  * Validated as ONE catalog rather than as N independent strings, which is the difference that
  * matters: duplicate keys are rejected, and a subtree shared between two root keys is proved once.
  *
- * @param {readonly unknown[]} inputs
+ * @param {readonly LocalizedStringInput[]} inputs BOOT-M0-0584. `unknown[]` admitted anything and
+ *   the walk below refuses it at run time; the element type says so at compile time instead
  * @returns {readonly Readonly<LocalizedStringInput>[]}
  * @throws {StringsParseError} if any value is not a valid localized string
  */
@@ -311,12 +362,17 @@ function requireParsedStringsFile(file, index) {
  * a budget the result fits inside.
  *
  * @param {readonly ParsedStringsFile[]} files the shards, in the order their sources should appear
- * @param {{ limits?: ParsedCatalogLimits }} [options]
+ * @param {Readonly<{ limits?: ParsedCatalogLimits }>} [options] BOOT-M0-0729
  * @returns {ParsedStringsFile}
  * @throws {StringsParseError} on no input, a locale disagreement, a conflicting repeated key, a
  *   value that is not a parsed strings file, or a limit the merged catalog exceeds
  */
 export function mergeParsedStringsFiles(files, options) {
+  // BEFORE the arity guard, deliberately: `mergeParsedStringsFiles([], { typo })` names the typo
+  // rather than the empty array, because a misspelled option is a mistake the caller can fix from
+  // the message and an empty list is usually a symptom of one.
+  refuseUnknownOptions("mergeParsedStringsFiles", options, ["limits"], { loadingLimits: "limits" });
+
   if (!Array.isArray(files) || files.length === 0)
     throw parseError(`${MERGE_SOURCE}: merging requires at least one parsed strings file`,
       { source: MERGE_SOURCE });

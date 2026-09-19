@@ -180,11 +180,9 @@ export class ExpressionEvaluationError extends LokalizedError {
     if (token !== EXPRESSION_ERROR_TOKEN)
       throw new TypeError("ExpressionEvaluationError is not constructible; it is thrown by lokalized");
 
-    super(LOKALIZED_ERROR_TOKEN, message, options);
+    super(LOKALIZED_ERROR_TOKEN, "EXPRESSION_EVALUATION", message, options);
     /** @type {string} */
     this.name = "ExpressionEvaluationError";
-    /** @type {"EXPRESSION_EVALUATION"} */
-    this.code = "EXPRESSION_EVALUATION";
   }
 
   /**

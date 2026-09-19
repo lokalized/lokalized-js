@@ -48,7 +48,12 @@ const STRUCTURAL = /** @type {Record<string, string>} */ ({
   // `type LocaleTag = string` exactly; a named alias would add no constraint a consumer can rely on.
   LocaleTag: "an alias for `string`; every locale parameter is typed `string`",
   TranslationStatus: "a string union, inlined at each result member",
-  LocaleMatchType: "a string union, inlined on the delivered LocaleMatch",
+  // `LocaleMatchType` SAT HERE reading "a string union, inlined on the delivered LocaleMatch", and
+  // that was measured FALSE: `types/core/index.d.ts` declared `matchType: string`, so nothing was
+  // inlined. The `why` field is free-form prose no rule reads — only the NAME's absence is tested —
+  // so a false reason sat inside the table built to hold falsifiable ones. The type is delivered now
+  // and this line's deletion is the record. Its two neighbours were checked at the same time and
+  // both are true: `status` is emitted as a real union, and so is a warning's `type`.
   LocalizedStringWarningType: "a string union, inlined on the delivered LocalizedStringWarning",
   PluralNumber: "a numeric union, inlined at every classifier parameter",
   CatalogInput: "inlined as the value type of the delivered catalog record",

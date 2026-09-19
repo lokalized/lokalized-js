@@ -3,9 +3,9 @@
   "milestone": "M8",
   "note": "DERIVED from planning/M8-STATUS.md, not asserted. A clause is PROVEN only where the record names a gate that exists AND an ablation that was actually performed with its result stated. Produced by five extraction agents and re-checked by an adversarial downgrade pass instructed to default to NOT-PROVEN. tools/clause-ledger.mjs enforces the rule on every run.",
   "tally": {
-    "PROVEN": 69,
-    "NOT-PROVEN": 9,
-    "DEFERRED": 15
+    "PROVEN": 78,
+    "NOT-PROVEN": 13,
+    "DEFERRED": 2
   },
   "clauses": [
     {
@@ -31,7 +31,7 @@
         "npm run verify"
       ],
       "ablation": "THREE ablations, all firing. Adding `baseUrl` to the projection and adding `cldrVersion` to it each turn \"clause 2: the projection keeps EXACTLY the five identity fields\" red; folding the transport-only per-file `url` into the per-locale digest turns the two-origins test and the one-field-at-a-time test red. Control 5 tests / 0 failing before and after.",
-      "evidenceLine": "MEASURED BLIND AT THE LAYER THAT ACTUALLY EXCLUDES: `computeCatalogIdentity` hashes whatever projection it is handed, and `src/load/identity.js:110` says so — it \"cannot exclude `baseUrl` or a per-file `url`, because they never reach it: this is the function that drops them\". The function that drops them is `catalogIdentityInputFor`, and nothing tested it: adding `baseUrl` to it turned ZERO tests red across eight files, and so did adding `cldrVersion`. Only the per-file `url` was gated, incidentally — folding it into the digest changes the hashed VALUE, which the pinned-bytes test catches for a reason unrelated to exclusion. AND THE WIDENING IS SILENT: the canonicalizer IGNORES a member it does not know (measured — `{...the five, baseUrl}` produces byte-identical output), so a widened projection changes no fingerprint and no behaviour, and the exact-key-set assertion is the only thing that can catch it."
+      "evidenceLine": "MEASURED BLIND AT THE LAYER THAT ACTUALLY EXCLUDES: `computeCatalogIdentity` hashes whatever projection it is handed, and `src/load/identity.js:110` says so — it \"cannot exclude `baseUrl` or a per-file `url`, because they never reach it: this is the function that drops them\". The function that drops them is `catalogIdentityInputFor`, and nothing tested it: adding `baseUrl` to it turned ZERO tests red across eight files, and so did adding `cldrVersion`. Only the per-file `url` was gated, incidentally — folding it into the digest changes the hashed VALUE, which the pinned-bytes test catches for a reason unrelated to exclusion. AND THE WIDENING IS SILENT, so a widened projection changes no fingerprint and no behaviour, and the exact-key-set assertion is the only thing that can catch it. CORRECTED 2026-09-18: this read `the canonicalizer IGNORES a member it does not know (measured — {...the five, baseUrl} produces byte-identical output)`, and that named the wrong function. Executed against `canonicalBytes` itself, the output is NOT byte-identical — `baseUrl` is serialized in sorted position. The silent-widening property belongs to `projection()` (src/load/identity.js:76-83), which rebuilds the object field by field and drops what it was not taught. Same conclusion, different mechanism, and the difference is load-bearing: anyone reading the old sentence would conclude that widening the projection is free, where in fact `canonicalBytes` REFUSES an undefined member and the whole suite fails."
     },
     {
       "id": 3,
@@ -88,11 +88,15 @@
     {
       "id": 7,
       "statement": "The hashes give consistency and corruption detection, NOT authenticity against an attacker who can replace manifest and files; production guidance requires a trusted HTTPS origin or an app-owned signature.",
-      "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "No occurrence anywhere in M8-STATUS.md. The plan itself says \"Nothing executable ... its only proof is that the documentation says it\", and the status doc's own precedent for a documentation-shaped clause is :1064, \"clause 50 is documentation-shaped and remains unproven\". [cite fix: that plan phrase is M8-PLAN.md:255, not :251.]"
+      "verdict": "PROVEN",
+      "slice": "M-D S18 (the 'documentation-shaped' premise was wrong)",
+      "gates": [
+        "test/manifest-trust-boundary.test.js",
+        "npm run check:readme",
+        "npm test"
+      ],
+      "ablation": "Five ablations, all firing, control clean. Stopping the body-digest comparison reds 'tampering with the catalog BYTES alone is caught at the digest' AND takes check:readme to exit 1, so the README sample is a live gate on the check and not an illustration. DELETING THE WHOLE README SECURITY SECTION reds only 'the README carries the production guidance, and names both remedies' while check:readme stays at exit 0 with 41 groups — which is the measured proof that the presence assertion is the only thing that can see it, because check:readme's anti-vacuity terms are GLOBAL. Making the tampered body a DIFFERENT length reds both the same-length assertion and the tamper arm, which is the zh-123 guard working: at unequal length the load is refused at stage 'limit' and never reaches a hash. And adding one new caller option to src/load/ reds the derived option-surface assertion, which is what makes the staleness arm name-independent.",
+      "evidenceLine": "CLOSED by M-D S18, and the premise it was held on is wrong. M8-PLAN.md:255's 'nothing executable' is false: the proposition is a PAIR of loads over one door with opposite outcomes. Measured — replace only the catalog bytes and the load is refused at stage 'digest'; replace the MANIFEST too and it succeeds and serves the attacker's words, because the manifest is the trust root and nothing in this library verifies it. Stripping a sha256 is a ConfigurationError and blanking one is refused by the manifest's own catalogFingerprint self-consistency check, so regenerating the whole manifest is the only route and it needs an untrusted channel. Both remedies the clause names are exercised rather than recommended: an https origin you trust, and pinning getCatalogIdentity().catalogFingerprint against a value the build carries out of band."
     },
     {
       "id": 8,
@@ -604,20 +608,28 @@
     {
       "id": 50,
       "statement": "Cache-key separation: direct-locale rendering must key on the normalized ORIGINAL lookup locale, never only the diagnostic selection or resolved catalog; equal selected locale and equal match type are insufficient for whole-list negotiation.",
-      "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:1062-1064: \"Plan 8.3's clause-50 cache-key fixtures (two supplied negotiations selecting the same locale with different match types, and two with the same selection differing only in requested ranges) are NOT written — clause 50 is documentation-shaped and remains unproven.\""
+      "verdict": "PROVEN",
+      "slice": "M-D S18 (proposition (b) was already gated and unnoticed; (c) is new)",
+      "gates": [
+        "test/cache-key-lookup-locale.test.js",
+        "test/example-edge.test.js",
+        "npm test"
+      ],
+      "ablation": "TWO PROPOSITIONS, EACH ABLATED SEPARATELY. (b) equal selection and equal match type are insufficient: keying `matchPreservingCacheKey` by `inputs.match.locale` alone reds two named tests in test/example-edge.test.js — 'match-preserving responses are never keyed by selected locale alone' and 'two headers with an identical narrow context are owed different bytes' — measured, not assumed, and the new file correctly stays green over it. (c) the direct-locale key is the normalized ORIGINAL lookup locale: six ablations against test/cache-key-lookup-locale.test.js, all firing, control clean. Keying by the URL segment AS SPELLED reds 'three spellings of one locale URL are one page and one cache entry'; keying by the RESOLVED catalog reds '/fr-BE/ and /fr/ share a resolved catalog and must not share a cache key' — through App.Title AND through Checkout.Cta, which is the hole that sank the first design; dropping the lookup locale from the key reds both; and giving the fixture's fr-BE.json a key the page renders reds the anti-vacuity test that guards the fixture itself.",
+      "evidenceLine": "CLOSED by M-D S18, and the old evidence line (M8-STATUS.md:1065-1067) was stale rather than wrong: it predates M9 S1's edge example, which gates proposition (b). Proposition (c) was genuinely ungated in every channel — keying the direct-locale response by the resolved catalog collided /fr-CA/ with /fr/ while npm test was 1,575/1,575 exit 0. THE FIXTURE IS THE SUBSTANCE: a first design probed the defect through one catalog key and was measured INERT against the same defect probed through another, because examples/catalogs' fr-CA holds App.Title and omits Checkout.Cta. The shipped fixture builds its own directory whose fr-BE.json overrides NO rendered key, so every per-key resolved locale for fr-BE is fr and the collision is reachable whichever key a defect reads — with an anti-vacuity test asserting exactly that property, so an edit to the fixture cannot silently narrow the gate."
     },
     {
       "id": 51,
       "statement": "Choosing ONE of the five listed cache strategies is mandatory for a cacheable document selected from `Accept-Language`; there is no unconditional prohibition on `Vary`.",
-      "verdict": "DEFERRED",
-      "slice": "S10 (recorded in its owed note)",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:806-808: \"Plan 6.4's cache-correctness prose (`Vary`, locale-keyed URLs, the normalized cache key) is documentation for M-D, not code, and nothing here implements or gates it.\" Named onward milestone M-D, so DEFERRED rather than NOT-PROVEN. The plan's own row concedes the narrow-context option's \"reviewed application invariant\" is a human act with no machine check (M8-PLAN.md:299)."
+      "verdict": "PROVEN",
+      "slice": "M-D S20 (its deferral named M-D as the onward milestone, and M-D is now)",
+      "gates": [
+        "test/cache-strategy-declared.test.js",
+        "test/example-edge.test.js",
+        "npm test"
+      ],
+      "ablation": "Five ablations, all firing, control clean — and the fifth is the one that justifies the file. Dropping the redirect's Vary, dropping the preserve arm's Vary, and dropping both its Vary and its key each red two or three of the four rules. Making the redirect TARGET read the header without adding a Vary reds 'a response that changes with the header varies on it'. AND THE DISCRIMINATING ONE: adding a NEW route that is header-sensitive and shared-cacheable with no Vary reds two rules here and leaves test/example-edge.test.js AND test/example-server.test.js entirely GREEN — which is the difference between every existing route being correct and the next one being safe.",
+      "evidenceLine": "CLOSED by M-D S20. The deferral (M8-STATUS.md:806-808) named M-D as the onward milestone — 'documentation for M-D, not code, and nothing here implements or gates it' — and M-D is now: M9 S1 built the edge example implementing two of plan 6.4's five strategies, S18 gated the key separation, and the README carries a caching section. What was missing is a rule stated over the ROUTE SET rather than per route. test/cache-strategy-declared.test.js enumerates every route under both strategies, MEASURES header-sensitivity by rendering each twice, and asserts (1) every shared-cacheable response declares a strategy — Vary: Accept-Language or a URL-determined key, never neither — and (2) any response whose bytes, status or Location change with the header carries Vary. Measured: 4 of 12 observations are header-sensitive and all four vary; the other 8 carry a key. It deliberately asserts NO prohibition on Vary anywhere, because that is the clause's second half."
     },
     {
       "id": 52,
@@ -793,58 +805,73 @@
     {
       "id": 66,
       "statement": "Java-vs-JS load comparison is scoped to cases with the same candidate availability, and that bound is written into `diff:load`'s header rather than discovered when a comparison goes red.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S25 (the header's false claim REMOVED; no enforcement exists)",
+      "verdict": "PROVEN",
+      "slice": "M-D S29",
       "gates": [
-        "tools/load-diff/run.mjs"
+        "tools/load-diff/run.mjs",
+        "tools/differentials.mjs"
       ],
-      "ablation": "",
-      "evidenceLine": "HELD, and a defect in the record was fixed rather than papered over. `tools/load-diff/run.mjs`'s header ended \"`assertSingleFault` below is the enforcement, not the convention\" — AND THERE IS NO SUCH FUNCTION. One grep hit in the whole tool, inside the comment claiming it existed: the eighth text in this project asserting its own enforcement, the same shape as `src/core/index.js` once naming a test file that did not exist. A MECHANICAL ENFORCEMENT WAS BUILT AND THEN REMOVED because it was measured INERT: re-materializing every probe with its directory entries created in REVERSE order and requiring an identical port observation runs clean over all 40 probes AND STAYS CLEAN when the port's own `entries.sort(byUtf8Bytes)` is ablated away, because `readdirSync` on this host returns a stable order regardless of creation order. A check that cannot fail on the machine that runs it is worse than none. The header now states that single-faultedness is a CONVENTION here, names the attempt and why it failed, and no longer claims a function that does not exist."
+      "ablation": "Four arms, controls clean both sides. (1) THE REPAIRED DEFECT, as a PAIR: a port-side mutation that drops one discovered catalog makes the two sides load different sets — with the bound, 18 probes report OUT OF SCOPE naming both sets and `scopeChecked` falls 21 -> 3; with the bound removed and the same mutation, 19 MISMATCHES, which is the tool asserting the full-vs-subset content equality plan :2585 declines. (2) THE INERT-INSTRUMENT ARM, which is what the two earlier attempts lacked: reverting the scope rule leaves `diff:load` at exit 0 with its headline unchanged and `diff:all` records it green — and `npm run diff:check`, which has NO Java and runs in `verify` and CI, exits 1 naming `scopeChecked` as ZERO. (3) A call to a subset door anywhere in the tool exits 1 with SCOPE BROKEN. (4) A recorded defect count above zero reds `diff:check` as a finding the headline does not carry.",
+      "evidenceLine": "PROVEN. The clause has two halves and both are now real. THE BOUND: plan :2585 permits 'a full Java catalog compared with the exact JS loaded set ONLY where both have the same candidate availability' and refuses arbitrary full-vs-subset equality. Availability is equal here BY CONSTRUCTION — both sides read one whole directory, Java through `loadFromFilesystem` and the port through `readStringsFromDirectory` — and two checks hold that construction rather than trusting it: per probe the two loaded catalog SETS are compared FIRST and a divergence is reported as OUT OF SCOPE with the content columns not consulted at all, and structurally the run fails if the tool calls a subset door. Before this, an availability divergence arrived as several CONTENT mismatches — measured, 19 of them — which is precisely the equality the plan says this tool may not claim. THE HEADER now carries the bound, which is the clause's own second sentence and what S25 deleted a false version of. AND THE PART THAT FAILED TWICE IS CLOSED BY A RECORDED FACT: `diff:load` needs the JDK so it runs in neither `verify` nor CI, and S17's attempt was rejected because reverting the instrument left `npm test` green and `diff:check` at exit 0 — nothing could tell a WIRED instrument from an INERT one. Tools may now print one `##diff-facts` line whose `exercised` counts must be non-zero and whose `defects` counts must be zero; `measurements/differentials.json` carries them and `diff:check` gates them WITHOUT Java. Measured 2026-09-17: 21 of 41 probes are in scope (the other 20 are refusals, where availability is not a question), and the reverted instrument records `scopeChecked: 0` and reds the JDK-free run."
     },
     {
       "id": 67,
       "statement": "The packed browser artifact set exists — single-file `dist/browser/lokalized.js` plus explicit subpath entries, Rollup+Terser lockfile-pinned, source maps and an output-graph manifest, with no Node built-ins, bare specifiers or top-level await in any browser graph.",
-      "verdict": "DEFERRED",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. M8-STATUS.md:1155-1162 (amendment A5) verified verbatim — \"DECIDED: defer. ... building the pipeline is a whole subsystem (Rollup + Terser + a CI browser matrix) and M-R is the release milestone that needs it anyway. ... Slice S12 is withdrawn.\" Confirmed on disk: `lokalized-js` has no `dist/`."
+      "verdict": "PROVEN",
+      "slice": "M-R S9 (the artifact landed in S6; three of its eight conjuncts were gated here)",
+      "gates": [
+        "tools/build-browser.mjs",
+        "tools/browser-entries.mjs",
+        "tools/bundle-sizes.mjs",
+        "test/browser-global.test.js"
+      ],
+      "ablation": "Each of the eight conjuncts ablated SEPARATELY against `npm run check:dist`, control re-proved green and the tool sha256 re-read after every restore. FIVE were already gated: the single-file root, the subpath entry set, the bundler pin (by check:bundle), and the Node-built-in and bare-specifier prohibitions, both read off esbuild's metafile rather than a regex. THREE were produced and never checked, each leaving the gate at EXIT 0. (a) `sourcemap: false` now reds 20 problems - 17 missing sourceMappingURL plus three floor terms. (b) Deleting the manifest writeFileSync now reds 1 problem, the read-back rule; every other check reads the in-memory object and passed, which is how it shipped a dist/ with no manifest. (c) Top-level await: the text rule reads only the first statement of the first line of minified output and is unreachable, so the bundler enforces it now - MEASURED across both formats and both flag states, since an earlier version of this comment got the second half wrong: esm WITHOUT the flag BUILDS with the await in the output, esm WITH it is refused, and iife is refused either way because the format cannot express it. Also: blanking one sourcesContent entry reds naming src/internal/jcs.js; tampering with a built file after the manifest is written reds naming 'core.js (896 declared, 897 on disk)'; making the generated-entry exemption unreachable reds 'applied 0 time(s)' and WIDENING it reds 'applied 50 time(s)', so the floor is two-sided. The exact manifest lookup is load-bearing: with one output renamed against the derivation the tightened form reds 'produced no output file' and the previous endsWith form is EXIT 0.",
+      "evidenceLine": "PROVEN 2026-09-19. The artifact exists and ships: dist/browser/ carries a single-file root with no transitive imports (plan :2144), seven module entries sharing a content-hashed chunk graph, 17 source maps, an output-graph manifest, and - as amendment A21 - a classic-script lokalized.global.js. The bundler is the lockfile-pinned esbuild rather than plan :2149's Rollup+Terser, which is amendment A20 with its cost recorded. Every conjunct is now checked ON THE BUILT ARTIFACT rather than on src/, which is blocker B9 and was the state M-R S6 found. Re-driven in Chromium from the packed tarball: 8/8 entries load with export counts 70/21/5/10/2/6/5/2, isSecureContext true, crypto.subtle present, root one request, 17 requests for everything, the classic script defines window.lokalized and renders, zero not found."
     },
     {
       "id": 68,
       "statement": "Size and browser tests consume the EXACT packed production output, never a development approximation.",
-      "verdict": "DEFERRED",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. M8-STATUS.md:1159-1162 (A5) verified verbatim — \"The cost is accepted explicitly: every browser and size number M8 recorded describes UNBUNDLED SOURCE, not a packed artifact, so plan :2152-2153's 'consume the exact packed production output, never a development approximation' is unmet for M8. The 0a browser half already reports this rather than hiding it.\""
+      "verdict": "PROVEN",
+      "slice": "M-R S9",
+      "gates": [
+        "tools/bundle-sizes.mjs",
+        "tools/release-check.mjs",
+        "measurements/release-rehearsal.json",
+        "tools/readme-newcomer.mjs"
+      ],
+      "ablation": "Six mutations against `npm run check:bundle`, all firing, control byte-identical either side: removing the dist-table region reds naming it; perturbing one generated figure reds with a diff; a hand-written figure in the section prose reds the stray-number rule (which had to be taught the second region - it correctly reported all 24 of the new table's figures as hand-written on its first run); slicing distRows below nine reds the row floor; making the tarball's manifest unreadable reds the anti-vacuity term. Against `npm run check:release`: falsifying all 24 recorded size fields reds 23 problems - the 24th wrote the ROOT entry's true value, files: 1, so there was nothing to detect, and the field IS compared as the seven other 'files' lines show - while falsifying a SINGLE brotliBytes reds exactly one, so the rule is not an all-or-nothing blob. Against `npm run check:readme:packed`: reverting the path extraction to the src-only regex reds, and with the per-entry failure ALSO suppressed the new browserModules < mapped.length floor still reds. That exact pair left the gate at EXIT 0 printing '0 module fetch(es)' beside 'every documented browser entry point loads' before this slice.",
+      "evidenceLine": "PROVEN 2026-09-19, and it was NOT true before. `check:bundle` bundled the tarball's SOURCE through a synthetic one-import entry, which is a development approximation in plan :2153's exact sense and reads 3,001 bytes under the shipped root: +3,670 the synthetic entry tree-shakes and a real entry point must keep, -517 legal-comment form, -190 namespace-versus-export-statement, +38 sourcemap comment. A second generated table now measures dist/browser/ inside the packed tarball from esbuild's own build manifest, and both ship, each captioned with the question it answers. The browser half: measurements/release-rehearsal.json was the only record of the shipped payload, was 42% stale (root 322,547 recorded against 187,717 measured, predating M-R S8's re-encoding) and was UNGATED - setting every size field to 1 left the tool at exit 0. Each entry's file count, raw bytes and brotli are now re-derived from the tarball, deterministic and machine-independent on scenario:2k's reasoning rather than scenario:0a's report-only rule. Retrospective proof: the new rule printed 23 problems against the record as it stood."
     },
     {
       "id": 69,
       "statement": "CI serves the packed artifact over HTTP and runs the no-build example in every supported browser, asserting `isSecureContext`, `crypto.subtle`, and that digest verification ACTUALLY RAN, plus an optional-entry graph walk.",
-      "verdict": "DEFERRED",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. M8-STATUS.md:1155-1162 (A5) withdraws slice S12, where the packed-artifact CI browser matrix lived, and names \"a CI browser matrix\" as part of the deferred subsystem. A7 (:1174-1194) enumerates what CI does run and names no browser matrix."
-    },
-    {
-      "id": 70,
-      "statement": "M8 proves a load-only worker graph — `lokalized/load` without `lokalized/negotiate`, requiring Fetch, streams, AbortController, TextDecoder and WebCrypto — smoke-tested in at least one NAMED worker runtime from the packed artifact.",
-      "verdict": "DEFERRED",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. M8-STATUS.md:1164-1165 (A5) verified verbatim — \"B8 (the named worker runtime) defers with it, not separately: plan :2334-2344 defines that smoke test as running 'from the packed artifact', so with no packed artifact there is nothing to smoke-test.\""
-    },
-    {
-      "id": 71,
-      "statement": "Documentation shows the import map or direct URL form, never uses `latest` for production, and shows merging the `imports` member where a page already owns an import map.",
       "verdict": "NOT-PROVEN",
       "slice": "",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "RE-CHECKED, unchanged. Re-grepped M8-STATUS.md: \"latest\" 0 hits, \"import map\" 0 hits — no documentation-example gate anywhere. No slice addresses it, no amendment (A5-A11, :1155-1234) defers or cuts it, and the grep gate for `latest` in published examples that M8-PLAN.md:319 suggests does not appear in the record."
+      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B4: the exact browser floors — Safari 16.4, Chrome 111, Firefox 111 — have never been executed and no service or runner is named. CI has zero browser jobs. Partly reachable: a refutation pass found Playwright pins browser builds per release and may supply two of the three. Measure before escalating."
+    },
+    {
+      "id": 70,
+      "statement": "M8 proves a load-only worker graph — `lokalized/load` without `lokalized/negotiate`, requiring Fetch, streams, AbortController, TextDecoder and WebCrypto — smoke-tested in at least one NAMED worker runtime from the packed artifact.",
+      "verdict": "NOT-PROVEN",
+      "slice": "",
+      "gates": [],
+      "ablation": "",
+      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B3: no worker runtime has ever been named. Measured across five repositories, the only occurrences of workerd, Cloudflare, Deno Deploy or Bun are inside M8-PLAN.md's own list of candidates. This is a published support claim rather than a tooling detail, so it is the maintainer's to name. The example and its capability probes already exist; what is missing is a runtime to run them in and a packed artifact to run them from."
+    },
+    {
+      "id": 71,
+      "statement": "Documentation shows the import map or direct URL form, never uses `latest` for production, and shows merging the `imports` member where a page already owns an import map.",
+      "verdict": "PROVEN",
+      "slice": "M-D S19 (a pattern-matching prototype was measured escapable in S17; this one derives)",
+      "gates": [
+        "test/browser-import-map.test.js",
+        "npm run check:readme",
+        "npm test"
+      ],
+      "ablation": "Seven ablations, all firing, control clean — and each one is an escape the S17 prototype allowed. Dropping four subpaths from the documented map reds the completeness test; pinning the root to `latest` reds two tests; planting `lokalized@latest` in examples/README.md reds the multi-file pinning rule, which the prototype could not see because it read one file; documenting `lokalized/node` in a BROWSER map reds completeness; adding a new export to package.json reds completeness, so a growing surface rots the docs the day it lands; pointing one URL at the wrong file reds the target check; and replacing the merge guidance with 'add another block' reds the guidance test.",
+      "evidenceLine": "CLOSED by M-D S19, and the content half was measured IN A BROWSER rather than drafted. The documented 8-entry import map was loaded in Chromium over the package's raw published src/: `import { createStrings } from \"lokalized\"` renders, and eight subpaths resolve (root 70 exports, core 21, load 10, negotiate 6, parse 5, data/ordinal 5, ssr 2, data/ranges 2) while `lokalized/node` fails because the browser tries to fetch node:fs, node:crypto, node:fs/promises and node:url as URLs — which is why the documented map excludes it. Whole-list Accept-Language negotiation runs unchanged in the browser. The drafted guidance in S17 claimed a document may have only one import map; measured in the same browser, TWO MAPS ON ONE PAGE BOTH APPLY, so the merge advice now stands on being the single portable place a specifier resolves rather than on a false constraint. The gate DERIVES the subpath set and each file target from package.json#exports instead of pattern-matching, which is what closes the escapes S17 measured. It deliberately does not check a URL's HOST, and says so."
     },
     {
       "id": 72,
@@ -889,13 +916,14 @@
       "verdict": "PROVEN",
       "slice": "D2 (maintainer decision, 2026-09-14)",
       "gates": [
+        "npm run declarations",
+        "npm run verify",
         "test/identity-projection-and-error-classes.test.js",
-        "tools/declaration-probes/run.mjs",
         "test/symbol-allowlist.test.js",
-        "npm run verify"
+        "tools/declaration-probes/run.mjs"
       ],
       "ablation": "BOTH HALVES NOW GATED. Runtime: direct construction and subclass instantiation each throw /not constructible/, with the control that a real library operation still throws one and instanceof on the EXPORTED binding recognises it. Declaration: two consumer-shaped TypeScript probes, one that must fail to construct and one that must fail to extend, beside a control that must still narrow on the class - without the must-fail arms the file is satisfied by a declaration typed any. And a sweep asserts all seven exported subclasses extend LokalizedError, which two ablations proved was asserted nowhere when the base first landed.",
-      "evidenceLine": "CLOSED. The declaration half was the real blocker - measured, ALL FIVE library error classes emitted constructor(token: symbol, ...) where plan 3.5:1107-1108 requires the declarations to 'expose no constructor or extension signature'. THE PLAN'S OWN ANSWER TURNED OUT NOT TO BE NEEDED. CatchOnlyErrorClass would have cost a rename of every class binding and leaked an impl type name into each declaration; TypeScript already has the idiom. @private on each subclass constructor emits `private constructor();`, which TypeScript refuses to `new` AND refuses to extend - exactly the two properties the plan names - and @protected on the base emits `protected constructor();`, which the seven subclasses still reach through super(). The static raiser is what keeps the module's own factory working, since a private constructor is callable only from inside the class body; it takes the unexported token first, so a consumer cannot use it. Name and code are unchanged throughout, which is what keeps every string-matching consumer and every recorded message working. Eight of plan 3.5's nine error classes now export; the ninth is blocked on plan open question 4, not on this clause."
+      "evidenceLine": "CLOSED. The declaration half was the real blocker - measured, ALL FIVE library error classes emitted constructor(token: symbol, ...) where plan 3.5:1107-1108 requires the declarations to 'expose no constructor or extension signature'. THE PLAN'S OWN ANSWER TURNED OUT NOT TO BE NEEDED. CatchOnlyErrorClass would have cost a rename of every class binding and leaked an impl type name into each declaration; TypeScript already has the idiom. @private on each subclass constructor emits `private constructor();`, which TypeScript refuses to `new` AND refuses to extend - exactly the two properties the plan names - and @protected on the base emits `protected constructor();`, which the seven subclasses still reach through super(). The static raiser is what keeps the module's own factory working, since a private constructor is callable only from inside the class body; it takes the unexported token first, so a consumer cannot use it. Name and code are unchanged throughout, which is what keeps every string-matching consumer and every recorded message working. Eight of plan 3.5's nine error classes now export; the ninth is blocked on plan open question 4, not on this clause. || SCOPE MEASURED AND NARROWED 2026-09-18 (M-R S2), WITHOUT MOVING THE VERDICT. This clause names exactly three classes and all three hold: through the PACKAGE's own exports map, with a green control, `new` and `extends` are both refused for StringsLoadingError, StringsParseError and DigestUnavailableError. What over-claimed was A13's closing narrative, which said `@private` 'refuses to `new` AND refuses to extend' as though it held for every library error. Swept all nine through the package: `new` is refused for nine of nine, `extends` for SEVEN. `LokalizedError` emits `protected constructor();` deliberately, so its own subclasses can `super()` — and that also lets a consumer extend it. `ExpressionEvaluationError` carries `@private` in SOURCE and the emitted .d.ts drops it entirely, so it is refused through the source and permitted through the package. **`npm run declarations` could not see either, because every probe imported an absolute `src/*.js` path and type-checked the SOURCE rather than the artifact a consumer receives.** The harness now has a package-resolving mode and all nine classes are swept in both arms, with the two divergences asserted in their CURRENT state so they cannot drift further and go red if anyone closes them. The runtime refuses all nine regardless — a subclass instance throws 'is not constructible' — so the catch-only guarantee holds at the layer that enforces it."
     },
     {
       "id": 76,
@@ -924,22 +952,23 @@
     {
       "id": 78,
       "statement": "Partial and failed loads release resources — 9.3 metric 7, retained memory after a partial or failed load.",
-      "verdict": "NOT-PROVEN",
-      "slice": "S26 (two instruments built, BOTH measured unsound, neither shipped)",
+      "verdict": "PROVEN",
+      "slice": "M-D S17 (third attempt; the first two instruments were measured unsound in S26 and shipped nothing)",
       "gates": [
-        "test/fetch-loader.test.js"
+        "test/load-retention.test.js",
+        "npm test"
       ],
-      "ablation": "S11a ablation P (:869): 'the response reader is never released on a limit refusal' turns the never-ending-body test red; :857 'Ablated: deleting the `finally` turns that test red and nothing else.' No ablation and no measurement of RETAINED BYTES after a partial or failed load is recorded.",
-      "evidenceLine": "HELD, with two failed attempts recorded so the next one does not repeat them. ATTEMPT 1, a WeakRef on the byte array the transport handed over, is VACUOUS: `readBoundedStream` COPIES the chunks into a fresh Uint8Array, so the watched object is released at the boundary no matter what the loader keeps. The tell was an ablation that refused to fire — making the runner push every body it reads into a module-level array turned ZERO tests red, because what it retained was the copy and what the probe watched was the original. ATTEMPT 2, a heap delta across a forced collection, is the right SHAPE for a memory clause (9.3 metric 7 asks for retained memory, not object identity) but its calibration does not hold up: loading four ~1.5 MB catalogs and DELIBERATELY KEEPING the record grew `heapUsed` by only ~490 KB after forced collection, so the retaining control does not reach a budget derived from the fixture and the arm cannot distinguish retention from noise. Rather than tune a threshold whose mechanism is not understood — which is how a gate becomes ceremonial — both files were DELETED and nothing was shipped. What a correct instrument needs: a watched object the loader actually retains (the PARSED catalog, not the transport's bytes), reachable on the FAILED path where no record is returned, or a heap protocol whose retaining control is first shown to move by the amount the fixture allocates."
+      "ablation": "A LIVE DEFECT, not only a gate. Reproduced independently before any fix: a held StringsLoadingError from a six-file load failing one digest reached 5 of 5 parsed catalogs, with a deliberately-kept record as the control reading 1. After releasing the parse slots on every rejection path in src/load/run-plan.js the same probe reads 0 and the control still reads 1. Five ablations against the finished gate, all firing, control clean: removing every slot release reds the 'digest' arm; keeping ONLY the loadingError release reds the 'abort' arm (which is what proves the try/catch around Promise.all is load-bearing, since a worker-thrown abort unwinds past the outer checks); keeping ONLY the worker-catch release reds 'digest'; releasing just the FIRST slot (results[0] = null) reds 'digest' — the vacuity mutation a two-file fixture passes; and blinding the instrument reds the control assertion 'cannot distinguish release from blindness'. A behaviour-preserving comment leaves it exit 0.",
+      "evidenceLine": "CLOSED by M-D S17. The instrument watches the PARSED CATALOG rather than the transport's bytes (S26 attempt 1 was vacuous because readBoundedStream COPIES the chunks) and COUNTS live strings in a heap snapshot rather than measuring a heap delta against a threshold (S26 attempt 2 failed its own precondition). No --expose-gc, no threshold, nothing to tune. Six arms — digest failure, transport refusal, allow-partial whose fallback failed, an abort delivered from inside a worker, the Node file door, and the subset door — each five catalogs wide with EVERY parsed tag asserted absent. Two paths are covered that the clause's wording invites and an earlier design missed: the worker-thrown abort, and the doors other than loadEntireManifest."
     },
     {
       "id": 79,
       "statement": "Browser request graph and first usable render — 9.3 metric 5, a third M8-owned performance metric.",
-      "verdict": "DEFERRED",
+      "verdict": "NOT-PROVEN",
       "slice": "A6 (0b cut to M-R; S13 withdrawn)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "M8-STATUS.md:1169-1172 A6: 'DECIDED: cut, do not substitute … Slice S13 is withdrawn.' The plan names 0b's harness plus a real browser as the only instrument for this metric, and the record moves that vehicle to M-R; A5 (:1157-1162) additionally records that 'every browser and size number M8 recorded describes UNBUNDLED SOURCE'."
+      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B4: the exact browser floors — Safari 16.4, Chrome 111, Firefox 111 — have never been executed and no service or runner is named. CI has zero browser jobs. Partly reachable: a refutation pass found Playwright pins browser builds per release and may supply two of the three. Measure before escalating."
     },
     {
       "id": 80,
@@ -957,74 +986,78 @@
     {
       "id": 81,
       "statement": "Preload reuse is proven as ONE network request — same URL, destination, CORS and credentials mode; anonymous preload matches the default loader; the SHA-256 check stays application-layer with no HTML integrity attribute.",
-      "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "M8-STATUS.md:205-206 lists preload among what is 'Still open in M8: everything with no Java counterpart — … preload, the packed artifact, and 0b under amendment A4', and no later entry closes it. Neither A5 (:1155-1166) nor A6 (:1167-1172) names preload, so the record neither proves it nor moves it."
+      "verdict": "PROVEN",
+      "slice": "M-D S22 (the browser property both clauses were held on, measured)",
+      "gates": [
+        "test/preload-reuse.test.js",
+        "test/example-server.test.js",
+        "npm test"
+      ],
+      "ablation": "Seven ablations, all firing, control clean — and J1 is the mutation the BROWSER control actually measured. Dropping `crossorigin` from the emitted preload reds 'their attribute set is the one the browser measurement was taken against'; adding an `integrity` attribute reds that and the integrity test; changing `as=\"fetch\"` to `as=\"script\"` reds the attribute set; changing the loader's default to `credentials: \"include\"` reds the anonymous-mode test. Three more attack the RECORD rather than the code: removing its control arm, recording that control arm as 1 (reused, so it controls nothing), and recording a matched arm as 2 each red 'it carries a control arm that was NOT reused'. A behaviour-preserving comment is exit 0.",
+      "evidenceLine": "CLOSED by M-D S22, in a real browser. Plan 6.3:2179-2183 names four things that must match for a preload to be reused; three were already checked in Node and the fourth — whether the browser genuinely reuses the entry — is what both clauses were held on. Measured on Chrome 152 over a trustworthy origin, with the preloads observed to have landed (4 of 4) before the loader ran so a reuse cannot be confused with a race: the three MATCHED urls produce ONE performance.getEntriesByType('resource') entry each, initiator `link`, no 'fetch' entry at all. THE CONTROL IS WHAT MAKES THAT READABLE: a fourth url preloaded WITHOUT `crossorigin`, so its CORS mode does not match the loader's, produces TWO entries with initiators `link+fetch` — and Chrome names the cause itself ('is found, but is not used because the request credentials mode does not match'), while emitting no such warning for the three matched urls. Recorded in measurements/preload-reuse.json with the attribute set it was taken against; test/preload-reuse.test.js is the half that runs without a browser and GATES on that attribute set moving, on the deterministic-and-machine-independent reasoning scenario:2k uses for its catalog digest rather than 0a's report-only rule for source graphs."
     },
     {
       "id": 82,
       "statement": "Scenario 0b is FROZEN before M8 implementation or evidence begins — manifest fields, host/CDN profile, headers, cache/preload state, region, attestation hash set and the 0b pack recipe.",
-      "verdict": "DEFERRED",
+      "verdict": "NOT-PROVEN",
       "slice": "A4 then A6 (0b withdrawn; S13 withdrawn)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "M8-STATUS.md:21-23 A4 amends the entry condition ('0b moves from an entry condition to a late slice (S13)'), then :1169-1172 A6: 'DECIDED: cut, do not substitute … Slice S13 is withdrawn. A4 already moved 0b off the critical path; this finishes the move.'"
+      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
     },
     {
       "id": 83,
       "statement": "Scenario 0b RUNS against the named production-host profile and records request count, encoded and decoded bytes, preload reuse, streaming limits, first usable render and the host's actual content encoding.",
-      "verdict": "DEFERRED",
+      "verdict": "NOT-PROVEN",
       "slice": "A6 (0b cut to M-R; S13 withdrawn)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "M8-STATUS.md:1169-1172 A6: '0b exists to replace a local-server transfer-byte figure with a real-host one … A real host has to exist for release regardless. Slice S13 is withdrawn.' No 0b harness, artifact or run is recorded anywhere in the status doc."
+      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
     },
     {
       "id": 84,
       "statement": "0b meets the actual-host REQUEST threshold.",
-      "verdict": "DEFERRED",
+      "verdict": "NOT-PROVEN",
       "slice": "A6 (0b cut to M-R); A7 (threshold shape)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "M8-STATUS.md:1169-1172 A6 cuts 0b to M-R; A7 (:1176-1179) restates M8's thresholds as 'recorded, ratcheted where a ratchet exists, reported where none does' rather than freezing any, so no actual-host request threshold exists or is met in M8."
+      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
     },
     {
       "id": 85,
       "statement": "0b meets the actual-host TRANSFER threshold, decided on measured transfer bytes rather than the observed content-encoding label.",
-      "verdict": "DEFERRED",
+      "verdict": "NOT-PROVEN",
       "slice": "A6 (0b cut to M-R); A7 (threshold shape)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "M8-STATUS.md:1169-1170 A6: '0b exists to replace a local-server transfer-byte figure with a real-host one (`M2-STATUS.md:127`), so running it against a stand-in produces exactly the number it exists to replace.' No measured transfer figure for a real host is recorded."
+      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
     },
     {
       "id": 86,
       "statement": "0b meets the actual-host LATENCY threshold.",
-      "verdict": "DEFERRED",
+      "verdict": "NOT-PROVEN",
       "slice": "A6 (0b cut to M-R); A7 (threshold shape)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "M8-STATUS.md:1169-1172 A6 cuts 0b to M-R; A7 (:1176-1178) declines freezing thresholds because it 'would revoke the 2026-09-01 no-thresholds decision'. No latency number, gate or ablation appears in the record."
+      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
     },
     {
       "id": 87,
       "statement": "0b meets the actual-host PRELOAD threshold.",
-      "verdict": "DEFERRED",
+      "verdict": "NOT-PROVEN",
       "slice": "A6 (0b cut to M-R); A7 (threshold shape)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "M8-STATUS.md:1169-1172 A6 cuts 0b to M-R. Distinct from clause 81, which the record leaves 'Still open in M8' at :205-206; this threshold half moves with 0b and no frozen preload number exists."
+      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
     },
     {
       "id": 88,
       "statement": "…OR 0b receives 9.2's reviewed REBASELINE or CLAIM CUT — a miss closes only after reviewed new evidence or an explicit claim cut, M2 and M8 being go/no-go gates, not reporting points.",
-      "verdict": "DEFERRED",
+      "verdict": "NOT-PROVEN",
       "slice": "A6 (0b cut to M-R); A7 (A3-shaped amendment instead)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "M8-STATUS.md:1169-1172 A6 takes neither 9.2 path — it cuts 0b to M-R ('DECIDED: cut, do not substitute'). A7 (:1176-1179) instead extends clause 19's 'recorded, ratcheted where a ratchet exists, reported where none does', which is an amendment rather than the reviewed rebaseline or claim cut this clause names — and it converts a go/no-go gate into a reporting point, which this clause's second half forbids. Worth flagging to the maintainer."
+      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
     },
     {
       "id": 89,
@@ -1033,25 +1066,30 @@
       "slice": "A7 (thresholds restated; scenarios 1-5 declared OWED)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "M8-STATUS.md:1178-1179 A7: 'The five never-built performance scenarios (1-5) are declared OWED with an explicit note that no M8 number depends on them, rather than cut.' OWED is not frozen-and-met; 0b is gone by A6; and the record states no scenario's threshold as met. A7's discharged proof obligation (:1181-1193, CI ran ZERO spec-repo gates, now runs five) is about spec-side ratchets, not about any scenario threshold."
+      "evidenceLine": "STILL NOT-PROVEN, and deliberately not moved by M-D S23 — the clause names a NUMBERED frozen M7 scenario suite, and closing it by declaring the existing scenarios to be that suite would be the 'move a case to passed by weakening a rule' shape this project polices. What S23 DID is measure the coverage the clause is really about, plan 9.3's seven measurements, so the next attempt starts from a fact rather than from A7's 'OWED': (1) cold decode/parse/compile — scenario:0a and scenario:2k; (2) construction PEAK and retained memory — retained is covered by 0a, 2k and 6, PEAK IS MEASURED NOWHERE and is the one genuine measurement gap; (3) warm get/getResult throughput — scenario:2k's steadyLookupNs arms; (4) fallback-chain and equivalence-cache behaviour — 2k's two arms plus test/candidate-chain-memo.test.js; (5) browser request graph and first usable render — 0a's browser half, fresh since S19 (the real-HOST version is 0b, cut to M-R by A6); (6) Node server concurrency with per-call locales — NEW in S23, scenario:concurrency, in verify and CI; (7) partial and failed load cleanup — test/load-retention.test.js, clause 78. M-D S24 then closed (2)'s missing half: scenario:peak-memory bisects --max-old-space-size in a child process, because a sampler on the same thread cannot observe a synchronous operation's own peak, and its soundness precondition — the largest catalog must cost more than the runtime's own floor — is the S26 lesson encoded as a gate. **SO ALL SEVEN OF 9.3's MEASUREMENTS ARE NOW RECORDED.** What remains for this clause is not a measurement: it is the FORMAL numbered M7 scenario suite, frozen with a hash, and a THRESHOLD — and A7 declined to freeze any threshold because doing so would revoke the 2026-09-01 no-thresholds decision. That is a maintainer's call, not a gap an agent can build."
     },
     {
       "id": 90,
       "statement": "The newcomer NPM flow contains no hidden decision.",
       "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "'newcomer' appears NOWHERE in M8-STATUS.md. No slice, gate, walkthrough or ablation addresses the NPM onboarding flow; the record is silent, which under this ledger's rule is NOT-PROVEN rather than 'probably fine'."
+      "slice": "M-D S26 (measured; verdict deliberately unmoved)",
+      "gates": [
+        "tools/readme-newcomer.mjs"
+      ],
+      "ablation": "5 ablations, all firing, controls clean both sides: the README ceasing to publish its catalogs reds 9 samples + 2 anti-vacuity terms; a repository catalog drifting from the published copy reds naming the file and both byte counts; a module leaving `files` reds 48; an import-map target the tarball lacks reds 1; and the sandbox gaining anything the README did not publish reds naming the extra files. That last term DID NOT FIRE on its first version — it compared top-level directory names, so `examples/` built from the README and `examples/` copied from the repository were indistinguishable to it; it now compares every file.",
+      "evidenceLine": "STILL NOT-PROVEN, and the verdict is deliberately unmoved: M8-PLAN.md:338 is right that there is no machine oracle for 'hidden decision', and declaring this gate to be one would be the 'move a case to passed by weakening a rule' shape. What changed is that the record is no longer silent. (1) MEASURED 2026-09-16: `npm run check:readme` executes all 42 sample groups from INSIDE the repository, and 9 of them — 74 of 244 asserted outputs, 30% — FAIL for anybody who installed the package, every one because it reads `examples/catalogs`, a directory `npm pack` does not ship and whose contents the document never showed. Reproduced independently by an agent and by hand. (2) The README now publishes those four catalogs, and `npm run check:readme:packed` runs every sample from the real tarball in a directory holding nothing but the package, that package.json, and what the README itself publishes — in `verify` and in CI. 44 groups / 261 assertions, exit 0. (3) Four readers with no access to `src/`, `test/` or the planning directory attempted the flows; adversarial verifiers refuted most claims and CONFIRMED SIX of forty (this line said FOUR until 2026-09-17: it was written while two verifiers were still running and never re-read against the finished count — the 'recorded against an intermediate build' shape S27 found in corpusSha256, and it was caught by an agent comparing this ledger against the slice record rather than by any gate), of which the sharpest are that the README says 'opt-in' four times about ordinal and range data and names the option `pluralData` ZERO times, and that `get(key, values, options)`'s three slots are stated in no prose, so merging the locale into the values bag silently serves the instance's locale. Both are now executed sections. WHAT REMAINS IS A PERSON: a gate that every documented sample runs is a NECESSARY condition, not the clause, and the four confirmed decisions were all found by a reader rather than by any gate."
     },
     {
       "id": 91,
       "statement": "The newcomer DIRECT-BROWSER flow contains no hidden decision.",
       "verdict": "NOT-PROVEN",
-      "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "'newcomer' appears NOWHERE in M8-STATUS.md. A5 (:1159-1161) additionally removes this flow's mechanically checkable substrate — 'every browser and size number M8 recorded describes UNBUNDLED SOURCE, not a packed artifact, so plan :2152-2153's \"consume the exact packed production output\" … is unmet for M8' — but the record never states that clause 91 itself moves."
+      "slice": "M-D S26 (substrate measured and gated; verdict deliberately unmoved)",
+      "gates": [
+        "tools/readme-newcomer.mjs",
+        "test/browser-import-map.test.js"
+      ],
+      "ablation": "Substrate arms: an import-map target absent from the tarball reds; a module leaving `files` reds the published-vs-repository module count for 4 entry points; a documented map dropping one of the eight subpaths reds; a remote map at `latest` reds; documenting only local maps reds the pinning rule's own anti-vacuity term; and the README's list of the built-ins `lokalized/node` reaches drifting from `src/node/` reds — that last proved retrospectively against the drift that had actually shipped.",
+      "evidenceLine": "STILL NOT-PROVEN for clause 90's reason — no machine oracle for 'hidden decision' — but its SUBSTRATE is now measured against the artifact a reader receives rather than the working tree. `test/browser-import-map.test.js` proved the documented map complete and correctly aimed since S19, and resolved every target against the REPOSITORY; a reader's browser resolves them against a CDN serving the tarball. Measured: all 8 targets present, the whole graph behind them present, 49 modules, 212 module fetches across the eight entry points, no dangling edge, and the published graph identical in size to the repository's for every entry. Two real defects found by a reader following the section: it documented only `https://cdn.example/…`, a placeholder host that does not resolve, with ZERO occurrences of `node_modules` in 2,241 lines — so the section titled 'Loading from a browser without a bundler' could not be followed literally and the reader had to invent the one thing it exists to supply; and it enumerated FOUR Node built-ins behind `lokalized/node` where `src/node/` reaches FIVE (`node:path`, in discovery.js). The local eight-entry map and the HTTP-serving requirement are now documented, the enumeration is corrected, and the enumeration is DERIVED from `src/node/` so the next one to move fails instead of rotting. The map completeness rule now reads EVERY map in the document rather than the first, because the second one landed with two of eight subpaths and the old rule was structurally blind to it."
     },
     {
       "id": 92,
@@ -1065,7 +1103,10 @@
         "tools/load-diff/run.mjs"
       ],
       "ablation": "S14 (:1117-1124): child-directory skip removed = 2 FAILED; discovery budget charged AFTER the skip filters = 3 FAILED; not-a-regular-file check removed = the run HANGS; the two Location guards collapsed = 1 FAILED; control 2,117 passed / 0 FAILED. S2b (:178-180): a fresh LoadingSession per file fails 3 of 5 in test/directory-session.test.js while conformance stays 2,112 passed / 0 FAILED. No ablation exists for the reserved-stable-ID activation half.",
-      "evidenceLine": "DEFERRED BY DECISION, extending amendment A10's 'record, do not resume' from the registry apparatus to the two clauses that depend on it. The grounds are measured and are worse than A10 recorded: the registry's 1,338 rows are ALL reviewStatus 'unreviewed', including the 27 carrying activationMilestone 'M8'; and plan 8.6:2698 requires every behavioral vector to carry one or more requirementIds, where ZERO of the 2,363 corpus cases carry one and the corpus holds 0 distinct requirement IDs. So the closure 8.6 describes has neither reviewed nodes nor any edges at all. Building it is a milestone's worth of authoring, not a clause's, and the corpus already gates on exact ID sets - which is the guarantee the apparatus exists to provide. HELD — and S25's evidence line for this clause WAS WRONG, corrected here rather than left standing. It stated \"THERE IS NO STATUS OR ACTIVATION FIELD AT ALL\" in `lokalized-spec/pre-m0/bootstrap.requirements.candidate.json`. THAT IS FALSE. The registry's rows carry EIGHTEEN fields, including `activationMilestone`, `ownerMilestone`, `verificationClass`, `parityClass`, `evidence` and `reviewStatus` — and EXACTLY 27 rows have `activationMilestone: \"M8\"`, which is precisely the 27 this clause names. The error was mine and its mechanism is worth recording: I printed `Object.keys(rows[0]).slice(0, 8)` and read the TRUNCATION I had introduced as an ABSENCE. A truncated view read as a complete one, which is the same family as every other text this project has caught asserting the inverse of its subject. WHAT IS ACTUALLY TRUE, measured: all 27 M8-activated rows are `parityClass: \"implementation-required\"` with `evidence` entries naming evidence ids, and ALL 27 are `reviewStatus: \"unreviewed\"` — as are all 1,338 rows in the registry. So the clause is not blocked by an inexpressible property; it is blocked by a REVIEW that has never been performed. The corpus half remains strongly evidenced (133/133 required `load` cases, 2,117 / 0). Closing the clause is now a bounded, executable task — review the 27 rows against their named evidence — rather than the dead end S25 recorded. S27 ADDS A SECOND MEASURED BLOCKER, and it is upstream of the review: plan 8.6:2698 says \"Every behavioral and generated vector carries one or more `requirementIds`\" and MEASURED 2026-09-14, ZERO of the 2,363 corpus cases carry one — the field is present and empty on every case, 0 distinct ids across the whole corpus. So evidence closure has no EDGES at all: even with the 27 rows reviewed, nothing links a requirement to the vectors that would discharge it. That is a corpus-authoring gap, not a port gap, and it is larger than the review this clause was waiting on. Found by an adversarially-verified blind-design pass whose agents were forbidden from reading the runner and measured the corpus instead."
+      "evidenceLine": "DEFERRED BY DECISION, extending amendment A10's 'record, do not resume' from the registry apparatus to the two clauses that depend on it. The grounds are measured and are worse than A10 recorded: the registry's 1,338 rows are ALL reviewStatus 'unreviewed', including the 27 carrying activationMilestone 'M8'; and plan 8.6:2698 requires every behavioral vector to carry one or more requirementIds, where ZERO of the 2,363 corpus cases carry one and the corpus holds 0 distinct requirement IDs. So the closure 8.6 describes has neither reviewed nodes nor any edges at all. Building it is a milestone's worth of authoring, not a clause's, and the corpus already gates on exact ID sets - which is the guarantee the apparatus exists to provide. HELD — and S25's evidence line for this clause WAS WRONG, corrected here rather than left standing. It stated \"THERE IS NO STATUS OR ACTIVATION FIELD AT ALL\" in `lokalized-spec/pre-m0/bootstrap.requirements.candidate.json`. THAT IS FALSE. The registry's rows carry EIGHTEEN fields, including `activationMilestone`, `ownerMilestone`, `verificationClass`, `parityClass`, `evidence` and `reviewStatus` — and EXACTLY 27 rows have `activationMilestone: \"M8\"`, which is precisely the 27 this clause names. The error was mine and its mechanism is worth recording: I printed `Object.keys(rows[0]).slice(0, 8)` and read the TRUNCATION I had introduced as an ABSENCE. A truncated view read as a complete one, which is the same family as every other text this project has caught asserting the inverse of its subject. WHAT IS ACTUALLY TRUE, measured: all 27 M8-activated rows are `parityClass: \"implementation-required\"` with `evidence` entries naming evidence ids, and ALL 27 are `reviewStatus: \"unreviewed\"` — as are all 1,338 rows in the registry. So the clause is not blocked by an inexpressible property; it is blocked by a REVIEW that has never been performed. The corpus half remains strongly evidenced (133/133 required `load` cases, 2,117 / 0). Closing the clause is now a bounded, executable task — review the 27 rows against their named evidence — rather than the dead end S25 recorded. S27 ADDS A SECOND MEASURED BLOCKER, and it is upstream of the review: plan 8.6:2698 says \"Every behavioral and generated vector carries one or more `requirementIds`\" and MEASURED 2026-09-14, ZERO of the 2,363 corpus cases carry one — the field is present and empty on every case, 0 distinct ids across the whole corpus. So evidence closure has no EDGES at all: even with the 27 rows reviewed, nothing links a requirement to the vectors that would discharge it. That is a corpus-authoring gap, not a port gap, and it is larger than the review this clause was waiting on. Found by an adversarially-verified blind-design pass whose agents were forbidden from reading the runner and measured the corpus instead.",
+      "deferral": {
+        "whileTrue": "registryAllUnreviewed"
+      }
     },
     {
       "id": 93,
@@ -1074,7 +1115,10 @@
       "slice": "D4/D5 (maintainer decision, 2026-09-14) - evidence closure",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "DEFERRED BY DECISION, extending amendment A10's 'record, do not resume' from the registry apparatus to the two clauses that depend on it. The grounds are measured and are worse than A10 recorded: the registry's 1,338 rows are ALL reviewStatus 'unreviewed', including the 27 carrying activationMilestone 'M8'; and plan 8.6:2698 requires every behavioral vector to carry one or more requirementIds, where ZERO of the 2,363 corpus cases carry one and the corpus holds 0 distinct requirement IDs. So the closure 8.6 describes has neither reviewed nodes nor any edges at all. Building it is a milestone's worth of authoring, not a clause's, and the corpus already gates on exact ID sets - which is the guarantee the apparatus exists to provide. M8-STATUS.md:1219-1223 A10: 'DECIDED: record, do not resume. The requirement-registry and evidence-closure apparatus plan :2907 makes a condition of milestone closure does not exist, by the M0 engineering-gate decision … the gate that would police this is disarmed twice over (`pre-m0/registry-linter.mjs:201-209`).' That is a recorded waiver — neither a move to another milestone nor a statement that M8 does not own it — with no gate and no ablation behind it. S27 ADDS A SECOND MEASURED BLOCKER, and it is upstream of the review: plan 8.6:2698 says \"Every behavioral and generated vector carries one or more `requirementIds`\" and MEASURED 2026-09-14, ZERO of the 2,363 corpus cases carry one — the field is present and empty on every case, 0 distinct ids across the whole corpus. So evidence closure has no EDGES at all: even with the 27 rows reviewed, nothing links a requirement to the vectors that would discharge it. That is a corpus-authoring gap, not a port gap, and it is larger than the review this clause was waiting on. Found by an adversarially-verified blind-design pass whose agents were forbidden from reading the runner and measured the corpus instead."
+      "evidenceLine": "DEFERRED BY DECISION, extending amendment A10's 'record, do not resume' from the registry apparatus to the two clauses that depend on it. The grounds are measured and are worse than A10 recorded: the registry's 1,338 rows are ALL reviewStatus 'unreviewed', including the 27 carrying activationMilestone 'M8'; and plan 8.6:2698 requires every behavioral vector to carry one or more requirementIds, where ZERO of the 2,363 corpus cases carry one and the corpus holds 0 distinct requirement IDs. So the closure 8.6 describes has neither reviewed nodes nor any edges at all. Building it is a milestone's worth of authoring, not a clause's, and the corpus already gates on exact ID sets - which is the guarantee the apparatus exists to provide. M8-STATUS.md:1219-1223 A10: 'DECIDED: record, do not resume. The requirement-registry and evidence-closure apparatus plan :2907 makes a condition of milestone closure does not exist, by the M0 engineering-gate decision … the gate that would police this is disarmed twice over (`pre-m0/registry-linter.mjs:201-209`).' That is a recorded waiver — neither a move to another milestone nor a statement that M8 does not own it — with no gate and no ablation behind it. S27 ADDS A SECOND MEASURED BLOCKER, and it is upstream of the review: plan 8.6:2698 says \"Every behavioral and generated vector carries one or more `requirementIds`\" and MEASURED 2026-09-14, ZERO of the 2,363 corpus cases carry one — the field is present and empty on every case, 0 distinct ids across the whole corpus. So evidence closure has no EDGES at all: even with the 27 rows reviewed, nothing links a requirement to the vectors that would discharge it. That is a corpus-authoring gap, not a port gap, and it is larger than the review this clause was waiting on. Found by an adversarially-verified blind-design pass whose agents were forbidden from reading the runner and measured the corpus instead.",
+      "deferral": {
+        "whileTrue": "corpusCarriesNoRequirementIds"
+      }
     }
   ]
 }

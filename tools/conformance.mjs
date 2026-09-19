@@ -46,7 +46,7 @@
  */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -57,6 +57,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 // an `unsupported` — a Java refusal it does not declare keeps its Java values and FAILS — and an
 // entry no case consults turns the run red. See the decision recorded at the top of that file.
 import { adaptConstructRefusal, staleConstructAdaptations } from "./construct-refusals.mjs";
+import { adaptDefineRefusal, staleDefineAdaptations } from "./define-refusals.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const specDir = process.env.LOKALIZED_SPEC_DIR ? resolve(process.env.LOKALIZED_SPEC_DIR) : resolve(root, "../lokalized-spec");
@@ -268,13 +269,25 @@ const OWNER_MILESTONE = {
   // this file is exactly how a real exactness defect was once absorbed. M5b is named as the owner
   // because programmatic construction and the catalog model are its scope; M5b is closed, so these
   // are new required IDs against a closed milestone rather than work it left unfinished.
-  define: "M5b",
+  // `define` HAD AN ENTRY HERE AND NO LONGER NEEDS ONE, for exactly the reason stated for
+  // `construct` below: the operation has a real arm, so no `define` case can reach
+  // `operationNotImplemented` any more. The long note that stood here described what the arm would
+  // have to decide; it is superseded by the arm itself and by `tools/define-refusals.mjs`, which
+  // records the one decision that turned out to be needed. Deleted with the capability rather than
+  // left behind, on this project's standing lesson about known-gap lists.
   // `construct` HAD AN ENTRY HERE AND NO LONGER NEEDS ONE. M7 B4 gave the operation a real arm, so
   // no `construct` case can reach `operationNotImplemented` any more and an owner annotation for it
   // would be a label on a bucket that is permanently empty. Deleted rather than left in place, on
   // this project's standing lesson that a rule outlives its capability by being deleted with it:
   // an attribution table that keeps entries for implemented operations stops being readable as the
   // list of what is unbuilt, which is the one thing it is for.
+  //
+  // **THE TABLE IS NOW EMPTY, AND THAT IS THE FINISHED STATE RATHER THAN AN OVERSIGHT.** Every
+  // operation the corpus records has an arm, so `unsupported` is 0 and nothing can reach
+  // `operationNotImplemented`. The machinery stays because it is what forces the NEXT unimplemented
+  // operation to name an owner before it can report a reason: that function throws on a missing
+  // entry, which is the rule that kept 145 `load` rows from reporting work nobody owed. An empty
+  // table with a live rule is not the same thing as no rule.
 };
 
 /**
@@ -1170,7 +1183,17 @@ function definedNode(node, root) {
           `each definedCatalog alternative must be an object with exactly one expression`,
         );
       const [expression] = Object.keys(element);
-      return { expression, ...definedNode(element[expression], false) };
+      const body = element[expression];
+      // A STRING BODY IS THE SHORTHAND, and this branch used to refuse it with an AuthoringError.
+      // The strings-file vocabulary spells a whole-message alternative as `{ "<expr>": "<text>" }`
+      // OR `{ "<expr>": { translation, placeholders, … } }` — the fixture catalog this family runs
+      // against uses the first form — while plan 3.2's `WholeMessageAlternativeInput` is always an
+      // object with the expression as a member. `definedPlaceholder` below has always expanded the
+      // string form for FRAGMENT alternatives; this arm did not, and no `definedCatalog` fixture
+      // carried one, so the gap sat here unreached. Measured: it turns four `define` cases into an
+      // AuthoringError that reads like a port refusal.
+      if (typeof body === "string") return { expression, translation: body };
+      return { expression, ...definedNode(body, false) };
     });
   }
   return out;
@@ -1269,12 +1292,58 @@ function degenerateTiebreakersFor(tiebreakerSource) {
  * @param {{ strings: any }} instanceBox filled by the caller the moment construction returns
  * @param {{ catalogSource?: string, localeSource?: string } | null} overrides
  */
-function createStringsOptionsFor(fixture, instanceBox, overrides) {
+/**
+ * The fixture's catalogs, AS THE ORACLE BUILDS THEM: a real directory, walked by the real loader.
+ *
+ * `VectorOracle.buildStrings:191-199` opens with
+ * `LocalizedStringLoader.loadFromFilesystem(directory, loadingOptionsFrom(...))` and hands the
+ * resulting map to `Strings.Builder.localizedStringSupplier`. EVERY fixture's instance is built that
+ * way — there is no in-memory arm on the Java side at all. This runner used to hand `createStrings`
+ * the fixture's DECODED `files` map instead, which agrees for any fixture whose catalogs survive a
+ * JSON round-trip and cannot express one whose FILENAMES are the subject.
+ *
+ * That gap was 11 required cases and a guard that called them unsupported. Going through the loader
+ * closes it and is also simply the faithful thing: one rule, the oracle's own, instead of a decoded
+ * map plus an exception for the fixtures it cannot spell.
+ *
+ * MEASURED ACROSS THE WHOLE CORPUS BEFORE IT LANDED, because a change this wide is exactly where a
+ * silent regression hides: 2,139 passed / 0 FAILED / 11 unsupported through the decoded map, and
+ * 2,150 passed / 0 FAILED / 0 unsupported through the loader. Nothing moved except the eleven.
+ *
+ * Two deliberate non-changes, both because Java does the same:
+ *  - warnings are DROPPED (`onWarning` is a sink). `buildStrings` calls the two-argument
+ *    `loadFromFilesystem`, which has no handler, and no operation here reads `getWarnings()` off a
+ *    constructed instance — `parse` and `load` compare warnings, and both collect their own.
+ *  - `loadingLimits` is still passed to `createStrings` below. The limits now apply at LOAD as well,
+ *    which is where Java applies them; leaving the construction-time copy in place keeps every
+ *    existing case on the path it already passed on, and no case distinguishes the two.
+ *
+ * @param {any} fixture
+ * @param {string} fixtureId
+ */
+function loadedCatalogsFor(fixture, fixtureId) {
+  if (!nodeApi?.readStringsFromDirectory)
+    throw new AuthoringError(
+      "lokalized/node does not export readStringsFromDirectory, so no fixture instance can be " +
+      "built the way the oracle builds one. M8's directory loader has shipped, so this is a build " +
+      "problem rather than unimplemented work.",
+    );
+
+  const directory = materializeFixtureDirectory(fixture, fixtureId);
+  const loaded = nodeApi.readStringsFromDirectory(directory, {
+    ...directoryLoadOptionsFor(fixture.loadingOptions),
+    onWarning: () => {},
+    // Java's loader has `Ordinality` on its classpath unconditionally, exactly as the `parse` and
+    // `load` arms supply it for the same reason.
+    ...(ordinalApi?.ordinalData ? { pluralData: { ordinal: ordinalApi.ordinalData } } : {}),
+  });
+
+  return loaded.catalogs;
+}
+
+function createStringsOptionsFor(fixture, instanceBox, overrides, fixtureId) {
   if (!core?.createStrings) unsupported("createStrings is not implemented");
   if (fixture.loadOnly) unsupported("load-only fixture: no Strings instance is constructed");
-  if (Object.keys(fixture.rawFiles ?? {}).length || Object.keys(fixture.rawFilesBase64 ?? {}).length)
-    unsupported("raw/byte fixtures require the bounded parser's failure paths");
-
   // The optional plural modules, always supplied. Java's Strings has the ordinal and cardinal-range
   // tables unconditionally, so an oracle-faithful runner must hand the JS port its equivalents or
   // every ordinal fixture would report a construction failure that Java never had. This is consumer
@@ -1322,7 +1391,12 @@ function createStringsOptionsFor(fixture, instanceBox, overrides) {
 
   const catalogOption =
     overrides?.catalogSource === undefined
-      ? { strings: fixture.files }
+      ? { strings: loadedCatalogsFor(fixture, fixtureId) }
+      // The degenerate arms stay on the DECLARED map, and that is not an inconsistency: each builds a
+      // catalog no loader could produce, from a fixture with no raw files at all (measured — the 82
+      // raw-file fixtures and the 21 `constructionOverrides` fixtures do not intersect), so the
+      // declared map and a loaded one are the same content. The oracle's own degenerate arms derive
+      // from `firstCatalogOf(loaded)` for the same reason.
       : degenerateCatalogFor(overrides.catalogSource, fixture);
 
   // `instanceCallbacks: "libraryDefaults"` installs NEITHER recording callback, so the port selects
@@ -1384,7 +1458,7 @@ function createStringsOptionsFor(fixture, instanceBox, overrides) {
  * are passes, not remaining work. The 24 that genuinely differ are attributed after the fact in
  * `classifyFailure`.
  */
-function stringsFor(fixture) {
+function stringsFor(fixture, fixtureId) {
   // A `constructionOverrides` fixture is a DEGENERATE record whose subject is the refusal itself, and
   // `construct` is the only operation that can observe one. lokalized-spec's ingest already refuses
   // to pair such a fixture with any other operation, so reaching here means the corpus and this
@@ -1396,7 +1470,7 @@ function stringsFor(fixture) {
     );
 
   const instanceBox = { strings: null };
-  instanceBox.strings = core.createStrings(createStringsOptionsFor(fixture, instanceBox, null));
+  instanceBox.strings = core.createStrings(createStringsOptionsFor(fixture, instanceBox, null, fixtureId));
   return instanceBox.strings;
 }
 
@@ -1664,6 +1738,29 @@ const withoutTemporaryPaths = (message) =>
 let fixtureRunRoot = null;
 let materializedCount = 0;
 const materializedDirectories = new Map();
+
+/**
+ * REMOVE THE RUN'S FIXTURE TREE ON THE WAY OUT.
+ *
+ * It was never removed, and nothing noticed while only the `load` family materialized. Measured on
+ * this machine before the fix: **494 orphaned `lokalized-vectors-conformance-*` roots totalling
+ * 2.0 GB**, one per run since the `load` arm landed. Building every fixture's instance through the
+ * loader materializes far more of them per run, so the leak had to be closed in the same slice that
+ * widened it rather than left to be found later as a full disk.
+ *
+ * On `exit` rather than in a `finally`: the runner has several exit paths (a thrown AuthoringError,
+ * `process.exit` on a failed gate, a clean return) and this must cover all of them. Failures are
+ * reported with the ORACLE'S OWN scrub applied (`<fixtures>/`), so no diagnostic here points a
+ * reader at a path they were meant to open afterwards.
+ */
+process.on("exit", () => {
+  if (fixtureRunRoot === null) return;
+  try {
+    rmSync(join(fixtureRunRoot, ".."), { recursive: true, force: true });
+  } catch {
+    // A tree we could not remove is not worth failing a conformance run over.
+  }
+});
 
 function materializeFixtureDirectory(fixture, fixtureId) {
   const cached = materializedDirectories.get(fixtureId);
@@ -3089,7 +3186,7 @@ function runCase(testCase, fixture) {
     }
 
     case "getResult": {
-      const strings = stringsFor(fixture);
+      const strings = stringsFor(fixture, testCase.fixture);
       // AFTER `stringsFor`, deliberately. 31 of the 34 `IllegalArgumentException` rows here are
       // pre-walk `localeMatchSupplier` ingress refusals, and the port has no supplier ingress yet;
       // they must keep reporting THAT and not be run against a refusal the port makes for some
@@ -3175,7 +3272,7 @@ function runCase(testCase, fixture) {
       // leave this list: it earns the removal by being compared, never by being inconvenient. The
       // list is now EMPTY, so it is gone rather than kept as a mechanism-shaped hole that would
       // read as a guard while gating nothing — the `xfailedIds` mistake this file already made once.
-      const strings = stringsFor(fixture);
+      const strings = stringsFor(fixture, testCase.fixture);
       if (expected.thrown)
         return thrownCase(expected, () =>
           strings.get(input.key, placeholdersFor(input), callOptionsFor(input, strings)));
@@ -3399,6 +3496,125 @@ function runCase(testCase, fixture) {
       return jcs(actual) === jcs(wanted) ? { ok: true } : { ok: false, actual, wanted };
     }
 
+    case "define": {
+      // PROGRAMMATIC CONSTRUCTION, AND THEN EQUALITY — two observations through two doors, because
+      // Java makes them with two mechanisms and collapsing them onto one would lose a channel.
+      //
+      // Java's `define` hands `Strings.Builder.localizedStringSupplier` nothing at all. It BUILDS a
+      // `LocalizedString` from the case input and asks a `Strings` constructed from the fixture
+      // catalog whether its `LocalizedStringSet` CONTAINS it — so `built` is whether the value
+      // objects' own constructors accepted the graph, and `contains` is `LocalizedString#equals`
+      // reached through `Set#contains`.
+      //
+      // `built` IS `defineLocalizedString`. Plan 3.6's programmatic door, which validates eagerly —
+      // the same moment Java's value-object constructors do. (The `catalogSource: "defined"` arm far
+      // above deliberately does NOT use it, and that is not a contradiction: that family observes
+      // what `createStrings` refuses, which is a different site, so it needs an inert graph.)
+      //
+      // `contains` IS THE MERGE PREDICATE, consulted through its public door. `mergeParsedStringsFiles`
+      // deduplicates structurally-equal entries and refuses conflicting ones, and M9 S3 MEASURED that
+      // predicate against `lokalized-java` 3.0.0 on the pinned JDK — placeholder-map order equal,
+      // alternatives order NOT equal, commentary null-vs-present not equal. So this arm invents no
+      // equality rule; it asks the one the library already ships and that Java already arbitrated.
+      // Both sides of the comparison are built by the SAME model walk (`parseStrings` over the
+      // fixture's own catalog text and over the probe), which is what makes the answer a fact about
+      // the two VALUES rather than about two doors.
+      //
+      // WHAT THIS ARM CANNOT SEE, said here rather than left to be found: a value the programmatic
+      // door accepts and the text door refuses, or the reverse, would make `built` and `contains`
+      // describe different objects. That is not hypothetical bookkeeping — it is checked, below,
+      // and a disagreement is reported as a FAILED case rather than quietly resolved.
+      if (!parseApi?.defineLocalizedString) unsupported("defineLocalizedString is not implemented");
+      if (!parseApi?.mergeParsedStringsFiles) unsupported("mergeParsedStringsFiles is not implemented");
+
+      const wantedDefine = expected.define;
+      const probeBody = input.localizedString;
+      const key = probeBody?.key;
+
+      // OUTSIDE THE TRY, exactly as the `construct` arm builds its options outside: `definedNode`
+      // throws `AuthoringError` on a model member it has not been taught, and banking a harness
+      // mistake as "the port refused this" is how the `define` decoder once recorded nine mistyped
+      // shapes as believable refusals. It must escape.
+      const definedInput = definedNode(probeBody, true);
+
+      const locale = input.locale;
+      const catalogFile = parseApi.parseStrings(
+        parseResourceFor(fixture, testCase.fixture, locale),
+        { locale, source: `${testCase.fixture}:${locale}` },
+      );
+
+      /** @type {{ built: boolean, failureType: string | null, failureMessage: string | null,
+       *   catalogKeyPresent: boolean | null, contains: boolean | null }} */
+      let actual;
+      try {
+        parseApi.defineLocalizedString(definedInput);
+        actual = { built: true, failureType: null, failureMessage: null, catalogKeyPresent: null, contains: null };
+      } catch (error) {
+        if (error instanceof Unsupported || error instanceof NoCounterpart || error instanceof AuthoringError)
+          throw error;
+        actual = {
+          built: false,
+          failureType: /** @type {Error} */ (error).constructor.name,
+          failureMessage: messageOf(error),
+          catalogKeyPresent: null,
+          contains: null,
+        };
+      }
+
+      if (actual.built) {
+        actual.catalogKeyPresent = catalogFile.strings.some((string) => string.key === key);
+
+        // The probe as a one-entry shard in the SAME vocabulary the fixture is written in, so the
+        // comparison is between two parsed models rather than between two doors.
+        const { key: _key, ...body } = probeBody;
+        let probeFile;
+        try {
+          probeFile = parseApi.parseStrings(utf8.encode(JSON.stringify({ [key]: body })), {
+            locale,
+            source: `${testCase.id}:probe`,
+          });
+        } catch (error) {
+          // The door disagreement named in the header. Reported as a real difference — never
+          // absorbed, never downgraded to `unsupported`.
+          actual.contains = `the programmatic door accepted this value and the text door refused it: ${messageOf(error)}`;
+          probeFile = null;
+        }
+
+        if (probeFile) {
+          try {
+            parseApi.mergeParsedStringsFiles([catalogFile, probeFile]);
+            actual.contains = true;
+          } catch {
+            actual.contains = false;
+          }
+        }
+      }
+
+      let wanted;
+      if (wantedDefine.built) {
+        wanted = {
+          built: true,
+          failureType: null,
+          failureMessage: null,
+          catalogKeyPresent: wantedDefine.catalogKeyPresent,
+          contains: wantedDefine.contains,
+        };
+      } else {
+        // Adapted through `tools/define-refusals.mjs`, keyed on the recorded Java pair EXACTLY. A
+        // refusal the table does not declare keeps its Java spelling here and is reported FAILED.
+        const adapted = adaptDefineRefusal(wantedDefine.failureType, wantedDefine.failureMessage);
+        wanted = {
+          built: false,
+          failureType: adapted ? adapted.jsType : wantedDefine.failureType,
+          failureMessage: adapted ? adapted.jsMessage : wantedDefine.failureMessage,
+          catalogKeyPresent: wantedDefine.catalogKeyPresent,
+          contains: wantedDefine.contains,
+        };
+      }
+
+      return jcs(actual) === jcs(wanted) ? { ok: true } : { ok: false, actual, wanted };
+    }
+
     case "construct": {
       // CONSTRUCTION ITSELF as the observation. `DefaultStrings`' constructor performs a series of
       // validations that no well-formed fixture can reach, because an ordinary fixture installs
@@ -3412,7 +3628,7 @@ function runCase(testCase, fixture) {
       // Recording the harness's own mistakes as believable refusals is precisely how the `define`
       // decoder banked nine mistyped shapes, and this arm is the same shape of machine.
       const instanceBox = { strings: null };
-      const options = createStringsOptionsFor(fixture, instanceBox, fixture.constructionOverrides ?? null);
+      const options = createStringsOptionsFor(fixture, instanceBox, fixture.constructionOverrides ?? null, testCase.fixture);
 
       /** @type {{ constructed: boolean, failureType: string | null, failureMessage: string | null, probe: unknown }} */
       let actual;
@@ -3483,7 +3699,7 @@ function runCase(testCase, fixture) {
       //
       // The module guard is the same one the other three ingresses carry, decided on the subpath's
       // existence rather than on anything the port did with a header.
-      const strings = stringsFor(fixture);
+      const strings = stringsFor(fixture, testCase.fixture);
 
       if (!negotiateApi?.createLocaleNegotiator) unsupported("createLocaleNegotiator is not implemented");
 
@@ -3580,7 +3796,7 @@ function runCase(testCase, fixture) {
         const wantedNames = ERROR_NAME[javaType];
         const wanted = { name: wantedNames.join(" or "), message: expected.thrown.message };
         try {
-          matchForCase(fixture, input, ranges);
+          matchForCase(fixture, input, ranges, testCase.fixture);
           return { ok: false, actual: { name: "no exception", message: null }, wanted };
         } catch (error) {
           if (error instanceof Unsupported) throw error;
@@ -3595,7 +3811,7 @@ function runCase(testCase, fixture) {
       // The same call the recorded-throw branch above makes, on the same two ingresses. See
       // `matchForCase` for why the locale and range doors are separate and why `stringsFor`'s
       // fixture gating is what keeps the cases this arm does not unlock honest.
-      const match = matchForCase(fixture, input, ranges);
+      const match = matchForCase(fixture, input, ranges, testCase.fixture);
 
       // All EIGHT recorded fields, the same key list on both sides. Nothing is defaulted from the
       // expected side and nothing is gated on the recorded side having a value: every `matchFor`
@@ -3661,8 +3877,8 @@ function runCase(testCase, fixture) {
  * the two whose catalogs are raw bytes report the capability that actually blocks them instead of
  * the operation name, and both of those reason strings already existed.
  */
-function matchForCase(fixture, input, ranges) {
-  const strings = stringsFor(fixture);
+function matchForCase(fixture, input, ranges, fixtureId) {
+  const strings = stringsFor(fixture, fixtureId);
 
   if (input.locale !== undefined) return strings.getDirectLocaleContext(input.locale).localeMatch;
 
@@ -4444,6 +4660,12 @@ if (staleAdaptations.length) {
   for (const claim of staleAdaptations) console.log(`  ${claim}`);
 }
 
+const staleDefineRefusals = familyFilter ? [] : staleDefineAdaptations();
+if (staleDefineRefusals.length) {
+  console.log(`\nSTALE DEFINE-REFUSAL ADAPTATION (${staleDefineRefusals.length}):`);
+  for (const claim of staleDefineRefusals) console.log(`  ${claim}`);
+}
+
 if (staleDrops.length) {
   console.log(`\nSTALE DELIBERATE DROP (${staleDrops.length}) — recorded as dropped, but passing again:`);
   for (const entry of staleDrops) console.log(`  ${entry.id}`);
@@ -4591,6 +4813,7 @@ process.exit(
   failed.length === 0 && regressions.length === 0 && causeMessageRegressions.length === 0 &&
   causeMessageUndeclared.length === 0 && staleCauseMessageDivergences.length === 0 &&
   staleNonportabilityClaims.length === 0 && staleAdaptations.length === 0 &&
+  staleDefineRefusals.length === 0 &&
   staleDrops.length === 0 && staleMessageDivergences.length === 0 &&
   uncomparedExpectedFields.length === 0 && staleUncomparedDeclarations.length === 0 &&
   staleOwnerMilestones.length === 0 && newlyUnconvertibleRequired.length === 0 &&

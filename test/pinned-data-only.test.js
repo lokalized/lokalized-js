@@ -65,14 +65,93 @@ test("no module under src/ reaches for the host Intl implementation", () => {
   assert.deepEqual(offenders, [], "src/ must classify from pinned CLDR data, never from the host Intl");
 });
 
+/**
+ * Every way of turning a string into code that this tree can be scanned for, each with the reason it
+ * is here rather than a tighter spelling.
+ *
+ * **These were widened on 2026-09-16 after the narrow versions were measured and found narrow.** The
+ * pair that shipped for five milestones was `/\beval\s*\(/` and `/\bnew\s+Function\b/`, and three
+ * ordinary spellings walked straight past them: `Function("return 1")` (the constructor called
+ * without `new`), `setTimeout("x=1", 0)`, and indirect eval assembled as `globalThis["ev" + "al"]`.
+ * Injected into `src/internal/locale.js` — a file the two per-file gates in `test/plural.test.js` and
+ * `test/expression.test.js` do not scan — each left ALL 1,570 tests green.
+ *
+ * Each entry is a BARE TOKEN wherever one will do, on the same reasoning the `Intl` test above
+ * states: a mention of `eval` or `Function` in executable text is either the thing itself or a step
+ * toward it, and this tree has zero of either today, so the stricter pattern costs nothing and a
+ * deliberate exception is a one-line reviewable edit. Measured before landing: 54 files, 0 hits for
+ * every pattern below.
+ *
+ * WHAT THIS CANNOT SEE, said here rather than left to be discovered. A source scan reads spellings,
+ * not values. `const g = globalThis; g["ev" + "al"]("1")` defeats the last pattern because the alias
+ * is what gets indexed; so does any name arriving from outside the file. The last pattern raises the
+ * cost of hiding a global lookup in THIS tree, it does not make one impossible.
+ *
+ * `import(` is deliberately absent. A dynamic import loads a module, it does not evaluate a string,
+ * and the root-graph walk further down this file has a pattern for exactly that shape because a
+ * relative `import("…")` is a legitimate edge here. `test/expression.test.js` forbids it in the two
+ * files where laziness would break eager compilation, which is a different property.
+ *
+ * The two PER-FILE gates are not made redundant by this and should not be deleted for overlapping
+ * with it. `test/plural.test.js:406` and `test/expression.test.js:72` each pin the property as part
+ * of the contract of one module — a rules engine and an expression compiler are exactly the two
+ * places somebody would reach for `new Function` and have a reason — and each states that reason
+ * beside the module it belongs to. This gate is the floor under the whole tree.
+ */
+const DYNAMIC_CODE = [
+  // Covers `eval(x)`, `(0, eval)(x)`, `globalThis.eval(x)` and `globalThis["eval"]` alike. `evaluate`
+  // and `ExpressionEvaluationError` do not match: `\b` requires a boundary on BOTH sides.
+  { pattern: /\beval\b/, why: "eval, by any route" },
+  // The bare word, so `new Function(…)`, `Function(…)`, `Reflect.construct(Function, …)` and
+  // `const F = Function` are one rule rather than four, and passing the constructor somewhere else
+  // is caught too.
+  { pattern: /\bFunction\b/, why: "the Function constructor, by any route" },
+  // A string first argument is an eval with a delay on it. The timers themselves are not forbidden.
+  { pattern: /\bset(?:Timeout|Interval)\s*\(\s*["'`]/, why: "a string-argument timer" },
+  // How a name is assembled at runtime to get past the two rules above.
+  { pattern: /\b(?:globalThis|window|self|global)\s*\[/, why: "a computed index into the global object" },
+];
+
+test("the dynamic-code patterns match what they claim to match", () => {
+  // The gate above is four regexes and nothing else executes them, so a typo would make it pass
+  // silently forever. Every pattern is shown one line it must catch and one it must not.
+  const offending = [
+    'const f = eval("1");',
+    'const f = (0, eval)("1");',
+    'const f = new Function("return 1");',
+    'const f = Function("return 1");',
+    'const f = Reflect.construct(Function, ["return 1"]);',
+    'setTimeout("x = 1", 0);',
+    "setInterval('x = 1', 0);",
+    'globalThis["ev" + "al"]("1");',
+    'self[name]("1");',
+  ];
+  for (const line of offending)
+    assert.ok(DYNAMIC_CODE.some(({ pattern }) => pattern.test(line)), `no pattern catches ${line}`);
+
+  const legal = [
+    'if (typeof value === "function") return value;',
+    "const subtle = globalThis.crypto?.subtle;",
+    "const evaluated = evaluateExpression(node);",
+    "throw new ExpressionEvaluationError(TOKEN, message);",
+    "setTimeout(() => resolve(), 0);",
+    'const parsed = await import("../data/ordinal.js");',
+  ];
+  for (const line of legal) {
+    const hit = DYNAMIC_CODE.find(({ pattern }) => pattern.test(line));
+    assert.equal(hit, undefined, `${hit?.why} falsely matched ${line}`);
+  }
+});
+
 test("no module under src/ evaluates code at runtime", () => {
   /** @type {string[]} */
   const offenders = [];
 
   for (const path of files)
     for (const [index, line] of codeLines(path).entries())
-      if (/\beval\s*\(/.test(line) || /\bnew\s+Function\b/.test(line))
-        offenders.push(`${path.slice(sourceRoot.length)}:${index + 1}: ${line.trim()}`);
+      for (const { pattern, why } of DYNAMIC_CODE)
+        if (pattern.test(line))
+          offenders.push(`${path.slice(sourceRoot.length)}:${index + 1}: ${why}: ${line.trim()}`);
 
   assert.deepEqual(offenders, [], "CLDR rule conditions compile to closures, never to evaluated code");
 });

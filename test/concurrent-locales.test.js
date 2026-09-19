@@ -106,6 +106,7 @@ import { decode as pinnedProvenance } from "../src/data/provenance.js";
 import { loadEntireManifestFromFiles, loadStringsFromFiles } from "../src/node/index.js";
 import { sha256Hex } from "../src/internal/sha256.js";
 import { createSsrStamp, validateSsrStamp } from "../src/ssr/index.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "lokalized-concurrent-"));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -1099,8 +1100,7 @@ function manifestOf(label, bodies, options) {
     formatVersion: 1,
     catalogVersion: `catalog-${label}`,
     catalogFingerprint: "0".repeat(64),
-    cldrVersion: pinnedProvenance().cldrVersion,
-    dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale: options.fallbackLocale,
     baseUrl: pathToFileURL(`${directory}/`).href,
     files,

@@ -16,6 +16,7 @@ import {
   parseStringsManifest,
   validateStringsManifest,
 } from "../src/load/manifest.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 /** A manifest whose declared fingerprint actually matches its contents. */
 function manifest(overrides = {}) {
@@ -26,8 +27,7 @@ function manifest(overrides = {}) {
     // FROM THE PINNED DATA, not literals: plan :1893 makes a manifest built against different
     // CLDR data a ConfigurationError, so a hard-coded version turns every fixture red the day
     // the pinned data moves — and hides the check it was meant to pass through.
-    cldrVersion: pinnedProvenance().cldrVersion,
-    dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale: "en",
     baseUrl: "https://cdn.example/v1/",
     files: {

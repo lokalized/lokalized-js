@@ -36,7 +36,12 @@ import { configurationError } from "../internal/configuration-error.js";
  * convenience, and `test/ssr-stamp.test.js` checks it by diffing the WHOLE serialized object against
  * an expected key set rather than by spot-checking fields.
  *
- * @typedef {Readonly<{ locale: string | null, matchType: string }>} SsrLocaleMatchV1
+ * The match type is plan 6.4:2214's `LocaleMatchType`, referenced through core rather than spelled
+ * out again — a JSDoc `import(...)` sits in a comment, so `tools/graph-walk.mjs` strips it before
+ * matching and this adds NO module edge. `test/ssr-graph.test.js` pins this subpath to exactly two
+ * modules and still does.
+ *
+ * @typedef {Readonly<{ locale: string | null, matchType: import("../core/index.js").LocaleMatchType }>} SsrLocaleMatchV1
  */
 
 /**
@@ -170,14 +175,19 @@ function narrow(match) {
     throw configurationError("A locale match's `locale` must be a tag or null");
   if (typeof matchType !== "string" || !MATCH_TYPES.has(matchType))
     throw configurationError(`Unknown locale match type ${JSON.stringify(matchType)}`);
-  return { locale: /** @type {string | null} */ (locale), matchType };
+  // The membership test above is what makes this cast sound: `matchType` is narrowed by MATCH_TYPES
+  // at runtime, and the cast tells tsc what that test proved.
+  return {
+    locale: /** @type {string | null} */ (locale),
+    matchType: /** @type {import("../core/index.js").LocaleMatchType} */ (matchType),
+  };
 }
 
 /**
  * The rendering context, resolved to the pair a stamp serializes.
  *
  * @param {any} strings @param {any} context
- * @returns {{ lookupLocale: string, localeMatch: { locale: string | null, matchType: string } }}
+ * @returns {{ lookupLocale: string, localeMatch: { locale: string | null, matchType: import("../core/index.js").LocaleMatchType } }}
  */
 function projectionFor(strings, context) {
   if (!isRecord(context)) throw configurationError("A rendering context is required");
@@ -238,7 +248,7 @@ function projectionFor(strings, context) {
  * The invariants plan 6.4 states for both construction and validation.
  *
  * @param {any} strings
- * @param {{ lookupLocale: string, localeMatch: { locale: string | null, matchType: string } }} projection
+ * @param {{ lookupLocale: string, localeMatch: { locale: string | null, matchType: import("../core/index.js").LocaleMatchType } }} projection
  */
 function requireMatchInvariants(strings, projection) {
   const { locale, matchType } = projection.localeMatch;

@@ -9,20 +9,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 31,
-      "sourceBytes": 872639,
-      "importMs": 0.342,
-      "constructionMs": 0.1105,
-      "firstRenderMs": 0.3804,
-      "retainedBytes": 76448
+      "sourceBytes": 764556,
+      "importMs": 0.306,
+      "constructionMs": 0.1248,
+      "firstRenderMs": 0.3205,
+      "retainedBytes": 77168
     },
     {
       "label": "core + parsed equivalent",
       "modules": 30,
-      "sourceBytes": 862390,
-      "importMs": 0.726,
-      "constructionMs": 0.4089,
-      "firstRenderMs": 0.3259,
-      "retainedBytes": 452056
+      "sourceBytes": 753943,
+      "importMs": 0.7,
+      "constructionMs": 0.371,
+      "firstRenderMs": 0.3086,
+      "retainedBytes": 463152
     }
   ],
   "rebaselines": [
@@ -407,33 +407,93 @@
         "root + raw-text catalog: source graph grew 869917 -> 872639 bytes",
         "core + parsed equivalent: source graph grew 859668 -> 862390 bytes"
       ]
+    },
+    {
+      "reason": "M-D S32: +295 source bytes from removing two stale graph counts from shipped docblocks (src/index.js and src/internal/interpolate.js). No module joins any graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 872639 -> 872930 bytes",
+        "core + parsed equivalent: source graph grew 862390 -> 862564 bytes"
+      ]
+    },
+    {
+      "reason": "M-D S33: four maintainer decisions land together — the manifest format carries all seven build-identity fields (runtime-metadata.js joins the load and node graphs, +1 module each), every public door refuses an unknown option (configuration-error.js joins the parse graph via catalog.js, +1 module), matchType is narrowed to plan 3.4's LocaleMatchType (JSDoc only), and the onWarning observer is documented. No behaviour moved that the corpus can see: conformance is 2,150/0/0 across all four.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 872930 -> 883653 bytes",
+        "core + parsed equivalent: source graph grew 862564 -> 873287 bytes"
+      ]
+    },
+    {
+      "reason": "M-D S34: the four aggregate load budgets are charged ACROSS a load at the manifest doors, as the types and README have always documented and as the directory door has always done. runPlan now gives each file its own LoadingSession (unchanged as a per-file bound, new as a measurement) and reconciles the four counters in FETCH-PLAN order after the workers finish, replaying through the session's own guarded methods so both door families raise one sentence. lokalized/load 39 -> 38 and lokalized/node 42 -> 41 modules: the runner calls the INTERNAL parseStringsWithSession, so the public parse door leaves both loader graphs. Root/core/parse grow by the shared LoadingSession.absorb. conformance byte-identical at 2,150/0/0.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 883653 -> 885858 bytes",
+        "core + parsed equivalent: source graph grew 873287 -> 875492 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S3: localeMatch and LoadFailure declaration fixes; comments only, +1,232 bytes in core's graph and +1,819 in load's",
+      "growth": [
+        "root + raw-text catalog: source graph grew 885858 -> 887090 bytes",
+        "core + parsed equivalent: source graph grew 875492 -> 876724 bytes"
+      ]
+    },
+    {
+      "reason": "M-R: every returned LocaleMatch and language-range list is deep-frozen at its one construction site in matchForRanges, and parseLanguageRanges freezes its members; LocaleMatch and WeightedLanguageRange are each a single Readonly<...> typedef that core and negotiate derive instead of authoring their own mutable copies.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 887090 -> 888822 bytes",
+        "core + parsed equivalent: source graph grew 876724 -> 878456 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S3: the consumer-facing contract defects the requirement registry exposed. Returned values are now frozen one level down — getResult().localeMatch's consideredLocales, languageRange and requestedLanguageRanges (and its members) were mutable, so a consumer could write into a record the library handed them; the typedef's arrays became readonly to match what the runtime now enforces. StringsLoadingError.failures is typed LoadFailure[] rather than any[], and the runner's internal cast narrowed from stage?: string to the seven-member union. TranslationFailure.localeMatch and FallbackEvent.localeMatch are typed Readonly<LocaleMatch> rather than unknown — both are handed to consumer callbacks. All JSDoc and freeze calls; conformance byte-identical at 2,150/0/0.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 888822 -> 890018 bytes",
+        "core + parsed equivalent: source graph grew 878456 -> 879652 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S4: the readonly sweep — fourteen typedefs wrapped, nine error-class fields marked @readonly, the error code threaded through the base constructor. Docblock prose, not behaviour.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 890018 -> 894940 bytes",
+        "core + parsed equivalent: source graph grew 879652 -> 884327 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S5: the Unicode attribution is now a preserved legal comment on the fifteen generated CLDR modules. Comment bytes only; no module joined either graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 894940 -> 897709 bytes",
+        "core + parsed equivalent: source graph grew 884327 -> 887096 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S8: likely-subtags.js is re-encoded structurally — 7,788 rows in 25 KB of source instead of 158 KB, decoding to output byte-identical to the pinned CLDR artifact. The browser root bundle falls 322,509 -> 187,679 minified and 73,653 -> 55,610 brotli, -24.5% on the wire. Conformance byte-identical at 2,150/0/0.",
+      "growth": []
     }
   ],
   "browser": {
-    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/1.49585.0 Chrome/152.0.7977.76 Safari/537.36",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.2553.1 Chrome/152.0.7977.76 Safari/537.36",
     "transferCompression": "none — the harness server does not compress; section 9.2's gzip/brotli ceilings are a separate measure",
     "memoryKind": "performance.memory (coarse, whole-page)",
     "note": "One variant per page load: measuring both in one document leaves the second with a warm module cache and zero cold-import, resource and transfer figures.",
     "variants": [
       {
         "label": "root + raw-text catalog",
-        "resources": 25,
-        "encodedBytes": 777757,
-        "decodedBytes": 777757,
-        "coldImportMs": 32,
-        "importMs": 1.9,
-        "constructionMs": 0.5,
-        "firstRenderMs": 1.3,
+        "resources": 31,
+        "encodedBytes": 887090,
+        "decodedBytes": 887090,
+        "coldImportMs": 25.8,
+        "importMs": 1.6,
+        "constructionMs": 0.2,
+        "firstRenderMs": 0.5,
         "firstRender": "I read 3 books"
       },
       {
         "label": "core + parsed equivalent",
-        "resources": 24,
-        "encodedBytes": 769512,
-        "decodedBytes": 769512,
-        "coldImportMs": 27.2,
+        "resources": 30,
+        "encodedBytes": 876724,
+        "decodedBytes": 876724,
+        "coldImportMs": 21,
         "importMs": 2.5,
-        "constructionMs": 1.1,
+        "constructionMs": 0.9,
         "firstRenderMs": 0.8,
         "firstRender": "I read 3 books"
       }

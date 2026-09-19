@@ -45,6 +45,7 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 /**
  * The hosts a cache could be hung off without ever appearing as a NEW global name.
@@ -168,8 +169,7 @@ function manifestFor(spec) {
     formatVersion: 1,
     catalogVersion: spec.catalogVersion,
     catalogFingerprint: "0".repeat(64),
-    cldrVersion: pinnedProvenance().cldrVersion,
-    dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale: spec.fallbackLocale ?? "en",
     baseUrl: spec.baseUrl,
     files,
@@ -787,7 +787,10 @@ test("a dropped LoadedStrings is collectable; nothing retains its catalogs", () 
       const bytes = utf8.encode(body);
       const draft = {
         formatVersion: 1, catalogVersion: "c32.retention", catalogFingerprint: "0".repeat(64),
-        cldrVersion: pinnedProvenance().cldrVersion, dataFingerprint: pinnedProvenance().dataFingerprint,
+        // INTERPOLATED, not imported: this source is a STRING handed to a child \`node -e\`, which
+        // has no module scope of ours to import from. The parent spreads the same constant, so the
+        // two cannot drift.
+        ...${JSON.stringify(BUILD_IDENTITY)},
         fallbackLocale: "en", baseUrl: base,
         files: { en: { url: "en.json", sha256: createHash("sha256").update(bytes).digest("hex"), decodedBytes: bytes.length } },
         tiebreakers: {},

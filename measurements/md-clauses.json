@@ -1,0 +1,239 @@
+{
+  "formatVersion": 1,
+  "milestone": "M-D",
+  "note": "DERIVED from the plan's M-D row by three agents working independently through different lenses \u2014 the gate, the ablation, and the plan's own wording \u2014 each told to downgrade anything the record does not support, because every M-D slice was written by the agent whose work this judges. That independence is the thing M9's ledger recorded as OWED about itself. Their verdicts stand except where the `adjustment` field says otherwise and why; three ablations they found missing were run and recorded rather than waved through, and two live defects they found were fixed. M-D S31 upgraded q1 and t3 by closing the two gaps those verdicts had MEASURED \u2014 no bundler executed anywhere, and the network sample was the one block nothing ran. The two that remain are the maintainer's: t11 is a waiver of a plan obligation taken on agent authority, and a1 needs a person who is not the implementer.",
+  "clauses": [
+    {
+      "id": 1,
+      "planId": "q1",
+      "statement": "The npm/bundler quickstart \u2014 install the published package and import it by bare specifier \u2014 is EXECUTED, and every output it claims is asserted.",
+      "verdict": "PROVEN",
+      "gates": [
+        "tools/readme-examples.mjs",
+        "check:readme",
+        "tools/readme-newcomer.mjs",
+        "check:readme:packed",
+        "tools/bundle-sizes.mjs",
+        "check:bundle",
+        "test/readme-topics.test.js",
+        "test/readme-enumerations.test.js",
+        "../lokalized-spec/scripts/documentation-topics.mjs"
+      ],
+      "ablation": "THE NPM HALF was already ablated twice over \u2014 M-D-STATUS.md:1391-1403 (S28) and :1120-1137 (S26), plus an output falsification re-measured 2026-09-17 red at README:77. THE BUNDLER HALF is new, and it is what this clause was downgraded for. `npm run check:bundle` bundles the real `npm pack` tarball with a pinned esbuild and is in `verify` AND in CI. Twelve ablations, all firing, control clean both sides (M-D-STATUS.md, S31): a hand-edited prose number reds naming the anchor ('gutted': the README says 317,235, 159,999 and the measurement is 317,235, 159,514); a hand-edited table cell reds with the row diff; the generated region's marker removed reds 'a missing region is not agreement'; an anchored sentence reworded reds 'matched 0 times \u2026 bound to nothing'; the sideEffects ablation made inert reds TWICE (the staged package differs by NOTHING AT ALL, and the bundle did not move); the root reaching opt-in data reds naming src/data/ranges.js and src/data/cardinal-ranges.js; the opt-in list misspelt reds 'a fact about the spelling rather than about the graph'; `graph-walk.mjs` blinded in either direction reds the cross-check naming the phantom or missing modules; a caret on the esbuild pin reds; a stray hand-written figure in the owned section reds naming it; the combined bundle dropping a part reds 'it is not the union of them'; and `--write` under CI exits 2 rather than healing the document.",
+      "evidenceLine": "UPGRADED 2026-09-17 (M-D S31), and only because the gap the previous verdict MEASURED was closed rather than argued away. That verdict read: 'the plan's phrase is npm/bundler and NO BUNDLER EXECUTES ANYWHERE \u2014 node_modules holds only @types, typescript and undici-types, and esbuild/webpack/rollup/vite occur zero times.' esbuild 0.28.2 is now an exactly-pinned devDependency, `tools/bundle-sizes.mjs` bundles the packed artifact on every `verify` and every CI run, and the README's bundler figures are DERIVED \u2014 a generated table region plus five anchored prose spans \u2014 where all fourteen were stale, measured against the very version the document named. The npm half is executed twice over, from the working tree and from the real tarball."
+    },
+    {
+      "id": 2,
+      "planId": "q2",
+      "statement": "The direct-browser quickstart \u2014 the import map plus the `<script type=\"module\">` a reader pastes into a page \u2014 is EXECUTED, and the output it claims is asserted.",
+      "verdict": "PROVEN",
+      "gates": [
+        "tools/readme-blocks.mjs",
+        "check:readme",
+        "check:readme:packed",
+        "test/readme-topics.test.js",
+        "test/browser-import-map.test.js",
+        "tools/readme-newcomer.mjs",
+        "tools/graph-walk.mjs"
+      ],
+      "ablation": "Recorded, M-D-STATUS.md:1391-1403 (S28) \u2014 five of the nine are this clause's: marker loss (yesterday's state) -> red \"the plan's word is EXECUTED\"; re-homed to a ```js block -> red on the shape rule; asserts nothing -> red; the host-only rule widens past DOM statements -> red NAMING the dropped import (it crashed as a SyntaxError before the bounds existed); a marked html block with no module body -> red \"marking it executes nothing\". Plus M-D-STATUS.md:1120-1137: a documented import-map target the tarball lacks -> red naming the specifier; a module leaving `files` -> 48 red, 4 browser entry points among them. I RE-RAN FOUR OF THESE first-hand against the README text in memory: marker removed -> group MISSING and the shape rule red; re-homed to ```js -> shape rule red alone; assertion stripped -> \"asserts nothing\"; module body removed -> group MISSING plus the parse problem naming it. And the output falsification: control GREEN (1 assertion), falsified -> RED `AssertionError [ERR_ASSERTION]: browser-quickstart (README:2311)`, `+ 'Bonjour Ada' / - 'Hello Ada'`.",
+      "evidenceLine": "tools/readme-blocks.mjs's ```html arm makes the browser sample a group both gates run; test/readme-topics.test.js:170 pins the SHAPE so the gap cannot reopen as a js block beside it; test/browser-import-map.test.js derives the map from package.json#exports; tools/readme-newcomer.mjs walks all 8 targets in the tarball (49 modules, 212 fetches). Ablations M-D-STATUS.md:1391 and :1120; four reproduced 2026-09-17, red at README:2311."
+    },
+    {
+      "id": 3,
+      "planId": "q3",
+      "statement": "The server-rendering quickstart \u2014 load a catalog directory, construct, stamp, cross the wire, validate \u2014 is EXECUTED, and every output it claims is asserted.",
+      "verdict": "PROVEN",
+      "gates": [
+        "check:readme",
+        "check:readme:packed",
+        "test/readme-topics.test.js"
+      ],
+      "ablation": "The quickstart RULE's ablations are recorded at M-D-STATUS.md:1391-1403 and apply to this row by the same assertions (marker loss -> \"the plan's word is EXECUTED\"; the plan grows a quickstart -> drift; a claimed output the library does not produce -> red). The record names NO ssr-specific red, so I measured one myself, read-only: control GREEN (24 assertions); falsifying `stamp.lookupLocale;     // => \"fr-CA\"` to `\"fr\"` goes RED with `AssertionError [ERR_ASSERTION]: ssr (README:1665)`. Also relevant and recorded: M-D-STATUS.md:1120-1137, the README ceasing to publish its catalogs reds 9 sample groups \u2014 this group is one of the 10 that read a published catalog directory. ABLATION RUN AND RECORDED 2026-09-17, because the agent correctly reported that S28's nine ablations are about the quickstart RULE and the browser sample rather than this clause: falsifying one asserted output in the `ssr` group (`stamp.localeMatch`'s locale) exits 1 with `example 'ssr' failed`; control clean both sides.",
+      "evidenceLine": "tools/readme-examples.mjs and tools/readme-newcomer.mjs execute group 'ssr' (24 outputs, README:1644-1760) from the working tree and from the published tarball; test/readme-topics.test.js:153 binds it to the plan's quickstart list. Quickstart-rule ablations M-D-STATUS.md:1391; ssr-specific red measured 2026-09-17 at README:1665."
+    },
+    {
+      "id": 4,
+      "planId": "q4",
+      "statement": "The explicit-locale quickstart \u2014 asking one shared instance for a named locale on each call \u2014 is EXECUTED, and every output it claims is asserted.",
+      "verdict": "PROVEN",
+      "gates": [
+        "check:readme",
+        "check:readme:packed",
+        "test/readme-topics.test.js",
+        "test/readme-enumerations.test.js"
+      ],
+      "ablation": "The quickstart RULE's ablations are recorded at M-D-STATUS.md:1391-1403 and apply here by the same assertions. No matching-specific red is recorded, so I measured one, read-only: control GREEN (6 assertions); falsifying `strings.get(\"Hi\", undefined, { locale: \"fr-CH\" });   // => \"Bonjour\"` to `\"Salut\"` goes RED with `AssertionError [ERR_ASSERTION]: matching (README:331)`. I also reproduced the rule-level red for the mapping itself (a group removed from the parser's output reds the readme-topics assertion naming the quickstart). ABLATION RUN AND RECORDED 2026-09-17, for the same reason as q3: falsifying `strings.get(\"Hi\", undefined, { locale: \"fr-CA\" })`'s claimed output exits 1 with `example 'matching' failed`; control clean both sides.",
+      "evidenceLine": "tools/readme-examples.mjs and tools/readme-newcomer.mjs execute group 'matching' (6 outputs, README:318-358) in both environments; test/readme-topics.test.js:153 binds it to the plan's quickstart list; test/readme-enumerations.test.js keeps the section's matchType enumeration derived rather than transcribed. Quickstart-rule ablations M-D-STATUS.md:1391; matching-specific red measured 2026-09-17 at README:331."
+    },
+    {
+      "id": 5,
+      "planId": "t1",
+      "statement": "The README documents tiebreakers as plan \u00a72.2 means them \u2014 the four-tier fallback chain, and what a tiebreaker list is for when a language has more than one loaded catalog.",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/readme-topics.test.js",
+        "check:readme",
+        "check:readme:packed"
+      ],
+      "ablation": "M-D-STATUS.md S27 table: 'a mapped section renamed away -> red, naming the topic and the heading'; 'a mapped section reduced to a stub -> red, naming the non-empty line count'. I reproduced both reds independently against copies in my own directory (rename -> \"no heading\"; stub -> \"has only 1 non-empty line(s)\"; control green).",
+      "evidenceLine": "IMPLEMENTATION-PLAN-v7.md \u00a72.2 'Fallback chain and tiebreakers' L106-135; README.md L313-388; ablations M-D-STATUS.md S27."
+    },
+    {
+      "id": 6,
+      "planId": "t2",
+      "statement": "The README documents tagged language-form values \u2014 that a form is a value with axis/name/renderName, recognized structurally rather than by string, and that the bare string does not select.",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/readme-topics.test.js",
+        "check:readme",
+        "check:readme:packed"
+      ],
+      "ablation": "S27's gate-level reds (rename -> red naming topic+heading; stub -> red naming line count), reproduced by me on copies. No topic-specific ablation is recorded for tagged values.",
+      "evidenceLine": "Plan L1424-1426 (nominal/text distinction, forged tuples rejected, renderName) and the M6 row L2922; README.md L188-241, plus the derived axis census at L241-268."
+    },
+    {
+      "id": 7,
+      "planId": "t3",
+      "statement": "The README documents loading \u2014 reading catalogs from a directory and over the network, and the bounds and failure surface the loaders impose.",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/readme-topics.test.js",
+        "check:readme",
+        "check:readme:packed",
+        "tools/readme-blocks.mjs"
+      ],
+      "ablation": "The previous verdict's reason was exact and is now false: 'no ablation is recorded for the loading content, and none could bind the unexecuted block \u2014 nothing runs it.' The network sample is now a group of four concatenated blocks with TEN asserted outputs, executed by `check:readme` from the working tree and by `check:readme:packed` from the published tarball. Ablations (M-D S31), all firing, control clean: falsifying one claimed output \u2014 `Object.keys(loaded.catalogs)` from [\"fr-CA\",\"fr\",\"en\"] to [\"fr-CA\",\"fr\",\"es\",\"en\"] \u2014 exits 1 with `AssertionError: network (README:496)`; a generator that ignores `publicationBaseUrl` reds it; a generator publishing absolute per-file URLs reds it. Both of those last two ALSO red the existing suite, which is recorded rather than glossed: this sample closes a DOCUMENTATION gap and adds no behavioural coverage the suite lacks. Separately, `tools/readme-blocks.mjs` now counts an unmarked ```html block and FAILS on one carrying a <script type=\"module\"> body \u2014 proved retrospectively, a README with such a block claiming a false output passes the pre-S31 parser at exit 0.",
+      "evidenceLine": "UPGRADED 2026-09-17 (M-D S31). Plan \u00a74.5 L1566, \u00a76 L1807, \u00a76.2 L1943; README.md's 'Over the network' section is executed end to end against a real loopback `node:http` origin \u2014 manifest generated by `createStringsManifestFromDirectory` with real SHA-256 digests, fetched over a real socket, digest-verified, constructed, rendered \u2014 and asserts the FETCH PLAN as well as the result (`served` is [\"manifest.json\",\"fr-CA.json\",\"fr.json\",\"en.json\"] and es.json is never requested). `check:readme` no longer reports it among the blocks nothing runs; the one fenced block still unmarked is the local import map, which carries no module body and is gated by test/browser-import-map.test.js."
+    },
+    {
+      "id": 8,
+      "planId": "t4",
+      "statement": "The README documents failure handling \u2014 the four failure values, what the default policy does on a resolution failure, and how a missing key surfaces.",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/readme-topics.test.js",
+        "check:readme",
+        "check:readme:packed"
+      ],
+      "ablation": "S27's gate-level reds (rename -> red naming topic+heading; stub -> red naming line count), reproduced by me on copies.",
+      "evidenceLine": "Plan \u00a72.5 'Per-candidate and final failure behavior' L221, \u00a73.5 'Failure responses, callbacks, and errors' L961; README.md L759-901."
+    },
+    {
+      "id": 9,
+      "planId": "t5",
+      "statement": "The README documents accessibility \u2014 specifically where this library's responsibility ends, and the one consequence a page author cannot infer: that the bidi isolate characters are part of the returned string.",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/readme-topics.test.js",
+        "check:readme",
+        "check:readme:packed"
+      ],
+      "ablation": "S27's gate-level reds, reproduced by me on copies (stub of this very section -> 'has only 1 non-empty line(s)'). S27 also records this topic as one of the two that had ZERO coverage before the slice, found by grep.",
+      "evidenceLine": "Plan L2926 (the M-D row) is the ONLY place the plan mentions accessibility \u2014 measured, 1 occurrence; README.md L1312-1364."
+    },
+    {
+      "id": 10,
+      "planId": "t6",
+      "statement": "The README documents Content Security Policy and bundling \u2014 that the library evaluates no code at runtime, which globals it needs, and how to load it in a browser without a bundler.",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/browser-import-map.test.js",
+        "test/readme-enumerations.test.js",
+        "test/readme-topics.test.js",
+        "check:readme",
+        "test/pinned-data-only.test.js"
+      ],
+      "ablation": "M-D-STATUS.md S19: seven ablations, all firing, control clean \u2014 each an escape the prototype allowed, including that ADDING A NEW EXPORT to `package.json` reds the completeness test, a README carrying a moving `lokalized@latest` url reds the pinning test, and a map omitting four of eight subpaths reds. S26 separately records the built-ins list drifting (four named, five reached) and being turned into a derived comparison.",
+      "evidenceLine": "Plan L2926 is the ONLY mention of CSP \u2014 measured, 1 occurrence; README.md L2159-2439; browser-import-map.test.js L53, L78-80, L89, L120-126."
+    },
+    {
+      "id": 11,
+      "planId": "t7",
+      "statement": "The README documents caching a localized page \u2014 that a page negotiated from Accept-Language is not keyed by its URL, and which cache keys are safe.",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/readme-topics.test.js",
+        "check:readme",
+        "check:readme:packed"
+      ],
+      "ablation": "S27's gate-level reds, reproduced by me. Adjacent (gating the example, not the README): S18's six ablations on `test/cache-key-lookup-locale.test.js` and S20's fifth ablation \u2014 a new header-sensitive shared-cacheable route with no `Vary` reds `test/cache-strategy-declared.test.js` while both example suites stay green.",
+      "evidenceLine": "Plan \u00a76.4 'SSR stamp and cache correctness' L2190, and the five permitted cacheable shapes at L2302-2311; README.md L1924-2159."
+    },
+    {
+      "id": 12,
+      "planId": "t8",
+      "statement": "The README documents data mismatch \u2014 that a manifest published by one build and read by another on different pinned data is refused, and which disagreements count.",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/readme-topics.test.js",
+        "check:readme",
+        "check:readme:packed"
+      ],
+      "ablation": "S27's gate-level reds, reproduced by me. No content-specific ablation is recorded, but the four-kind claim is itself an executed assertion rather than prose, so a port change that stopped refusing any one of them reds `check:readme` directly.",
+      "evidenceLine": "Plan 6.2:2072-2075 ('Manifest schema/semantic/fingerprint/runtime-data mismatch rejects with `ConfigurationError` before\u2026') and L2274-2275 (must not silently hydrate mismatched translated content); README.md L2439-2542, hydration refusal executed at L1720."
+    },
+    {
+      "id": 13,
+      "planId": "t9",
+      "statement": "The README documents React Server Components \u2014 that a Strings instance cannot cross a serialization boundary but its data can, and that re-fetching on the client is one option rather than a requirement.",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/readme-topics.test.js",
+        "check:readme",
+        "check:readme:packed"
+      ],
+      "ablation": "S27's gate-level reds, reproduced by me \u2014 and this is the topic whose section the ablation 'a mapped section renamed away (RSC, as it was yesterday)' was actually taken against, since RSC had zero coverage before that slice.",
+      "evidenceLine": "Plan L1268 (values survive JSON/RSC because recognition is structural) and \u00a76.6 L2356-2358 ('RSC integrations send raw/canonical catalog data or a manifest across the boundary and construct a client instance; they do not attempt to serialize compiled closures. Re-fetching is one option, not a requirement.'); README.md L1886-1923."
+    },
+    {
+      "id": 14,
+      "planId": "t10",
+      "statement": "The README documents migration from lokalized-java \u2014 what moves over unchanged, what the API shape changes to, and what a Java deployment must decide differently.",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/readme-topics.test.js",
+        "check:readme"
+      ],
+      "ablation": "Only S27's gate-level reds (rename/stub), which I reproduced. There is no ablation that binds this section's content, and I measured why: the false sentence sits in PROSE, so `check:readme` is structurally blind to it (S12's own recorded limit), and `readme-topics` only counts non-empty lines \u2014 42, comfortably over its floor of 12.",
+      "evidenceLine": "Plan L2926 is the ONLY mention of Java migration \u2014 measured, 1 occurrence (Appendix B L3135 is a Java public-type disposition, not migration documentation); README.md L2619-2674, false sentence at L2668. ADJUSTED: UPGRADED from the deriving agent's NOT-PROVEN, and only because its two concrete reasons were FIXED in this slice rather than argued away. It found a LIVE FALSE SENTENCE \u2014 'Five error classes carry a `code` and extend an exported `LokalizedError`' when eight subclasses do, a count written before `ResolutionError` landed and never re-read \u2014 and no clause-specific ablation. The sentence no longer states a count: the property is now DERIVED by an executed block, and falsifying it exits 1 with `example 'migration-errors' failed`. Its third reason stands and is recorded rather than resolved: the plan elaborates 'Java migration' NOWHERE outside the M-D row, so what 'covers' means here is a judgement, exactly as for accessibility and CSP."
+    },
+    {
+      "id": 15,
+      "planId": "t11",
+      "statement": "The README documents how this library differs from i18next.",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/readme-topics.test.js",
+        "test/readme-i18next.test.js",
+        "tools/i18next-diff/run.mjs",
+        "check:i18next",
+        "check:readme"
+      ],
+      "ablation": "Eleven, all firing, controls clean both sides, in throwaway copies. The record: a missing record, a tool edited since its last real run against i18next, and a census with no I18NEXT-BETTER verdict each red `npm run check:i18next`. The prose: a stated i18next figure the record does not carry, a drifted lokalized column, an opening that stops conceding i18next is better, and a dropped reason-to-choose-this each red test/readme-i18next.test.js. The TABLES specifically: four cell mutations (a drifted cell, an invented i18next figure, an invented lokalized figure, a softened raw-key cell) \u2014 and the table rule exists BECAUSE an ablation found the first two rules blind to a changed table cell whose value also appeared in the executed block below it.",
+      "evidenceLine": "DISCHARGED 2026-09-18 (M-D S35). The decline recorded at planning/M-D-STATUS.md:176 rested on one factual premise \u2014 that a comparison would be 'recollection about software this machine does not have' \u2014 and that premise is FALSE: i18next 26.4.2 installs and executes here, verified by running it. So the section is written the way the rest of this README is, by executing both libraries. `tools/i18next-diff/run.mjs` runs BOTH and records seven probes to measurements/i18next.json; `npm run check:i18next` re-checks the record with no i18next installed and is in verify AND CI, on the nine JDK differentials' pattern, because i18next is an oracle this zero-dependency package may not depend on. The census is the honest part: I18NEXT-BETTER 4, LOKALIZED-STRICTER 1, SAME 1, DIFFERENT-NO-WINNER 1 \u2014 and the tool REFUSES TO RECORD a run in which the competitor never wins. The README's own decline-staleness predicate fired the moment the section mentioned i18next, which is the mechanism working rather than being escaped."
+    },
+    {
+      "id": 16,
+      "planId": "a1",
+      "statement": "A person who does not know the implementation \u2014 a design partner, or a maintainer other than the one who built it \u2014 works the quickstart and one realistic integration through to a working result, and hits nothing they had to decide for themselves that the documentation does not state.",
+      "verdict": "NOT-PROVEN",
+      "gates": [
+        "tools/readme-examples.mjs",
+        "check:readme",
+        "tools/readme-newcomer.mjs",
+        "check:readme:packed",
+        "test/browser-import-map.test.js",
+        "test/readme-topics.test.js",
+        "test/readme-enumerations.test.js",
+        "../lokalized-spec/scripts/documentation-topics.mjs"
+      ],
+      "ablation": "No ablation exists for this clause and none can, because there is no gate whose removal would turn a person's report red. What the record names are ablations of the NECESSARY-CONDITION gates, and those are named with their reds: for the packed gate (m8-clauses.json clause 90 and M-D-STATUS.md:1120-1137) \u2014 the README ceasing to publish its catalogs reds 9 sample groups + 2 anti-vacuity terms; a repository catalog drifting from the published copy reds naming the file and both byte counts; a module leaving `files` (`!src/data/parents.js`) reds 48; a documented import-map target the tarball lacks reds naming the specifier; the sandbox gaining anything the README did not publish reds naming the extra files \u2014 and that last term DID NOT FIRE on its first version (it compared top-level directory names, so the repository's whole `examples/` tree passed) and was rebuilt to walk every file. For the browser substrate (clause 91): a dropped subpath, a remote map at `latest`, and the README's Node-built-in list drifting from `src/node/` each red, the last proved retrospectively against the drift that had shipped. Every one of these ablates a gate over the DOCUMENT and the PACKAGE. The clause's subject \u2014 what a reader had to decide that the document does not state \u2014 has no such gate, and the one measurement ever taken of it (S26's four readers, 40 claims / 6 confirmed) is prose in a status file, not an artifact anything re-derives.",
+      "evidenceLine": "NOT-PROVEN, and the record does not overclaim it. The necessary conditions are real and were re-measured today: every documented sample, including the ```html direct-browser quickstart S28 found unexecuted, runs from the published tarball plus only what the README itself publishes (49 groups / 276 outputs, exit 0), the documented import map is complete against `package.json#exports` and every target's whole graph is in the tarball, and the two enumerations a reader tripped over are derived rather than transcribed. None of that is the clause. The clause's evidence would be a person's report, and the project has exactly one person, who is the implementer: `roles.draft.json` / M0-STATUS.md:45-46 puts implementer, reviewer and decision-owner on one name and declares role separation ABSENT rather than simulated \u2014 so the clause's 'or maintainer unfamiliar with the implementation' branch is empty here and only the design-partner branch remains, which the plan's own risk register (IMPLEMENTATION-PLAN-v7.md ~:3048) lists as a live risk: 'No design partner \u2026 Require an unfamiliar maintainer walkthrough at minimum; do not call M-D complete otherwise.' The closest substitute was tried and measured: S26's four agent readers were denied src/, test/, tools/, examples/ and planning/, but they carry the project instruction file that describes the internals \u2014 the brief had to tell them that noticing they already knew something the README does not state WAS the finding, which concedes they were not unfamiliar \u2014 and the adversarial layer over them was measured to be a filter on claims rather than an oracle on facts (a verifier reclassified as 'navigation' a defect that was returning the raw key for French plurals and warning on every load). Substituting a simulation here produces exactly the number the clause exists to replace, which is the reasoning amendment A6 used to CUT scenario 0b rather than run it against a stand-in."
+    }
+  ],
+  "tally": {
+    "PROVEN": 15,
+    "NOT-PROVEN": 1
+  }
+}

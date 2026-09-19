@@ -48,7 +48,11 @@ import { validateStringsManifest } from "./manifest.js";
  * @returns {readonly string[]}
  */
 export function chain(manifest, lookupLocale, options = {}) {
-  const validated = validateStringsManifest(manifest, options);
+    // PROJECTED to the validator's own surface. Forwarding a loader's whole options object
+    // makes the validator refuse `fetch`/`readFile`/`signal` — a door refusing its own caller
+    // for using that caller's documented options. Measured: leaving these wholesale reds 270
+    // tests, 130 of them on `fetch` alone.
+  const validated = validateStringsManifest(manifest, { limits: options.limits });
   // Normalized once, here, and it is the normalized serialized value that is planned from and
   // recorded — plan 6.1: "both functions use and record the normalized serialized value".
   const lookup = normalizeTag(lookupLocale);
@@ -72,7 +76,11 @@ export function chain(manifest, lookupLocale, options = {}) {
  * @returns {readonly FetchEntry[]}
  */
 export function fetchSet(manifest, lookupLocale, options = {}) {
-  const validated = validateStringsManifest(manifest, options);
+    // PROJECTED to the validator's own surface. Forwarding a loader's whole options object
+    // makes the validator refuse `fetch`/`readFile`/`signal` — a door refusing its own caller
+    // for using that caller's documented options. Measured: leaving these wholesale reds 270
+    // tests, 130 of them on `fetch` alone.
+  const validated = validateStringsManifest(manifest, { limits: options.limits });
   const base = new URL(validated.baseUrl);
 
   /** @type {FetchEntry[]} */

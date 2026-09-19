@@ -67,6 +67,7 @@ import { loadEntireManifest, loadStrings } from "../src/load/fetch-loader.js";
 import { loadEntireManifestFromFiles, loadStringsFromFiles } from "../src/node/file-loader.js";
 import { sha256Hex } from "../src/internal/sha256.js";
 import { validateStringsManifest } from "../src/load/manifest.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
 
@@ -158,8 +159,7 @@ function fixture(tags, { baseUrl, fallbackLocale = "en", tiebreakers = {} }) {
     formatVersion: 1,
     catalogVersion: "clause-20",
     catalogFingerprint: "0".repeat(64),
-    cldrVersion: pinnedProvenance().cldrVersion,
-    dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale,
     baseUrl,
     files,

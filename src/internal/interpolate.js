@@ -16,7 +16,9 @@
  *   the only place that knows which substitutions came from the caller and which from the catalog.
  *
  * TWO SERVICES ARRIVE THROUGH THE CONTEXT rather than by import, and for the same reason in both
- * cases: this module sits in the ROOT graph, which `npm run scenario:0a` ratchets at 19 modules.
+ * cases: this module sits in the ROOT graph, whose module count and source bytes `npm run
+ * scenario:0a` and `npm run subpath:graphs` both ratchet. (This sentence used to name the count. It
+ * said 19; the graph passed 30 five milestones ago and nothing re-read it.)
  * `evaluateExpression` keeps the expression evaluator's own edges out of here, and
  * `ordinalityNameFor`/`rangeCardinalityNameFor` keep the OPTIONAL `lokalized/data/ordinal` and
  * `lokalized/data/ranges` tables out of the root entirely — `createStrings` detects catalog use of
@@ -43,7 +45,7 @@ import { LANGUAGE_FORM_NAMES } from "./catalog.js";
 // The ERROR CLASS only, from the tokenizer that declares it — not the evaluator, whose edges stay
 // out of here by the rule above. `expression-tokenizer.js` is already in both measured graphs
 // (`expression.js` re-exports this class and `core/index.js` imports the evaluator), so this edge
-// adds no module: `npm run scenario:0a` reports 25 root / 24 core before and after.
+// adds no module, measured with `npm run scenario:0a` before and after the edge was added.
 // `contextualizePlaceholderFailure` needs it to reproduce `DefaultStrings.java:1270-1281`, which
 // preserves the failing exception's TYPE rather than flattening every cause into one class.
 import { ExpressionEvaluationError, expressionEvaluationError } from "./expression-tokenizer.js";

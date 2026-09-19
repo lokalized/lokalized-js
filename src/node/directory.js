@@ -18,6 +18,7 @@
  * `test/directory-session.test.js` is its entire enforcement.
  */
 import { LoadingSession } from "../internal/catalog.js";
+import { refuseUnknownOptions } from "../internal/configuration-error.js";
 import { parseStringsWithSession } from "../internal/parse-file.js";
 import { directoryLabel, discoverCatalogFiles, keyedByRenderedTag, resolveDiscoveryLimit } from "./discovery.js";
 
@@ -30,12 +31,18 @@ import { directoryLabel, discoverCatalogFiles, keyedByRenderedTag, resolveDiscov
  * @param {{
  *   limits?: import("../internal/catalog.js").ParseLimits,
  *   maximumDiscoveryEntries?: number,
- *   pluralData?: { ordinal?: unknown, ranges?: unknown },
+ *   pluralData?: Readonly<{ ordinal?: unknown, ranges?: unknown }>,
  *   onWarning?: (warning: import("../internal/parse-warnings.js").LocalizedStringWarning) => void,
  * }} [options]
  * @returns {{ catalogs: Record<string, ParsedStringsFile>, warnings: readonly unknown[] }}
  */
 export function readStringsFromDirectory(directory, options = {}) {
+  // BEFORE both existing validations, which mask: measured, `{ limits: { maximumInputBytes: -1 },
+  // typo: 1 }` reports the resolveLimits RangeError and `{ maximumDiscoveryEntries: 0, typo: 1 }`
+  // reports the discovery RangeError.
+  refuseUnknownOptions("readStringsFromDirectory", options,
+    ["limits", "maximumDiscoveryEntries", "onWarning", "pluralData"], { loadingLimits: "limits" });
+
   // VALIDATED IN THIS ORDER, and the order is observable when BOTH are wrong: the discovery budget
   // is refused before the seven portable limits are, because that is where Java refuses it — its
   // options builder rejects an out-of-band limit before a loader ever runs.

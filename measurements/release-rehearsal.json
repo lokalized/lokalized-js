@@ -1,0 +1,103 @@
+{
+  "formatVersion": 1,
+  "recordedAgainst": {
+    "builder": "esbuild 0.28.2",
+    "targets": [
+      "safari16.4",
+      "chrome111",
+      "firefox111"
+    ]
+  },
+  "note": "The browser half is DRIVEN BY HAND in a real browser, on scenario:0a reasoning — a green `verify` must not need a person at one. `npm run check:release` compares what it can without a browser: that every file this capture loaded is in the tarball, that nothing 404ed, and that the render is the French catalog s entry rather than the fallback.",
+  "procedure": "npm pack -> npm install the tarball into a clean ESM project -> serve node_modules/lokalized over HTTP -> import map pointing `lokalized` at dist/browser/lokalized.js -> import and render.",
+  "browser": {
+    "engine": "Chromium (Claude browser pane)",
+    "capturedFrom": "the packed tarball, served over HTTP",
+    "isSecureContext": true,
+    "cryptoSubtle": "object",
+    "rendered": "Bonjour, Ada",
+    "plural": "2 item(s)",
+    "rootRequests": 1,
+    "totalRequests": 17,
+    "notFound": 0,
+    "classicScript": {
+      "file": "dist/browser/lokalized.global.js",
+      "definesGlobal": "lokalized",
+      "rendered": "Bonjour"
+    },
+    "entries": [
+      {
+        "specifier": "lokalized",
+        "file": "dist/browser/lokalized.js",
+        "files": 1,
+        "rawBytes": 187717,
+        "brotliBytes": 55518,
+        "exports": 70,
+        "loadedInBrowser": true
+      },
+      {
+        "specifier": "lokalized/core",
+        "file": "dist/browser/core.js",
+        "files": 7,
+        "rawBytes": 186889,
+        "brotliBytes": 55401,
+        "exports": 21,
+        "loadedInBrowser": true
+      },
+      {
+        "specifier": "lokalized/parse",
+        "file": "dist/browser/parse.js",
+        "files": 5,
+        "rawBytes": 163059,
+        "brotliBytes": 49356,
+        "exports": 5,
+        "loadedInBrowser": true
+      },
+      {
+        "specifier": "lokalized/load",
+        "file": "dist/browser/load.js",
+        "files": 7,
+        "rawBytes": 181470,
+        "brotliBytes": 54493,
+        "exports": 10,
+        "loadedInBrowser": true
+      },
+      {
+        "specifier": "lokalized/ssr",
+        "file": "dist/browser/ssr.js",
+        "files": 2,
+        "rawBytes": 7186,
+        "brotliBytes": 2246,
+        "exports": 2,
+        "loadedInBrowser": true
+      },
+      {
+        "specifier": "lokalized/negotiate",
+        "file": "dist/browser/negotiate.js",
+        "files": 3,
+        "rawBytes": 110170,
+        "brotliBytes": 34585,
+        "exports": 6,
+        "loadedInBrowser": true
+      },
+      {
+        "specifier": "lokalized/data/ordinal",
+        "file": "dist/browser/data/ordinal.js",
+        "files": 8,
+        "rawBytes": 193597,
+        "brotliBytes": 57038,
+        "exports": 5,
+        "loadedInBrowser": true
+      },
+      {
+        "specifier": "lokalized/data/ranges",
+        "file": "dist/browser/data/ranges.js",
+        "files": 8,
+        "rawBytes": 196125,
+        "brotliBytes": 57075,
+        "exports": 2,
+        "loadedInBrowser": true
+      }
+    ]
+  }
+}

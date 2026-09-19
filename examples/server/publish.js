@@ -6,11 +6,13 @@
  * `createStringsManifestFromDirectory` does the part that needs a real oracle: it walks the directory
  * the way `readStringsFromDirectory` does, hashes each catalog's bytes, and computes the catalog
  * identity. What it does NOT do is name the files immutably — measured, the generator emits
- * `baseUrl + <locale>.json` and has no option for anything else.
+ * `baseUrl` plus each catalog's own name ON DISK, percent-encoded (`manifest-directory.js:157` is
+ * `url: encodeURIComponent(entry.fileName)`), and has no option for anything else.
  *
- * **THAT MATTERS BECAUSE PLAN 6.3:2177 WANTS THE PRELOAD TO POINT AT "exact digest-bound immutable
- * files".** A URL that is stable across catalog revisions cannot carry
- * `Cache-Control: immutable`, so any deployment that wants the plan's preload story has to rename the
+ * **THAT MATTERS BECAUSE PLAN 6.5:2327 WANTS THE PRELOAD TO POINT AT "exact digest-bound immutable
+ * files"** — and 6.3:2177 shows one, `/strings/en-US.a1b2.json`. A URL that is stable across catalog
+ * revisions cannot carry `Cache-Control: immutable`, so a deployment wanting the plan's preload
+ * story has to rename the
  * files itself, exactly as below. This step is therefore part of the example rather than an
  * implementation detail of it, and the gap is recorded in `planning/M9-STATUS.md` rather than hidden
  * behind a helper.

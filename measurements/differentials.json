@@ -1,11 +1,22 @@
 {
-  "recordedAt": "2026-09-16T02:49:56.224Z",
-  "sourceSha256": "ff7acf6d05a66a6dcbbc98368b05b73c67cdb5a7a825b5345e75735b76530b54",
+  "recordedAt": "2026-09-17T16:16:44.484Z",
+  "sourceSha256": "cb6905b918de2b2a4d7c23c2485724af3b8b0d0d15e234bb00ee4bd20daace3c",
   "differentials": {
     "load": {
       "exit": 0,
       "headline": "41 identical — every probe's locales, keys, PARSED CONTENT, failure",
-      "toolSha256": "6863a3a902f8290933ddac98f3fbba739420f5da3276ebb997447437f42d7aac"
+      "toolSha256": "0f09ded96119893a8565022a83b89fe5f13a2dcee54c1b2685a2fe7f1b55368d",
+      "facts": {
+        "exercised": {
+          "probes": 41,
+          "compared": 41,
+          "scopeChecked": 21
+        },
+        "defects": {
+          "availabilityDivergences": 0,
+          "subsetDoorsUsed": 0
+        }
+      }
     },
     "likely-subtag": {
       "exit": 0,

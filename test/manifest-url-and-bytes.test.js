@@ -75,6 +75,7 @@ import { loadEntireManifest, loadStrings } from "../src/load/fetch-loader.js";
 import { loadEntireManifestFromFiles, loadStringsFromFiles } from "../src/node/file-loader.js";
 import { validateStringsManifest } from "../src/load/manifest.js";
 import { wholeManifestPlan } from "../src/load/run-plan.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
 
@@ -98,7 +99,7 @@ function manifestWith(baseUrl, urls) {
     [tag, { url, sha256: createHash("sha256").update(utf8.encode(bodyFor(tag))).digest("hex") }]));
   const draft = /** @type {any} */ ({
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
-    cldrVersion: pinnedProvenance().cldrVersion, dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale: "en", baseUrl, files, tiebreakers: {},
   });
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;

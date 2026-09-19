@@ -66,6 +66,34 @@
  *
  * What remains is each probe's `discriminates` line, which says why it is single-fault where that is
  * not obvious. Whoever finds a real enforcement should replace this paragraph with it.
+ *
+ * **THE SCOPE OF WHAT THIS TOOL MAY ASSERT, which plan :2585 bounds and which belongs here rather
+ * than being discovered when a comparison goes red.** The sentence is: "a full Java catalog compared
+ * with the exact JS loaded set ONLY where both have the same candidate availability. Arbitrary
+ * full-vs-subset equality is not claimed."
+ *
+ * Availability is equal here BY CONSTRUCTION, and that is worth stating precisely rather than
+ * trusting: both sides are handed ONE directory and both read ALL of it — Java through
+ * `loadFromFilesystem`, the port through `readStringsFromDirectory`. The port's SUBSET doors
+ * (`loadStrings` and its siblings) fetch a candidate chain and nothing else, and comparing one of
+ * those against a full Java load is exactly the equality the plan declines. Two things hold the
+ * construction, because "by construction" is a claim like any other:
+ *
+ *   - PER PROBE, the two loaded catalog SETS are compared FIRST, and a divergence is reported as OUT
+ *     OF SCOPE with both sets named — the content columns are not consulted at all. Before this, a
+ *     difference in availability arrived as several content mismatches, which is the tool asserting
+ *     precisely what the plan says it may not;
+ *   - STRUCTURALLY, the run fails if this file calls a subset door at all, which is the edit that
+ *     would break the bound everywhere at once rather than probe by probe.
+ *
+ * **AND THE COUNT IS RECORDED, WHICH IS THE HALF TWO EARLIER ATTEMPTS AT THIS CLAUSE LACKED.** This
+ * tool needs the JDK, so it runs in neither `verify` nor CI; S17's attempt was rejected because
+ * reverting the instrument while leaving its test in place left `npm test` green and `diff:check` at
+ * exit 0 — **nothing could tell a wired instrument from an inert one.** The `##diff-facts` line below
+ * carries `scopeChecked` into `measurements/differentials.json`, and `diff:check` — which has no Java
+ * and IS in `verify` and CI — fails when an exercised count reaches zero. Measured 2026-09-17:
+ * 21 of the 41 probes have both sides loading, so 21 is the in-scope population and the other 20 are
+ * refusals, where availability is not a question anyone can ask.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
@@ -377,6 +405,10 @@ const canonical = (value) =>
 
 let compared = 0;
 const mismatches = [];
+/** Probes whose two sides loaded DIFFERENT catalog sets — outside what plan :2585 lets this claim. */
+const availabilityDivergences = [];
+/** Probes where both sides loaded and the sets were compared and AGREED: the in-scope population. */
+let scopeChecked = 0;
 const unmapped = [];
 
 for (const probe of PROBES) {
@@ -416,6 +448,24 @@ for (const probe of PROBES) {
     javaMessage = fromJava.masked;
     portMessage = fromPort.masked;
   }
+
+  // THE SCOPE BOUND, CHECKED BEFORE ANYTHING DERIVED FROM IT. Plan :2585 permits "a full Java
+  // catalog compared with the exact JS loaded set ONLY where both have the same candidate
+  // availability", and refuses arbitrary full-vs-subset equality. Two loads that read different
+  // catalogs have nothing comparable behind their keys, so a divergence HERE is reported as what it
+  // is and the content columns are not consulted at all — where before it arrived as several content
+  // mismatches the tool had no standing to claim. Only the both-loaded case is in scope: if one side
+  // REFUSED and the other did not, that is a real disagreement about the load and belongs below.
+  if (!java.failed && !port.failed && canonical(java.locales) !== canonical(port.locales)) {
+    availabilityDivergences.push({
+      probe: probe.name,
+      discriminates: probe.discriminates,
+      java: java.locales,
+      port: port.locales,
+    });
+    continue;
+  }
+  if (!java.failed && !port.failed) scopeChecked++;
 
   const wanted = {
     failed: java.failed,
@@ -539,11 +589,57 @@ if (mismatches.length) {
   console.log(`  identity, verbatim message and full ordered warning list agree with the oracle.`);
 }
 
+if (availabilityDivergences.length) {
+  console.log(`\nOUT OF SCOPE (${availabilityDivergences.length}) — the two sides loaded DIFFERENT`);
+  console.log(`  catalog sets, so nothing behind their keys is comparable. Plan :2585 permits this`);
+  console.log(`  comparison only where both have the same candidate availability:`);
+  for (const row of availabilityDivergences) {
+    console.log(`\n  ${row.probe}`);
+    console.log(`    exists to catch: ${row.discriminates}`);
+    console.log(`    java loaded ${JSON.stringify(row.java)}`);
+    console.log(`    port loaded ${JSON.stringify(row.port)}`);
+  }
+}
+
+/**
+ * THE BOUND IS ALSO STRUCTURAL, and this is the edit that would quietly break it.
+ *
+ * Candidate availability is equal here BY CONSTRUCTION: both sides are handed one directory and
+ * both read all of it, Java through `loadFromFilesystem` and the port through
+ * `readStringsFromDirectory`. Pointing the port side at a SUBSET door — `loadStrings` and its
+ * siblings fetch a candidate chain and nothing else — makes every comparison below the
+ * full-vs-subset equality plan :2585 explicitly does not claim, and the per-probe rule above would
+ * report it as dozens of out-of-scope probes rather than as the one mistake it is.
+ */
+const SUBSET_DOORS = ["loadStrings", "loadStringsFromDirectory", "loadStringsFromFiles"];
+const selfSource = readFileSync(fileURLToPath(import.meta.url), "utf8");
+const subsetDoorsUsed = SUBSET_DOORS.filter((door) => new RegExp(`\\b${door}\\s*\\(`).test(selfSource));
+if (subsetDoorsUsed.length) {
+  console.log(`\nSCOPE BROKEN — this tool calls ${subsetDoorsUsed.join(", ")}, a subset door. Plan :2585`);
+  console.log(`  does not claim full-vs-subset equality; both sides must read the whole directory.`);
+}
+
 const fieldProblems = oracleFieldProblems("load", loadRecorder, UNCOMPARED_ORACLE_FIELDS);
 if (fieldProblems.length) {
   console.log(`\nORACLE FIELD COVERAGE (${fieldProblems.length}):`);
   for (const problem of fieldProblems) console.log(`  ${problem}`);
 }
 
+/**
+ * FACTS ABOUT THIS RUN, for `measurements/differentials.json` to carry and `diff:check` to gate
+ * WITHOUT a JDK.
+ *
+ * This is the hole M8 clause 66 was held on twice. `diff:load` needs Java, so it runs in neither
+ * `verify` nor CI — and S17's attempt at this clause was rejected because reverting the instrument
+ * while leaving its test in place left `npm test` green and `diff:check` at exit 0: **nothing could
+ * tell a wired instrument from an inert one.** A headline cannot answer that; `scopeChecked: 0`
+ * can, and it is a number the recorded artifact carries into a JDK-free run.
+ */
+console.log(`##diff-facts ${JSON.stringify({
+  exercised: { probes: PROBES.length, compared, scopeChecked },
+  defects: { availabilityDivergences: availabilityDivergences.length, subsetDoorsUsed: subsetDoorsUsed.length },
+})}`);
+
 process.exit(mismatches.length === 0 && degenerate.length === 0 && unmapped.length === 0
-  && fieldProblems.length === 0 ? 0 : 1);
+  && fieldProblems.length === 0 && availabilityDivergences.length === 0
+  && subsetDoorsUsed.length === 0 ? 0 : 1);

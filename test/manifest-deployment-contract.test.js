@@ -97,6 +97,7 @@ import {
   createStringsManifestFromDirectory, loadEntireManifestFromFiles, readStringsFromDirectory,
 } from "../src/node/index.js";
 import { sha256Hex } from "../src/internal/sha256.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
 const root = mkdtempSync(join(tmpdir(), "lokalized-clause6-"));
@@ -192,8 +193,7 @@ function manifestFor(tags, options = {}) {
     catalogFingerprint: "0".repeat(64),
     // READ FROM THE RUNTIME'S OWN PROVENANCE, never hard-coded: hard-coding would turn the next data
     // regeneration into a red in this file for a reason that has nothing to do with clause 6.
-    cldrVersion: pinnedProvenance().cldrVersion,
-    dataFingerprint: pinnedProvenance().dataFingerprint,
+    ...BUILD_IDENTITY,
     fallbackLocale,
     baseUrl,
     files,

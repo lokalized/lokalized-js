@@ -51,86 +51,13 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { moduleFor, parseReadme } from "./readme-blocks.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const readmePath = join(root, "README.md");
-const source = readFileSync(readmePath, "utf8");
-const lines = source.split("\n");
+const { groups, htmlModules, catalogs, unmarkedBlocks, problems } = parseReadme(readFileSync(readmePath, "utf8"));
 
-/** @type {Map<string, { code: string[], assertions: number }>} */
-const groups = new Map();
-/** @type {string[]} */
-const problems = [];
-/** Blocks with no `<!-- example: … -->` marker — reported, never silently skipped. */
-let unmarkedBlocks = 0;
 let totalAssertions = 0;
-
-/** `expr;  // => JSON` and a lone `// => JSON`. */
-const INLINE = /^(?<expr>.*?;)\s*\/\/\s*=>\s*(?<want>.+)$/;
-const LONE = /^\s*\/\/\s*=>\s*(?<want>.+)$/;
-
-/** @type {string | null} */
-let pending = null;
-for (let index = 0; index < lines.length; ++index) {
-  const line = /** @type {string} */ (lines[index]);
-  const marker = /^<!--\s*example:\s*([A-Za-z0-9_-]+)\s*-->\s*$/.exec(line);
-  if (marker) { pending = /** @type {string} */ (marker[1]); continue; }
-  if (!/^```js\s*$/.test(line)) continue;
-
-  const start = index + 1;
-  let end = start;
-  while (end < lines.length && !/^```\s*$/.test(/** @type {string} */ (lines[end]))) ++end;
-  const body = lines.slice(start, end);
-  index = end;
-
-  if (pending === null) { unmarkedBlocks++; continue; }
-  const name = pending;
-  pending = null;
-
-  if (!groups.has(name)) groups.set(name, { code: [], assertions: 0 });
-  const group = /** @type {{ code: string[], assertions: number }} */ (groups.get(name));
-  group.code.push(`// --- README line ${start} ---`);
-
-  for (let offset = 0; offset < body.length; ++offset) {
-    const text = /** @type {string} */ (body[offset]);
-    const inline = INLINE.exec(text);
-    if (inline?.groups) {
-      group.code.push(expect(inline.groups.expr ?? "", inline.groups.want ?? "", start + offset + 1, name));
-      group.assertions++;
-      continue;
-    }
-    const lone = LONE.exec(text);
-    if (lone?.groups) {
-      // THE EXPRESSION IS THE PREVIOUS EMITTED LINE, and it must exist. A `// =>` floating free
-      // would otherwise assert nothing while looking exactly like an assertion.
-      const previous = group.code.pop();
-      if (previous === undefined || !/;\s*$/.test(previous) || previous.startsWith("//")) {
-        problems.push(`README:${start + offset + 1}: a '// =>' comment with no single-line ` +
-          `expression before it. Put the expression and its expectation on one line, or end the ` +
-          `expression with ';' on the line above.`);
-        if (previous !== undefined) group.code.push(previous);
-        continue;
-      }
-      group.code.push(expect(previous, lone.groups.want ?? "", start + offset + 1, name));
-      group.assertions++;
-      continue;
-    }
-    group.code.push(text);
-  }
-}
-
-/**
- * @param {string} expr @param {string} want @param {number} line @param {string} name
- */
-function expect(expr, want, line, name) {
-  const trimmed = expr.trim().replace(/;$/, "");
-  return `__expect(${trimmed}, ${want.trim()}, ${JSON.stringify(`${name} (README:${line})`)});`;
-}
-
-const PREAMBLE = `import { deepStrictEqual } from "node:assert/strict";
-let __checked = 0;
-const __expect = (actual, expected, where) => { deepStrictEqual(actual, expected, where); ++__checked; };
-`;
 
 const work = mkdtempSync(join(tmpdir(), "lokalized-readme-"));
 /** @type {string[]} */
@@ -141,7 +68,7 @@ try {
     // Written INSIDE the repo so `import "lokalized"` resolves through the package's own exports,
     // which is the resolution a reader gets and therefore the one worth testing.
     const file = join(root, `.readme-example-${name}.mjs`);
-    writeFileSync(file, `${PREAMBLE}${group.code.join("\n")}\nprocess.stdout.write(String(__checked));\n`);
+    writeFileSync(file, moduleFor(group));
     try {
       const out = execFileSync(process.execPath, [file], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
       ran.push(`  ok    ${name.padEnd(14)} ${out.trim()} assertion(s)`);
@@ -159,11 +86,47 @@ try {
 console.log(`README examples — ${groups.size} group(s), ${totalAssertions} asserted output(s)`);
 for (const line of ran) console.log(line);
 if (unmarkedBlocks > 0)
-  console.log(`  ${unmarkedBlocks} \`\`\`js block(s) carry no <!-- example: … --> marker and were NOT run`);
+  console.log(`  ${unmarkedBlocks} fenced block(s) carry no <!-- example: … --> marker and were NOT run`);
+if (catalogs.size > 0)
+  console.log(`  ${catalogs.size} catalog file(s) published for readers — executed by \`npm run check:readme:packed\``);
+for (const [name, dropped] of htmlModules)
+  console.log(`  '${name}' is a browser sample: its <script type="module"> ran with ${dropped} ` +
+    `host-only statement(s) dropped`);
 
 // THE ANTI-VACUITY TERMS. A checker that finds nothing must say so rather than exit 0.
 if (groups.size === 0) problems.push("no example groups found — every README sample is unexecuted");
 if (totalAssertions === 0) problems.push("no '// =>' expectations found — the samples run but claim nothing");
+
+// AND THE TERMS ABOVE ARE GLOBAL, WHICH MEASURABLY IS NOT ENOUGH. They ask whether ANYTHING runs, so
+// the document can lose a whole sample and stay green: MEASURED 2026-09-17, un-marking the two
+// `alternatives` blocks takes this run from 51 groups / 289 outputs to 50 / 285, leaves
+// `test/readme-topics.test.js` green as well, and reports the loss only in the un-gated
+// "N fenced block(s) … were NOT run" line. That is the same shape as the security section a previous
+// slice measured could be deleted entirely at exit 0.
+//
+// So the executed surface has FLOORS, at today's count, in the house style — not exact equality,
+// because growing the document must stay free. Raising them is a one-line deliberate edit; a sample
+// that silently stops being executed is not.
+const MINIMUM_GROUPS = 53;
+const MINIMUM_ASSERTIONS = 305;
+// RAISED FROM 1 TO 3 BY M-R S9, deliberately and with the three named. The browser section now
+// documents three routes, and two of its blocks cannot be ```js samples: the two ```html import
+// maps are JSON-in-HTML with no module body to run, and the classic-`<script src>` block is not a
+// module at all, so `readme-blocks.mjs`'s marked-html arm — which requires a
+// `<script type="module">` — cannot execute it. The classic-script block is NOT left unchecked:
+// `test/browser-global.test.js` extracts it from this README and runs it against a real build of
+// `dist/browser/lokalized.global.js` in a browser-shaped sandbox.
+const MAXIMUM_UNMARKED = 3;
+if (groups.size < MINIMUM_GROUPS)
+  problems.push(`${groups.size} executed group(s), and this README had ${MINIMUM_GROUPS}. A sample ` +
+    `stopped being executed; if that was deliberate, lower MINIMUM_GROUPS and say why`);
+if (totalAssertions < MINIMUM_ASSERTIONS)
+  problems.push(`${totalAssertions} asserted output(s), and this README had ${MINIMUM_ASSERTIONS}. ` +
+    `Claims stopped being checked; if that was deliberate, lower MINIMUM_ASSERTIONS and say why`);
+if (unmarkedBlocks > MAXIMUM_UNMARKED)
+  problems.push(`${unmarkedBlocks} fenced block(s) carry no marker, and this README had ` +
+    `${MAXIMUM_UNMARKED}. A sample nothing runs is the state M-D exists to end — mark it, or raise ` +
+    `MAXIMUM_UNMARKED deliberately and say what the new one is`);
 
 if (problems.length > 0) {
   console.error(`\n${problems.length} problem(s):`);

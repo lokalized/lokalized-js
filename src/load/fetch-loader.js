@@ -20,7 +20,7 @@
  * bounded body, then digest it. The Node door hashes incrementally instead, which is why the digest
  * belongs to the transport rather than to the runner.
  */
-import { configurationError } from "../internal/configuration-error.js";
+import { configurationError, refuseUnknownOptions } from "../internal/configuration-error.js";
 import { normalizeTag } from "../internal/locale.js";
 import { fetchSet } from "./planning.js";
 import { validateStringsManifest } from "./manifest.js";
@@ -28,6 +28,21 @@ import { hex, readBoundedStream, runPlan, wholeManifestPlan } from "./run-plan.j
 import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-error.js";
 
 /** @typedef {import("./index.js").StringsManifestV1} StringsManifestV1 */
+
+/**
+ * Every member the two Fetch doors read, measured with a recording proxy over the options object.
+ *
+ * `request` is an opaque `RequestInit` passed through verbatim — including members this library has
+ * never heard of, which is the point of it. **It is also a SECOND route to cancellation**, and that
+ * is worth knowing rather than discovering: `request.signal` reaches the transport, but `runPlan`'s
+ * four abort checks read `options.signal` only, so aborting through `request` cancels the individual
+ * request without cancelling the loader's outstanding work. Pass `signal` for the loader-level
+ * guarantee. Not refused — a `RequestInit` is the caller's to fill.
+ */
+const FETCH_DOOR_OPTIONS = /** @type {const} */ (["fetch", "limits", "partialFailure", "request", "signal"]);
+
+/** The two spellings a reader reaches for, neither of which fails at the call. */
+const FETCH_DOOR_NEAR_MISSES = /** @type {const} */ ({ transport: "fetch", loadingLimits: "limits" });
 /** @typedef {import("./index.js").FetchEntry} FetchEntry */
 
 // EXPORTED for `test/example-server.test.js`, which pairs it with the `crossorigin` attribute the
@@ -65,11 +80,9 @@ export class DigestUnavailableError extends LokalizedError {
     if (token !== DIGEST_ERROR_TOKEN)
       throw new TypeError("DigestUnavailableError is not constructible; it is thrown by lokalized/load");
 
-    super(LOKALIZED_ERROR_TOKEN, message);
+    super(LOKALIZED_ERROR_TOKEN, "DIGEST_UNAVAILABLE", message);
     /** @type {"DigestUnavailableError"} */
     this.name = "DigestUnavailableError";
-    /** @type {"DIGEST_UNAVAILABLE"} */
-    this.code = "DIGEST_UNAVAILABLE";
   }
 
   /**
@@ -177,6 +190,13 @@ const FETCH_TRANSPORT = {
  * @param {StringsManifestV1} manifest @param {string} lookupLocale @param {any} [options]
  */
 export async function loadStrings(manifest, lookupLocale, options = {}) {
+  // DOOR ENTRY, NOT PREFLIGHT, and that is measured. With the refusal inside
+  // `FETCH_TRANSPORT.preflight` it fires only when the bogus option is the sole fault and is MASKED
+  // in 4 of 5 probes — `validateStringsManifest` (:214), `resolveLimits` (:215) and `chain()`'s tag
+  // normalization all run before `preflight` (:218). `transport` is the near miss that cost real
+  // time: it does not fail at the call, it sends the load to THE REAL NETWORK.
+  refuseUnknownOptions("loadStrings", options, FETCH_DOOR_OPTIONS, FETCH_DOOR_NEAR_MISSES);
+
   const plan = fetchSet(manifest, lookupLocale, options);
   const loaded = await runPlan(manifest, plan, options, FETCH_TRANSPORT);
   // NORMALIZED, per plan 6.1's "both functions use and record the normalized serialized value" and
@@ -191,7 +211,11 @@ export async function loadStrings(manifest, lookupLocale, options = {}) {
 
 /** @param {StringsManifestV1} manifest @param {any} [options] */
 export async function loadEntireManifest(manifest, options = {}) {
-  const validated = validateStringsManifest(manifest, options);
+  refuseUnknownOptions("loadEntireManifest", options, FETCH_DOOR_OPTIONS, FETCH_DOOR_NEAR_MISSES);
+
+  // PROJECTED: the validator takes `limits` alone, and this door's own `fetch`/`signal`/`request`/
+  // `partialFailure` are not its business.
+  const validated = validateStringsManifest(manifest, { limits: options.limits });
   const loaded = await runPlan(manifest, wholeManifestPlan(validated), options, FETCH_TRANSPORT);
   return Object.freeze({ ...loaded, coverage: Object.freeze({ kind: "entire-manifest" }) });
 }

@@ -28,7 +28,7 @@ import { createReadStream } from "node:fs";
 import { open } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { configurationError } from "../internal/configuration-error.js";
+import { configurationError, refuseUnknownOptions } from "../internal/configuration-error.js";
 import { normalizeTag } from "../internal/locale.js";
 import { resolveLimits } from "../internal/catalog.js";
 import { fetchSet } from "../load/planning.js";
@@ -67,18 +67,37 @@ async function* chunksOf(/** @type {any} */ answer) {
   throw new TypeError("`readFile` must resolve to a Uint8Array or an async iterable of them");
 }
 
+/**
+ * `fetch` and `request` are OMITTED from these doors' options types. Refused rather than ignored: a
+ * caller who passed one believes network loading is happening, and silently dropping it is the
+ * failure mode that gets discovered in production.
+ *
+ * **IT LIVES HERE, SEPARATE FROM THE GENERIC UNKNOWN-OPTION GUARD, BECAUSE IT NAMES A REMEDY.** The
+ * generic refusal says which names a door takes; this one says where to go instead, and a caller
+ * reaching for `fetch` on a file loader has a real question the shorter sentence does not answer.
+ * Every door runs THIS first and the generic guard second, so the tailored message wins — measured,
+ * because running them the other way round silently replaced it and `test/node-file-loader.test.js`
+ * was the only thing that noticed.
+ *
+ * It ALSO stays in `FILE_TRANSPORT.preflight`, which is not redundancy: preflight is reached by
+ * every path into `runPlan`, including any future door, so removing the call there would leave a new
+ * door to remember this on its own.
+ *
+ * @param {Record<string, unknown> | null | undefined} options
+ */
+function refuseNetworkOptions(options) {
+  for (const networkOnly of ["fetch", "request"])
+    if (options?.[networkOnly] !== undefined)
+      throw configurationError(
+        `\`${networkOnly}\` is not an option of the Node file loaders; they read \`file:\` URLs. ` +
+        `An HTTP caller uses \`loadStrings\` from lokalized/load with Fetch instead`);
+}
+
 /** @type {import("../load/run-plan.js").LoadTransport} */
 const FILE_TRANSPORT = {
   defaultStage: "read",
   preflight(options, plan) {
-    // `fetch` and `request` are OMITTED from this door's options type. Refused rather than ignored:
-    // a caller who passed one believes network loading is happening, and silently dropping it is the
-    // failure mode that gets discovered in production.
-    for (const networkOnly of ["fetch", "request"])
-      if (options?.[networkOnly] !== undefined)
-        throw configurationError(
-          `\`${networkOnly}\` is not an option of the Node file loaders; they read \`file:\` URLs. ` +
-          `An HTTP caller uses \`loadStrings\` from lokalized/load with Fetch instead`);
+    refuseNetworkOptions(options);
 
     for (const entry of plan) {
       let protocol;
@@ -113,6 +132,32 @@ const FILE_TRANSPORT = {
 };
 
 /**
+ * What each Node file door reads. Measured with a runtime census over the whole suite — 247 door
+ * invocations across four doors — rather than by scanning, and cross-checked against the declared
+ * option types in this file.
+ *
+ * **`readStringsManifest` DECLARES `signal` AND IGNORES IT**, which is recorded here rather than
+ * quietly fixed: the body contains zero occurrences of it and `file.readFile()` is called with no
+ * argument, so a pre-aborted signal resolves normally. It stays in the accepted set because
+ * refusing a name this door's own type declares would be a worse answer than an inert option; making
+ * it bite is a behaviour change of its own.
+ */
+const NODE_FILE_OPTIONS = /** @type {const} */ (["limits", "partialFailure", "readFile", "signal"]);
+const READ_MANIFEST_OPTIONS = /** @type {const} */ (["limits", "signal"]);
+
+/**
+ * The composed door's surface is the UNION of the generator's and the file loaders' — minus
+ * `publicationBaseUrl`, which it refuses by name with its own remedy just below.
+ */
+const DIRECTORY_DOOR_OPTIONS = /** @type {const} */ ([
+  "catalogVersion", "fallbackLocale", "limits", "maximumDiscoveryEntries", "partialFailure",
+  "readFile", "signal", "tiebreakers",
+]);
+
+/** `fetch` and `request` are refused by name at these doors, with a remedy; see FILE_TRANSPORT. */
+const NODE_NEAR_MISSES = /** @type {const} */ ({ loadingLimits: "limits" });
+
+/**
  * Plan 6.2's `readStringsManifest`: a filesystem path or `file:` URL, through the same bounded parser.
  *
  * It deliberately does NOT accept an HTTP URL. Plan 6.2 is explicit that "HTTP callers use Fetch plus
@@ -124,6 +169,12 @@ const FILE_TRANSPORT = {
  * @returns {Promise<Readonly<StringsManifestV1>>}
  */
 export async function readStringsManifest(path, options = {}) {
+  // ABOVE the path/URL resolution and above `resolveLimits`, both of which mask: measured,
+  // `readStringsManifest('nope.json', { limits: { maximumInputBytes: -1 } })` reports the RangeError
+  // and an `https:` path reports the scheme refusal.
+  refuseNetworkOptions(options);
+  refuseUnknownOptions("readStringsManifest", options, READ_MANIFEST_OPTIONS, NODE_NEAR_MISSES);
+
   const url = path instanceof URL ? path : (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(path)
     ? new URL(path) : pathToFileURL(path));
   if (url.protocol !== "file:")
@@ -155,6 +206,9 @@ export async function readStringsManifest(path, options = {}) {
  * @param {LoadStringsFromFilesOptions} [options]
  */
 export async function loadStringsFromFiles(manifest, lookupLocale, options = {}) {
+  refuseNetworkOptions(options);
+  refuseUnknownOptions("loadStringsFromFiles", options, NODE_FILE_OPTIONS, NODE_NEAR_MISSES);
+
   const plan = fetchSet(manifest, lookupLocale, options);
   const loaded = await runPlan(manifest, plan, options, FILE_TRANSPORT);
   return Object.freeze({
@@ -169,7 +223,10 @@ export async function loadStringsFromFiles(manifest, lookupLocale, options = {})
  * @param {StringsManifestV1} manifest @param {LoadStringsFromFilesOptions} [options]
  */
 export async function loadEntireManifestFromFiles(manifest, options = {}) {
-  const validated = validateStringsManifest(manifest, options);
+  refuseNetworkOptions(options);
+  refuseUnknownOptions("loadEntireManifestFromFiles", options, NODE_FILE_OPTIONS, NODE_NEAR_MISSES);
+
+  const validated = validateStringsManifest(manifest, { limits: options.limits });
   const loaded = await runPlan(manifest, wholeManifestPlan(validated), options, FILE_TRANSPORT);
   return Object.freeze({ ...loaded, coverage: Object.freeze({ kind: "entire-manifest" }) });
 }
@@ -220,7 +277,39 @@ export async function loadStringsFromDirectory(directory, options) {
       "manifest against the directory's own `file:` URL. Use createStringsManifestFromDirectory to " +
       "produce a manifest for publication");
 
+  // THE BESPOKE REFUSAL ABOVE RUNS FIRST, deliberately: it names a remedy, and a generic
+  // "unknown option" would replace a sentence that tells the publisher where to go with one that
+  // does not. `fetch` and `request` are refused the same way by FILE_TRANSPORT's preflight — but
+  // ONLY on the calls that reach it, which is why this door needs its own arm below.
+  refuseNetworkOptions(options);
+  refuseUnknownOptions("loadStringsFromDirectory", options, DIRECTORY_DOOR_OPTIONS, NODE_NEAR_MISSES);
+
   const path = directoryPath(directory);
-  const manifest = await createStringsManifestFromDirectory(path, options);
-  return loadEntireManifestFromFiles(manifest, options);
+
+  // **TWO PROJECTIONS, AND BOTH ARE LOAD-BEARING.** This door's surface is the union of two narrower
+  // ones, and it used to hand its WHOLE options object to each half. Once each half refuses what it
+  // does not know, that forward makes the composed door refuse its own caller: measured, forwarding
+  // wholesale reds five tests — `no-global-catalog-cache`, `node-directory-manifest` and
+  // `load-abort`, the last of which does not even name the cause, it TIMES OUT after two seconds
+  // because the read it waits for never starts.
+  //
+  // Projecting only the file half (the obvious one-line fix) is WORSE THAN THE DISEASE: it drops
+  // `fetch` before it can reach `FILE_TRANSPORT.preflight`, so `loadStringsFromDirectory(dir,
+  // { …, fetch })` — refused today with a remedy — would LOAD SILENTLY. The whole suite stays green
+  // over that, because the only bespoke-`fetch` test drives a different door. Hence the explicit
+  // refusal above rather than an exclusion.
+  const manifest = await createStringsManifestFromDirectory(path, {
+    catalogVersion: options.catalogVersion,
+    fallbackLocale: options.fallbackLocale,
+    ...(options.tiebreakers === undefined ? {} : { tiebreakers: options.tiebreakers }),
+    ...(options.limits === undefined ? {} : { limits: options.limits }),
+    ...(options.maximumDiscoveryEntries === undefined
+      ? {} : { maximumDiscoveryEntries: options.maximumDiscoveryEntries }),
+  });
+  return loadEntireManifestFromFiles(manifest, {
+    ...(options.readFile === undefined ? {} : { readFile: options.readFile }),
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.partialFailure === undefined ? {} : { partialFailure: options.partialFailure }),
+    ...(options.limits === undefined ? {} : { limits: options.limits }),
+  });
 }

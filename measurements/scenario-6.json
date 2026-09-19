@@ -30,30 +30,30 @@
     "method": "median of 9; graph figures from tools/example-graph-walk.mjs; requests counted over an in-memory transport serving the published manifest and catalogs"
   },
   "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
-  "fixtureSha256": "59754a7dc591b630a415a803707046be4e46d444bfe4301a4aac59d5c6de6184",
+  "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
   "closureClasses": 806,
   "closureBytes": 23482,
   "node": [
     {
       "label": "edge worker",
-      "modules": 47,
-      "sourceBytes": 1102676,
+      "modules": 46,
+      "sourceBytes": 995963,
       "nodeBuiltinEdges": 0,
       "ianaClosureBytes": 23482,
-      "importMs": 0.5055
+      "importMs": 0.4445
     },
     {
       "label": "server renderer",
-      "modules": 54,
-      "sourceBytes": 1173639,
+      "modules": 53,
+      "sourceBytes": 1075476,
       "nodeBuiltinEdges": 10,
       "ianaClosureBytes": 23482,
-      "importMs": 8.5917
+      "importMs": 15.7062
     }
   ],
-  "negotiateMsPerHeader": 0.07579,
-  "firstRenderMs": 1.0033,
-  "retainedBytes": 0,
+  "negotiateMsPerHeader": 0.05688,
+  "firstRenderMs": 0.834,
+  "retainedBytes": -15560,
   "requestsPerRender": {
     "fr-CA": 4,
     "fr-CH": 4,
@@ -97,6 +97,58 @@
         "edge worker: source graph grew 1101675 -> 1102676 bytes",
         "server renderer: source graph grew 1172638 -> 1173639 bytes"
       ]
+    },
+    {
+      "reason": "M8 clause 78: src/load/run-plan.js releases the parse slots on every rejection path. +1,347 bytes in both variants (the edge worker and the server renderer share the loader).",
+      "growth": [
+        "edge worker: source graph grew 1102676 -> 1104023 bytes",
+        "server renderer: source graph grew 1173639 -> 1174986 bytes"
+      ]
+    },
+    {
+      "reason": "the fixture catalogs gained CARDINALITY_MANY: es, fr and fr-CA declared only ONE and OTHER, which French and Spanish CLDR do not, so the load warned on every run and fr at 1000000 returned the raw key. Found by readers following the README with no access to src/. The three files are also the README's published reference set, so the document showed an incomplete catalog as the example.",
+      "growth": [
+        "the fixture changed (59754a7dc591b630 -> 885dd1d9d5c53443). Every figure below was measured against different bytes."
+      ]
+    },
+    {
+      "reason": "src/load/manifest.js: a stale inline comment reading 'only the comparison is missing' sat seven lines above the comparison it described. Replaced with two lines stating why the shape check precedes it; +88 bytes in both variants' graphs, no behaviour change.",
+      "growth": [
+        "edge worker: source graph grew 1104023 -> 1104111 bytes",
+        "server renderer: source graph grew 1174986 -> 1175074 bytes"
+      ]
+    },
+    {
+      "reason": "M-D S32: +291/+461 source bytes from removing two stale graph counts from shipped docblocks and correcting two plan citations in examples/server/publish.js. No module joins either graph.",
+      "growth": [
+        "edge worker: source graph grew 1104111 -> 1104402 bytes",
+        "server renderer: source graph grew 1175074 -> 1175535 bytes"
+      ]
+    },
+    {
+      "reason": "M-D S33: four maintainer decisions land together — the manifest format carries all seven build-identity fields (runtime-metadata.js joins the load and node graphs, +1 module each), every public door refuses an unknown option (configuration-error.js joins the parse graph via catalog.js, +1 module), matchType is narrowed to plan 3.4's LocaleMatchType (JSDoc only), and the onWarning observer is documented. No behaviour moved that the corpus can see: conformance is 2,150/0/0 across all four.",
+      "growth": [
+        "edge worker: source graph grew 1104402 -> 1125055 bytes",
+        "server renderer: source graph grew 1175535 -> 1204558 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S4: the readonly sweep. Source grew by docblock prose restated from @property lists; no module joined either graph.",
+      "growth": [
+        "edge worker: source graph grew 1125055 -> 1126347 bytes",
+        "server renderer: source graph grew 1204558 -> 1205860 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S5: the legal-comment attribution on the fifteen generated CLDR modules. Comment bytes only.",
+      "growth": [
+        "edge worker: source graph grew 1126347 -> 1129116 bytes",
+        "server renderer: source graph grew 1205860 -> 1208629 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S8: likely-subtags.js is re-encoded structurally — 7,788 rows in 25 KB of source instead of 158 KB, decoding to output byte-identical to the pinned CLDR artifact. The browser root bundle falls 322,509 -> 187,679 minified and 73,653 -> 55,610 brotli, -24.5% on the wire. Conformance byte-identical at 2,150/0/0.",
+      "growth": []
     }
   ]
 }

@@ -12,6 +12,7 @@
         "value": "count",
         "translations": {
           "CARDINALITY_ONE": "livre",
+          "CARDINALITY_MANY": "livres",
           "CARDINALITY_OTHER": "livres"
         }
       }

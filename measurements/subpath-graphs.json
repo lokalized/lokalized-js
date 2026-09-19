@@ -106,44 +106,80 @@
     },
     {
       "reason": "M9 S9: jdkLanguageSubtag maps the superseded ISO codes FORWARD to the modern spelling (the pinned JDK 21 behaviour) and both inverted comments are corrected with their measurements"
+    },
+    {
+      "reason": "M8 clause 78: src/load/run-plan.js releases the parse slots on every rejection path (a held StringsLoadingError retained 5 of 5 parsed catalogs through the error's captured stack; measured 0 after). +1,347 bytes, of which the mechanism is three lines and the rest is the comment explaining why a memory property is being asserted in a loader."
+    },
+    {
+      "reason": "src/load/manifest.js: an inline comment reading 'only the comparison is missing' sat seven lines above the comparison it said was missing — a stale self-asserting text in shipped source, found by an agent measuring the data-mismatch surface. Replaced with two lines stating why the shape check precedes the comparison; +88 bytes in the load and node graphs, no behaviour change."
+    },
+    {
+      "reason": "M-D S31: re-recorded after the new SHRINK report surfaced a stale artifact. The record read 872,639 bytes for lokalized against a live 872,635 — four bytes, from a comment reworded in S30 — because this ratchet only ever failed on growth and said nothing about a shrink. Found by tools/bundle-sizes.mjs, which ran a real bundler over the same graphs and agreed with the tree while disagreeing with this file."
+    },
+    {
+      "reason": "M-D S32: two stale graph counts removed from shipped source docblocks — src/index.js said the root 'stays 25 root / 24 core' in the present tense (it is 31/30) and src/internal/interpolate.js said scenario:0a 'ratchets at 19 modules'. Both propositions held; only the figures had not been re-read since M2, so the numbers are gone and the propositions stay."
+    },
+    {
+      "reason": "M-D S33: four maintainer decisions land together — the manifest format carries all seven build-identity fields (runtime-metadata.js joins the load and node graphs, +1 module each), every public door refuses an unknown option (configuration-error.js joins the parse graph via catalog.js, +1 module), matchType is narrowed to plan 3.4's LocaleMatchType (JSDoc only), and the onWarning observer is documented. No behaviour moved that the corpus can see: conformance is 2,150/0/0 across all four."
+    },
+    {
+      "reason": "M-D S34: the four aggregate load budgets are charged ACROSS a load at the manifest doors, as the types and README have always documented and as the directory door has always done. runPlan now gives each file its own LoadingSession (unchanged as a per-file bound, new as a measurement) and reconciles the four counters in FETCH-PLAN order after the workers finish, replaying through the session's own guarded methods so both door families raise one sentence. lokalized/load 39 -> 38 and lokalized/node 42 -> 41 modules: the runner calls the INTERNAL parseStringsWithSession, so the public parse door leaves both loader graphs. Root/core/parse grow by the shared LoadingSession.absorb. conformance byte-identical at 2,150/0/0."
+    },
+    {
+      "reason": "M-R S3: TranslationFailure/FallbackEvent localeMatch typed Readonly<LocaleMatch> and StringsLoadingError.failures typed LoadFailure; documentation comments only, no runtime change"
+    },
+    {
+      "reason": "M-R: every returned LocaleMatch and language-range list is deep-frozen at its one construction site in matchForRanges, and parseLanguageRanges freezes its members; LocaleMatch and WeightedLanguageRange are each a single Readonly<...> typedef that core and negotiate derive instead of authoring their own mutable copies."
+    },
+    {
+      "reason": "M-R S3: the consumer-facing contract defects the requirement registry exposed. Returned values are now frozen one level down — getResult().localeMatch's consideredLocales, languageRange and requestedLanguageRanges (and its members) were mutable, so a consumer could write into a record the library handed them; the typedef's arrays became readonly to match what the runtime now enforces. StringsLoadingError.failures is typed LoadFailure[] rather than any[], and the runner's internal cast narrowed from stage?: string to the seven-member union. TranslationFailure.localeMatch and FallbackEvent.localeMatch are typed Readonly<LocaleMatch> rather than unknown — both are handed to consumer callbacks. All JSDoc and freeze calls; conformance byte-identical at 2,150/0/0."
+    },
+    {
+      "reason": "M-R S4: the registry's 179 readonly statements land. Fourteen JSDoc typedefs wrapped in Readonly<> with their per-property documentation restated as prose in the docblock (which is what grew the source), nine error-class fields marked @readonly, the code threaded through LokalizedError's constructor, and five parameter element types narrowed from unknown."
+    },
+    {
+      "reason": "M-R S5: the Unicode attribution becomes a preserved legal comment on each of the fifteen generated CLDR modules, so it survives minification into whatever a consumer bundles. ~2.1 KB of source per graph; esbuild deduplicates the identical banners to one copy in the artifact."
+    },
+    {
+      "reason": "M-R S8: likely-subtags.js is re-encoded structurally — 7,788 rows in 25 KB of source instead of 158 KB, decoding to output byte-identical to the pinned CLDR artifact. The browser root bundle falls 322,509 -> 187,679 minified and 73,653 -> 55,610 brotli, -24.5% on the wire. Conformance byte-identical at 2,150/0/0."
     }
   ],
   "subpaths": {
     "lokalized": {
       "modules": 31,
-      "bytes": 872639
+      "bytes": 764556
     },
     "lokalized/core": {
       "modules": 30,
-      "bytes": 862390
+      "bytes": 753943
     },
     "lokalized/parse": {
-      "modules": 28,
-      "bytes": 681507
+      "modules": 29,
+      "bytes": 573868
     },
     "lokalized/load": {
       "modules": 38,
-      "bytes": 769701
+      "bytes": 658048
     },
     "lokalized/ssr": {
       "modules": 3,
-      "bytes": 27279
+      "bytes": 33699
     },
     "lokalized/negotiate": {
       "modules": 16,
-      "bytes": 413829
+      "bytes": 288060
     },
     "lokalized/node": {
       "modules": 41,
-      "bytes": 798770
+      "bytes": 692468
     },
     "lokalized/data/ordinal": {
       "modules": 33,
-      "bytes": 892152
+      "bytes": 784282
     },
     "lokalized/data/ranges": {
       "modules": 33,
-      "bytes": 897025
+      "bytes": 789155
     }
   }
 }

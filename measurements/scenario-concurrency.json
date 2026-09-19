@@ -1,0 +1,51 @@
+{
+  "scenario": "concurrency",
+  "revision": 1,
+  "frozenAt": "2026-09-16",
+  "note": "Correctness is GATED; milliseconds are reported and never gated (A3/A4 no-thresholds decision).",
+  "recipe": {
+    "description": "one process-wide Strings, N interleaved requests, each with its own per-call locale",
+    "locales": [
+      "en",
+      "fr",
+      "ja",
+      "de",
+      "es"
+    ],
+    "keys": 40,
+    "requests": 50,
+    "lookupsPerRequest": 3,
+    "yieldPattern": "(i * 7) % 11",
+    "iterations": 5,
+    "shapes": [
+      "rebuild-per-request",
+      "shared + forLocale",
+      "shared + forLocaleMatch"
+    ],
+    "negativeControl": "shared + a module-level 'current locale' variable"
+  },
+  "recipeSha256": "4801090e9dd56410d6df4a7d94470b47bda95bfea7dadec5b0450a9839f5aec2",
+  "fixtureSha256": "6de90990cbac3d9fbdd16d9c1302543f6de59230274213772db9025d5a889835",
+  "shapes": {
+    "rebuild-per-request": {
+      "correct": true,
+      "medianMsPerRequest": 0.4177
+    },
+    "shared + forLocale": {
+      "correct": true,
+      "medianMsPerRequest": 0.0932
+    },
+    "shared + forLocaleMatch": {
+      "correct": true,
+      "medianMsPerRequest": 0.0208
+    }
+  },
+  "negativeControlAnsweredWrong": true,
+  "resolver": {
+    "atConstruction": 0,
+    "afterInspection": 0,
+    "callsPerLookup": 1
+  },
+  "instancesConstructed": 752,
+  "rebaselines": []
+}

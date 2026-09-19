@@ -9,9 +9,43 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 Third-party notices
 --------------------------------------------------------------------------------
 
-This package will include data derived from Unicode CLDR, licensed under
-Unicode License v3. The full notice must accompany any build that ships that
-data; see THIRD-PARTY-NOTICES.md in the lokalized-spec repository.
+Unicode CLDR
+------------
 
-No CLDR-derived data is present in this package yet. This notice is staged so
-that the first build to include it cannot ship without one.
+This package INCLUDES data derived from Unicode CLDR 48.2, licensed under Unicode
+License v3. It is generated, not vendored verbatim: fifteen modules under
+`src/data/` encode plural rules, ordinal rules, plural ranges, likely subtags,
+supplemental metadata, script metadata and the language/script/region/variant
+validity sets, derived from these CLDR files:
+
+  common/supplemental/plurals.xml          common/supplemental/ordinals.xml
+  common/supplemental/pluralRanges.xml     common/supplemental/likelySubtags.xml
+  common/supplemental/supplementalMetadata.xml
+  common/supplemental/supplementalData.xml
+  common/properties/scriptMetadata.txt
+  common/validity/{language,script,region,variant}.xml
+
+Source: https://github.com/unicode-org/cldr/tree/release-48-2
+
+  Copyright (c) 1991-2025 Unicode, Inc. All rights reserved.
+  Distributed under the Terms of Use in https://www.unicode.org/copyright.html
+  SPDX-License-Identifier: Unicode-3.0
+
+The full Unicode License v3 text is in THIRD-PARTY-NOTICES.md, which is published
+with this package. Each of the fifteen modules also carries the copyright and a
+pointer to that file as a preserved legal comment, so the attribution survives
+minification into whatever a consumer bundles.
+
+IANA language range equivalents
+-------------------------------
+
+`src/data/iana-range-equivalents.js` is NOT CLDR data. It encodes the language
+range equivalence closure that `java.util.Locale.LanguageRange.parse` applies,
+recorded from a pinned OpenJDK 21.0.11 build. See THIRD-PARTY-NOTICES.md.
+
+minimal-json
+------------
+
+`src/internal/json-parse.js` reproduces the observable behaviour of the JSON
+reader the upstream Java implementation embeds. No minimal-json source is
+included here. See THIRD-PARTY-NOTICES.md.

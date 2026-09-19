@@ -24,6 +24,7 @@ import { createStrings } from "../src/core/index.js";
 import { parseStrings } from "../src/parse/index.js";
 import { createSsrStamp, validateSsrStamp } from "../src/ssr/index.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const en = parseStrings(JSON.stringify({ Hi: "hello" }), { locale: "en" });
 const fr = parseStrings(JSON.stringify({ Hi: "bonjour" }), { locale: "fr" });
@@ -40,8 +41,7 @@ function loadedStrings(overrides = {}) {
     fallbackLocale: "en",
     manifestLocaleConfiguration: { fallbackLocale: "en", supportedLocales: ["en", "fr"], tiebreakers: {} },
     catalogIdentity: IDENTITY,
-    cldrVersion: pinned.cldrVersion,
-    dataFingerprint: pinned.dataFingerprint,
+    ...BUILD_IDENTITY,
     loadingLimits: {},
     coverage: { kind: "lookup", lookupLocale: "fr" },
     requestedFiles: [{ locale: "fr" }, { locale: "en" }],

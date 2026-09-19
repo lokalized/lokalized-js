@@ -57,6 +57,7 @@ import {
 import { incompleteLanguageFormReporter } from "../internal/parse-warnings.js";
 import { PLURAL_DATA_RUNTIME, UnsupportedLocaleError, unsupportedLocaleError } from "../internal/plural.js";
 import { RUNTIME_METADATA } from "../internal/runtime-metadata.js";
+import { refuseUnknownOptions } from "../internal/configuration-error.js";
 import { decode as decodePinnedDataProvenance } from "../data/provenance.js";
 import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-error.js";
 import { ResolutionError, invalidState, nullishThrow } from "../internal/resolution-error.js";
@@ -71,80 +72,110 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * Plan 3.2:565-588 declares `CreateStringsOptions` as a UNION —
  * `DirectCreateStringsOptions | LoadedCreateStringsOptions` — whose arms carry `?: never` members
  * that make the two mutually exclusive. This module declared only the DIRECT arm and read the loaded
- * one through `/** @type {any} *\/ (options).loaded` at the top of `createStrings`, so `tsc` emitted
- * `strings` and `fallbackLocale` as REQUIRED and no `loaded` member at all. MEASURED 2026-09-14:
- * `createStrings({ loaded: record, locale: "fr-BE" })` — M8's flagship call, the one the plan's own
- * 6.2 examples spell — fails with `TS2353: Object literal may only specify known properties, and
- * 'loaded' does not exist in type 'CreateStringsOptions'`, while the direct door typechecks.
+ * one through `/**
+ * The DIRECT arm of plan 3.2:565-576.
  *
- * The RUNTIME was never wrong: `internal/loaded-input.js:52-56` already refuses every member the
- * plan marks `?: never` beside `loaded`. What was missing is the declaration saying so, and the
- * `any` cast is exactly what hid it — this project's standing lesson that a cast is a place a gate
- * cannot look.
+ * **EVERY MEMBER IS `readonly`, per BOOT-M0-0315 through BOOT-M0-0341, and the cost to a caller was
+ * MEASURED before the wrap rather than assumed.** Three consumer shapes were compiled: an object
+ * literal passed straight in, a caller's own mutable object built up, mutated and then handed over,
+ * and a variable ANNOTATED with this type and then mutated. The first two compile — a
+ * readonly-membered parameter still accepts a mutable argument — and only the third is refused, which
+ * is the guarantee the plan asks for and the one pattern a caller can rewrite where they stand.
  *
- * @typedef {object} DirectCreateStringsOptions
- * @property {string} fallbackLocale
- * @property {Record<string, unknown> | ReadonlyMap<string, unknown>} strings plan section 3.2's
- *   `CatalogMap`: each locale tag mapped to one `CatalogInput`. A `Map` is accepted alongside a
- *   record — see `catalogEntries`, and plan 4.3, which accepts a `Map` wherever a keyed record is
- *   taken because the keys come from a generated or untrusted source.
- * @property {string} [locale] the ambient locale; required until localeResolver lands
- * @property {Record<string, readonly string[]> | ReadonlyMap<string, readonly string[]> | null}
- *   [tiebreakers] plan section 3.2's `TiebreakerMap`. Snapshotted and frozen at construction —
+ * The per-member notes below were `@property` documentation until that wrap. JSDoc has no readonly
+ * modifier for a `@property`, so the object type is written inline and the notes move up here, where
+ * the emitted declaration still carries every word of them.
+ *
+ * - `strings` — plan section 3.2's `CatalogMap`: each locale tag mapped to one `CatalogInput`. A
+ *   `Map` is accepted alongside a record — see `catalogEntries`, and plan 4.3, which accepts a
+ *   `Map` wherever a keyed record is taken because the keys come from a generated or untrusted
+ *     source.
+ *
+ * - `locale` — the ambient locale; required until localeResolver lands
+ *
+ * - `tiebreakers` — plan section 3.2's `TiebreakerMap`. Snapshotted and frozen at construction —
  *   see `safeTiebreakers`.
- * @property {import("../internal/catalog.js").ParseLimits} [loadingLimits] per-load bounds; plan
- *   section 3.2's `Partial<StringsLoadingLimits>`. The RAW boundaries — input bytes, reader
- *   characters, JSON nesting — apply only to the forms that still have the original text; the
- *   model/file/node/warning boundaries apply to every form, "across all raw and already-parsed
- *   catalogs".
- * @property {undefined} [runtimeLimits] plan 4.6: v1 exposes no runtime-limit customization, and a
- *   non-undefined value is refused at construction rather than silently ignored.
- * @property {never} [loaded] plan 3.2:575. WITHOUT THIS THE UNION DOES NOT DISCRIMINATE, which the
- *   control caught: TypeScript relaxes excess-property checking against a union, so a call naming
- *   BOTH `loaded` and `strings` matched this arm with `loaded` waved through. Both arms have to
- *   spell the other's members `never` for the pair to be mutually exclusive to a caller.
- * @property {CatalogIdentity | null} [catalogIdentity] plan 3.4:635's build-produced identity for a
- *   DIRECT construction. Core validates its shape, not its truth, and reports it from
- *   `getCatalogIdentity()`; it does not make the instance stampable, because plan 6.4 requires a
- *   verified `LoadedStrings` and a shape-valid identity is exactly what that rule exists to refuse.
- * @property {(warning: LocalizedStringWarning) => void} [onWarning] observer for the incomplete
- *   language-form warnings this construction raises, called as each is admitted by the warning
- *   budget. A throwing handler aborts construction.
- * @property {{ ordinal?: unknown, ranges?: unknown }} [pluralData] the OPTIONAL plural modules'
- *   exported data objects. The root graph cannot reach `lokalized/data/ordinal` or
- *   `lokalized/data/ranges` — `npm run scenario:0a` ratchets it so it cannot — so a catalog that
- *   selects on `ORDINALITY_*` or uses a range placeholder is answerable only if the application
- *   hands the data over here.
- * @property {(term: string, locale: string) => unknown} [phoneticResolver] plan section 3.7's
- *   `PhoneticResolver`: synchronous, handed a raw TERM and the EVALUATION locale, and returning a
- *   tagged `PHONETIC_*` value. Omitting it is not the same as having none — see
- *   `THROWING_PHONETIC_RESOLVER`.
- * @property {import("../internal/bidi.js").BidiIsolation} [bidiIsolation] whether caller-supplied
- *   values are wrapped in Unicode isolate controls. DEFAULTS TO `"rtl-locales"`, so isolation is on
- *   for RTL evaluation locales with nothing configured; it is not opt-in behavior.
- * @property {BuiltinFallbackPolicy | FallbackPolicy} [fallbackPolicy] plan section 2.5's
- *   per-candidate continuation decision. `== null` means unset and selects `"missing-or-no-match"`,
- *   the same defaulting `bidiIsolation` uses and for the same reason (`DefaultStrings.java:473`
- *   substitutes the built-in when handed null, so an explicit null and an omitted option are one
- *   state in Java and must be one state here).
- * @property {FailureHandler} [onFailure] plan section 3.5's final-failure handler, consulted EXACTLY
- *   ONCE and only after the walk has ended with nothing. `== null` selects the library default,
- *   which returns the interpolated key (`DefaultStrings.java:472`).
- * @property {FallbackObserver} [onFallback] plan sections 3.2/3.5's fallback OBSERVER, called at
- *   most once per lookup — after a LATER candidate has produced a translation and before that
- *   translation is returned. It has NO Java counterpart: `DefaultStrings` discards each candidate's
- *   failure the moment a later one succeeds, so nothing in the corpus can check this and the tests
- *   in `test/fallback-observer.test.js` are the specification's only enforcement. `== null` means
- *   "no observer" rather than a library default, because there is no sensible default observation.
- * @property {() => string} [localeResolver] plan section 3.2's ambient locale ingress, Java's
- *   `localeSupplier` (`DefaultStrings.java:2456`). Consulted per lookup, never at construction. The
- *   value it returns is the REQUESTED tag and stays the `lookupLocale`; the diagnostic match is
- *   computed from it. Takes no matcher argument — plan 3.2: "callers that need negotiation close
- *   over a `LocaleNegotiator` from `lokalized/negotiate`".
- * @property {() => LocaleMatch} [localeMatchResolver] plan section 3.2's negotiation ingress, Java's
- *   `localeMatchSupplier` (`DefaultStrings.java:2447`). Consulted per lookup. Its SELECTION, or the
- *   match's own fallback when unmatched, REPLACES the lookup locale — the asymmetry against
- *   `localeResolver` that the one-fixture six-ingress table exists to pin.
+ *
+ * - `loadingLimits` — per-load bounds; plan section 3.2's `Partial<StringsLoadingLimits>`. The
+ *   RAW boundaries — input bytes, reader characters, JSON nesting — apply only to the forms that
+ *   still have the original text; the model/file/node/warning boundaries apply to every form,
+ *   "across all raw and already-parsed catalogs".
+ *
+ * - `runtimeLimits` — plan 4.6: v1 exposes no runtime-limit customization, and a non-undefined
+ *   value is refused at construction rather than silently ignored.
+ *
+ * - `loaded` — plan 3.2:575. WITHOUT THIS THE UNION DOES NOT DISCRIMINATE, which the control
+ *   caught: TypeScript relaxes excess-property checking against a union, so a call naming BOTH
+ *   `loaded` and `strings` matched this arm with `loaded` waved through. Both arms have to spell
+ *   the other's members `never` for the pair to be mutually exclusive to a caller.
+ *
+ * - `catalogIdentity` — plan 3.4:635's build-produced identity for a DIRECT construction. Core
+ *   validates its shape, not its truth, and reports it from `getCatalogIdentity()`; it does not
+ *   make the instance stampable, because plan 6.4 requires a verified `LoadedStrings` and a
+ *   shape-valid identity is exactly what that rule exists to refuse.
+ *
+ * - `onWarning` — observer for the incomplete language-form warnings this construction raises,
+ *   called as each is admitted by the warning budget. A throwing handler aborts construction.
+ *
+ * - `pluralData` — the OPTIONAL plural modules' exported data objects. The root graph cannot
+ *   reach `lokalized/data/ordinal` or `lokalized/data/ranges` — `npm run scenario:0a` ratchets it
+ *   so it cannot — so a catalog that selects on `ORDINALITY_*` or uses a range placeholder is
+ *   answerable only if the application hands the data over here.
+ *
+ * - `phoneticResolver` — plan section 3.7's `PhoneticResolver`: synchronous, handed a raw TERM
+ *   and the EVALUATION locale, and returning a tagged `PHONETIC_*` value. Omitting it is not the
+ *   same as having none — see `THROWING_PHONETIC_RESOLVER`.
+ *
+ * - `bidiIsolation` — whether caller-supplied values are wrapped in Unicode isolate controls.
+ *   DEFAULTS TO `"rtl-locales"`, so isolation is on for RTL evaluation locales with nothing
+ *   configured; it is not opt-in behavior.
+ *
+ * - `fallbackPolicy` — plan section 2.5's per-candidate continuation decision. `== null` means
+ *   unset and selects `"missing-or-no-match"`, the same defaulting `bidiIsolation` uses and for
+ *   the same reason (`DefaultStrings.java:473` substitutes the built-in when handed null, so an
+ *   explicit null and an omitted option are one state in Java and must be one state here).
+ *
+ * - `onFailure` — plan section 3.5's final-failure handler, consulted EXACTLY ONCE and only
+ *   after the walk has ended with nothing. `== null` selects the library default, which returns
+ *   the interpolated key (`DefaultStrings.java:472`).
+ *
+ * - `onFallback` — plan sections 3.2/3.5's fallback OBSERVER, called at most once per lookup —
+ *   after a LATER candidate has produced a translation and before that translation is returned. It
+ *   has NO Java counterpart: `DefaultStrings` discards each candidate's failure the moment a later
+ *   one succeeds, so nothing in the corpus can check this and the tests in
+ *   `test/fallback-observer.test.js` are the specification's only enforcement. `== null` means "no
+ *   observer" rather than a library default, because there is no sensible default observation.
+ *
+ * - `localeResolver` — plan section 3.2's ambient locale ingress, Java's `localeSupplier`
+ *   (`DefaultStrings.java:2456`). Consulted per lookup, never at construction. The value it
+ *   returns is the REQUESTED tag and stays the `lookupLocale`; the diagnostic match is computed
+ *   from it. Takes no matcher argument — plan 3.2: "callers that need negotiation close over a
+ *   `LocaleNegotiator` from `lokalized/negotiate`".
+ *
+ * - `localeMatchResolver` — plan section 3.2's negotiation ingress, Java's `localeMatchSupplier`
+ *   (`DefaultStrings.java:2447`). Consulted per lookup. Its SELECTION, or the match's own fallback
+ *   when unmatched, REPLACES the lookup locale — the asymmetry against `localeResolver` that the
+ *   one-fixture six-ingress table exists to pin.
+ *
+ * @typedef {Readonly<{
+ *   fallbackLocale: string,
+ *   strings: Readonly<Record<string, unknown>> | ReadonlyMap<string, unknown>,
+ *   locale?: string,
+ *   tiebreakers?: Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]> | null,
+ *   loadingLimits?: import("../internal/catalog.js").ParseLimits,
+ *   runtimeLimits?: undefined,
+ *   loaded?: never,
+ *   catalogIdentity?: CatalogIdentity | null,
+ *   onWarning?: (warning: LocalizedStringWarning) => void,
+ *   pluralData?: Readonly<{ ordinal?: unknown, ranges?: unknown }>,
+ *   phoneticResolver?: (term: string, locale: string) => unknown,
+ *   bidiIsolation?: import("../internal/bidi.js").BidiIsolation,
+ *   fallbackPolicy?: BuiltinFallbackPolicy | FallbackPolicy,
+ *   onFailure?: FailureHandler,
+ *   onFallback?: FallbackObserver,
+ *   localeResolver?: () => string,
+ *   localeMatchResolver?: () => LocaleMatch,
+ * }>} DirectCreateStringsOptions
  */
 
 /**
@@ -153,26 +184,33 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * has refused the same combinations since S9, in `internal/loaded-input.js`, and the declaration is
  * what had never said so.
  *
- * @typedef {object} LoadedCreateStringsOptions
- * @property {import("../load/index.js").LoadedStrings} loaded the record a loader returned. Plan
- *   6.2's own examples call `createStrings({ loaded, locale })` directly, which is the call that did
- *   not typecheck.
- * @property {string} [locale]
- * @property {() => string} [localeResolver]
- * @property {() => import("../internal/locale.js").LocaleMatch} [localeMatchResolver] plan 3.2 calls
- *   this a `LocaleMatchResult`; the port name for the same shape is `LocaleMatch`.
- * @property {never} [fallbackLocale]
- * @property {never} [strings]
- * @property {never} [tiebreakers]
- * @property {never} [catalogIdentity]
- * @property {undefined} [runtimeLimits]
- * @property {(warning: LocalizedStringWarning) => void} [onWarning]
- * @property {{ ordinal?: unknown, ranges?: unknown }} [pluralData]
- * @property {(term: string, locale: string) => unknown} [phoneticResolver]
- * @property {import("../internal/bidi.js").BidiIsolation} [bidiIsolation]
- * @property {BuiltinFallbackPolicy | FallbackPolicy} [fallbackPolicy]
- * @property {(event: FallbackEvent) => void} [onFallback]
- * @property {FailureHandler} [onFailure]
+ * `readonly` throughout, per BOOT-M0-0344 and the behaviour members this arm shares with the direct
+ * one; see that type for the measurement behind the wrap.
+ *
+ * - `loaded` — the record a loader returned. Plan 6.2's own examples call `createStrings({
+ *   loaded, locale })` directly, which is the call that did not typecheck.
+ *
+ * - `localeMatchResolver` — plan 3.2 calls this a `LocaleMatchResult`; the port name for the
+ *   same shape is `LocaleMatch`.
+ *
+ * @typedef {Readonly<{
+ *   loaded: import("../load/index.js").LoadedStrings,
+ *   locale?: string,
+ *   localeResolver?: () => string,
+ *   localeMatchResolver?: () => import("../internal/locale.js").LocaleMatch,
+ *   fallbackLocale?: never,
+ *   strings?: never,
+ *   tiebreakers?: never,
+ *   catalogIdentity?: never,
+ *   runtimeLimits?: undefined,
+ *   onWarning?: (warning: LocalizedStringWarning) => void,
+ *   pluralData?: Readonly<{ ordinal?: unknown, ranges?: unknown }>,
+ *   phoneticResolver?: (term: string, locale: string) => unknown,
+ *   bidiIsolation?: import("../internal/bidi.js").BidiIsolation,
+ *   fallbackPolicy?: BuiltinFallbackPolicy | FallbackPolicy,
+ *   onFallback?: (event: FallbackEvent) => void,
+ *   onFailure?: FailureHandler,
+ * }>} LoadedCreateStringsOptions
  */
 
 /**
@@ -188,24 +226,63 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * @typedef {(reason: FailureReason, attemptedLocale: string, cause: unknown) => boolean} FallbackPolicy
  * @typedef {{ action: "return-key" } | { action: "return-string", translation: string } | { action: "throw" }} FailureResponse
  * @typedef {(failure: TranslationFailure) => FailureResponse} FailureHandler
- * @typedef {{ range: string, weight: number }} WeightedLanguageRange
- * @typedef {{ matchType: string, locale: string | null, isMatch: boolean, fallbackLocale: string,
- *   consideredLocales: readonly string[], effectiveWeight: number | null,
- *   languageRange: string | WeightedLanguageRange | null,
- *   requestedLanguageRanges: readonly WeightedLanguageRange[] }} LocaleMatch
- * @typedef {Readonly<{ key: string, lookupLocale: string, localeMatch: unknown,
+ * **`TranslationFailure.localeMatch` AND `FallbackEvent.localeMatch` WERE `unknown` UNTIL M-R S3.**
+ * Both records are handed to CONSUMER CALLBACKS — `onFailure` and `onFallback` — so anyone writing a
+ * failure handler received `unknown` and had to cast before reading the match that caused the
+ * failure. The requirement registry states both as the match result (`BOOT-M0-0484`, `BOOT-M0-0499`),
+ * and the sibling field on the lookup result has carried `Readonly<LocaleMatch>` all along; these two
+ * simply never got it. Found by reading 1,338 registered release requirements nobody had opened.
+ *
+ * **NOT `| null`, and that is measured rather than assumed.** `translationFailureFor`'s own parameter
+ * was annotated `unknown` and `isFallbackFor` accepts `{ matchType } | null`, so nullability looked
+ * open. Instrumented at the assignment and run across the whole suite AND the corpus — 1,656 tests
+ * and 2,363 cases — the value was null or undefined ZERO times: the kernel's no-match path returns a
+ * record with `matchType: "none"` rather than nothing. Typing it nullable would have made every
+ * consumer write a branch that can never be taken.
+ * @typedef {import("../internal/locale.js").WeightedLanguageRange} WeightedLanguageRange
+ */
+
+/**
+ * Plan 3.4:779's `LocaleMatchType`, declared in a `~~~ts` fence and used at :794 and at 6.4:2214;
+ * :3154's mapping table says it lives "in core", which is what settles the ownership question.
+ *
+ * DERIVED FROM `internal/locale.js`'s typedef RATHER THAN SPELLED OUT, and that is deliberate: the
+ * eight values are already authored in two places under `src/` (that typedef and `ssr/index.js`'s
+ * runtime `MATCH_TYPES` set), and an enumeration nothing re-derives is the thing this project has
+ * watched rot more than any other. A third authored copy here would be a third thing to keep in
+ * step. `test/readme-enumerations.test.js` compares every copy that remains.
+ *
+ * The field was `string` until this landed, which is why `test/plan-surface.test.js` carried a
+ * STRUCTURAL disposition reading "a string union, inlined on the delivered LocaleMatch" — measured
+ * false: `types/core/index.d.ts` said `matchType: string`, so nothing was inlined and no consumer of
+ * `lokalized/core` could branch on the set. `lokalized/negotiate` has shipped the real union all
+ * along through `types/internal/locale.d.ts`, so the two subpaths disagreed about one field's type.
+ *
+ * @typedef {import("../internal/locale.js").LocaleMatch["matchType"]} LocaleMatchType
+ */
+
+/**
+ * DERIVED, for the reason the `LocaleMatchType` note directly above gives about a third authored
+ * copy — and this WAS the second one. It was spelled out here field for field with every member
+ * mutable, while `internal/locale.js` (which `lokalized/negotiate` ships) declared the same eight
+ * fields and the runtime froze the record. So the two subpaths disagreed about the whole type the
+ * way they had disagreed about `matchType` alone, and a `lokalized/core` consumer was told it could
+ * write to a frozen object. Deriving it is what stops them drifting apart again.
+ *
+ * @typedef {import("../internal/locale.js").LocaleMatch} LocaleMatch
+ * @typedef {Readonly<{ key: string, lookupLocale: string, localeMatch: Readonly<LocaleMatch>,
  *   attemptedLocales: readonly string[], placeholders: Readonly<Record<string, unknown>>,
  *   reason: FailureReason, cause: unknown, message: string }>} TranslationFailure
  * @typedef {Readonly<{ locale: string, reason: FailureReason, cause: unknown }>} PrecedingFailure
- * @typedef {Readonly<{ key: string, lookupLocale: string, localeMatch: unknown,
+ * @typedef {Readonly<{ key: string, lookupLocale: string, localeMatch: Readonly<LocaleMatch>,
  *   attemptedLocales: readonly string[], resolvedLocale: string,
  *   precedingFailures: readonly PrecedingFailure[] }>} FallbackEvent
  * @typedef {(event: FallbackEvent) => void} FallbackObserver
- * @typedef {{ locale?: string, localeMatch?: LocaleMatch,
+ * @typedef {Readonly<{ locale?: string, localeMatch?: LocaleMatch,
  *   bidiIsolation?: import("../internal/bidi.js").BidiIsolation,
  *   fallbackPolicy?: BuiltinFallbackPolicy | FallbackPolicy | null,
  *   onFailure?: FailureHandler | null,
- *   onFallback?: FallbackObserver | null }} TranslationCallOptions
+ *   onFallback?: FallbackObserver | null }>} TranslationCallOptions
  */
 
 /**
@@ -714,9 +791,17 @@ export { ResolutionError };
  * loop reads — and `test/language-form-types.test.js` re-derives them from it on every run, so a
  * table that gains a member and a union that does not is a red test rather than a silent widening.
  *
+ * **THE THIRD PARAMETER DEFAULTS, AND THAT IS THE WHOLE OF BOOT-M0-0672 THROUGH BOOT-M0-0675.**
+ * Plan 3.7 and fourteen registry statements spell this type with TWO arguments —
+ * `TaggedLanguageFormValue<"gender", "GENDER_FEMININE">` at BOOT-M0-0708, and ten more at
+ * BOOT-M0-0676 to BOOT-M0-0685 — while the port required three, so the SPELLING THE REGISTRY USES
+ * did not compile: `TS2314: Generic type 'TaggedLanguageFormValue' requires 3 type argument(s)`.
+ * A default keeps the precision where a caller supplies it and makes the plan's own form legal,
+ * which is exactly what BOOT-M0-0675 asks for anyway — `renderName` of type `string`.
+ *
  * @template {LanguageFormAxis} A
  * @template {LanguageFormName} N
- * @template {string} R
+ * @template {string} [R=string]
  * @typedef {Readonly<{ $lokalized: "language-form", axis: A, name: N, renderName: R }>}
  *   TaggedLanguageFormValue plan 3.7's `TaggedLanguageFormValue<axis, name>`, with the third
  *   parameter carrying `renderName` — the Java enum member's own name, which plan 3.7 forbids
@@ -823,13 +908,11 @@ export class MissingTranslationError extends LokalizedError {
         "MissingTranslationError is not constructible; it is thrown by a throwing onFailure handler",
       );
 
-    super(LOKALIZED_ERROR_TOKEN, message);
+    super(LOKALIZED_ERROR_TOKEN, "MISSING_TRANSLATION", message);
 
     /** @type {"MissingTranslationError"} */
     this.name = "MissingTranslationError";
-    /** @type {"MISSING_TRANSLATION"} */
-    this.code = "MISSING_TRANSLATION";
-    /** The frozen failure the handler saw, by reference. @type {TranslationFailure} */
+    /** The frozen failure the handler saw, by reference. BOOT-M0-0515. @type {TranslationFailure} @readonly */
     this.failure = failure;
   }
 
@@ -849,6 +932,28 @@ export class MissingTranslationError extends LokalizedError {
 const MISSING_TRANSLATION_TOKEN = Symbol("lokalized.missing-translation-error");
 
 /**
+ * Every member `createStrings` reads, DERIVED BY FOLLOWING THE VALUE rather than by scanning.
+ *
+ * A source scan for `options.<name>` reports twelve and misses five, because this door reaches its
+ * options through five spellings: plain `options.x`; an aliased `direct.x` after a cast; a
+ * cast-parenthesised `(options).x`, whose `)` breaks the anchor; a computed `(options)[name]` in the
+ * locale-source filter; and a symbol index. `onWarning` and `pluralData` are read in
+ * `parseCatalogInput`, which this door hands its whole options object to — an option a helper reads
+ * is still this door's option. Measured with a recording Proxy on a real successful call: 17 string
+ * names and one symbol.
+ *
+ * `runtimeLimits` STAYS IN THE SET even though plan 4.6 refuses any non-undefined value: it is
+ * refused with a message that says v1 fixes the render-time limits, and `npm run declarations`
+ * carries a probe on that message. Dropping it here would replace that with "unknown option", which
+ * is strictly less useful to the caller.
+ */
+const CREATE_STRINGS_OPTIONS = /** @type {const} */ ([
+  "strings", "fallbackLocale", "locale", "tiebreakers", "loadingLimits", "runtimeLimits",
+  "loaded", "catalogIdentity", "onWarning", "pluralData", "phoneticResolver", "bidiIsolation",
+  "fallbackPolicy", "onFailure", "onFallback", "localeResolver", "localeMatchResolver",
+]);
+
+/**
  * Build a `Strings` from raw catalogs.
  *
  * Synchronous by contract: parsing, validation, and locale-configuration work all happen here so
@@ -857,6 +962,16 @@ const MISSING_TRANSLATION_TOKEN = Symbol("lokalized.missing-translation-error");
  * @param {CreateStringsOptions} options
  */
 export function createStrings(options) {
+  // FIRST STATEMENT, and the placement is measured rather than chosen. This door does no I/O, so
+  // the binding constraint is MASKING: six existing validations fire ahead of anything that could
+  // notice a misspelling — the loaded-branch conflicts, `requireJdkWellFormedLocale(fallbackLocale)`,
+  // the `strings === undefined` TypeError, the exactly-one-locale-source rule, the `runtimeLimits`
+  // refusal and `resolveLimits`. Concretely, `createStrings({ strings, limits })` with no locale
+  // reported "requires exactly one of 'locale'…" and never mentioned the typo. It must also precede
+  // the normalization below, which deletes `loaded` and injects four members — past that line the
+  // guard would be inspecting a synthesized object rather than the caller's.
+  refuseUnknownOptions("createStrings", options, CREATE_STRINGS_OPTIONS, { limits: "loadingLimits" });
+
   // The `loaded` branch is NORMALIZED into the direct branch's inputs rather than given a second
   // construction path, so locale validation, duplicate rejection, model validation and expression
   // compilation stay in exactly one place. Everything the loader result has to prove is proved
@@ -2227,7 +2342,9 @@ const MAXIMUM_PREFERRED_LANGUAGES = 32;
  *
  * @param {{ fallbackLocale: string, supportedLocales: readonly string[],
  *   tiebreakers?: Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]> | null }} configuration
- * @param {Iterable<unknown>} languages the caller's preference list, most-preferred first
+ * @param {Iterable<string>} languages the caller's preference list, most-preferred first.
+ *   BOOT-M0-0467 states `readonly string[]`; an iterable of strings accepts one, and the guard
+ *   below already refuses a bare string, which is the mistake this element type now catches first
  * @returns {string} the selected supported locale, or the resolved fallback
  */
 export function chooseLocaleForPreferredLanguages(configuration, languages) {

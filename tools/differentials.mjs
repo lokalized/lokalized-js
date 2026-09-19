@@ -105,7 +105,37 @@ if (process.argv.includes("--run")) {
     if (!headline.trim())
       throw new Error(`diff:${name} printed no recognisable summary line; the record would carry an` +
         ` empty headline, which is indistinguishable from a run nobody read`);
-    record.differentials[name] = { exit, headline: headline.trim().slice(0, 200), toolSha256: toolDigest(name) };
+    // FACTS A TOOL RECORDS ABOUT ITS OWN RUN, so that `diff:check` can ask a question a headline
+    // cannot answer WITHOUT a JDK. M8 clause 66 was held twice on exactly that gap: `diff:load`
+    // needs Java, so reverting its instrument while leaving the tests in place left `npm test` green
+    // and this gate at exit 0 — nothing could tell a WIRED instrument from an INERT one. A tool
+    // opts in by printing one `##diff-facts {…}` line; the numbers it declares are then carried
+    // into a run that has no Java at all. A tool printing none records none, which is why the
+    // check below asks whether a fact that was recorded has gone to zero rather than demanding
+    // every tool have them.
+    //
+    // THE SHAPE IS TWO-PART BECAUSE A DIFFERENTIAL HAS TWO KINDS OF NUMBER, and collapsing them
+    // would make the gate meaningless in one direction or the other:
+    //   exercised — what the run actually put through the comparison. ZERO means the instrument
+    //               went inert, which is the failure this exists to catch.
+    //   defects   — what it found. NON-ZERO means a recorded red that a green headline would hide.
+    // Neither is checked here, where Java is available and the tool's own exit status already
+    // covers it; both are checked in `--check`, which is the run that has no Java.
+    const factsLine = lines.filter((line) => line.startsWith("##diff-facts ")).pop();
+    let facts;
+    if (factsLine) {
+      try {
+        facts = JSON.parse(factsLine.slice("##diff-facts ".length));
+      } catch (error) {
+        throw new Error(`diff:${name} printed a ##diff-facts line that is not JSON: ${factsLine.slice(0, 120)}`);
+      }
+    }
+    record.differentials[name] = {
+      exit,
+      headline: headline.trim().slice(0, 200),
+      toolSha256: toolDigest(name),
+      ...(facts ? { facts } : {}),
+    };
     if (exit !== 0) failed++;
     console.log(`  ${exit === 0 ? "ok  " : "FAIL"}  diff:${name.padEnd(14)} ${headline.trim().slice(0, 96)}`);
   }
@@ -126,6 +156,18 @@ for (const name of DIFFERENTIALS) {
   const entry = record.differentials?.[name];
   if (!entry) { problems.push(`diff:${name} has no recorded run`); continue; }
   if (entry.exit !== 0) problems.push(`diff:${name} was recorded RED (exit ${entry.exit})`);
+  for (const [fact, value] of Object.entries(entry.facts?.exercised ?? {})) {
+    if (typeof value !== "number")
+      problems.push(`diff:${name} recorded a non-numeric '${fact}' among its exercised facts`);
+    else if (value === 0)
+      problems.push(`diff:${name} recorded '${fact}' as ZERO — it ran and exercised nothing on that` +
+        ` axis, which a green headline cannot tell you and is the shape a wired instrument going` +
+        ` INERT actually has`);
+  }
+  for (const [fact, value] of Object.entries(entry.facts?.defects ?? {})) {
+    if (value !== 0)
+      problems.push(`diff:${name} recorded ${value} '${fact}' — a finding its headline does not carry`);
+  }
   const digest = toolDigest(name);
   if (digest !== entry.toolSha256)
     problems.push(`diff:${name}'s tool has changed since it was last run against Java` +

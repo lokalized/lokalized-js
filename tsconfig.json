@@ -7,6 +7,19 @@
     "outDir": "types",
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    // es2023 IS THE NODE FLOOR, not a taste. Node 20 has every ES2023 feature and none of
+    // ES2024 (Object.groupBy, Promise.withResolvers and Set.prototype.union all probe
+    // undefined there), so es2023 is the highest target compatible with `engines.node`.
+    // Raising it would let tsc accept syntax the floor cannot run, and only the `20` CI leg
+    // would catch it. Move this and the floor together or not at all.
+    //
+    // IT GUARDS HALF THE FLOOR, and the other half is the `@types/node` pin in package.json.
+    // Measured, both arms: `Promise.withResolvers()` in src/ is refused identically under
+    // @types/node 20 and 22, because it is an ECMAScript API typed by `lib` — this line is what
+    // catches it. `fs.glob` (Node v22.0.0) is a NODE API: refused under the 20.x pin
+    // ("Module 'node:fs' has no exported member 'glob'") and ACCEPTED under @types/node@22 with
+    // the identical source. Neither guard covers the other's class, so both pins move with the
+    // floor or the promise stops being checked.
     "target": "es2023",
     "lib": ["es2023", "dom"],
     "strict": true,

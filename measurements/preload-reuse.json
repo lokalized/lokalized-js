@@ -1,0 +1,51 @@
+{
+  "scenario": "preload-reuse",
+  "note": "M8 clause 81 and M9 clause 24. Plan 6.3:2179-2183 lists FOUR things that must match for a preload to be reused: url, destination, CORS mode and credentials mode. Node can check three of them, and test/example-server.test.js does. THE FOURTH \u2014 whether a browser genuinely reuses the entry \u2014 is a browser property, and both clauses were held on exactly that. This artifact is the measurement. It is recorded rather than run in `verify` for the same reason scenario 0a's browser half is: a green verify must not need a human at a browser.",
+  "capturedAgainst": {
+    "preloadAttributes": "as=\"fetch\" crossorigin href rel=\"preload\" type=\"application/json\"",
+    "loaderDefaultRequest": {
+      "mode": "cors",
+      "credentials": "same-origin"
+    },
+    "why": "The attribute set the shipped server emits, with hrefs elided and attributes sorted so the comparison is order-independent. If it moves, the measurement below no longer describes the code that is shipped, and the Node-side gate fails rather than letting a stale number stand. Deterministic and machine-independent, so this one GATES \u2014 the 2k catalog-digest reasoning, not the 0a source-graph reasoning."
+  },
+  "browser": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.110.0 Chrome/152.0.7977.76 Safari/537.36",
+    "capturedOn": "2026-09-16",
+    "origin": "http://localhost \u2014 a trustworthy origin, so isSecureContext is true and crypto.subtle.digest exists",
+    "instrument": "performance.getEntriesByType('resource') entries per catalog URL, after the preloads have landed (4 of 4 observed before the loader ran, so a reuse cannot be confused with a race) and after the real `loadStrings` fetched the same URLs.",
+    "matched": {
+      "arms": {
+        "fr-CA.json": 1,
+        "fr.json": 1,
+        "en.json": 1
+      },
+      "initiators": {
+        "fr-CA.json": "link",
+        "fr.json": "link",
+        "en.json": "link"
+      },
+      "reading": "ONE network request per URL. The loader's fetch was served from the preload; no entry with a 'fetch' initiator exists for any of the three."
+    },
+    "control": {
+      "arms": {
+        "es.json": 2
+      },
+      "initiators": {
+        "es.json": "link+fetch"
+      },
+      "difference": "preloaded WITHOUT `crossorigin`, so the CORS mode does not match the loader's",
+      "browserWarning": "A preload for 'http://localhost:8712/examples/catalogs/es.json' is found, but is not used because the request credentials mode does not match. Consider taking a look at crossorigin attribute.",
+      "why": "Without an arm that is NOT reused, 'one entry means reuse' is unfalsifiable \u2014 the counter could be blind. Chrome names the cause itself, and emits no such warning for the three matched URLs."
+    },
+    "rendered": {
+      "fr-CA": "La librairie Lokalized du Canada",
+      "es": "La libreria Lokalized"
+    }
+  },
+  "integrityAttribute": {
+    "present": false,
+    "why": "Plan 6.3 keeps the SHA-256 check application-layer. An HTML `integrity` attribute would move it into the browser's Subresource Integrity check, which fails the request rather than reporting a named digest failure the loader can attribute to a locale."
+  },
+  "procedure": "npm run serve:0a, put a probe page under .tmp-*/ that emits the same preload attributes and then runs loadStrings over the same manifest, load it, and read performance.getEntriesByType('resource'). Include an arm whose preload attributes deliberately do NOT match, or the measurement proves nothing."
+}

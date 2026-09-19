@@ -15,6 +15,7 @@ import { test } from "node:test";
 import { createStrings } from "../src/core/index.js";
 import { parseStrings } from "../src/parse/index.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
+import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const en = parseStrings(JSON.stringify({ Hi: "hello" }), { locale: "en" });
 const fr = parseStrings(JSON.stringify({ Hi: "bonjour" }), { locale: "fr" });
@@ -27,8 +28,7 @@ function loadedStrings(overrides = {}) {
     tiebreakers: {},
     fallbackLocale: "en",
     catalogIdentity: { catalogVersion: "v1", catalogFingerprint: "0".repeat(64) },
-    cldrVersion: pinned.cldrVersion,
-    dataFingerprint: pinned.dataFingerprint,
+    ...BUILD_IDENTITY,
     loadingLimits: {},
     coverage: { kind: "lookup", lookupLocale: "fr" },
     // THE MANIFEST'S UNIVERSE, which is what the plan is recomputed against. Every fixture below that

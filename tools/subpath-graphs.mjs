@@ -101,6 +101,7 @@ if (trespassers.length) {
 
 const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, "utf8")) : null;
 const growth = [];
+const shrank = [];
 if (baseline) {
   for (const row of measured) {
     const was = baseline.subpaths?.[row.specifier];
@@ -112,9 +113,26 @@ if (baseline) {
       growth.push(`${row.specifier}: module count grew ${was.modules} -> ${row.modules}`);
     if (row.bytes > was.bytes)
       growth.push(`${row.specifier}: source graph grew ${was.bytes} -> ${row.bytes} bytes`);
+    // A SHRINK IS NOT A FAILURE AND IT IS NOT NOTHING. This ratchet only ever asked "did it grow",
+    // so a graph that got SMALLER left the artifact describing a tree that no longer exists, in
+    // silence. Measured 2026-09-17: the record read 872,639 bytes for `lokalized` against a live
+    // 872,635 — four bytes, from a comment reworded one slice earlier — and nothing anywhere said
+    // so. It was found by `tools/bundle-sizes.mjs` running a real bundler over the same graph and
+    // disagreeing with the RECORD while agreeing with the tree. Reported, not gated, on
+    // `scenario:0a`'s reasoning: re-recording is a deliberate act with a reason attached.
+    if (row.modules < was.modules || row.bytes < was.bytes)
+      shrank.push(`${row.specifier}: ${was.modules} -> ${row.modules} modules, ` +
+        `${was.bytes} -> ${row.bytes} bytes`);
   }
 } else {
   console.log(`\n  no baseline yet; run with --write --reason "…" to record one`);
+}
+
+if (shrank.length) {
+  console.log(`\n  STALE — the recorded graph is larger than the tree it describes:`);
+  for (const line of shrank) console.log(`    ${line}`);
+  console.log(`  Reported, not gated. Re-record with --write --reason "…" when the shrink is` +
+    `\n  deliberate, so the artifact stops describing source that is gone.`);
 }
 
 if (growth.length) {

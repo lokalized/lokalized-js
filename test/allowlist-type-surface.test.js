@@ -50,6 +50,10 @@ const CATEGORIZED_TYPES = /** @type {[string, string, string][]} */ ([
   // "tagged-value types" as having NO delivered member; these are it. The 61 constants shipped in
   // M5b and their types did not, which left every one emitted as `… | undefined` with the two tag
   // fields widened to `string`.
+  // Plan 3.4:779 declares `LocaleMatchType` and :3154 puts it "in core". Not in plan 3.1's table,
+  // so no 3.1-derived gate could ever have demanded it — the structural blindness S29 and S30
+  // recorded, in a fourth instance.
+  ["core", "LocaleMatchType", "match/configuration structural types"],
   ["core", "TaggedLanguageFormValue", "tagged-value types"],
   ["core", "LanguageFormValue", "tagged-value types"],
   ["core", "PhoneticValue", "tagged-value types"],

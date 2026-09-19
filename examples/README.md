@@ -18,12 +18,12 @@ npm run check:examples        # typechecks them as consumer TypeScript would
 ## These are gates, not illustrations
 
 Plan 6.5 does not describe demo code; it describes properties, and the tests beside these files
-assert them one by one — `test/example-edge.test.js`, `test/example-server.test.js` and
-`test/example-graphs.test.js`. Twenty-two ablations were run against a throwaway copy while they
-were written: twenty-one turned a named test red on the first attempt, and the one that did not
-fire is why `test/example-edge.test.js` now asserts `isFallback` (rendering with `forLocale` instead
-of `forLocaleMatch` had been invisible to every other assertion, because the worker already uses the
-selected locale as its lookup).
+assert them one by one — `test/example-edge.test.js`, `test/example-edge-capabilities.test.js`,
+`test/example-server.test.js` and `test/example-graphs.test.js`. Twenty-two ablations were run
+against a throwaway copy while they were written: twenty-one turned a named test red on the first
+attempt, and the one that did not fire is why `test/example-edge.test.js` now asserts `isFallback`
+(rendering with `forLocale` instead of `forLocaleMatch` had been invisible to every other assertion,
+because the worker already uses the selected locale as its lookup).
 
 The sharpest of them is the cache key. `Accept-Language: fr-CH` and `Accept-Language: fr-BE` both
 select `fr` by the same `cldr-fallback` match type, so the selected locale, the match type, and the
@@ -35,24 +35,25 @@ other's page. See [`app/cache-policy.js`](app/cache-policy.js).
 
 **The library's own load-then-construct pipeline did not typecheck.** `run-plan.js` annotated its
 accumulator `Record<string, unknown>`, so the record every loader returns was not assignable to the
-`loaded` option every loader exists to feed — `TS2322`, for every TypeScript consumer, with all
-1,400-odd JavaScript tests green. Compiling these examples under `--strict` is what surfaced it, and
+`loaded` option every loader exists to feed — `TS2322`, for every TypeScript consumer, with the whole
+JavaScript suite green. Compiling these examples under `--strict` is what surfaced it, and
 `tools/declaration-probes/run.mjs` now carries a probe that derives its record from the loader's own
 return type rather than declaring one.
 
-**The manifest generator cannot emit immutable URLs.** Plan 6.3 wants the preload to name
-"exact digest-bound immutable files"; `createStringsManifestFromDirectory` publishes
-`<locale>.json` and has no option for anything else, so [`server/publish.js`](server/publish.js)
-renames them itself. That is safe — the catalog identity excludes every URL by design — but it is a
-step every deployment has to repeat.
+**The manifest generator cannot emit immutable URLs.** Plan 6.5 wants the preload to name
+"exact digest-bound immutable files" and 6.3 shows one (`/strings/en-US.a1b2.json`);
+`createStringsManifestFromDirectory` publishes each catalog's own name ON DISK, percent-encoded and
+relative to `baseUrl` — never a name derived from the tag — and has no option for anything else, so
+[`server/publish.js`](server/publish.js) renames them itself. That is safe — the catalog identity
+excludes every URL by design — but it is a step every deployment has to repeat.
 
 ## What is not here yet
 
-The worker smoke test plan 6.5:2343 asks for runs **from the packed artifact**, and that build is
+The worker smoke test plan 6.5:2342 asks for runs **from the packed artifact**, and that build is
 deferred to M-R. Until it exists, "no Node-only code in the edge graph" is enforced structurally by
 `test/example-graphs.test.js`, which walks the worker's transitive imports and uses the server
 example — which legitimately imports `node:http` and `lokalized/node` — as the control that proves
 the walk can see what it forbids.
 
-The examples are deliberately **not** in `package.json#files`: the published tarball is the delivery
-graph the size scenarios measure, and a Node server does not belong in it.
+The examples are deliberately **not** in `package.json#files`: the tarball is what a reader
+installs and what `npm run check:bundle` bundles to size, and a Node server does not belong in it.

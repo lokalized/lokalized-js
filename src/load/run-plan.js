@@ -23,6 +23,7 @@
  *
  * @typedef {import("./index.js").StringsManifestV1} StringsManifestV1
  * @typedef {import("./index.js").FetchEntry} FetchEntry
+ * @typedef {import("./index.js").LoadFailure} LoadFailure
  *
  * @typedef {object} LoadTransport
  * @property {"fetch" | "read"} defaultStage the `LoadFailure.stage` for a failure that arrives
@@ -37,8 +38,14 @@
  *   BOTH because the two doors hash differently — one-shot WebCrypto against an assembled body, or
  *   an incremental `node:crypto` hash updated as chunks arrive.
  */
-import { resolveLimits } from "../internal/catalog.js";
-import { parseStrings } from "../parse/index.js";
+import { LoadingSession, resolveLimits } from "../internal/catalog.js";
+// The SHARED BODY, not `lokalized/parse`'s door — the same import `src/node/directory.js` makes, for
+// the same reason. `parseStrings` constructs a FRESH `LoadingSession` per call and offers no way to
+// supply one, which is exactly right for a door that parses one resource and exactly wrong here: the
+// four budgets that class carries are documented as spanning a whole load, and this runner parses a
+// whole load. Reaching the shared body is what lets each planned file be MEASURED against its own
+// session and the totals reconciled afterwards.
+import { parseStringsWithSession } from "../internal/parse-file.js";
 import { localeConfigurationForManifest, validateStringsManifest } from "./manifest.js";
 import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-error.js";
 
@@ -73,17 +80,27 @@ export class StringsLoadingError extends LokalizedError {
    * consumer could fabricate a load failure that every `instanceof` check would believe.
    *
    * @param {symbol} token the internal construction token
-   * @param {string} message @param {readonly any[]} failures
+   * @param {string} message @param {readonly LoadFailure[]} failures
    */
   constructor(token, message, failures) {
     if (token !== LOADING_ERROR_TOKEN)
       throw new TypeError("StringsLoadingError is not constructible; it is thrown by the loaders");
 
-    super(LOKALIZED_ERROR_TOKEN, message);
+    super(LOKALIZED_ERROR_TOKEN, "STRINGS_LOADING", message);
     this.name = "StringsLoadingError";
-    /** @type {string} */
-    this.code = "STRINGS_LOADING";
-    /** @type {readonly any[]} */
+    /**
+     * **`LoadFailure[]`, NOT `any[]` — it was `any[]` until M-R S3.** This is the field a consumer
+     * reads while diagnosing a broken deployment, and `failures[0].stage` is the whole reason the
+     * stage is a seven-member sequence rather than a boolean (see `LoadFailure` in `./index.js`).
+     * Typed `any` it answered every spelling: `failures[0].staeg` compiled, and so did assigning a
+     * stage to a `number`. Measured through the package on 2026-09-18, all three ways.
+     *
+     * The array is frozen at run time, and BOOT-M0-0533 asks the declaration to say so about the
+     * FIELD as well: `readonly LoadFailure[]` stopped an element write and not a whole-array one.
+     *
+     * @type {readonly LoadFailure[]}
+     * @readonly
+     */
     this.failures = Object.freeze([...failures]);
   }
 
@@ -92,7 +109,7 @@ export class StringsLoadingError extends LokalizedError {
    * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
    * the token it takes first is never exported from this package.
    *
-   * @param {symbol} token @param {string} message @param {readonly any[]} failures
+   * @param {symbol} token @param {string} message @param {readonly LoadFailure[]} failures
    */
   static raise(token, message, failures) {
     return new StringsLoadingError(token, message, failures);
@@ -105,7 +122,7 @@ const LOADING_ERROR_TOKEN = Symbol("lokalized.strings-loading-error");
 /**
  * The only way to raise one. Mirrors `parseError` in `internal/parse-diagnostics.js`.
  *
- * @param {string} message @param {readonly any[]} failures
+ * @param {string} message @param {readonly LoadFailure[]} failures
  */
 export function loadingError(message, failures) {
   return StringsLoadingError.raise(LOADING_ERROR_TOKEN, message, failures);
@@ -161,8 +178,16 @@ async function loadOne(/** @type {FetchEntry} */ entry, /** @type {any} */ optio
   if (digest !== entry.sha256)
     throw { stage: "digest", cause: new Error(`${entry.locale}: digest ${digest} does not match the manifest's ${entry.sha256}`) };
 
+  // **A FRESH SESSION PER FILE, AND IT IS A MEASUREMENT AS WELL AS A BOUND.** As a bound it is what
+  // keeps the aggregate budgets refusing WHILE A FILE IS STILL BEING READ: a resource that busts a
+  // budget on its own cannot be made acceptable by anything its neighbours do, so charging it against
+  // a fresh session refuses at the byte that crosses, exactly as it did before reconciliation existed.
+  // As a measurement its four counters ARE this file's contribution to the load's totals, taken by the
+  // parser itself rather than re-derived from the projection — `runPlan` replays them in plan order.
+  const session = new LoadingSession(limits);
   try {
-    return parseStrings(bytes, { locale: entry.locale, source: entry.url, limits });
+    const parsed = parseStringsWithSession(bytes, { locale: entry.locale, source: entry.url }, session);
+    return { parsed, contribution: session };
   } catch (cause) {
     // The parser owns the decode/parse/validate distinction; a fatal UTF-8 failure surfaces from it
     // as a parse error too, so the stage is reported as `parse` rather than guessed apart.
@@ -211,7 +236,11 @@ function tiebreakersForLoaded(declared, loadedTags) {
  * @param {any} options @param {LoadTransport} transport
  */
 export async function runPlan(manifest, plan, options, transport) {
-  const validated = validateStringsManifest(manifest, options);
+    // PROJECTED to the validator's own surface. Forwarding a loader's whole options object
+    // makes the validator refuse `fetch`/`readFile`/`signal` — a door refusing its own caller
+    // for using that caller's documented options. Measured: leaving these wholesale reds 270
+    // tests, 130 of them on `fetch` alone.
+  const validated = validateStringsManifest(manifest, { limits: options.limits });
   const limits = resolveLimits(options.limits);
 
   // PREFLIGHTED BEFORE ANY CATALOG I/O.
@@ -235,38 +264,158 @@ export async function runPlan(manifest, plan, options, transport) {
       if (index >= plan.length) return;
       const entry = /** @type {FetchEntry} */ (plan[index]);
       try {
-        results[index] = { ok: true, entry, parsed: await loadOne(entry, options, limits, transport) };
+        const { parsed, contribution } = await loadOne(entry, options, limits, transport);
+        results[index] = { ok: true, entry, parsed, contribution };
       } catch (thrown) {
-        const failure = /** @type {{ stage?: string, cause?: unknown }} */ (thrown ?? {});
+        // THE ASSERTED SHAPE NAMES `LoadFailure["stage"]`, NOT `string`, so this line and the record
+        // below are checked against the seven-member sequence instead of accepting any word. Every
+        // `throw { stage }` reachable from here spells a member of it — `fetch`, `read`, `limit`,
+        // `digest`, `parse` — and `transport.defaultStage` is already typed `"fetch" | "read"`.
+        const failure = /** @type {{ stage?: LoadFailure["stage"], cause?: unknown }} */ (thrown ?? {});
         if (options.signal?.aborted) throw options.signal.reason ?? new Error("aborted");
-        results[index] = {
-          ok: false,
-          entry,
-          failure: Object.freeze({
-            locale: entry.locale, url: entry.url,
-            stage: failure?.stage ?? transport.defaultStage, cause: failure?.cause ?? failure,
-          }),
-        };
+        /** @type {LoadFailure} */
+        const loadFailure = Object.freeze({
+          locale: entry.locale, url: entry.url,
+          stage: failure?.stage ?? transport.defaultStage, cause: failure?.cause ?? failure,
+        });
+        results[index] = { ok: false, entry, failure: loadFailure };
       }
     }
   };
 
+  // **EVERY REJECTION PATH BELOW RELEASES THE SLOTS FIRST, and that is a memory property rather
+  // than a tidiness one.** A rejected load throws an error the caller typically HOLDS — in a log
+  // line, a retry record, a test's `assert.rejects` — and an Error captures its stack, which retains
+  // the frames it was built in, which retains this function's scope, which retains `results`, which
+  // retains every catalog that had already PARSED. Measured on a six-file load failing one digest:
+  // the held rejection reached 5 of 5 parsed catalogs. `results.fill(null)` breaks that edge; the
+  // same measurement then reads 0, with a deliberately-kept record as the control that still reads 1.
+  //
+  // The `failures` list computed below is NOT affected: it holds frozen `{locale, url, stage, cause}`
+  // records and never the parsed catalog, which is why clearing the slots costs the diagnostic
+  // nothing.
+  //
+  // THE `catch` IS NOT DECORATION. An abort detected inside a worker (the two checks above) unwinds
+  // past every line below, so clearing at the outer checks alone leaves that path leaking — measured
+  // before this was written, with a signal whose `reason` was undefined.
   // Queued work retains plan order because each worker takes the next unclaimed index.
-  await Promise.all(Array.from({ length: Math.min(MAXIMUM_ACTIVE_READS, plan.length) }, worker));
+  try {
+    await Promise.all(Array.from({ length: Math.min(MAXIMUM_ACTIVE_READS, plan.length) }, worker));
+  } catch (thrown) {
+    results.fill(null);
+    throw thrown;
+  }
   // Abort is never converted into partial success: it cancels outstanding work and rejects.
-  if (options.signal?.aborted) throw options.signal.reason ?? new Error("aborted");
+  if (options.signal?.aborted) {
+    results.fill(null);
+    throw options.signal.reason ?? new Error("aborted");
+  }
 
+  // **ANNOTATED FOR THE SAME REASON `catalogs` IS, one screen down.** `results` is an untyped slot
+  // array, so without this the loader's own inferred return type declared `failures: readonly any[]`
+  // — and `LoadedStrings.failures` has declared `readonly LoadFailure[]` all along, so the two
+  // artifacts a consumer can reach disagreed about one field. Measured through the package on
+  // 2026-09-18: `Awaited<ReturnType<typeof loadStrings>>["failures"][0].stage` assigned to a `number`
+  // compiled. Each record is CONSTRUCTED under a `LoadFailure` annotation above, which is what makes
+  // this an ordering claim about the slots rather than an unchecked assertion about their contents.
+  /** @type {readonly LoadFailure[]} */
   const failures = results.filter((row) => row && !row.ok).map((row) => row.failure);
   const allowPartial = options.partialFailure === "allow-partial";
   const fallbackRow = results.find((row) => row && row.entry.locale === validated.fallbackLocale);
   const fallbackLoaded = fallbackRow ? fallbackRow.ok : false;
 
-  if (failures.length > 0 && (!allowPartial || !fallbackLoaded))
+  if (failures.length > 0 && (!allowPartial || !fallbackLoaded)) {
+    results.fill(null);
     throw loadingError(
       `${failures.length} catalog file(s) failed to load` +
       (allowPartial && !fallbackLoaded ? "; the resolved fallback-locale file is among them, so a partial result is not offered" : ""),
       failures,
     );
+  }
+
+  // **THE AGGREGATE BUDGETS, RECONCILED IN FETCH-PLAN ORDER — the step that makes the four counters
+  // `LoadingSession` carries mean at this door what they already mean at the directory door.**
+  //
+  // Plan 3.2 requires the file, byte, node and warning budgets to apply "across all raw and
+  // already-parsed catalogs"; `src/internal/parse-file.js`'s own header says Java threads ONE session
+  // through a whole directory load. `src/node/directory.js` does that, because its walk is sequential.
+  // THIS RUNNER COULD NOT, and shipping a shared counter would have been worse than the gap: with
+  // eight reads in flight the file that busts it is whichever finishes last, so the blamed file — and
+  // therefore the failure list plan 6.2:2077 fixes to fetch-plan order — would depend on completion
+  // order. Measured before this existed: two files with one translation node each at
+  // `maximumTranslationNodes: 1` were REFUSED by the directory door and LOADED by every manifest
+  // door, and the same held for `maximumTotalInputBytes` and `maximumWarnings`.
+  //
+  // So parsing stays concurrent and independent, and the totals are reconciled here, afterwards, over
+  // the slots in PLAN ORDER. Nothing in this walk can observe when anything arrived.
+  //
+  // **IT RUNS OVER THE SURVIVORS, AFTER THE PARTIAL-FAILURE DECISION ABOVE, and that ordering is the
+  // design.** The survivors are exactly the catalogs about to be returned, so the invariant this
+  // establishes is the one a caller can use: WHAT YOU GET BACK FITS THE LIMITS YOU DECLARED. Running
+  // it first would replace an honest "3 catalog file(s) failed to load" with a budget message for a
+  // load that was failing anyway.
+  //
+  // **AND IT IS FATAL WHATEVER `partialFailure` SAYS — the same rule abort has, for the same reason.**
+  // `allow-partial` means "some files could not be obtained; serve the rest", and every file here WAS
+  // obtained and parsed cleanly. Dropping good catalogs until the rest fit a byte budget would return
+  // a `complete: false` record whose missing locales have no per-file explanation and whose catalog
+  // set is decided by a limit rather than by what the deployment published — a silent,
+  // configuration-dependent reduction of the served set. A budget is a property of the LOAD; naming
+  // the file at which it was crossed is a diagnostic, not an attribution.
+  //
+  // A file that busts a budget BY ITSELF is a different thing and keeps its old behaviour: it is that
+  // file's failure, it is reported at stage `parse`, and `allow-partial` may still serve the rest.
+  const aggregate = new LoadingSession(options.limits);
+  for (let index = 0; index < results.length; ++index) {
+    const row = results[index];
+    if (!row || !row.ok) continue;
+    try {
+      aggregate.absorb(row.contribution, row.entry.url);
+    } catch (cause) {
+      // STAGE `parse`, and it is a consistency argument rather than a preference. These four budgets
+      // are charged by the parser as it walks, and when ONE file crosses one of them on its own this
+      // runner has always reported `parse`. Reporting the cross-file crossing as `limit` would make
+      // the SAME budget report two different stages depending on how many files it took to cross it.
+      // `limit` stays what it is — `readBoundedStream`'s per-file byte bounds, enforced by the
+      // transport before any parsing happens.
+      /** @type {LoadFailure} */
+      const failure = Object.freeze({
+        locale: row.entry.locale, url: row.entry.url, stage: "parse", cause,
+      });
+      // CLEARED FOR UNIFORMITY, AND THE MEASUREMENT SAYS SO RATHER THAN THE COMMENT CLAIMING A WIN.
+      // Every other rejection path here clears the slots because a held rejection otherwise retains
+      // them (the block above). Ablated on THIS path — removed, then re-measured with and without
+      // `.stack` materialised — the held rejection reaches 0 of 5 parsed catalogs either way, while
+      // the same removal one branch down still reds `test/load-retention.test.js` at its first arm.
+      // So this line is not what makes that file's aggregate arm pass; it is kept so this is not the
+      // one rejection path that leaves the slots alive, which is a V8-version-dependent bet to take.
+      // **THE PER-FILE FAILURES ARE CARRIED, NOT DISCARDED, and the first version of this dropped
+      // them.** Reaching here under `allow-partial` means some files had ALREADY failed and were
+      // being tolerated; throwing `[failure]` alone reported the budget crossing and silently lost
+      // every diagnostic the worker loop had accumulated. Measured: three catalogs with `fr`'s bytes
+      // corrupted on disk, `allow-partial` — the control returns `complete: false` with
+      // `fr:limit` recorded, and with an aggregate budget crossed the same load reported ONLY
+      // `en:parse`. A caller told their load busts a budget, while the reason one of their files was
+      // unreadable is thrown away, cannot act on either.
+      //
+      // MERGED IN FETCH-PLAN ORDER, which is where plan 6.2:2077 puts them. `failures` is already in
+      // plan order because the worker loop writes slots by index, and the aggregate failure belongs
+      // at the index of the file that crossed — so splicing by index is what keeps ONE ordering rule
+      // rather than appending and hoping nobody looks.
+      const ordered = results
+        .map((row_, at) => (row_ && !row_.ok ? { at, failure: row_.failure } : null))
+        .filter((entry) => entry !== null);
+      ordered.push({ at: index, failure });
+      ordered.sort((left, right) => left.at - right.at);
+
+      results.fill(null);
+      throw loadingError(
+        "the load exceeds an aggregate loading limit; a partial result is not offered, because every " +
+        "file that was obtained parsed cleanly and the budget is the whole load's",
+        ordered.map((entry) => entry.failure),
+      );
+    }
+  }
 
   // **THESE TWO ANNOTATIONS ARE WHAT MAKES THE LOADER'S RESULT ASSIGNABLE TO `createStrings`.**
   // They read as placeholders and were: `Record<string, unknown>` and `unknown[]` widened the two

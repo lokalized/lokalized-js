@@ -318,21 +318,46 @@ export const IANA_RANGE_EQUIVALENTS = new Map([
 	["zom", ["zom", "yos"]],
 ]);
 
-/** @typedef {{ range: string, weight: number }} WeightedLanguageRange */
+/**
+ * `Readonly`, because the runtime freezes every one of these it hands a caller — `matchForRanges`
+ * freezes each member of `requestedLanguageRanges` and the elected `languageRange`, and
+ * `parseLanguageRanges` freezes each member of its list. Plan 3.4:900 spells the same shape
+ * `LanguageRange = Readonly<{ range, weight }>`.
+ *
+ * THE SOLE AUTHORED COPY. `src/core/index.js` and `src/negotiate/index.js` each declared their own
+ * mutable one, so all three subpaths published a type that permitted a write the runtime refuses;
+ * both now derive this. It appears in OUTPUT position only — measured across the emitted
+ * declarations, no parameter takes it — so the narrowing cannot refuse a caller's own object.
+ *
+ * @typedef {Readonly<{ range: string, weight: number }>} WeightedLanguageRange
+ */
 
 /**
- * @typedef {object} LocaleMatch
- * @property {"none"|"exact"|"canonical"|"cldr-fallback"|"likely-subtag"|"extended-range"|"primary-language"|"wildcard"} matchType
- * @property {string | null} locale
- * @property {boolean} isMatch
- * @property {string} fallbackLocale
- * @property {string[]} consideredLocales
- * @property {number | null} effectiveWeight
- * @property {string | WeightedLanguageRange | null} languageRange the range that WON, spelled either
- *   as a bare string — the one-argument `LanguageRange` spelling, whose weight is 1.0 by definition —
- *   or as the `{ range, weight }` pair. Java's field is a `LanguageRange`, which always carries its
- *   weight; the port PRODUCES the pair for that reason, and accepts either from a caller.
- * @property {WeightedLanguageRange[]} requestedLanguageRanges
+ * `READONLY IN EVERY MEMBER`, which is plan 3.4:788-796's own spelling of `LocaleMatchResult` and
+ * which the runtime now enforces: `matchForRanges` freezes the record, both arrays and the
+ * `languageRange` pair. The declaration was mutable in all of them, so a consumer who wrote to a
+ * returned match compiled clean and threw at runtime under `"use strict"` — the module system's
+ * default for every ESM consumer of this package.
+ *
+ * It stays assignable FROM a caller's mutable object, which is what keeps the narrowing free: a
+ * supplied `{ localeMatch }` is an INPUT here as well as an output, and `readonly` members accept a
+ * mutable source.
+ *
+ * @typedef {Readonly<{
+ *   matchType: "none"|"exact"|"canonical"|"cldr-fallback"|"likely-subtag"|"extended-range"|"primary-language"|"wildcard",
+ *   locale: string | null,
+ *   isMatch: boolean,
+ *   fallbackLocale: string,
+ *   consideredLocales: readonly string[],
+ *   effectiveWeight: number | null,
+ *   languageRange: string | WeightedLanguageRange | null,
+ *   requestedLanguageRanges: readonly WeightedLanguageRange[],
+ * }>} LocaleMatch
+ *
+ * `languageRange` is the range that WON, spelled either as a bare string — the one-argument
+ * `LanguageRange` spelling, whose weight is 1.0 by definition — or as the `{ range, weight }` pair.
+ * Java's field is a `LanguageRange`, which always carries its weight; the port PRODUCES the pair for
+ * that reason, and accepts either from a caller.
  */
 
 /**
@@ -1293,15 +1318,28 @@ export function matchForRange(range, weight, supported, fallbackLocale, tiebreak
  * @returns {LocaleMatch}
  */
 export function matchForRanges(languageRanges, supported, fallbackLocale, tiebreakers, rangeEquivalents) {
-	const sortedSupported = sortedSupportedTags(supported);
+	// FROZEN HERE, AT THE ONE PLACE A `LocaleMatch` IS BUILT, because this is the only function in
+	// the port that constructs one: `matchFor` and `matchForRange` are wrappers over it, and every
+	// public door that hands a match to a caller — `negotiator.matchFor*`, `forLanguageRanges`,
+	// `forAcceptLanguage`, `getResult().localeMatch`, `getDirectLocaleContext().localeMatch` —
+	// reaches the caller through one of those. Plan :345 and :762 make the freeze a contract and
+	// plan 3.4:788-796 declares every member `readonly`; before this, the top-level record was
+	// frozen by its consumers while `consideredLocales`, `languageRange` and
+	// `requestedLanguageRanges` (and its members) were not, so the guarantee stopped one level down.
+	//
+	// The cost is ONE match per call, not one per candidate: every site below is `return
+	// localeMatch(...)` or `return noMatch()`, and the two shared arrays are frozen once here rather
+	// than inside either builder. Neither is mutated after construction — `sortedSupported` is read
+	// through `.indexOf`/`supportedTagAt` and `requestedLanguageRanges` only through `.length`.
+	const sortedSupported = Object.freeze(sortedSupportedTags(supported));
 	const resolvedTiebreakers = resolveTiebreakers(tiebreakers, sortedSupported);
 
-	/** @type {WeightedLanguageRange[]} */
-	const requestedLanguageRanges =
-		[...languageRanges].map(({ range, weight }) => ({ range, weight }));
+	/** @type {readonly WeightedLanguageRange[]} */
+	const requestedLanguageRanges = Object.freeze(
+		[...languageRanges].map(({ range, weight }) => Object.freeze({ range, weight })));
 
 	/** @returns {LocaleMatch} */
-	const noMatch = () => ({
+	const noMatch = () => Object.freeze({
 		matchType: "none",
 		locale: null,
 		isMatch: false,
@@ -1666,7 +1704,7 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 		const localeIndex = sortedSupported.indexOf(locale);
 		const governor = memberAt(governorMemberIndexByLocale[localeIndex] ?? 0);
 
-		return {
+		return Object.freeze({
 			matchType: languageRangeMatchTypeFor(locale, governor, fallbackLocale, resolvedTiebreakers),
 			locale,
 			isMatch: true,
@@ -1692,9 +1730,9 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 			//
 			// `governor` is one of `sortedRanges`, a permutation of `requestedLanguageRanges` with the
 			// range text and weight carried verbatim, so the pair is present there BY CONSTRUCTION.
-			languageRange: { range: governor.range, weight: governor.weight },
+			languageRange: Object.freeze({ range: governor.range, weight: governor.weight }),
 			requestedLanguageRanges,
-		};
+		});
 	};
 
 	for (let memberIndex = 0; memberIndex < memberCount; ++memberIndex) {

@@ -131,6 +131,7 @@ export class UnsupportedLocaleError extends LokalizedError {
 
     super(
       LOKALIZED_ERROR_TOKEN,
+      "UNSUPPORTED_LOCALE",
       role === undefined
         ? `Unsupported locale '${localeTag}' was provided`
         : `Unsupported ${role} locale '${localeTag}' was provided`,
@@ -141,11 +142,11 @@ export class UnsupportedLocaleError extends LokalizedError {
      * spelling, because the class was exported from no subpath until S35 and one test read it. The
      * plan's name wins now that a consumer can see it: `interface UnsupportedLocaleError extends
      * LokalizedError { readonly code: "UNSUPPORTED_LOCALE"; readonly locale: LocaleTag; }`.
+     * BOOT-M0-0518 declares it `readonly` with the rest of the record.
      * @type {string}
+     * @readonly
      */
     this.locale = localeTag;
-    /** @type {"UNSUPPORTED_LOCALE"} */
-    this.code = "UNSUPPORTED_LOCALE";
     /** @type {"source" | "target" | undefined} */
     this.role = role;
   }
