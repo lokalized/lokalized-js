@@ -34,6 +34,24 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const spec = resolve(root, "../lokalized-spec");
 const java = resolve(root, "../lokalized-java");
+
+/**
+ * **EVERY GIT PROBE HERE IS ALLOWED TO FAIL, SO NONE OF THEM MAY PRINT.** Each is wrapped in a
+ * `try`/`catch` that answers `null` — `../lokalized-java` is simply not checked out in CI, which is
+ * expected and handled. But git writes its own `fatal:` to stderr before the catch ever runs, so a
+ * CI log carried two lines reading `fatal: cannot change to '.../lokalized-java'` immediately above
+ * the real failure, and they look like the cause. They are not: the run failed on four unexplained
+ * nulls, and the maintainer had to read past the noise to see it.
+ *
+ * This project has recorded the inverse of this mistake twice — a crashed harness reading as a
+ * catastrophic regression — and the rule is the same facing the other way: an EXPECTED failure must
+ * not announce itself in the voice of a real one.
+ */
+const GIT = { encoding: /** @type {const} */ ("utf8"), stdio: /** @type {const} */ (["ignore", "pipe", "ignore"]) };
+
+/** Modes, read once: `--write` records, `--check` validates the record without the Java oracle. */
+const write = process.argv.includes("--write");
+const check = process.argv.includes("--check");
 const OUTPUT = join(root, "measurements/lokalized-parity.json");
 
 const problems = [];
@@ -45,7 +63,7 @@ const obligations = JSON.parse(readFileSync(join(spec, "parity-obligations.json"
 const sha = (/** @type {Buffer | string} */ bytes) => createHash("sha256").update(bytes).digest("hex");
 const digestOf = (/** @type {string} */ path) => { try { return sha(readFileSync(path)); } catch { return null; } };
 const headOf = (/** @type {string} */ at) => {
-  try { return execFileSync("git", ["-C", at, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(); } catch { return null; }
+  try { return execFileSync("git", ["-C", at, "rev-parse", "HEAD"], GIT).trim(); } catch { return null; }
 };
 
 /** Every id in a corpus partition, sorted, so the set is a value rather than an enumeration order. */
@@ -115,7 +133,7 @@ const FIELDS = [
       "answers are the tag's. That is a coincidence of these two commits, not a rule, which is why " +
       "both are recorded." },
   { name: "javaReferenceTagCommit", obligation: 1,
-    value: (() => { try { return execFileSync("git", ["-C", java, "rev-parse", "3.0.0^{commit}"], { encoding: "utf8" }).trim(); } catch { return null; } })(),
+    value: (() => { try { return execFileSync("git", ["-C", java, "rev-parse", "3.0.0^{commit}"], GIT).trim(); } catch { return null; } })(),
     reason: "absent only if the 3.0.0 tag is not present in this checkout" },
   { name: "dataCommit", obligation: 1, value: headOf(spec) },
   { name: "portingContractArchiveDigest", obligation: 1, value: null,
@@ -225,7 +243,7 @@ const FIELDS = [
   { name: "xfailMetadata", obligation: 6, value: [],
     note: "no xfail mechanism exists, so there is no metadata to carry. See `xfailedIds`." },
   { name: "sourceDateEpoch", obligation: 6,
-    value: (() => { try { return Number(execFileSync("git", ["-C", root, "log", "-1", "--format=%ct"], { encoding: "utf8" }).trim()); } catch { return null; } })(),
+    value: (() => { try { return Number(execFileSync("git", ["-C", root, "log", "-1", "--format=%ct"], GIT).trim()); } catch { return null; } })(),
     note: "derived from the COMMIT, because the package is at 0.0.0 with no release tag. When a " +
       "release tag exists this should prefer it; recorded here rather than left to be discovered." },
 ];
@@ -260,7 +278,10 @@ const byObligation = new Map(obligations.map((/** @type {any} */ o) => [o.index,
 for (const field of FIELDS) {
   if (!byObligation.has(field.obligation))
     problems.push(`field '${field.name}' claims obligation ${field.obligation}, which plan 8.5 does not state`);
-  if (field.value === null && !field.reason && !field.blocker)
+  // IN `--check` THE CARRY HAS NOT HAPPENED YET, so this runs once, after it. Leaving it here too
+  // would report every oracle-derived field as an unexplained null in exactly the environment the
+  // carry exists to serve, and the run would fail on the thing it just accounted for.
+  if (!check && field.value === null && !field.reason && !field.blocker)
     problems.push(`field '${field.name}' is null and records neither a reason nor a blocker — ` +
       `an unexplained null is exactly what this report exists not to publish`);
 }
@@ -329,8 +350,97 @@ const report = {
   })),
 };
 
+/**
+ * **THE FIELDS THAT NEED THE JAVA ORACLE, AND WHY `--check` CARRIES THEM FROM THE RECORD.**
+ *
+ * `npm pack` runs `prepack`, and `prepack` used to regenerate this report. Measured on CI: the
+ * `packed` job checks out THIS repo only, so the report crashed reading the spec's corpus, and the
+ * `verify` job — which has the spec but no `lokalized-java` and no pinned JDK — got four
+ * unexplained nulls and exited 1. **`npm pack` could not run anywhere but the authoring machine**,
+ * which includes any publish environment. Reproduced against the previous commit's copy of this
+ * tool: identical failure, so it is this tool's shape and not a recent edit.
+ *
+ * The split is `diff:all`/`diff:check`'s, for the same reason. `--write` measures everything and
+ * needs the oracle; it is a deliberate act. `--check` re-derives and compares EVERYTHING ELSE
+ * byte-for-byte — the corpus partition, the obligation set, the digests, the package version — and
+ * takes only the fields below from the record, because nothing in a JDK-less environment can
+ * measure them.
+ *
+ * **IT IS NOT A TOLERANCE: a field that CAN be measured here and disagrees with the record still
+ * fails.** So on the authoring machine `--check` is as strict as a full comparison, and in CI it is
+ * strict about everything CI can see. The carry is narrow, named, and reported.
+ *
+ * **AND HERE IS WHAT IT CANNOT DO, measured rather than left to be found.** Perturbing the
+ * record's `referenceJdkVendor` and running where the JDK EXISTS exits 1 naming both values;
+ * running the same perturbed record where the JDK is ABSENT exits 0, because the carry has nothing
+ * to compare against. A carried field is therefore attested by the machine that recorded it and by
+ * no other — which is the whole reason the authoring machine's run is the strict one and why
+ * `--write` is a deliberate act rather than something `prepack` does behind a publish.
+ */
+const ORACLE_DERIVED = ["javaReferenceCommit", "javaReferenceTagCommit", "referenceJdkVendor",
+  "referenceJdkVersion", "referenceJdkRuntimeVersion", "referenceJdkImageDigest"];
+
+if (check) {
+  /** @type {any} */
+  let priorRecord = null;
+  try { priorRecord = JSON.parse(readFileSync(OUTPUT, "utf8")); } catch { /* reported below */ }
+
+  if (priorRecord === null) {
+    problems.push(`${OUTPUT} does not exist or is not readable. Absence is never agreement; ` +
+      `re-record with: node tools/parity-report.mjs --write`);
+  } else {
+    let carried = 0;
+    let crossChecked = 0;
+    for (const field of FIELDS) {
+      if (!ORACLE_DERIVED.includes(field.name)) continue;
+      const recordedValue = priorRecord.fields?.[field.name] ?? null;
+      if (field.value === null && recordedValue !== null) { field.value = recordedValue; carried++; continue; }
+      if (field.value !== null && recordedValue !== null) {
+        crossChecked++;
+        if (field.value !== recordedValue)
+          problems.push(`field '${field.name}' measures ${JSON.stringify(field.value)} here and the ` +
+            `record says ${JSON.stringify(recordedValue)} — the oracle moved under the declaration`);
+      }
+    }
+    console.log(`  --check: ${carried} oracle-derived field(s) carried from the record, ` +
+      `${crossChecked} re-measured here and cross-checked`);
+
+    // ANTI-VACUITY: a field null in BOTH this environment and the record, with no reason of its
+    // own, is a hollow slot the carry has quietly made invisible. **A DECLARED reason is not that**
+    // — `referenceJdkImageDigest` is permanently null because no container image is used, and the
+    // first version of this term counted it as hollow and failed a clean tree.
+    const hollow = FIELDS.filter((field) => ORACLE_DERIVED.includes(field.name)
+      && field.value === null && !field.reason && !field.blocker);
+    if (hollow.length > 0)
+      problems.push(`${hollow.length} oracle-derived field(s) — ${hollow.map((f) => f.name).join(", ")} ` +
+        `— are null in BOTH this environment and the record, with no reason of their own; the ` +
+        `declaration is hollow where it should be either measured or explained`);
+  }
+}
+
+// REBUILT AFTER THE CARRY, so the undetermined set and the serialization describe the fields as
+// this run will publish them rather than as it first measured them.
+if (check) {
+  // **`report.fields` IS A SNAPSHOT TAKEN BEFORE THE CARRY and must be rebuilt with it.** The
+  // carry mutates `FIELDS`; the report was assembled from them earlier, so without this the
+  // serialization still holds the pre-carry nulls and the comparison below reds on three JDK
+  // fields the carry had just accounted for — the tool disagreeing with itself.
+  report.fields = Object.fromEntries(FIELDS.map((field) => [field.name, field.value]));
+
+  const undetermined = FIELDS.filter((field) => field.value === null);
+  // THE SAME PROJECTION THE RECORD WAS WRITTEN WITH, or the comparison below reds on a clean tree
+  // for a shape difference of this rebuild's own making. It dropped `obligation` on its first run.
+  report.undetermined = undetermined.map((field) => ({
+    field: field.name, obligation: byObligation.get(field.obligation)?.sentence ?? null,
+    ...(field.reason ? { reason: field.reason } : {}), ...(field.blocker ? { blocker: field.blocker } : {}),
+  }));
+  for (const field of undetermined)
+    if (!field.reason && !field.blocker)
+      problems.push(`field '${field.name}' is null and records neither a reason nor a blocker — ` +
+        `an unexplained null is exactly what this report exists not to publish`);
+}
+
 const serialized = `${JSON.stringify(report, null, 2)}\n`;
-const write = process.argv.includes("--write");
 if (write) {
   writeFileSync(OUTPUT, serialized);
 } else {
@@ -339,10 +449,18 @@ if (write) {
   catch { problems.push(`${OUTPUT} does not exist. Re-record with: node tools/parity-report.mjs --write`); }
 
   // **THE COMMIT SHAs ARE EXCLUDED FROM THE COMPARISON, AND WITHOUT THIS EVERY COMMIT REDS THE
-  // BUILD.** They are pack-time facts: `prepack` regenerates the report as its last step, so the
-  // copy that ships always names the commit it shipped from. The copy in the tree cannot, because
-  // it is written BEFORE the commit that contains it — a report pinning HEAD is stale the instant
-  // it is committed, and `npm run verify` would go red on a clean tree for no defect at all.
+  // BUILD.** The copy in the tree is written BEFORE the commit that contains it, so a report
+  // pinning HEAD is stale the instant it is committed and `npm run verify` would go red on a clean
+  // tree for no defect at all.
+  //
+  // **CORRECTED: this used to say "`prepack` regenerates the report as its last step, so the copy
+  // that ships always names the commit it shipped from."** It no longer does — see ORACLE_DERIVED
+  // above; regenerating at pack time made `npm pack` impossible in any environment without the
+  // Java oracle. The shipped copy is the COMMITTED copy, so its commit fields name the commit the
+  // record was taken at, which is one behind the one that carries it. They are excluded here for
+  // that reason rather than the old one, and `check:release` compares the packed copy to the tree
+  // copy, which is now trivially equal and still worth asserting: it catches a tarball assembled
+  // from anything other than this tree.
   // Found by noticing the maintainer's own commits had moved HEAD under a report recorded minutes
   // earlier; it would have reded their next commit rather than mine.
   //

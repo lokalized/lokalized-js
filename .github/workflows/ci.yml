@@ -74,7 +74,32 @@ jobs:
             echo "  set the SPEC_REPO_REF repository variable to the branch holding the corpus."
             exit 1
           fi
-          echo "corpus checkout OK"
+
+          # **AND CARRYING THE FILES IS NOT CARRYING THE RIGHT REVISION.** The five checks above
+          # pass over ANY revision of the spec that has the files, which is every revision of this
+          # branch — so a stale ref sails through and fails ten minutes later as a parity partition
+          # count nobody reads as a checkout problem. Measured 2026-09-20: a run resolved a spec 16
+          # cases behind, reported `2137/2137` where the tree records 2153, and the first red was
+          # `check:readme:packed`. Three gates were queued to fail for one cause, none naming it.
+          #
+          # `measurements/conformance.json#corpusSha256` is the port's own record of WHICH corpus
+          # every ratchet in this repository was measured against — `tools/conformance.mjs` already
+          # refuses to run when it moves, deliberately. This asserts the same equality at checkout,
+          # where the remedy is one variable rather than a re-record.
+          recorded=$(node -p "require('./measurements/conformance.json').corpusSha256")
+          live=$(sha256sum ../lokalized-spec/generated/behavioral-vectors.json | cut -d' ' -f1)
+          if [ "$recorded" != "$live" ]; then
+            echo "::error::the spec checkout is not the corpus this build's records were made against"
+            echo "  ref in use:       ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}"
+            echo "  corpus recorded:  $recorded"
+            echo "  corpus checked out: $live"
+            echo ""
+            echo "Either the ref is stale — clear the SPEC_REPO_REF repository variable so the"
+            echo "workflow default applies, or point it at the branch holding the current corpus —"
+            echo "or the spec moved deliberately and this repo owes a conformance re-record."
+            exit 1
+          fi
+          echo "corpus checkout OK — $(echo "$live" | cut -c1-8), the revision this build records against"
 
       - uses: actions/setup-node@v4
         with:
@@ -188,7 +213,7 @@ jobs:
         run: npm run divergences
 
       - name: Release parity declaration is what this build produces
-        run: npm run parity
+        run: npm run parity:check
       # The nine differentials need the pinned JDK, which CI provisions none of — but their RECORDED
       # result does not, and `diff:check` is the half that re-checks it: a missing record, a recorded
       # red, an unknown or omitted entry, or a differential whose TOOL has moved since its last Java
@@ -249,23 +274,38 @@ jobs:
       # re-check behind the claim. That is the same shape as clause 19's proof obligation, found the
       # same way, and it is fixed here rather than argued around.
       #
-      # SIX OF THE TWELVE RUN HERE. The exclusions are measured, not assumed, and each is named so a
-      # reader does not mistake this for the whole suite:
-      #   check:allowlist, check:surface, check:registry, check:documentation-topics — resolve the PLAN through
+      # EIGHT OF THE FIFTEEN RUN HERE. The exclusions are measured, not assumed, and each is named
+      # so a reader does not mistake this for the whole suite:
+      #   check:allowlist, check:surface, check:registry, check:documentation-topics,
+      #   check:parity-obligations                        — resolve the PLAN through
       #     scripts/planning-path.mjs and exit 2 with a remedy when it is absent. The planning
       #     directory is deliberately outside every checkout and is not pushed, so these cannot run
-      #     in CI by design. Measured 2026-09-17: each exits 2 with LOKALIZED_PLANNING_DIR pointing
-      #     nowhere, check:documentation-topics included.
+      #     in CI by design. Measured 2026-09-19: each exits 2 naming LOKALIZED_PLANNING_DIR.
       #   check:vectors, check:iana                       — drive the pinned JDK against
       #     lokalized-java, which this workflow does not check out or build. Measured: exit 1 naming
       #     the JDK path. They fail LOUDLY rather than skipping, which is why they are excluded here
       #     rather than run and ignored.
+      #
+      # **THIS LIST WAS HAND-MAINTAINED AND HAD DRIFTED TWICE OVER BY M-R S13** — it read "SIX OF
+      # THE TWELVE" while the spec's `check` had grown to fifteen, and two CI-RUNNABLE gates were
+      # missing: `check:iana-registry`, which had never been here, and `check:provenance`, added
+      # that day. `test/verify-ci-parity.test.js` deliberately skips any step with a
+      # `working-directory` — correctly, since those are another package's scripts — so the drift
+      # this workflow's own comment warns about was gated on THIS repo's list and on nothing here.
+      # It is gated both ways now: that file requires every `check:*` in the spec's `npm run check`
+      # to appear below or in a declared exclusion.
+      #
+      # Measured 2026-09-19 with LOKALIZED_PLANNING_DIR and LOKALIZED_ORACLE_JDK pointing nowhere:
+      # these eight exit 0, the five plan gates exit 2, the two JDK gates exit 1. The spec VENDORS
+      # what it needs of lokalized-java, so that repo's absence costs nothing here.
       - name: Spec-repo gates that need neither the plan nor the JDK
         working-directory: lokalized-spec
         run: |
           npm run check:snapshot
           npm run check:schemas
           npm run check:partitions
+          npm run check:iana-registry
+          npm run check:provenance
           npm run check:datalock
           npm run check:archive
           npm run check:coverage

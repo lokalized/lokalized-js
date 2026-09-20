@@ -129,3 +129,92 @@ describe("`npm run verify` and the CI job that mirrors it", () => {
     }
   });
 });
+
+/**
+ * **THE SIBLING REPO'S GATE LIST, WHICH THE COMPARISON ABOVE DELIBERATELY DOES NOT COVER — AND THE
+ * HOLE THAT LEFT.**
+ *
+ * The `verify` comparison skips any CI step carrying a `working-directory`, correctly: those run
+ * `lokalized-spec`'s scripts, and `npm run verify` here has no business calling them. But that left
+ * the spec-repo list gated by nothing. Measured at M-R S13: the workflow's own comment read "SIX OF
+ * THE TWELVE" while the spec's `check` had grown to fifteen, and TWO CI-runnable gates were absent
+ * — `check:iana-registry`, which had never been there, and `check:provenance`, added that day.
+ *
+ * So the drift this workflow's comment has warned about four times was gated on THIS repo's list
+ * and on nothing else. Both directions now: every `check:*` the spec's `npm run check` runs must
+ * appear in the CI step or in `SPEC_GATE_EXCLUSIONS` with a reason, and an exclusion naming a gate
+ * the spec no longer has is stale and fails.
+ *
+ * **WHAT THIS CANNOT DO IS RUN THEM.** Whether a gate NEEDS the plan or the JDK is measured by
+ * running it with those pointing nowhere, which belongs in a slice and not in a unit test. The
+ * reasons below are therefore declared, with the date they were measured — the check is that every
+ * gate is accounted for, not that its excuse is true.
+ */
+const SPEC_GATE_EXCLUSIONS = [
+  { gate: "check:allowlist", why: "resolves the plan through scripts/planning-path.mjs; exits 2 when it is absent" },
+  { gate: "check:surface", why: "resolves the plan through scripts/planning-path.mjs; exits 2 when it is absent" },
+  { gate: "check:registry", why: "resolves the plan through scripts/planning-path.mjs; exits 2 when it is absent" },
+  { gate: "check:documentation-topics", why: "derives the obligation from the plan's milestone rows; exits 2 without it" },
+  { gate: "check:parity-obligations", why: "derives plan 8.5's bullets from the plan text; exits 2 without it" },
+  { gate: "check:iana", why: "drives the pinned JDK against lokalized-java's classes; exits 1 naming the JDK path" },
+  { gate: "check:vectors", why: "drives the pinned JDK to re-emit the corpus; exits 1 naming the JDK path" },
+];
+
+describe("the sibling spec repo's gate list, and the CI step that mirrors it", () => {
+  const specPackage = JSON.parse(
+    readFileSync(new URL("../../lokalized-spec/package.json", import.meta.url), "utf8"));
+
+  const specGates = specPackage.scripts.check
+    .split("&&").map((/** @type {string} */ part) => part.trim().replace(/^npm run /, ""))
+    .filter((/** @type {string} */ name) => name.startsWith("check:"));
+
+  /** The spec step is the one the comparison above filters out: it declares a working-directory. */
+  const ciSpecGates = (() => {
+    const start = workflow.indexOf("working-directory: lokalized-spec");
+    assert.notEqual(start, -1, "no CI step runs in lokalized-spec; the spec-repo gates have moved");
+    const body = workflow.slice(start, workflow.indexOf("\n\n", start));
+    return [...body.matchAll(/npm run (check:[\w:-]+)/g)].map((match) => match[1]);
+  })();
+
+  it("is not comparing two empty lists", () => {
+    // **THE FLOORS ARE DELIBERATELY WELL BELOW TODAY'S COUNTS, and the first draft had them AT
+    // them (15 and 8).** That made this term fire on any legitimate removal and, worse, it fired
+    // FIRST — masking the accounting rule below, which is the one that names the offending gate.
+    // An anti-vacuity term exists to catch a broken PARSER, not to restate the policy rule beside
+    // it. An empty `specGates` is the dangerous direction: it makes the accounting rule silently
+    // green, where an empty `ciSpecGates` makes it fail loudly on its own.
+    assert.ok(specGates.length >= 5,
+      `only ${specGates.length} spec check gate(s) parsed out of package.json; the script shape moved`);
+    assert.ok(ciSpecGates.length >= 1,
+      "no spec gate parsed out of the CI step; the workflow's shape moved and nothing below is real");
+  });
+
+  it("accounts for every gate the spec's own `check` runs", () => {
+    const excused = new Set(SPEC_GATE_EXCLUSIONS.map((entry) => entry.gate));
+    const unaccounted = specGates.filter(
+      (/** @type {string} */ gate) => !ciSpecGates.includes(gate) && !excused.has(gate));
+
+    assert.deepEqual(unaccounted, [],
+      "spec gates that CI does not run and nothing excuses. Measure whether each needs the plan or " +
+      "the pinned JDK — run it with LOKALIZED_PLANNING_DIR and LOKALIZED_ORACLE_JDK pointing " +
+      "nowhere — then add it to the CI step or to SPEC_GATE_EXCLUSIONS with the reason.");
+  });
+
+  it("runs nothing CI cannot, and excuses nothing that is gone", () => {
+    const invented = ciSpecGates.filter((/** @type {string} */ gate) => !specGates.includes(gate));
+    assert.deepEqual(invented, [], "CI runs spec gates the spec's own `check` does not");
+
+    const stale = SPEC_GATE_EXCLUSIONS.filter((entry) => !specGates.includes(entry.gate));
+    assert.deepEqual(stale.map((entry) => entry.gate), [],
+      "excused spec gates that no longer exist; an excuse outliving its gate is how these lists rot");
+
+    // An exclusion for a gate CI ALSO runs is a contradiction, and the likelier direction of drift:
+    // somebody adds the gate to CI and leaves the excuse behind.
+    const both = SPEC_GATE_EXCLUSIONS.filter((entry) => ciSpecGates.includes(entry.gate));
+    assert.deepEqual(both.map((entry) => entry.gate), [],
+      "gates that are both run by CI and excused from it");
+
+    for (const entry of SPEC_GATE_EXCLUSIONS)
+      assert.ok(entry.why.length > 20, `${entry.gate} is excused without a reason`);
+  });
+});

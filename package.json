@@ -61,13 +61,13 @@
   "scripts": {
     "check": "tsc --noEmit",
     "types": "tsc --emitDeclarationOnly",
-    "prepack": "npm run types && npm run build:browser && npm run divergences -- --write && npm run parity -- --write",
+    "prepack": "npm run types && npm run build:browser && npm run divergences -- --write",
     "check:examples": "tsc -p tsconfig.examples.json",
     "check:readme": "node tools/readme-examples.mjs",
     "check:readme:packed": "node tools/readme-newcomer.mjs",
     "example:server": "node examples/server/server.js",
     "test": "node --test",
-    "verify": "npm run check && npm run types && npm run check:examples && npm run check:readme && npm run check:readme:packed && npm run check:bundle && npm run declarations && npm run check:readonly && npm run check:dist && npm run check:release && npm test && npm run size:graph && npm run subpath:graphs && npm run likely-subtag-consumers && npm run conformance && npm run divergences && npm run parity && npm run diff:check && npm run check:i18next && npm run scenario:0a && npm run scenario:2k && npm run scenario:6 && npm run scenario:concurrency && npm run scenario:peak-memory && npm run clause:ledger && npm run spike:placeholders",
+    "verify": "npm run check && npm run types && npm run check:examples && npm run check:readme && npm run check:readme:packed && npm run check:bundle && npm run declarations && npm run check:readonly && npm run check:dist && npm run check:release && npm test && npm run size:graph && npm run subpath:graphs && npm run likely-subtag-consumers && npm run conformance && npm run divergences && npm run parity:check && npm run diff:check && npm run check:i18next && npm run scenario:0a && npm run scenario:2k && npm run scenario:6 && npm run scenario:concurrency && npm run scenario:peak-memory && npm run clause:ledger && npm run spike:placeholders",
     "likely-subtag-consumers": "node tools/likely-subtag-consumers.mjs",
     "conformance": "node tools/conformance.mjs",
     "conformance:write": "node tools/conformance.mjs --write",
@@ -102,7 +102,8 @@
     "check:i18next": "node tools/i18next-diff/run.mjs --check",
     "check:bundle": "node tools/bundle-sizes.mjs",
     "parity": "node tools/parity-report.mjs",
-    "divergences": "node tools/divergences.mjs"
+    "divergences": "node tools/divergences.mjs",
+    "parity:check": "node tools/parity-report.mjs --check"
   },
   "devDependencies": {
     "@types/node": "20.19.43",
