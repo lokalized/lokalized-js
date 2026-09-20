@@ -161,6 +161,24 @@ const DEFERRAL_GROUNDS = {
   // now lives in the four clauses' evidence lines, where it is read rather than merely re-computed.
   // It goes back if something is ever deferred on it again.
 
+  /**
+   * A25: scenario 0b measures the PUBLISHED package served from a real host, so it cannot run
+   * until there is one.
+   *
+   * **A GROUND THAT IS AN EVENT RATHER THAN A DATE OR A MILESTONE, and it re-derives.** A6 cut 0b
+   * to M-R on the ground that no production host was named; A25 declines to name one today,
+   * because a host chosen for an unpublished package produces exactly the stand-in figure 0b
+   * exists to replace. The falsifiable fact is that nothing is published — read from the package's
+   * own version, which is the same field the first publish must change.
+   *
+   * It fails the moment the version leaves 0.0.0, which is when 0b becomes runnable and these
+   * clauses come due. That is the point: the deferral expires on the event it waits for.
+   */
+  packageUnpublished: () => {
+    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+    return pkg.version === "0.0.0";
+  },
+
   /** D4/D5: evidence closure has no reviewed requirement to attach to. */
   registryAllUnreviewed: () => {
     const registry = specJson("pre-m0/bootstrap.requirements.candidate.json");

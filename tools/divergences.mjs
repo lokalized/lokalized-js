@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // @ts-check
 /**
- * `DIVERGENCES.md` — where this port deliberately answers differently from lokalized-java 3.0.0.
+ * `DIVERGENCES.md` — where this port deliberately answers differently from lokalized-java 3.1.0.
  *
  * **PLAN 8.5 SAYS THIS IS "generated from the xfail/unsupported records" AND THAT SOURCE IS EMPTY.**
  * Measured: zero of the corpus's 2,363 cases carry an `xfail` field — the mechanism was never built
@@ -155,7 +155,13 @@ const body = [
   "     gates something, so a divergence that stops being true fails a check rather than outliving",
   "     this file. Regenerate with `node tools/divergences.mjs --write`. -->",
   "",
-  "This package is a port of [lokalized-java](https://github.com/lokalized/lokalized-java) 3.0.0 and",
+  // **3.0.0 UNTIL 2026-09-20, AND THE BEHAVIOURS IT COUNTS WERE NEVER 3.0.0's.** The corpus has
+  // been recorded against 3.1.0-SNAPSHOT since M-R S12/S13, and at least nine of the behaviours
+  // counted here — the `iana-equivalence.registry-gap.*` rows, all required and all passing —
+  // exist only because 3.1.0 answers differently from 3.0.0. The maintainer's decision: this is a
+  // port of 3.1.0 once that is released. The version is stated rather than derived because this
+  // file must run where lokalized-java is absent, which is every CI job.
+  "This package is a port of [lokalized-java](https://github.com/lokalized/lokalized-java) 3.1.0 and",
   `matches it on ${conformance.passedIds.length} recorded behaviours. Where it does not, the`,
   "difference is deliberate and listed here.",
   "",

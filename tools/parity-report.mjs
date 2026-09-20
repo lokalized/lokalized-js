@@ -127,11 +127,28 @@ const FIELDS = [
 
   { name: "implementationCommit", obligation: 1, value: headOf(root) },
   { name: "javaReferenceCommit", obligation: 1, value: headOf(java),
-    note: "this is lokalized-java's HEAD, which is TWO COMMITS AHEAD of the 3.0.0 tag the parity " +
-      "claim is about. Measured across those two commits: the only changes are build tooling and " +
-      "two generated CLDR resources, and zero behavioural Java source differs — so the oracle's " +
-      "answers are the tag's. That is a coincidence of these two commits, not a rule, which is why " +
-      "both are recorded." },
+    note: "lokalized-java's HEAD, and the parity claim is now against 3.1.0 rather than the 3.0.0 " +
+      "tag — the maintainer's decision of 2026-09-20: this package is a port of lokalized-java " +
+      "3.1.0 once that is released. **THIS NOTE SAID THE OPPOSITE AND WAS FALSE IN BOTH HALVES.** " +
+      "It read \"TWO COMMITS AHEAD of the 3.0.0 tag … zero behavioural Java source differs — so " +
+      "the oracle's answers are the tag's\". Measured 2026-09-20: FOUR commits ahead, and " +
+      "src/main/java differs by +1,014/-23 lines, which is IanaLanguageEquivalents — a behavioural " +
+      "change that moves fourteen ranges. The answers recorded in the corpus are 3.1.0-SNAPSHOT's, " +
+      "not the tag's, and that is the point of the decision rather than a drift to reconcile." },
+  { name: "javaReferenceVersion", obligation: 1,
+    // Read from the oracle's own pom rather than restated. Null where lokalized-java is absent —
+    // CI does not check it out — and carried from the record by `--check`, like every other
+    // oracle-derived field.
+    value: (() => {
+      try {
+        const pom = readFileSync(join(java, "pom.xml"), "utf8");
+        return /<artifactId>lokalized<\/artifactId>\s*<version>([^<]+)<\/version>/.exec(pom)?.[1]?.trim() ?? null;
+      } catch { return null; }
+    })(),
+    reason: "absent only where the lokalized-java checkout is not beside this one",
+    note: "the reference is 3.1.0-SNAPSHOT today: the parity target is 3.1.0 and it is NOT YET " +
+      "RELEASED, so this names a snapshot on purpose. It must read a release version before a " +
+      "parity-backed publish can claim one." },
   { name: "javaReferenceTagCommit", obligation: 1,
     value: (() => { try { return execFileSync("git", ["-C", java, "rev-parse", "3.0.0^{commit}"], GIT).trim(); } catch { return null; } })(),
     reason: "absent only if the 3.0.0 tag is not present in this checkout" },
@@ -377,8 +394,8 @@ const report = {
  * no other — which is the whole reason the authoring machine's run is the strict one and why
  * `--write` is a deliberate act rather than something `prepack` does behind a publish.
  */
-const ORACLE_DERIVED = ["javaReferenceCommit", "javaReferenceTagCommit", "referenceJdkVendor",
-  "referenceJdkVersion", "referenceJdkRuntimeVersion", "referenceJdkImageDigest"];
+const ORACLE_DERIVED = ["javaReferenceCommit", "javaReferenceTagCommit", "javaReferenceVersion",
+  "referenceJdkVendor", "referenceJdkVersion", "referenceJdkRuntimeVersion", "referenceJdkImageDigest"];
 
 if (check) {
   /** @type {any} */
@@ -474,8 +491,33 @@ if (write) {
     for (const field of PER_COMMIT) if (field in parsed.fields) parsed.fields[field] = "<per-commit>";
     return JSON.stringify(parsed, null, 2);
   };
+  // NAME WHAT MOVED. A gate that says "something differs" and leaves the reader to diff two 37-field
+  // documents by hand is the shape `check:vectors` was corrected for on 2026-09-20: the report has
+  // the comparison in its hands and must spend it.
+  const movedFields = () => {
+    try {
+      const was = JSON.parse(withoutCommits(recorded));
+      const now = JSON.parse(withoutCommits(serialized));
+      const moved = [];
+      const walk = (/** @type {any} */ a, /** @type {any} */ b, /** @type {string} */ path) => {
+        const keys = [...new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])];
+        for (const key of keys) {
+          const here = path ? `${path}.${key}` : key;
+          const left = a?.[key], right = b?.[key];
+          if (left && right && typeof left === "object" && typeof right === "object" && !Array.isArray(left)) {
+            walk(left, right, here); continue;
+          }
+          if (JSON.stringify(left) !== JSON.stringify(right))
+            moved.push(`${here}: recorded ${JSON.stringify(left)} -> now ${JSON.stringify(right)}`);
+        }
+      };
+      walk(was, now, "");
+      return moved.length > 0 ? `\n      ${moved.join("\n      ")}` : "";
+    } catch { return ""; }
+  };
   if (recorded && withoutCommits(recorded) !== withoutCommits(serialized))
-    problems.push("the recorded parity declaration is not what this run produces — either the build " +
+    problems.push("the recorded parity declaration is not what this run produces:" + movedFields() +
+      "\n    either the build " +
       "moved and it must be re-recorded deliberately, or something non-deterministic has entered it");
 }
 

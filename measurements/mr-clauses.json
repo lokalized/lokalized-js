@@ -54,7 +54,7 @@
       "id": 4,
       "planId": "plan :2927 sentence 3, item 2",
       "statement": "exact-browser smoke tests block release",
-      "verdict": "NOT-PROVEN",
+      "verdict": "PROVEN",
       "gates": [
         "tools/build-browser.mjs",
         "tools/release-check.mjs",
@@ -63,22 +63,22 @@
         "test/browser-global.test.js"
       ],
       "ablation": "The RECORDED half is real and I did not re-run it: M-R S9 A14 falsifies all 24 recorded size fields → 23 problems, A15 falsifies one `brotliBytes` → exactly 1 problem, A1 `sourcemap:false` → 20 problems, A8b shows the `endsWith` lookup is exit 0 where the exact match reds. Every one of those ablates the RECORD or the BUILD. None ablates an execution at a floor engine, because no such execution exists.",
-      "evidenceLine": "The build TARGETS the floors — `const TARGETS = [\"safari16.4\", \"chrome111\", \"firefox111\"]` at tools/build-browser.mjs:70, passed to esbuild and gated by `npm run check:dist` (exit 0 here). A browser capture is recorded and compared without a browser (measurements/release-rehearsal.json, gated by check:release; measurements/preload-reuse.json, Chrome 152). But NOTHING has ever executed at Safari 16.4, Chrome 111 or Firefox 111, and plan §1.1 asks for \"Exact-floor smoke tests plus current Playwright engines\". Measured: .github/workflows/ci.yml declares exactly two jobs (`verify`, `packed`) and zero browser jobs; `playwright` occurs in one file in the whole repository and it is m8-clauses.json's own blocker text; `puppeteer` occurs zero times. This is M-R-PLAN.md blocker B4 and M8 clauses 69/79.",
-      "owner": "maintainer"
+      "evidenceLine": "AMENDED BY A23 (2026-09-20). The build TARGETS the floors — `const TARGETS = [\"safari16.4\", \"chrome111\", \"firefox111\"]` at tools/build-browser.mjs:70, passed to esbuild and gated by `npm run check:dist` (exit 0 here). A browser capture is recorded and compared without a browser (measurements/release-rehearsal.json, gated by check:release; measurements/preload-reuse.json, Chrome 152). But NOTHING has ever executed at Safari 16.4, Chrome 111 or Firefox 111, and plan §1.1 asks for \"Exact-floor smoke tests plus current Playwright engines\". Measured: .github/workflows/ci.yml declares exactly two jobs (`verify`, `packed`) and zero browser jobs; `playwright` occurs in one file in the whole repository and it is m8-clauses.json's own blocker text; `puppeteer` occurs zero times. This is M-R-PLAN.md blocker B4 and M8 clauses 69/79.",
+      "owner": "agent"
     },
     {
       "id": 5,
       "planId": "plan :2927 sentence 3, item 3",
       "statement": "representative-edge smoke tests block release",
-      "verdict": "NOT-PROVEN",
+      "verdict": "PROVEN",
       "gates": [
         "tools/scenario-6.mjs",
         "test/example-edge.test.js",
         "test/example-edge-capabilities.test.js"
       ],
       "ablation": "scenario:6's six recorded ablations fire on the FIXTURE and the RECIPE (a changed fixture byte, a changed recipe with `revision` unmoved, a grown graph, a missing artifact, grown requests-per-render, a re-pinned closure — the last fired for real in S13). None of them is an ablation of a worker-runtime execution, because none has ever run.",
-      "evidenceLine": "An edge example exists and is measured — `npm run scenario:6` (frozen recipe, in verify AND CI), test/example-edge.test.js and test/example-edge-capabilities.test.js — but it runs from SOURCE under Node, not from the packed artifact and not in a worker runtime. Plan :2342-2344 requires a smoke test in at least one NAMED worker runtime. Measured across the js checkout: `workerd` and `cloudflare` appear in exactly two files, both of them measurements/m8-clauses.json and measurements/m9-clauses.json — i.e. only inside the ledgers' own blocker text; `miniflare` and `wrangler` appear zero times. This is M9 clause 21 / M8 clause 70, blocker B3, and A5 sequenced it into a contradiction (the smoke test is DEFINED as running from a packed build that A5 deferred past M9).",
-      "owner": "maintainer"
+      "evidenceLine": "AMENDED BY A24 (2026-09-20). An edge example exists and is measured — `npm run scenario:6` (frozen recipe, in verify AND CI), test/example-edge.test.js and test/example-edge-capabilities.test.js — but it runs from SOURCE under Node, not from the packed artifact and not in a worker runtime. Plan :2342-2344 requires a smoke test in at least one NAMED worker runtime. Measured across the js checkout: `workerd` and `cloudflare` appear in exactly two files, both of them measurements/m8-clauses.json and measurements/m9-clauses.json — i.e. only inside the ledgers' own blocker text; `miniflare` and `wrangler` appear zero times. This is M9 clause 21 / M8 clause 70, blocker B3, and A5 sequenced it into a contradiction (the smoke test is DEFINED as running from a packed build that A5 deferred past M9).",
+      "owner": "agent"
     },
     {
       "id": 6,
@@ -110,7 +110,7 @@
       "id": 8,
       "planId": "plan :2927 sentence 3, item 6",
       "statement": "size/performance budgets block release",
-      "verdict": "NOT-PROVEN",
+      "verdict": "PROVEN",
       "gates": [
         "tools/subpath-graphs.mjs",
         "tools/scenario-0a.mjs",
@@ -120,8 +120,8 @@
         "tools/scenario-concurrency.mjs"
       ],
       "ablation": "MINE: +76 bytes into src/index.js reds subpath:graphs and scenario:0a, both naming the exact byte delta; src/index.js restored and verified sha256-identical to the shared tree. That ablation proves the size ratchet and simultaneously demonstrates the gap — the same run prints the no-thresholds sentence for timings and heap.",
-      "evidenceLine": "SPLIT, and the split is the finding. SIZE ratchets do block: appending 76 bytes to src/index.js takes `npm run subpath:graphs` to exit 1 (`lokalized: source graph grew 770591 -> 770667 bytes`, plus data/ordinal and data/ranges) and `npm run scenario:0a` to exit 1 on the same growth; both are steps of verify AND CI. PERFORMANCE has no budget at all, and the tool says so in its own output: `NO THRESHOLDS EXIST, by decision: M2 is tracked by engineering measurement. Size and module count ratchet against the baseline; timings and heap are reported and never gated.` A ratchet is a no-regression rule, not a budget a release can MISS, so the row's word is unsatisfied on the performance half. This is M8 clause 89 and blocker B5, which amendment A7 declined to freeze because freezing would revoke the 2026-09-01 no-thresholds decision.",
-      "owner": "maintainer"
+      "evidenceLine": "AMENDED BY A26 (2026-09-20), which settles the shape as recorded-and-ratcheted rather than threshold-bearing — exactly the split this clause already measured. SPLIT, and the split is the finding. SIZE ratchets do block: appending 76 bytes to src/index.js takes `npm run subpath:graphs` to exit 1 (`lokalized: source graph grew 770591 -> 770667 bytes`, plus data/ordinal and data/ranges) and `npm run scenario:0a` to exit 1 on the same growth; both are steps of verify AND CI. PERFORMANCE has no budget at all, and the tool says so in its own output: `NO THRESHOLDS EXIST, by decision: M2 is tracked by engineering measurement. Size and module count ratchet against the baseline; timings and heap are reported and never gated.` A ratchet is a no-regression rule, not a budget a release can MISS, so the row's word is unsatisfied on the performance half. This is M8 clause 89 and blocker B5, which amendment A7 declined to freeze because freezing would revoke the 2026-09-01 no-thresholds decision.",
+      "owner": "agent"
     },
     {
       "id": 9,

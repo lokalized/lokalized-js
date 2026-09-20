@@ -7,16 +7,17 @@
     "implementationVersion": "0.0.0",
     "packageName": "lokalized",
     "packageVersion": "0.0.0",
-    "implementationCommit": "b6dfb787525e2a4196b1047a04273acfdacb47f1",
-    "javaReferenceCommit": "6311fec98f6c9b83351f1231d291be3878031427",
+    "implementationCommit": "bdba141ecfe68ca2d02c3a327973be2ff5183b21",
+    "javaReferenceCommit": "a91925827b3000148bddf36de5e738ed55e8408f",
+    "javaReferenceVersion": "3.1.0-SNAPSHOT",
     "javaReferenceTagCommit": "c971f071ded30562acf627c07e5767389d57f84b",
-    "dataCommit": "6ae70116f0778fa346db1151947153e73486435b",
+    "dataCommit": "17b3507b7d18a3ec5b2b44391ae28a30a0616a36",
     "portingContractArchiveDigest": null,
     "requirementsSha256": "649fabc4a99cac5798747ed17af05752d63388813ce4b54e084a74b632952136",
     "selectedReleaseProfileId": "strict-parity-0.x-draft",
     "releaseProfileApproved": false,
-    "profileRegistrySha256": "2d15cdfbf7a73c0b8573d603c318544c4f48787f89531a0717a2b4359f96f948",
-    "selectionRecordSha256": "72574d2a5b11218d569947c40fcdf7b44c7e02c5b94a4bee5e1f329a8e9713d4",
+    "profileRegistrySha256": "56a9f8819947bbcf10bd67e02a2e94a50c5ea7f5061dad9f103ab34129a31cad",
+    "selectionRecordSha256": "deaf86804a5358a8ed40791b5c2293baaa0659f1d28e0c678375047c016babc7",
     "activeRequirementIds": {
       "byActivationFrontier": 1338,
       "byReviewStatus": 0,
@@ -4611,7 +4612,7 @@
       ]
     },
     "xfailMetadata": [],
-    "sourceDateEpoch": 1789915192
+    "sourceDateEpoch": 1789919226
   },
   "undetermined": [
     {
@@ -4637,7 +4638,8 @@
   ],
   "notes": {
     "packageVersion": "8.5's first bullet names TWO versions, implementation and package. For a JavaScript package these coincide — the implementation IS the package and there is no second version anywhere in the repository — so both slots are filled from the same key and the coincidence is stated rather than left to look like a duplicated field.",
-    "javaReferenceCommit": "this is lokalized-java's HEAD, which is TWO COMMITS AHEAD of the 3.0.0 tag the parity claim is about. Measured across those two commits: the only changes are build tooling and two generated CLDR resources, and zero behavioural Java source differs — so the oracle's answers are the tag's. That is a coincidence of these two commits, not a rule, which is why both are recorded.",
+    "javaReferenceCommit": "lokalized-java's HEAD, and the parity claim is now against 3.1.0 rather than the 3.0.0 tag — the maintainer's decision of 2026-09-20: this package is a port of lokalized-java 3.1.0 once that is released. **THIS NOTE SAID THE OPPOSITE AND WAS FALSE IN BOTH HALVES.** It read \"TWO COMMITS AHEAD of the 3.0.0 tag … zero behavioural Java source differs — so the oracle's answers are the tag's\". Measured 2026-09-20: FOUR commits ahead, and src/main/java differs by +1,014/-23 lines, which is IanaLanguageEquivalents — a behavioural change that moves fourteen ranges. The answers recorded in the corpus are 3.1.0-SNAPSHOT's, not the tag's, and that is the point of the decision rather than a drift to reconcile.",
+    "javaReferenceVersion": "the reference is 3.1.0-SNAPSHOT today: the parity target is 3.1.0 and it is NOT YET RELEASED, so this names a snapshot on purpose. It must read a release version before a parity-backed publish can claim one.",
     "requirementsSha256": "plan 8.6's `requirements.json` is `pre-m0/bootstrap.requirements.candidate.json` here: the successor registry revision 8.6 describes has not been produced, so this is the digest of the candidate the project actually has.",
     "selectedReleaseProfileId": "read from a selection record whose own `status` is `draft-unapproved`; the id is selected, the selection is not approved. See `releaseProfileApproved`.",
     "profileRegistrySha256": "the selection record carries null for this; it is computable from the file that exists and is computed here rather than copied from the null.",
@@ -4681,6 +4683,7 @@
       "dischargedBy": [
         "implementationCommit",
         "javaReferenceCommit",
+        "javaReferenceVersion",
         "javaReferenceTagCommit",
         "dataCommit",
         "portingContractArchiveDigest"

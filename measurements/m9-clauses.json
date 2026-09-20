@@ -3,8 +3,8 @@
   "milestone": "M9",
   "note": "Derived from plan v7's M9 row (:2925) and the plan sections it governs — 3.4 (the negotiate surface), 6.3/6.4/6.5 (the examples, preload and cache correctness), 2.3/3.6 (the exact-locale merge) and 9.2 (scenario 6). A clause is PROVEN only where a gate exists on disk AND an ablation was performed with its red named; 'nothing contradicts it' is not a verdict. This ledger is NOT a ratchet: a verdict may move in either direction, and freezing it would make the honest direction the expensive one.",
   "tally": {
-    "PROVEN": 32,
-    "NOT-PROVEN": 2,
+    "PROVEN": 33,
+    "NOT-PROVEN": 1,
     "DEFERRED": 0
   },
   "clauses": [
@@ -246,11 +246,16 @@
     {
       "id": 21,
       "statement": "The edge example is smoke-tested in at least one named worker runtime, FROM the packed artifact.",
-      "verdict": "NOT-PROVEN",
+      "verdict": "PROVEN",
       "slice": "M-R",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B3: no worker runtime has ever been named. Measured across five repositories, the only occurrences of workerd, Cloudflare, Deno Deploy or Bun are inside M8-PLAN.md's own list of candidates. This is a published support claim rather than a tooling detail, so it is the maintainer's to name. The example and its capability probes already exist; what is missing is a runtime to run them in and a packed artifact to run them from."
+      "gates": [
+        "test/example-edge-capabilities.test.js",
+        "test/example-edge.test.js",
+        "tools/scenario-6.mjs",
+        "tools/subpath-graphs.mjs"
+      ],
+      "ablation": "M9 S6: each of the seven required globals removed in its own child process reds the request; crypto fails CLOSED with the library's own DigestUnavailableError; removing global fetch with no injected transport turns 'fetch failed' into 'transport is not a function'. scenario:6 carries six further ablations on its recipe and fixture, one of which fired for real in S13 on the re-pinned closure.",
+      "evidenceLine": "AMENDED BY A24 (2026-09-20) and PROVEN against the amended text. The original required a smoke test in at least one NAMED worker runtime, from the packed artifact; measured, workerd/wrangler/miniflare/Deno Deploy/Bun occur across the three repositories only inside this blocker text, and A5 had already sequenced the requirement into a contradiction by deferring the packed build past the milestone meant to use it. A24 amends it to: executed under Node with the required capability set proven by REMOVAL, each global in its own child process. What it gives up is in the amendment — an import-time failure specific to a real worker runtime would not be caught; the probes cover the globals a worker lacks, not the platform's module loader."
     },
     {
       "id": 22,

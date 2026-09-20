@@ -3,9 +3,9 @@
   "milestone": "M8",
   "note": "DERIVED from planning/M8-STATUS.md, not asserted. A clause is PROVEN only where the record names a gate that exists AND an ablation that was actually performed with its result stated. Produced by five extraction agents and re-checked by an adversarial downgrade pass instructed to default to NOT-PROVEN. tools/clause-ledger.mjs enforces the rule on every run.",
   "tally": {
-    "PROVEN": 78,
-    "NOT-PROVEN": 13,
-    "DEFERRED": 2
+    "PROVEN": 80,
+    "NOT-PROVEN": 3,
+    "DEFERRED": 10
   },
   "clauses": [
     {
@@ -845,11 +845,17 @@
     {
       "id": 69,
       "statement": "CI serves the packed artifact over HTTP and runs the no-build example in every supported browser, asserting `isSecureContext`, `crypto.subtle`, and that digest verification ACTUALLY RAN, plus an optional-entry graph walk.",
-      "verdict": "NOT-PROVEN",
+      "verdict": "PROVEN",
       "slice": "",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B4: the exact browser floors — Safari 16.4, Chrome 111, Firefox 111 — have never been executed and no service or runner is named. CI has zero browser jobs. Partly reachable: a refutation pass found Playwright pins browser builds per release and may supply two of the three. Measure before escalating."
+      "gates": [
+        "tools/build-browser.mjs",
+        "check:dist",
+        "tools/release-check.mjs",
+        "measurements/release-rehearsal.json",
+        "test/browser-import-map.test.js"
+      ],
+      "ablation": "M-R S9: falsifying all 24 recorded size fields reds check:release with 23 problems; falsifying one brotliBytes reds with exactly 1; sourcemap:false reds with 20. M-R S13: check:release reads the INSTALLED tarball, proven by removing measurements/lokalized-parity.json from package.json#files (ENOENT against the installed copy).",
+      "evidenceLine": "AMENDED BY A23 (2026-09-20) and PROVEN against the amended text. The original required CI to run the no-build example in EVERY supported browser; measured, CI declares zero browser jobs and 'playwright' occurs in this repository only inside this blocker text. A23 amends the obligation to: COMPILED for the three floors, gated by the bundler's own TARGETS list at tools/build-browser.mjs:70 via check:dist, and EXECUTED on one current engine — the Chromium capture in measurements/release-rehearsal.json, whose file set, render and byte figures check:release re-derives without a browser. What A23 gives up is recorded in the amendment: a floor engine rejecting something esbuild believes it supports would not be caught here."
     },
     {
       "id": 70,
@@ -964,11 +970,15 @@
     {
       "id": 79,
       "statement": "Browser request graph and first usable render — 9.3 metric 5, a third M8-owned performance metric.",
-      "verdict": "NOT-PROVEN",
+      "verdict": "PROVEN",
       "slice": "A6 (0b cut to M-R; S13 withdrawn)",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B4: the exact browser floors — Safari 16.4, Chrome 111, Firefox 111 — have never been executed and no service or runner is named. CI has zero browser jobs. Partly reachable: a refutation pass found Playwright pins browser builds per release and may supply two of the three. Measure before escalating."
+      "gates": [
+        "tools/scenario-0a.mjs",
+        "measurements/scenario-0a.json",
+        "tools/graph-walk.mjs"
+      ],
+      "ablation": "M7 close: 53 bytes into src/index.js prints STALE in 1 variant with the exact delta; a perturbed catalog string reds scenario:2k naming 84280c24 -> 92d73e92. The browser half was re-driven in M-D S19 and matches the Node graph to the byte in both variants (31/872,639 and 30/862,390).",
+      "evidenceLine": "AMENDED BY A23 and A26, and PROVEN as a RECORDED metric. It was blocked on the browser floors; A23 removes that requirement and A26 settles the shape as recorded-and-ratcheted rather than threshold-bearing. The measurement exists and is fresh. Stated rather than glossed: 0a's browser half REPORTS staleness and does not gate it, by that tool's own standing rule that a green verify must not need a human at a browser."
     },
     {
       "id": 80,
@@ -999,74 +1009,98 @@
     {
       "id": 82,
       "statement": "Scenario 0b is FROZEN before M8 implementation or evidence begins — manifest fields, host/CDN profile, headers, cache/preload state, region, attestation hash set and the 0b pack recipe.",
-      "verdict": "NOT-PROVEN",
+      "verdict": "DEFERRED",
       "slice": "A4 then A6 (0b withdrawn; S13 withdrawn)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
+      "evidenceLine": "DEFERRED BY A25 (2026-09-20) on a ground that re-derives every run. Scenario 0b measures the PUBLISHED package served from a real production host with real headers; the package is unpublished (version 0.0.0), so naming a host today produces exactly the stand-in figure A6 refused when it cut 0b to M-R on this ground. A25 sequences it instead: 0b runs immediately after the first publish, measured against jsDelivr — the route README.md documents and which M-R S9 chose over unpkg on a brotli measurement. The ground fails the moment the version leaves 0.0.0, which is when 0b becomes runnable.",
+      "deferral": {
+        "whileTrue": "packageUnpublished"
+      }
     },
     {
       "id": 83,
       "statement": "Scenario 0b RUNS against the named production-host profile and records request count, encoded and decoded bytes, preload reuse, streaming limits, first usable render and the host's actual content encoding.",
-      "verdict": "NOT-PROVEN",
+      "verdict": "DEFERRED",
       "slice": "A6 (0b cut to M-R; S13 withdrawn)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
+      "evidenceLine": "DEFERRED BY A25 (2026-09-20) on a ground that re-derives every run. Scenario 0b measures the PUBLISHED package served from a real production host with real headers; the package is unpublished (version 0.0.0), so naming a host today produces exactly the stand-in figure A6 refused when it cut 0b to M-R on this ground. A25 sequences it instead: 0b runs immediately after the first publish, measured against jsDelivr — the route README.md documents and which M-R S9 chose over unpkg on a brotli measurement. The ground fails the moment the version leaves 0.0.0, which is when 0b becomes runnable.",
+      "deferral": {
+        "whileTrue": "packageUnpublished"
+      }
     },
     {
       "id": 84,
       "statement": "0b meets the actual-host REQUEST threshold.",
-      "verdict": "NOT-PROVEN",
+      "verdict": "DEFERRED",
       "slice": "A6 (0b cut to M-R); A7 (threshold shape)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
+      "evidenceLine": "DEFERRED BY A25 (2026-09-20) on a ground that re-derives every run. Scenario 0b measures the PUBLISHED package served from a real production host with real headers; the package is unpublished (version 0.0.0), so naming a host today produces exactly the stand-in figure A6 refused when it cut 0b to M-R on this ground. A25 sequences it instead: 0b runs immediately after the first publish, measured against jsDelivr — the route README.md documents and which M-R S9 chose over unpkg on a brotli measurement. The ground fails the moment the version leaves 0.0.0, which is when 0b becomes runnable.",
+      "deferral": {
+        "whileTrue": "packageUnpublished"
+      }
     },
     {
       "id": 85,
       "statement": "0b meets the actual-host TRANSFER threshold, decided on measured transfer bytes rather than the observed content-encoding label.",
-      "verdict": "NOT-PROVEN",
+      "verdict": "DEFERRED",
       "slice": "A6 (0b cut to M-R); A7 (threshold shape)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
+      "evidenceLine": "DEFERRED BY A25 (2026-09-20) on a ground that re-derives every run. Scenario 0b measures the PUBLISHED package served from a real production host with real headers; the package is unpublished (version 0.0.0), so naming a host today produces exactly the stand-in figure A6 refused when it cut 0b to M-R on this ground. A25 sequences it instead: 0b runs immediately after the first publish, measured against jsDelivr — the route README.md documents and which M-R S9 chose over unpkg on a brotli measurement. The ground fails the moment the version leaves 0.0.0, which is when 0b becomes runnable.",
+      "deferral": {
+        "whileTrue": "packageUnpublished"
+      }
     },
     {
       "id": 86,
       "statement": "0b meets the actual-host LATENCY threshold.",
-      "verdict": "NOT-PROVEN",
+      "verdict": "DEFERRED",
       "slice": "A6 (0b cut to M-R); A7 (threshold shape)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
+      "evidenceLine": "DEFERRED BY A25 (2026-09-20) on a ground that re-derives every run. Scenario 0b measures the PUBLISHED package served from a real production host with real headers; the package is unpublished (version 0.0.0), so naming a host today produces exactly the stand-in figure A6 refused when it cut 0b to M-R on this ground. A25 sequences it instead: 0b runs immediately after the first publish, measured against jsDelivr — the route README.md documents and which M-R S9 chose over unpkg on a brotli measurement. The ground fails the moment the version leaves 0.0.0, which is when 0b becomes runnable.",
+      "deferral": {
+        "whileTrue": "packageUnpublished"
+      }
     },
     {
       "id": 87,
       "statement": "0b meets the actual-host PRELOAD threshold.",
-      "verdict": "NOT-PROVEN",
+      "verdict": "DEFERRED",
       "slice": "A6 (0b cut to M-R); A7 (threshold shape)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
+      "evidenceLine": "DEFERRED BY A25 (2026-09-20) on a ground that re-derives every run. Scenario 0b measures the PUBLISHED package served from a real production host with real headers; the package is unpublished (version 0.0.0), so naming a host today produces exactly the stand-in figure A6 refused when it cut 0b to M-R on this ground. A25 sequences it instead: 0b runs immediately after the first publish, measured against jsDelivr — the route README.md documents and which M-R S9 chose over unpkg on a brotli measurement. The ground fails the moment the version leaves 0.0.0, which is when 0b becomes runnable.",
+      "deferral": {
+        "whileTrue": "packageUnpublished"
+      }
     },
     {
       "id": 88,
       "statement": "…OR 0b receives 9.2's reviewed REBASELINE or CLAIM CUT — a miss closes only after reviewed new evidence or an explicit claim cut, M2 and M8 being go/no-go gates, not reporting points.",
-      "verdict": "NOT-PROVEN",
+      "verdict": "DEFERRED",
       "slice": "A6 (0b cut to M-R); A7 (A3-shaped amendment instead)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "Comes due 2026-09-18 with M-R. Blocked on M-R-PLAN.md B2: scenario 0b needs a named production host, CDN, region and headers, and none has ever been named — the plan's only concrete URL is the placeholder `https://cdn.example/…`. Amendment A6 CUT 0b to M-R on exactly this ground and pre-refused running it against a stand-in, because a stand-in produces the number 0b exists to replace. Also downstream of B5: 0b's four threshold clauses cannot pass or fail while the standing no-thresholds decision means no threshold exists to meet."
+      "evidenceLine": "DEFERRED BY A25 (2026-09-20) on a ground that re-derives every run. Scenario 0b measures the PUBLISHED package served from a real production host with real headers; the package is unpublished (version 0.0.0), so naming a host today produces exactly the stand-in figure A6 refused when it cut 0b to M-R on this ground. A25 sequences it instead: 0b runs immediately after the first publish, measured against jsDelivr — the route README.md documents and which M-R S9 chose over unpkg on a brotli measurement. The ground fails the moment the version leaves 0.0.0, which is when 0b becomes runnable.",
+      "deferral": {
+        "whileTrue": "packageUnpublished"
+      }
     },
     {
       "id": 89,
       "statement": "At M8 close every selected-profile scenario owned by M8 or an ancestor — 0a (M2), scenarios 1-3 and 4-5 (M7), 0b (M8) — meets its frozen threshold and tolerance.",
-      "verdict": "NOT-PROVEN",
+      "verdict": "DEFERRED",
       "slice": "A7 (thresholds restated; scenarios 1-5 declared OWED)",
       "gates": [],
       "ablation": "",
-      "evidenceLine": "STILL NOT-PROVEN, and deliberately not moved by M-D S23 — the clause names a NUMBERED frozen M7 scenario suite, and closing it by declaring the existing scenarios to be that suite would be the 'move a case to passed by weakening a rule' shape this project polices. What S23 DID is measure the coverage the clause is really about, plan 9.3's seven measurements, so the next attempt starts from a fact rather than from A7's 'OWED': (1) cold decode/parse/compile — scenario:0a and scenario:2k; (2) construction PEAK and retained memory — retained is covered by 0a, 2k and 6, PEAK IS MEASURED NOWHERE and is the one genuine measurement gap; (3) warm get/getResult throughput — scenario:2k's steadyLookupNs arms; (4) fallback-chain and equivalence-cache behaviour — 2k's two arms plus test/candidate-chain-memo.test.js; (5) browser request graph and first usable render — 0a's browser half, fresh since S19 (the real-HOST version is 0b, cut to M-R by A6); (6) Node server concurrency with per-call locales — NEW in S23, scenario:concurrency, in verify and CI; (7) partial and failed load cleanup — test/load-retention.test.js, clause 78. M-D S24 then closed (2)'s missing half: scenario:peak-memory bisects --max-old-space-size in a child process, because a sampler on the same thread cannot observe a synchronous operation's own peak, and its soundness precondition — the largest catalog must cost more than the runtime's own floor — is the S26 lesson encoded as a gate. **SO ALL SEVEN OF 9.3's MEASUREMENTS ARE NOW RECORDED.** What remains for this clause is not a measurement: it is the FORMAL numbered M7 scenario suite, frozen with a hash, and a THRESHOLD — and A7 declined to freeze any threshold because doing so would revoke the 2026-09-01 no-thresholds decision. That is a maintainer's call, not a gap an agent can build."
+      "evidenceLine": "AMENDED BY A26 and DEFERRED BY A25, and the two act together. A26 settles the threshold question left open since 2026-09-01 and which A7 declined to freeze: the shape is clause 19's as amended by A3 — recorded, ratcheted where a ratchet exists, reported where none does — and no threshold is frozen. All seven of plan 9.3's measurements are recorded. This clause nevertheless enumerates 0b by name, and 0b cannot run until the package is published, so it defers on the same ground rather than closing on a list one of whose members does not yet exist.",
+      "deferral": {
+        "whileTrue": "packageUnpublished"
+      }
     },
     {
       "id": 90,

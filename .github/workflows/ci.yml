@@ -325,7 +325,9 @@ jobs:
           npm run check:partitions
           npm run check:iana-registry
           npm run check:provenance
+          npm run check:selection
           npm run check:archive
+          npm run check:evidence
           npm run check:coverage
 
   packed:
