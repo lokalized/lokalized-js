@@ -325,3 +325,85 @@ test("THIRD-PARTY-NOTICES.md's own claims are the ones that ship", () => {
   for (const heading of ["## Unicode CLDR", "## IANA language range equivalents", "## minimal-json"])
     assert.ok(notices.includes(heading), `THIRD-PARTY-NOTICES.md has no ${heading} section`);
 });
+
+/**
+ * **THE IANA PROVENANCE SENTENCES IN THE THREE SHIPPED PROSE SURFACES, DERIVED RATHER THAN
+ * RESTATED.**
+ *
+ * M-R S13 moved the equivalence oracle: the closure stopped being probed out of
+ * `java.util.Locale.LanguageRange.parse` and started being probed out of lokalized-java's own
+ * registry-sourced table. `NOTICE`, `THIRD-PARTY-NOTICES.md` and `README.md` all describe that
+ * provenance, all three SHIP, and **not one of them was re-derived** — so for a day the package
+ * told every consumer its language data came from a JDK build, named an entry count 12 short, and
+ * (in THIRD-PARTY-NOTICES, the licensing surface) said "it carries no registry file date because
+ * there is no registry snapshot behind it" while the artifact recorded one.
+ *
+ * Nothing could have caught it. `notice-shape.test.js` above gates the CLDR claims and says
+ * nothing about IANA; `check:readme` cannot see prose at all, which S12 recorded; and
+ * `tools/provenance-check.mjs`, written the same day, reads only the SPEC's IANA-PROVENANCE.md.
+ * This is the standing lesson in its own words — a document that ships is a surface, and its
+ * second copy drifts like any other — with three second copies.
+ *
+ * Every number and name below comes from the shipped artifact. The prose may say more than this;
+ * what it may not do is contradict the data it ships beside.
+ */
+const surfaces = [
+  { path: "NOTICE", text: notice },
+  { path: "THIRD-PARTY-NOTICES.md", text: readFileSync(join(root, "THIRD-PARTY-NOTICES.md"), "utf8") },
+  { path: "README.md", text: readFileSync(join(root, "README.md"), "utf8") },
+];
+
+test("the shipped IANA provenance prose names the oracle that actually produced the closure, and not the one that used to", async () => {
+  const { RUNTIME_METADATA } = await import("../src/internal/runtime-metadata.js");
+  const [oracle] = RUNTIME_METADATA.ianaClosureSource.split(":");
+
+  // ANTI-VACUITY: if the constant stopped naming an oracle, every assertion below would pass by
+  // matching nothing.
+  assert.ok(oracle === "lokalized-java" || oracle === "jdk-corretto",
+    `ianaClosureSource names an oracle this test does not know: ${RUNTIME_METADATA.ianaClosureSource}`);
+
+  // The retired claim, in the exact shape all three carried it: the closure being the JDK's own
+  // `LanguageRange.parse` output. While the library is the oracle, no shipped file may say it.
+  const retired = /LanguageRange\.parse[^.]{0,120}\b(pinned )?OpenJDK|equivalence data[^.]{0,40}is \*\*the JDK's\*\*/;
+  for (const surface of surfaces) {
+    if (oracle !== "lokalized-java") continue;
+    assert.equal(retired.test(surface.text), false,
+      `${surface.path} still attributes the language-range closure to the JDK, and it is ` +
+      `${RUNTIME_METADATA.ianaClosureSource}'s. Re-derive the paragraph from the artifact.`);
+  }
+});
+
+test("the shipped IANA provenance prose states the entry count the package actually ships, wherever it states one", async () => {
+  const { decode } = await import("../src/data/iana-range-equivalents.js");
+  const shipped = decode().size;
+  assert.ok(shipped > 100, `the closure decoded to ${shipped} entries; the probe is not reading it`);
+
+  // Only THIRD-PARTY-NOTICES.md quotes a count today. The rule is keyed on the SHAPE of the
+  // claim rather than on that file, so a count appearing in another surface is caught too.
+  const claim = /encodes ([\d,]+) language\s+range equivalence classes/;
+  let stated = 0;
+  for (const surface of surfaces) {
+    const found = claim.exec(surface.text);
+    if (found === null) continue;
+    stated++;
+    assert.equal(Number(found[1].replace(/,/g, "")), shipped,
+      `${surface.path} says the closure encodes ${found[1]} classes; it ships ${shipped}`);
+  }
+  assert.ok(stated > 0,
+    "no shipped surface states the closure's size any more — either the sentence was reworded " +
+    "out from under this rule, or the attribution stopped being quantified. Re-aim it.");
+});
+
+test("the shipped IANA provenance prose does not deny the registry snapshot the artifact records", async () => {
+  const { RUNTIME_METADATA } = await import("../src/internal/runtime-metadata.js");
+  const date = RUNTIME_METADATA.ianaRegistryDate;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;   // no snapshot pinned; nothing to contradict
+
+  // THIRD-PARTY-NOTICES.md said "it carries no registry file date because there is no registry
+  // snapshot behind it" for a day after one was pinned. That is the licensing surface denying
+  // the provenance of the data in the same tarball.
+  const denial = /no registry file date|there is no registry snapshot|pinned to a JDK build rather than/i;
+  for (const surface of surfaces)
+    assert.equal(denial.test(surface.text), false,
+      `${surface.path} denies a registry snapshot while the build records File-Date ${date}`);
+});

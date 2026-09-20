@@ -7,7 +7,7 @@
     "implementationVersion": "0.0.0",
     "packageName": "lokalized",
     "packageVersion": "0.0.0",
-    "implementationCommit": "e607022a90294b9011298595141ce30aee674c8e",
+    "implementationCommit": "b6dfb787525e2a4196b1047a04273acfdacb47f1",
     "javaReferenceCommit": "6311fec98f6c9b83351f1231d291be3878031427",
     "javaReferenceTagCommit": "c971f071ded30562acf627c07e5767389d57f84b",
     "dataCommit": "6ae70116f0778fa346db1151947153e73486435b",
@@ -28,7 +28,7 @@
     "behavioralVectorsVersion": "1.0.0",
     "dataFingerprint": "9b4f24165b6dd1ee6dbb5f0822abc7bcde49c5b94d35903045826b45e1f30e68",
     "ianaRegistryDate": "2026-09-17",
-    "ianaDataFingerprint": "06991d8e1762fab1fa62995621018956dc2b2db0ae81e2001a780e0d0bb63353",
+    "ianaDataFingerprint": "42a658b350903ec3697499ecce103a08021cc4588ef60014045cf391786073c0",
     "ianaClosureSource": "lokalized-java:3.1.0-SNAPSHOT",
     "referenceJdkVendor": "Amazon.com Inc.",
     "referenceJdkVersion": "21.0.11",
@@ -4611,7 +4611,7 @@
       ]
     },
     "xfailMetadata": [],
-    "sourceDateEpoch": 1789876254
+    "sourceDateEpoch": 1789915192
   },
   "undetermined": [
     {

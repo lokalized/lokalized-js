@@ -60,7 +60,13 @@ const LEDGERS = [
   // `lokalized-spec/scripts/documentation-topics.mjs` now FAILS on a sentence in that row it cannot
   // read, rather than extracting the ones it knows and leaving the rest invisible.
   { milestone: "M-D", file: "measurements/md-clauses.json", expected: 16 },
+  // M-R's fourteen are plan :2927's own five sentences decomposed — sentence 3 alone states eight
+  // things that "block release". Verdicted by agents who did not write the slices, because all
+  // thirteen were one author's; M-D S30 recorded that as the independence a self-derived ledger
+  // lacks, and then M-R accumulated the same debt one milestone on.
+  { milestone: "M-R", file: "measurements/mr-clauses.json", expected: 14 },
 ];
+
 
 /**
  * **A DEFERRAL IS A CLAIM, AND UNTIL M-D S20 NOTHING RE-DERIVED IT.**
@@ -108,6 +114,25 @@ const MILESTONE_ORDER = [
 // because plan 10.2's dependency is on M-D's DELIVERABLES, all of which shipped, rather than on that
 // person's calendar.
 const CURRENT_MILESTONE = "M-R";
+
+/**
+ * **THE CURRENT MILESTONE MUST HAVE A LEDGER, and this term exists because twice it did not.**
+ *
+ * M-D S30 found `LEDGERS` naming M8 and M9 while `CURRENT_MILESTONE` read "M-D", with nineteen
+ * slices landed against obligations nothing had verdicted. It added M-D's ledger and did NOT add
+ * the rule — so when the constant moved to "M-R" the same hole opened again, and thirteen more
+ * slices accumulated before an assessment noticed. Twice is a pattern, and the repair for a
+ * pattern is a term rather than a third correction.
+ *
+ * Retrospective proof is the only kind worth having here: with the M-R entry above removed, this
+ * fails naming "M-R", which is exactly the state the repository was in this morning.
+ */
+if (!LEDGERS.some((ledger) => ledger.milestone === CURRENT_MILESTONE))
+  problems.push(
+    `CURRENT_MILESTONE is "${CURRENT_MILESTONE}" and LEDGERS declares no ledger for it, so every ` +
+    `slice landing against that milestone's obligations is unverdicted. Derive its clauses from ` +
+    `the plan's own row and add { milestone: "${CURRENT_MILESTONE}", file: ` +
+    `"measurements/${CURRENT_MILESTONE.toLowerCase().replace("-", "")}-clauses.json", expected: N }.`);
 
 const specDir = resolve(root, "..", "lokalized-spec");
 /** A spec-repo artifact, or a loud failure. A predicate that cannot read its input has not held. */

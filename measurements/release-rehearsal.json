@@ -31,7 +31,7 @@
         "file": "dist/browser/lokalized.js",
         "files": 1,
         "rawBytes": 188092,
-        "brotliBytes": 55838,
+        "brotliBytes": 55753,
         "exports": 70,
         "loadedInBrowser": true
       },
@@ -40,7 +40,7 @@
         "file": "dist/browser/core.js",
         "files": 7,
         "rawBytes": 187263,
-        "brotliBytes": 55593,
+        "brotliBytes": 55561,
         "exports": 21,
         "loadedInBrowser": true
       },
@@ -58,7 +58,7 @@
         "file": "dist/browser/load.js",
         "files": 7,
         "rawBytes": 181844,
-        "brotliBytes": 54582,
+        "brotliBytes": 54577,
         "exports": 10,
         "loadedInBrowser": true
       },
@@ -76,7 +76,7 @@
         "file": "dist/browser/negotiate.js",
         "files": 3,
         "rawBytes": 110996,
-        "brotliBytes": 34844,
+        "brotliBytes": 34861,
         "exports": 6,
         "loadedInBrowser": true
       },
@@ -85,7 +85,7 @@
         "file": "dist/browser/data/ordinal.js",
         "files": 8,
         "rawBytes": 193971,
-        "brotliBytes": 57075,
+        "brotliBytes": 57098,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -94,11 +94,11 @@
         "file": "dist/browser/data/ranges.js",
         "files": 8,
         "rawBytes": 196499,
-        "brotliBytes": 57232,
+        "brotliBytes": 57196,
         "exports": 2,
         "loadedInBrowser": true
       }
     ],
-    "sizesRecordedFor": "M-R S13: the IANA closure grows 806 -> 818 (twelve JDK-absent tags, four recovered by seeding the probe space from the oracle's own keys) and src/internal/locale.js gains Java's prefix walk at the single-locale door"
+    "sizesRecordedFor": "M-R S14: the registry snapshot's SHA-256 now travels with the closure (clause 33 conjunct 2) and the data lock references the 130 override rows (conjunct 3)"
   }
 }

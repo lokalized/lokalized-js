@@ -1,0 +1,208 @@
+{
+  "$comment": "M-R acceptance clauses, derived from IMPLEMENTATION-PLAN-v7.md:2927 (the M-R row) and verdicted by agents who did not write the slices. M-D S30 established that a milestone becomes CURRENT without a ledger and accumulates unverdicted slices; M-R reached thirteen. Every verdict here, and every gate and ablation cited, came from an independent assessment whose findings were each re-measured by a second agent told to default to refuted.",
+  "milestone": "M-R",
+  "derivedFrom": "IMPLEMENTATION-PLAN-v7.md:2927",
+  "clauses": [
+    {
+      "id": 1,
+      "planId": "plan :2927 sentence 1",
+      "statement": "2927, sentence 1): the packed export/symbol allowlist exposes only implemented paths",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/symbol-allowlist.test.js",
+        "test/declared-surface.test.js",
+        "test/plan-surface.test.js",
+        "test/allowlist-type-surface.test.js",
+        "test/package-shape.test.js",
+        "tools/release-check.mjs"
+      ],
+      "ablation": "MINE, run in the private copy: adding `\"./ghost\": {types:\"./types/ghost/index.d.ts\", import:\"./src/ghost/index.js\"}` to package.json#exports takes the same six files from 30 pass / 1 fail to 18 pass / 13 fail — 12 reds beyond the control, naming `export map matches the documented entry points exactly`, `every exported symbol is on its OWN subpath's allowlist`, `every allowlisted name is delivered, or owed by a named milestone`, `every documented map covers exactly the browser-safe subpaths`, and eight more. package.json restored and verified sha256-identical to the shared tree (b485fd7c…).",
+      "evidenceLine": "Five gates exist on disk and all are steps of `verify` AND of CI. Measured live rather than read: control run of test/{package-shape,symbol-allowlist,declared-surface,plan-surface,allowlist-type-surface,browser-import-map}.test.js is `tests 31 / pass 30 / fail 1`, the one failure being the known rsync artifact (.git excluded). The packed qualifier is real: test/notice-shape.test.js and tools/readme-newcomer.mjs read `npm pack` output, and tools/release-check.mjs installs the tarball into a clean project and imports all nine documented specifiers (`installed and imported 9 documented specifier(s); rendered \"Bonjour, Ada\"`, exit 0).",
+      "owner": "agent"
+    },
+    {
+      "id": 2,
+      "planId": "plan :2927 sentence 2",
+      "statement": "declarations pass package-surface tests",
+      "verdict": "PROVEN",
+      "gates": [
+        "tools/declaration-probes/run.mjs",
+        "tools/readonly-surface.mjs",
+        "test/plan-surface.test.js",
+        "test/declared-surface.test.js",
+        "tools/release-check.mjs"
+      ],
+      "ablation": "MINE (the ./ghost export above reds plan-surface and declared-surface), plus recorded and specific: M-R S2 — reverting the probes to source resolution reds, and the divergence table claiming a class refuses when it does not reds in both directions, four ablations, control clean both sides; M-R S4 — fifteen ablations all firing, control exit 0, six of them holes an adversarial agent found in the gate itself (a readonly ARRAY satisfied by a `string`; a declared contradiction that could not go stale because the check wrote `void stillOpen;`).",
+      "evidenceLine": "Executed: `npm run declarations` exit 0, `declaration probes: 40/40`, carrying both a must-compile and a must-be-refused arm; `npm run check:readonly` exit 0, `179 registry statements · 230 probes compiled · 1 unreachable by design · 3 declared contradiction(s)`. Both resolve through `package.json#exports` and read the EMITTED `types/*.d.ts`, which is the channel M-R S2 found blind. tools/release-check.mjs step 4 repeats TypeScript resolution against the INSTALLED tarball rather than the tree.",
+      "owner": "agent"
+    },
+    {
+      "id": 3,
+      "planId": "plan :2927 sentence 3, item 1",
+      "statement": "Node smoke tests block release",
+      "verdict": "PROVEN",
+      "gates": [
+        "tools/release-check.mjs",
+        "tools/readme-newcomer.mjs",
+        "test/package-shape.test.js"
+      ],
+      "ablation": "MINE, and it is the first ablation of this channel anywhere in the record: removing `measurements/lokalized-parity.json` from package.json#files takes `check:release` to exit 1 with ENOENT on `…/app/node_modules/lokalized/measurements/lokalized-parity.json` — so the gate genuinely reads the INSTALLED copy. Control exit 0. CAVEAT recorded rather than glossed: it reds as an uncaught Node stack, not as a named `problems.push` line, and a second mutation (pointing ./ssr at an unpublished `tools/graph-walk.mjs`) also produced a raw stack, from the prepack type-check. package.json restored sha256-identical.",
+      "evidenceLine": "`npm run check:release` installs the real `npm pack` tarball into an empty ESM project and uses it; it is a step of `verify` and a named CI step (.github/workflows/ci.yml:158-159). Executed here: exit 0, `lokalized-0.0.0.tgz, 1915056 bytes packed, 150 files`, nine specifiers imported, `require() answered ERR_PACKAGE_PATH_NOT_EXPORTED`. The CI matrix is `node: [\"20\",\"22\",\"24\",\"current\"]` with the floor leg first and the `packed` job pinned to 20. Worth recording against the plan: §1.1's table says the Node floor is 22 while `engines.node` is `>=20` — a decided deviation (M-D S33), not a gap.",
+      "owner": "agent"
+    },
+    {
+      "id": 4,
+      "planId": "plan :2927 sentence 3, item 2",
+      "statement": "exact-browser smoke tests block release",
+      "verdict": "NOT-PROVEN",
+      "gates": [
+        "tools/build-browser.mjs",
+        "tools/release-check.mjs",
+        "measurements/release-rehearsal.json",
+        "test/browser-import-map.test.js",
+        "test/browser-global.test.js"
+      ],
+      "ablation": "The RECORDED half is real and I did not re-run it: M-R S9 A14 falsifies all 24 recorded size fields → 23 problems, A15 falsifies one `brotliBytes` → exactly 1 problem, A1 `sourcemap:false` → 20 problems, A8b shows the `endsWith` lookup is exit 0 where the exact match reds. Every one of those ablates the RECORD or the BUILD. None ablates an execution at a floor engine, because no such execution exists.",
+      "evidenceLine": "The build TARGETS the floors — `const TARGETS = [\"safari16.4\", \"chrome111\", \"firefox111\"]` at tools/build-browser.mjs:70, passed to esbuild and gated by `npm run check:dist` (exit 0 here). A browser capture is recorded and compared without a browser (measurements/release-rehearsal.json, gated by check:release; measurements/preload-reuse.json, Chrome 152). But NOTHING has ever executed at Safari 16.4, Chrome 111 or Firefox 111, and plan §1.1 asks for \"Exact-floor smoke tests plus current Playwright engines\". Measured: .github/workflows/ci.yml declares exactly two jobs (`verify`, `packed`) and zero browser jobs; `playwright` occurs in one file in the whole repository and it is m8-clauses.json's own blocker text; `puppeteer` occurs zero times. This is M-R-PLAN.md blocker B4 and M8 clauses 69/79.",
+      "owner": "maintainer"
+    },
+    {
+      "id": 5,
+      "planId": "plan :2927 sentence 3, item 3",
+      "statement": "representative-edge smoke tests block release",
+      "verdict": "NOT-PROVEN",
+      "gates": [
+        "tools/scenario-6.mjs",
+        "test/example-edge.test.js",
+        "test/example-edge-capabilities.test.js"
+      ],
+      "ablation": "scenario:6's six recorded ablations fire on the FIXTURE and the RECIPE (a changed fixture byte, a changed recipe with `revision` unmoved, a grown graph, a missing artifact, grown requests-per-render, a re-pinned closure — the last fired for real in S13). None of them is an ablation of a worker-runtime execution, because none has ever run.",
+      "evidenceLine": "An edge example exists and is measured — `npm run scenario:6` (frozen recipe, in verify AND CI), test/example-edge.test.js and test/example-edge-capabilities.test.js — but it runs from SOURCE under Node, not from the packed artifact and not in a worker runtime. Plan :2342-2344 requires a smoke test in at least one NAMED worker runtime. Measured across the js checkout: `workerd` and `cloudflare` appear in exactly two files, both of them measurements/m8-clauses.json and measurements/m9-clauses.json — i.e. only inside the ledgers' own blocker text; `miniflare` and `wrangler` appear zero times. This is M9 clause 21 / M8 clause 70, blocker B3, and A5 sequenced it into a contradiction (the smoke test is DEFINED as running from a packed build that A5 deferred past M9).",
+      "owner": "maintainer"
+    },
+    {
+      "id": 6,
+      "planId": "plan :2927 sentence 3, item 4",
+      "statement": "notices block release",
+      "verdict": "PROVEN",
+      "gates": [
+        "test/notice-shape.test.js",
+        "tools/bundle-sizes.mjs",
+        "tools/release-check.mjs"
+      ],
+      "ablation": "Recorded with named reds and controls clean (M-R S5): eleven ablations — the `//` attribution revert (bundle carries 0 copies), the notices file leaving `files`, one banner drifting from the other fourteen, `NOTICE` pointing at the sibling repository again, a stale module count, the JDK-derived module gaining the CLDR stamp, the licence text reduced to a summary, the not-CLDR sentence deleted, a drifted banner (2 copies), and the notice sprayed onto a subpath carrying no data. Plus an auditor's 284-byte stub that passed 8/8 and is now refused by byte-identity against the pinned copy.",
+      "evidenceLine": "test/notice-shape.test.js asks `npm pack` what actually ships rather than reading the working tree, and tools/bundle-sizes.mjs keys its attribution rule on esbuild's own metafile byte accounting (`bytesInOutput > 0`) after a heuristic was measured to see 2% of what ships. Measured on the real tarball I packed: package/LICENSE, package/NOTICE and package/THIRD-PARTY-NOTICES.md are all present among the 150 files. Both gates are keyed on the GENERATOR'S PROVENANCE LINE rather than on the copyright stamp they require, which is the circularity M-R S5 measured and fixed.",
+      "owner": "agent"
+    },
+    {
+      "id": 7,
+      "planId": "plan :2927 sentence 3, item 5",
+      "statement": "reproducibility blocks release",
+      "verdict": "NOT-PROVEN",
+      "gates": [
+        "tools/release-check.mjs"
+      ],
+      "ablation": "None exists and none can, because no rule exists to ablate. The negative is the measurement: `check:release` exits 0 today and would exit 0 over a tarball that differed on every byte between two packs.",
+      "evidenceLine": "THE PROPERTY HOLDS AND NOTHING CHECKS IT. Measured: two consecutive `npm pack --pack-destination` runs produce byte-identical tarballs, sha256 5ee5cac5da5c61860ac61b02f60679f60449a6e2b2a152c1505485f04ece39af both times, 1,915,056 bytes. But a grep for `reproducib` across tools/, test/, .github/ and package.json finds the word in tools/release-check.mjs exactly once, inside the docblock QUOTING plan :2766's list of nine checks — it is the one item of the nine with no implementation. Nothing packs twice and compares, nothing pins the digest, and reproducibility across runtimes (the narrower real question M-R-PLAN.md names) is untested. This is the smallest open M-R item and it is an agent's.",
+      "owner": "agent"
+    },
+    {
+      "id": 8,
+      "planId": "plan :2927 sentence 3, item 6",
+      "statement": "size/performance budgets block release",
+      "verdict": "NOT-PROVEN",
+      "gates": [
+        "tools/subpath-graphs.mjs",
+        "tools/scenario-0a.mjs",
+        "tools/bundle-sizes.mjs",
+        "tools/scenario-2k.mjs",
+        "tools/scenario-peak-memory.mjs",
+        "tools/scenario-concurrency.mjs"
+      ],
+      "ablation": "MINE: +76 bytes into src/index.js reds subpath:graphs and scenario:0a, both naming the exact byte delta; src/index.js restored and verified sha256-identical to the shared tree. That ablation proves the size ratchet and simultaneously demonstrates the gap — the same run prints the no-thresholds sentence for timings and heap.",
+      "evidenceLine": "SPLIT, and the split is the finding. SIZE ratchets do block: appending 76 bytes to src/index.js takes `npm run subpath:graphs` to exit 1 (`lokalized: source graph grew 770591 -> 770667 bytes`, plus data/ordinal and data/ranges) and `npm run scenario:0a` to exit 1 on the same growth; both are steps of verify AND CI. PERFORMANCE has no budget at all, and the tool says so in its own output: `NO THRESHOLDS EXIST, by decision: M2 is tracked by engineering measurement. Size and module count ratchet against the baseline; timings and heap are reported and never gated.` A ratchet is a no-regression rule, not a budget a release can MISS, so the row's word is unsatisfied on the performance half. This is M8 clause 89 and blocker B5, which amendment A7 declined to freeze because freezing would revoke the 2026-09-01 no-thresholds decision.",
+      "owner": "maintainer"
+    },
+    {
+      "id": 9,
+      "planId": "plan :2927 sentence 3, item 7",
+      "statement": "public artifact archive blocks release",
+      "verdict": "NOT-PROVEN",
+      "gates": [
+        "tools/parity-report.mjs",
+        "../lokalized-spec/tools/data-archive.mjs"
+      ],
+      "ablation": "None. The clause has no implementation to ablate; what is gated is the report's refusal to publish an unexplained null, which is the honest half.",
+      "evidenceLine": "Plan :2395 requires each pinned Java reference tag to publish an immutable, checksummed `lokalized-porting-contracts-<version>.tar.gz`, and plan 8.5 requires its digest in the parity report. Measured: `find` across all four trees returns ZERO files matching *porting-contract*, and the only three files mentioning the name are IMPLEMENTATION-PLAN-v7.md, tools/parity-report.mjs and measurements/lokalized-parity.json — where `portingContractArchiveDigest` is correctly filed as `undetermined` with the reason that it is the Java side's to publish. The spec's `dist/lokalized-data-48.2.tar` exists and is gated by `check:archive` (exit 0 here), but that is plan M1's narrower data-only archive and the report already says so rather than substituting it.",
+      "owner": "maintainer"
+    },
+    {
+      "id": 10,
+      "planId": "plan :2927 sentence 3, item 8",
+      "statement": "parity metadata blocks release",
+      "verdict": "PROVEN",
+      "gates": [
+        "tools/parity-report.mjs",
+        "tools/divergences.mjs",
+        "tools/release-check.mjs",
+        "../lokalized-spec/scripts/parity-obligations.mjs"
+      ],
+      "ablation": "MINE: dropping the report from package.json#files reds check:release on the installed copy. RECORDED (M-R S10), four firing with controls clean: perturbing one recorded value reds parity:check; perturbing one row reds the divergence check; rewording a bullet in plan 8.5 reds the spec generator; emptying the by-design table reds three terms at once. I also confirmed the comparison is not a tolerance — PER_COMMIT is exactly five named fields (tools/parity-report.mjs:469-470) and everything else is compared byte-for-byte.",
+      "evidenceLine": "`lokalized-parity.json` and `DIVERGENCES.md` ship in the tarball (both measured present in the 150 packed files), `npm run parity:check` and `npm run divergences` are steps of verify AND of CI, and check:release step 7 compares the tarball's copies to the tree's. The obligation list is DERIVED from plan 8.5 by ../lokalized-spec/scripts/parity-obligations.mjs, which hashes each of the seven bullets and five prose requirements over its exact bytes and refuses to emit on a sentence it cannot read. Executed: 36 fields across 12 obligations, 7 undetermined each with a reason, 1 waiting on a person.",
+      "owner": "agent"
+    },
+    {
+      "id": 11,
+      "planId": "plan :2927 sentence 4a",
+      "statement": "CI embeds lokalized-parity.json against exact Java/CLDR/IANA/JDK references",
+      "verdict": "NOT-PROVEN",
+      "gates": [
+        "tools/parity-report.mjs",
+        "tools/release-check.mjs",
+        ".github/workflows/ci.yml"
+      ],
+      "ablation": "Recorded and two-sided (M-R S13): perturbing `referenceJdkVendor` and running where the JDK EXISTS exits 1 naming both values; the same perturbed record where the JDK is ABSENT exits 0. That pair is precisely what makes this NOT-PROVEN rather than proven — it measures the limit instead of hiding it.",
+      "evidenceLine": "The embedding half holds — the report is in the tarball and `parity:check` is a CI step. The REFERENCES half does not. (1) Plan 8.4 requires `reference-runtime-lock.json` recording the exact vendor, update/build string and immutable image digest; measured, `find` returns ZERO files of that name in any of the four trees, and `referenceJdkImageDigest` is null. (2) Plan :2612 pins an Eclipse Temurin image; the actual reference is Amazon Corretto 21.0.11 (`referenceJdkRuntimeVersion: \"Corretto-21.0.11.10.1\"`). That divergence IS recorded in the report's own note, which is the right handling, but it is recorded rather than resolved — blocker B8. (3) On a CI runner there is no JDK and no lokalized-java checkout, so the oracle-derived fields are CARRIED from the record, not verified: the tool printed `--check: 2 oracle-derived field(s) carried from the record, 3 re-measured here and cross-checked`, and M-R S13's own measurement shows a perturbed `referenceJdkVendor` exits 0 where the JDK is absent. So CI embeds the report against a RECORD of the references, and only the authoring machine checks them.",
+      "owner": "maintainer"
+    },
+    {
+      "id": 12,
+      "planId": "plan :2927 sentence 4b",
+      "statement": "every active release requirement has accepted evidence",
+      "verdict": "NOT-PROVEN",
+      "gates": [
+        "../lokalized-spec/pre-m0/registry-linter.mjs",
+        "tools/parity-report.mjs"
+      ],
+      "ablation": "None, and the absence is the finding: there is no rule whose removal would change anything, because the only closure rule in the linter is about registration. The parity report's `activeRequirementIds` honestly reports BOTH readings — `{byActivationFrontier: 1338, byReviewStatus: 0, total: 1338}` — and names the fork rather than picking one.",
+      "evidenceLine": "Blocker B1, and it is the sentence M-R-PLAN.md's headline says stops the milestone. Measured directly: pre-m0/bootstrap.requirements.candidate.json holds 1,338 rows and `reviewStatus` is `unreviewed` on 1,338 of 1,338; 0 of the corpus's 2,379 cases carry any `requirementIds`, so closure has no edges; 0 of the 1,338 ids match plan 8.6's mandated immutable form `LJ-<AREA>-NNN` (every one is `BOOT-M0-NNNN`); 20 rows carry `activationMilestone: \"M-R\"`. AND NO GATE ENFORCES IT: `npm run check:registry` exits 0 reporting `coverage 186/186 M0-frontier blocks (100%) · remaining 0`, but its \"closure\" is REGISTRATION closure — every M0-frontier plan block has at least one requirement — not evidence acceptance. Three earlier milestones passed this by recording it; M-R's row makes it a release gate.",
+      "owner": "maintainer"
+    },
+    {
+      "id": 13,
+      "planId": "plan :2927 sentence 4c",
+      "statement": "every portable and JS-required ID passes with zero failed/xfail/unsupported outcomes",
+      "verdict": "PROVEN",
+      "gates": [
+        "tools/conformance.mjs",
+        "tools/parity-report.mjs",
+        "../lokalized-spec/tools/partition-check.mjs"
+      ],
+      "ablation": "Recorded and dense: conformance ratchets the passing-ID set and gates on `corpusSha256` (M8 S27 — the stale digest reds naming `02626938 -> c860804c`); S27's eight partition ablations all fire with clean controls, including re-keying the partition check on the operation (43 stale records) and taking permanence from the fixture property instead of the outcome (59 regressions). The corpus digest guard also now runs at CI checkout, added after a push-ordering race resolved a spec 16 cases behind.",
+      "evidenceLine": "Executed here: `npm run conformance` exit 0, `passed 2166 / FAILED 0 / unsupported 0` over 2,379 cases; `npm run parity:check` prints `strict required partition: 2153/2153 passing, 0 failed, 0 xfailed, 0 unsupported — MET`. The corpus partition is 2,153 requiredPortableIds / 226 informationalIds, measured from behavioral-vectors.json. The two residual buckets are declared PERMANENT rather than pending — 43 refused by design (plan 4.6 fixes v1's limits) and 170 with no JVM counterpart — and `BY_DESIGN_UNSUPPORTED` fails on a stale or unreached declaration. ONE CONJUNCT IS VACUOUS AND MUST STAY SAID SO: 0 of 2,379 cases carry an `xfail` field, so \"zero xfailed\" is satisfied by the absence of the mechanism, exactly as M-R S2 said of BOOT-M0-0834. The verdict rests on the two conjuncts with content.",
+      "owner": "agent"
+    },
+    {
+      "id": 14,
+      "planId": "plan :2927 sentence 5",
+      "statement": "publication uses provenance/OIDC",
+      "verdict": "NOT-PROVEN",
+      "gates": [
+        ".github/workflows/ci.yml"
+      ],
+      "ablation": "None possible — there is no publish path to ablate.",
+      "evidenceLine": "Nothing exists. Measured across lokalized-js excluding node_modules: `id-token` 0 occurrences, `OIDC` 0 occurrences, `--provenance` 0 occurrences. `.github/workflows/` contains exactly one file, ci.yml, whose `permissions` block is `contents: read` and which declares two jobs, neither of which publishes. `npm publish` occurs 4 times and all four are prose — a README sentence, a bundle-sizes caption, a readme-newcomer docblock and a package-shape comment. The package version is 0.0.0 and M-R S9 records that `lokalized` is not on the registry. This is the whole of plan 9.1's last bullet and it is unstarted.",
+      "owner": "maintainer"
+    }
+  ]
+}

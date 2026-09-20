@@ -111,5 +111,5 @@ export const RUNTIME_METADATA = Object.freeze({
   ianaClosureSource: "lokalized-java:3.1.0-SNAPSHOT",
 
   // `lokalized-spec generated/iana-data-lock.json`'s `ianaDataFingerprint`.
-  ianaDataFingerprint: "06991d8e1762fab1fa62995621018956dc2b2db0ae81e2001a780e0d0bb63353",
+  ianaDataFingerprint: "42a658b350903ec3697499ecce103a08021cc4588ef60014045cf391786073c0",
 });

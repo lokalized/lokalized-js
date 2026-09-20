@@ -31,11 +31,12 @@ own.
 
 ## IANA language range equivalents
 
-`src/data/iana-range-equivalents.js` is generated and is NOT CLDR data. It encodes 806 language
-range equivalence classes, recorded by exhaustively probing `java.util.Locale.LanguageRange.parse`
-on a pinned OpenJDK 21.0.11 build; the values are that JDK's, and the tags probed were drawn from
-the CLDR data above. It is pinned to a JDK build rather than to an IANA registry release, and it
-carries no registry file date because there is no registry snapshot behind it.
+`src/data/iana-range-equivalents.js` is generated and is NOT CLDR data. It encodes 818 language
+range equivalence classes, recorded by exhaustively probing lokalized-java 3.1.0-SNAPSHOT's own
+equivalence table; the values are that library's, and the tags probed were drawn from the CLDR data
+above together with the library's own table keys. That table is generated from the IANA Language
+Subtag Registry snapshot pinned at File-Date 2026-09-17, so this artifact is anchored to a registry
+release rather than to a JDK build, and it records that date.
 
 ## minimal-json
 

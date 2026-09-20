@@ -2159,11 +2159,21 @@ File-Date and still carry different language-range behaviour, which is what `ian
 for — that one fingerprints the closure itself, and the two are compared together.
 
 What the closure actually *is* deserves saying plainly, because the date alone implies more than it
-should. The equivalence data this package uses is **the JDK's**, not the registry's, because the
-whole point is to answer as `lokalized-java` answers. The registry and the JDK disagree in 156
-places, and every one of them is enumerated in `DIVERGENCES.md`'s companion artifact — verified by
-reconstruction, meaning that applying those 156 overrides to the registry's own closure reproduces
-the JDK's byte for byte. So the snapshot is a real, checkable anchor rather than a label.
+should. The equivalence data is **`lokalized-java`'s own registry-sourced table**, not the JDK's:
+as of lokalized-java 3.1.0 the library generates that table from the pinned registry snapshot
+rather than calling `java.util.Locale.LanguageRange.parse`, and this package's closure is derived
+by probing the library. Answering as `lokalized-java` answers is still the whole point — what
+changed is that `lokalized-java` stopped deferring to whichever registry snapshot happened to be
+baked into the running JVM.
+
+The registry and the shipped closure still differ, and every difference is enumerated and verified
+by reconstruction: applying those overrides to the registry's own closure reproduces the shipped
+one byte for byte. So the snapshot is a real, checkable anchor rather than a label.
+
+The shipped closure and the JDK's own table disagree on a small, named set — `bh`/`bih`,
+`enm`/`yol`, `mgp`/`mrd`, `mrh`/`shl`, `dyl`/`sgn-dyl` and `zhk`/`sgn-zhk` — which is exactly the
+point of the change: a language deprecated after your JVM's bundled registry snapshot now resolves
+to its preferred form regardless of which JVM you run.
 
 ---
 
@@ -2954,11 +2964,11 @@ second table. Both columns are re-derived on every run, so they describe this co
 
 | import | minified | brotli |
 |---|---|---|
-| `import { createStrings } from "lokalized"` | 185,091 | 54,986 |
-| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 109,865 | 34,246 |
+| `import { createStrings } from "lokalized"` | 185,091 | 54,936 |
+| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 109,865 | 34,296 |
 | `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,630 | 2,002 |
 | `import { GENDER_FEMININE } from "lokalized"` | 2,350 | 914 |
-| the four above, in one bundle | 243,173 | 67,933 |
+| the four above, in one bundle | 243,173 | 67,973 |
 <!-- bundle-table:end -->
 
 <!-- dist-table:start -->
@@ -2968,15 +2978,15 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 
 | load | files | raw | brotli |
 |---|---|---|---|
-| `lokalized` | 1 | 188,092 | 55,838 |
-| `lokalized/core` | 7 | 187,263 | 55,593 |
+| `lokalized` | 1 | 188,092 | 55,753 |
+| `lokalized/core` | 7 | 187,263 | 55,561 |
 | `lokalized/parse` | 5 | 163,391 | 49,628 |
-| `lokalized/load` | 7 | 181,844 | 54,582 |
+| `lokalized/load` | 7 | 181,844 | 54,577 |
 | `lokalized/ssr` | 2 | 7,186 | 2,246 |
-| `lokalized/negotiate` | 3 | 110,996 | 34,844 |
-| `lokalized/data/ordinal` | 8 | 193,971 | 57,075 |
-| `lokalized/data/ranges` | 8 | 196,499 | 57,232 |
-| `lokalized.global.js`, the classic script | 1 | 264,048 | 72,186 |
+| `lokalized/negotiate` | 3 | 110,996 | 34,861 |
+| `lokalized/data/ordinal` | 8 | 193,971 | 57,098 |
+| `lokalized/data/ranges` | 8 | 196,499 | 57,196 |
+| `lokalized.global.js`, the classic script | 1 | 264,048 | 72,362 |
 <!-- dist-table:end -->
 
 **What a no-build page downloads.** The table above is what a bundler produces from the source; this

@@ -158,6 +158,7 @@ const SPEC_GATE_EXCLUSIONS = [
   { gate: "check:parity-obligations", why: "derives plan 8.5's bullets from the plan text; exits 2 without it" },
   { gate: "check:iana", why: "drives the pinned JDK against lokalized-java's classes; exits 1 naming the JDK path" },
   { gate: "check:vectors", why: "drives the pinned JDK to re-emit the corpus; exits 1 naming the JDK path" },
+  { gate: "check:datalock", why: "hashes real source files out of the sibling lokalized-java, which CI does not check out; exits 1 with ENOENT naming GeneratedCldrLocaleData.java" },
 ];
 
 describe("the sibling spec repo's gate list, and the CI step that mirrors it", () => {
@@ -168,12 +169,24 @@ describe("the sibling spec repo's gate list, and the CI step that mirrors it", (
     .split("&&").map((/** @type {string} */ part) => part.trim().replace(/^npm run /, ""))
     .filter((/** @type {string} */ name) => name.startsWith("check:"));
 
-  /** The spec step is the one the comparison above filters out: it declares a working-directory. */
+  /**
+   * Every step the comparison above filters out: the ones declaring `working-directory:
+   * lokalized-spec`.
+   *
+   * **ALL OF THEM, not the first.** The first version took `indexOf` and read to the next blank
+   * line, which was correct while exactly one step ran there — and broke the moment an
+   * `npm ci` step was added ahead of the gates, because it then read the INSTALL step, found no
+   * `check:` scripts, and reported every spec gate as unaccounted. A parser that assumes "there is
+   * one of these" fails the first time there are two, and it fails by describing the workflow as
+   * empty rather than by saying it could not parse.
+   */
   const ciSpecGates = (() => {
-    const start = workflow.indexOf("working-directory: lokalized-spec");
-    assert.notEqual(start, -1, "no CI step runs in lokalized-spec; the spec-repo gates have moved");
-    const body = workflow.slice(start, workflow.indexOf("\n\n", start));
-    return [...body.matchAll(/npm run (check:[\w:-]+)/g)].map((match) => match[1]);
+    const steps = workflow.split(/\n {6}- /).slice(1)
+      .filter((step) => /^\s*working-directory: lokalized-spec\s*$/m.test(step));
+    assert.notEqual(steps.length, 0, "no CI step runs in lokalized-spec; the spec-repo gates have moved");
+    const executable = (step) => step.split("\n").filter((line) => !/^\s*#/.test(line)).join("\n");
+    return steps.flatMap((step) =>
+      [...executable(step).matchAll(/npm run (check:[\w:-]+)/g)].map((match) => match[1]));
   })();
 
   it("is not comparing two empty lists", () => {
@@ -198,6 +211,35 @@ describe("the sibling spec repo's gate list, and the CI step that mirrors it", (
       "spec gates that CI does not run and nothing excuses. Measure whether each needs the plan or " +
       "the pinned JDK — run it with LOKALIZED_PLANNING_DIR and LOKALIZED_ORACLE_JDK pointing " +
       "nowhere — then add it to the CI step or to SPEC_GATE_EXCLUSIONS with the reason.");
+  });
+
+  /**
+   * **THE RULE ABOVE SAYS WHICH GATES ARE LISTED; THIS ONE SAYS THEY CAN RUN.** They are different
+   * questions and the difference is what broke CI on 2026-09-20: `check:schemas` imports `ajv`, a
+   * devDependency of lokalized-spec, and the only `npm ci` in the job runs in lokalized-js. The
+   * gate had been listed since A7 and had never once executed — the job died earlier every time,
+   * so nothing revealed it until the steps ahead were fixed.
+   *
+   * Found as a DID-NOT-FIRE while ablating the rule above: deleting the install step left this
+   * file green, because listing a gate and being able to run it are not the same claim.
+   */
+  it("installs the spec's dependencies if it runs any gate that could need them", () => {
+    const hasDeps = Object.keys(specPackage.devDependencies ?? {}).length > 0
+      || Object.keys(specPackage.dependencies ?? {}).length > 0;
+    if (!hasDeps || ciSpecGates.length === 0) {
+      assert.ok(true, "nothing to install or nothing to run");
+      return;
+    }
+
+    const installs = workflow.split(/\n {6}- /).slice(1)
+      .filter((step) => /^\s*working-directory: lokalized-spec\s*$/m.test(step))
+      .filter((step) => /npm (ci|install)\b/.test(step.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n")));
+
+    assert.ok(installs.length > 0,
+      `CI runs ${ciSpecGates.length} lokalized-spec gate(s) and never installs that package's ` +
+      `dependencies (it declares ${Object.keys(specPackage.devDependencies ?? {}).join(", ")}). ` +
+      "A gate that cannot resolve its imports has never run — add a step with " +
+      "`working-directory: lokalized-spec` running `npm ci || npm install` BEFORE the gates.");
   });
 
   it("runs nothing CI cannot, and excuses nothing that is gone", () => {

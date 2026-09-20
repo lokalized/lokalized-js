@@ -274,7 +274,7 @@ jobs:
       # re-check behind the claim. That is the same shape as clause 19's proof obligation, found the
       # same way, and it is fixed here rather than argued around.
       #
-      # EIGHT OF THE FIFTEEN RUN HERE. The exclusions are measured, not assumed, and each is named
+      # SEVEN OF THE FIFTEEN RUN HERE. The exclusions are measured, not assumed, and each is named
       # so a reader does not mistake this for the whole suite:
       #   check:allowlist, check:surface, check:registry, check:documentation-topics,
       #   check:parity-obligations                        — resolve the PLAN through
@@ -285,6 +285,15 @@ jobs:
       #     lokalized-java, which this workflow does not check out or build. Measured: exit 1 naming
       #     the JDK path. They fail LOUDLY rather than skipping, which is why they are excluded here
       #     rather than run and ignored.
+      #   check:datalock                                  — hashes REAL SOURCE FILES out of the
+      #     sibling lokalized-java (`src/main/java/com/lokalized/GeneratedCldrLocaleData.java` and
+      #     the CLDR generator), so it needs that repo present even though it needs no JDK.
+      #     Measured 2026-09-20: exit 1 with ENOENT naming that path. **It was in this list and had
+      #     never run** — the job died earlier every time, so nothing revealed it. Checking the repo
+      #     out would fix it and is deliberately NOT done: it would also make `javaReferenceCommit`
+      #     measurable in `parity:check`, which then cross-checks it against a record taken from the
+      #     `feature/iana-registry-equivalences` branch, and CI would resolve some other ref. That
+      #     trades a silent gap for a confusing red. It runs in the spec's own `npm run check`.
       #
       # **THIS LIST WAS HAND-MAINTAINED AND HAD DRIFTED TWICE OVER BY M-R S13** — it read "SIX OF
       # THE TWELVE" while the spec's `check` had grown to fifteen, and two CI-RUNNABLE gates were
@@ -298,6 +307,16 @@ jobs:
       # Measured 2026-09-19 with LOKALIZED_PLANNING_DIR and LOKALIZED_ORACLE_JDK pointing nowhere:
       # these eight exit 0, the five plan gates exit 2, the two JDK gates exit 1. The spec VENDORS
       # what it needs of lokalized-java, so that repo's absence costs nothing here.
+      # **THE SPEC IS ITS OWN NPM PACKAGE AND CI HAD NEVER INSTALLED IT.** `check:schemas` imports
+      # `ajv`, a devDependency of lokalized-spec; the only `npm ci` in this job runs in
+      # lokalized-js. Measured 2026-09-20: without this step `check:schemas` exits 1 with
+      # `Cannot find package 'ajv'`, and it has been in the list below since A7 without ever
+      # running — the job failed earlier every time, so the gap only surfaced once the steps ahead
+      # of it were fixed. A gate that has never executed is not a gate.
+      - name: Install the spec repo's own dependencies
+        working-directory: lokalized-spec
+        run: npm ci || npm install
+
       - name: Spec-repo gates that need neither the plan nor the JDK
         working-directory: lokalized-spec
         run: |
@@ -306,7 +325,6 @@ jobs:
           npm run check:partitions
           npm run check:iana-registry
           npm run check:provenance
-          npm run check:datalock
           npm run check:archive
           npm run check:coverage
 
