@@ -151,10 +151,15 @@ const DEFERRAL_GROUNDS = {
   },
 
   /** M9 blocker 2: the IANA closure is pinned to a JDK build, not to a registry release. */
-  ianaRegistryAxisAbsent: () => {
-    const lock = specJson("generated/iana-data-lock.json");
-    return lock.ianaRegistryFileDate == null && (lock.jdkCompatibilityOverrides ?? []).length === 0;
-  },
+  // **`ianaRegistryAxisAbsent` WAS HERE AND IS DELETED, BY THIS FILE'S OWN RULE.** It grounded M9
+  // clause 33's deferral: no registry snapshot, no File-Date, no override rows. M-R S11 pinned the
+  // snapshot and recorded 156 overrides, the predicate went false on the next run and named the
+  // clause, and clause 33 was re-verdicted NOT-PROVEN — which left this ground consulted by
+  // nothing, and the rule below fails an unconsulted ground as dead machinery. That is the second
+  // time this has happened (see `noPackedBrowserArtifact` above), and both times the sequence was
+  // the same: the ground fires, the clause moves, the ground retires. The fact it re-derived now
+  // lives in clause 33's evidence line, where it is read rather than merely re-computed.
+
 };
 
 if (!MILESTONE_ORDER.includes(CURRENT_MILESTONE))

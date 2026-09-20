@@ -142,24 +142,33 @@
     },
     {
       "reason": "M-R S8: likely-subtags.js is re-encoded structurally — 7,788 rows in 25 KB of source instead of 158 KB, decoding to output byte-identical to the pinned CLDR artifact. The browser root bundle falls 322,509 -> 187,679 minified and 73,653 -> 55,610 brotli, -24.5% on the wire. Conformance byte-identical at 2,150/0/0."
+    },
+    {
+      "reason": "M-R S11: runtime-metadata.js gained the ianaClosureSource field and a real File-Date for ianaRegistryDate, after the maintainer took the pinned-IANA-snapshot decision. +1,572 source bytes in every graph that carries build identity; no module joined any graph."
+    },
+    {
+      "reason": "M-R S13: lokalized-java 3.1.0's registry-sourced IANA table. The pinned closure grows 806 -> 814 classes and carries an 8-tag JDK delta (negotiate +4,162 B); the reduced identity table in src/internal/locale.js grows 269 -> 277 rows, which every graph reaches (+955 B)"
+    },
+    {
+      "reason": "M-R S13: the IANA closure 806 -> 818 classes (twelve JDK-absent tags; four recovered by seeding the probe space from the oracle's own key list) plus Java's prefix walk at the single-locale door in src/internal/locale.js"
     }
   ],
   "subpaths": {
     "lokalized": {
       "modules": 31,
-      "bytes": 764556
+      "bytes": 770591
     },
     "lokalized/core": {
       "modules": 30,
-      "bytes": 753943
+      "bytes": 759978
     },
     "lokalized/parse": {
       "modules": 29,
-      "bytes": 573868
+      "bytes": 577244
     },
     "lokalized/load": {
       "modules": 38,
-      "bytes": 658048
+      "bytes": 664083
     },
     "lokalized/ssr": {
       "modules": 3,
@@ -167,19 +176,19 @@
     },
     "lokalized/negotiate": {
       "modules": 16,
-      "bytes": 288060
+      "bytes": 297911
     },
     "lokalized/node": {
       "modules": 41,
-      "bytes": 692468
+      "bytes": 698503
     },
     "lokalized/data/ordinal": {
       "modules": 33,
-      "bytes": 784282
+      "bytes": 790317
     },
     "lokalized/data/ranges": {
       "modules": 33,
-      "bytes": 789155
+      "bytes": 795190
     }
   }
 }

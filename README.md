@@ -1942,8 +1942,8 @@ stamp.lookupLocale;     // => "fr-CA"
 stamp.localeMatch;      // => { locale: "fr-CA", matchType: "exact" }
 stamp.localeDataMode;   // => "pinned"
 
-// Not a date, despite the name — see the end of this section.
-/^\d{4}-\d{2}-\d{2}$/.test(stamp.ianaRegistryDate);   // => false
+// The File-Date of the pinned IANA registry snapshot — see the end of this section.
+/^\d{4}-\d{2}-\d{2}$/.test(stamp.ianaRegistryDate);   // => true
 ```
 
 Everything up to `cardinalityMode` is build and data identity — the same for every render of a given
@@ -2153,9 +2153,17 @@ against locales it did not download, while `getSupportedLocales()` is what arriv
 - **Not portable across builds.** `producerVersion` and `producerImplementation` are compared
   exactly; a client on a different release of this library is refused rather than reconciled.
 
-And `ianaRegistryDate` is **not a date**. The IANA equivalence closure here is pinned to a JDK build
-rather than to a registry release, so the field carries that build identifier. It is an opaque
-provenance string that two deployments must agree on, and nothing more.
+And `ianaRegistryDate` **is** the `File-Date` of the pinned IANA Language Subtag Registry snapshot
+this build was published against. It is provenance, not the data: two deployments could share a
+File-Date and still carry different language-range behaviour, which is what `ianaDataFingerprint` is
+for — that one fingerprints the closure itself, and the two are compared together.
+
+What the closure actually *is* deserves saying plainly, because the date alone implies more than it
+should. The equivalence data this package uses is **the JDK's**, not the registry's, because the
+whole point is to answer as `lokalized-java` answers. The registry and the JDK disagree in 156
+places, and every one of them is enumerated in `DIVERGENCES.md`'s companion artifact — verified by
+reconstruction, meaning that applying those 156 overrides to the registry's own closure reproduces
+the JDK's byte for byte. So the snapshot is a real, checkable anchor rather than a label.
 
 ---
 
@@ -2946,11 +2954,11 @@ second table. Both columns are re-derived on every run, so they describe this co
 
 | import | minified | brotli |
 |---|---|---|
-| `import { createStrings } from "lokalized"` | 184,716 | 54,718 |
-| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 109,035 | 34,083 |
+| `import { createStrings } from "lokalized"` | 185,091 | 54,986 |
+| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 109,865 | 34,246 |
 | `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,630 | 2,002 |
 | `import { GENDER_FEMININE } from "lokalized"` | 2,350 | 914 |
-| the four above, in one bundle | 242,342 | 67,730 |
+| the four above, in one bundle | 243,173 | 67,933 |
 <!-- bundle-table:end -->
 
 <!-- dist-table:start -->
@@ -2960,15 +2968,15 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 
 | load | files | raw | brotli |
 |---|---|---|---|
-| `lokalized` | 1 | 187,717 | 55,518 |
-| `lokalized/core` | 7 | 186,889 | 55,401 |
-| `lokalized/parse` | 5 | 163,059 | 49,356 |
-| `lokalized/load` | 7 | 181,470 | 54,493 |
+| `lokalized` | 1 | 188,092 | 55,838 |
+| `lokalized/core` | 7 | 187,263 | 55,593 |
+| `lokalized/parse` | 5 | 163,391 | 49,628 |
+| `lokalized/load` | 7 | 181,844 | 54,582 |
 | `lokalized/ssr` | 2 | 7,186 | 2,246 |
-| `lokalized/negotiate` | 3 | 110,170 | 34,585 |
-| `lokalized/data/ordinal` | 8 | 193,597 | 57,038 |
-| `lokalized/data/ranges` | 8 | 196,125 | 57,075 |
-| `lokalized.global.js`, the classic script | 1 | 263,217 | 72,021 |
+| `lokalized/negotiate` | 3 | 110,996 | 34,844 |
+| `lokalized/data/ordinal` | 8 | 193,971 | 57,075 |
+| `lokalized/data/ranges` | 8 | 196,499 | 57,232 |
+| `lokalized.global.js`, the classic script | 1 | 264,048 | 72,186 |
 <!-- dist-table:end -->
 
 **What a no-build page downloads.** The table above is what a bundler produces from the source; this
@@ -2986,9 +2994,9 @@ larger, so a figure quoted in it overstates what a visitor on a modern CDN actua
 not printed here, because a number nothing re-derives is how this section came to be wrong before.
 
 Three things are worth reading off that table. **Half of the root bundle is one pinned CLDR table** —
-replacing `likely-subtags` with an empty one takes the same bundle from 184,716 to 161,787 minified
+replacing `likely-subtags` with an empty one takes the same bundle from 185,091 to 162,162 minified
 bytes, which is the price of resolving `fr-CH` to `fr` without asking the host. **The tables are
-shared, not duplicated**: adding three more subpaths to the root costs 57,626 bytes, not another
+shared, not duplicated**: adding three more subpaths to the root costs 58,082 bytes, not another
 whole copy. And **`lokalized/ssr` carries no pinned data at all**, which is what lets the stamp
 module sit in a page that does no matching.
 
@@ -3012,7 +3020,7 @@ Object.keys(await import("lokalized/ssr"));   // => ["createSsrStamp", "validate
 ```
 
 `sideEffects` is declared `false` and bundlers honour it — removing that field takes the
-single-constant import from 2,350 to 78,540 minified bytes, 33× larger.
+single-constant import from 2,350 to 78,582 minified bytes, 33× larger.
 
 ---
 

@@ -55,14 +55,58 @@ test("ianaDataFingerprint IS the pinned IANA lock's fingerprint", { skip }, () =
   assert.equal(RUNTIME_METADATA.ianaDataFingerprint, ianaLock.ianaDataFingerprint);
 });
 
-test("ianaRegistryDate reports the pin that EXISTS, and announces that it is not a File-Date", { skip }, () => {
-  // THE DIVERGENCE, CHECKED RATHER THAN DESCRIBED. Plan 5.1 wants the registry snapshot's
-  // `File-Date`; `lokalized-spec generated/IANA-PROVENANCE.md` records that there is no snapshot and
-  // `ianaRegistryFileDate` is null by decision. This asserts both halves of what the port does
-  // instead: the value is derived from the lock's real pin, and it is not date-shaped, so nothing
-  // downstream can read it as one.
-  assert.equal(RUNTIME_METADATA.ianaRegistryDate, `jdk-oracle:${ianaLock.oracle.jdkVersion}`);
-  assert.doesNotMatch(RUNTIME_METADATA.ianaRegistryDate, /^\d{4}-\d{2}-\d{2}$/);
+test("ianaRegistryDate IS the pinned registry snapshot's File-Date", { skip }, async () => {
+  // **DERIVED, NEVER A LITERAL.** Until M-R S11 this field reported `jdk-oracle:<version>` because
+  // no registry snapshot existed; the snapshot is now pinned and plan 7.3 defines the field as its
+  // `File-Date`, so the value is read out of the artifact that carries it rather than restated
+  // here. A snapshot re-fetch moves both together or fails this.
+  const overrides = JSON.parse(await readFile(
+    new URL("../../lokalized-spec/generated/iana-registry-overrides.json", import.meta.url), "utf8"));
+  assert.equal(RUNTIME_METADATA.ianaRegistryDate, overrides.registrySnapshot.fileDate);
+  assert.match(RUNTIME_METADATA.ianaRegistryDate, /^\d{4}-\d{2}-\d{2}$/,
+    "the field is defined as a File-Date and must be date-shaped");
+
+  // The record must keep saying that the closure is not the registry unmodified. A date alone would
+  // let a reader think it was; it is not, and the overrides are the difference.
+  assert.ok(overrides.overrides.length > 0,
+    "no overrides are recorded, so nothing distinguishes the registry closure from the shipped one");
+});
+
+/**
+ * **THE THREE IANA CONSTANTS ARE DERIVED FROM THE SPEC, BECAUSE HAND-COPYING THEM FAILED.**
+ *
+ * `src/internal/runtime-metadata.js` carries them as literals with a comment naming the artifact
+ * each came from, and until M-R S13 nothing compared the two. `ianaClosureSource` said
+ * `jdk-corretto:21.0.11` for a slice after lokalized-java 3.1.0 became the oracle — a field whose
+ * entire job is to name the producing implementation, naming the wrong one, in a value that ships
+ * to every consumer and into every SSR stamp. The regex that was supposed to guard it asserted
+ * `/^jdk-corretto:/`, so it PINNED the stale answer.
+ *
+ * Derived now, all three against the artifacts, so a re-pin moves them together or fails here.
+ */
+test("the IANA constants are what the spec's artifacts say, field by field", { skip }, async () => {
+  const artifact = JSON.parse(await readFile(
+    new URL("../../lokalized-spec/generated/iana-language-range-equivalents.json", import.meta.url), "utf8"));
+  const lock = JSON.parse(await readFile(
+    new URL("../../lokalized-spec/generated/iana-data-lock.json", import.meta.url), "utf8"));
+
+  assert.equal(RUNTIME_METADATA.ianaDataFingerprint, lock.ianaDataFingerprint);
+  assert.equal(RUNTIME_METADATA.ianaRegistryDate, artifact.ianaRegistryFileDate);
+
+  // The oracle's NAME and VERSION, both from the artifact. A library-derived artifact records its
+  // own `libraryVersion`; a JDK-derived one is named by vendor and version, which is what this
+  // field said for the life of the project before the oracle moved.
+  const expectedSource = artifact.source === "lokalized-java"
+    ? `lokalized-java:${artifact.libraryVersion}`
+    : `jdk-corretto:${artifact.jdkVersion}`;
+  assert.equal(RUNTIME_METADATA.ianaClosureSource, expectedSource,
+    "the closure's source constant does not name the oracle that produced the pinned artifact");
+
+  // ANTI-VACUITY: a library-derived artifact with no version would make the expectation above
+  // `lokalized-java:undefined` and this test would pin that string quite happily.
+  if (artifact.source === "lokalized-java")
+    assert.match(artifact.libraryVersion, /^\d+\.\d+\.\d+(-SNAPSHOT)?$/,
+      "the artifact is library-derived and records no usable libraryVersion");
 });
 
 test("behavioralVectorsVersion IS the corpus's own version", { skip }, () => {
@@ -81,7 +125,10 @@ test("the two mode fields describe what this build actually does", () => {
 test("the record is frozen and carries exactly the declared fields", () => {
   assert.ok(Object.isFrozen(RUNTIME_METADATA));
   assert.deepEqual(Object.keys(RUNTIME_METADATA).sort(), [
-    "behavioralVectorsVersion", "cardinalityMode", "ianaDataFingerprint", "ianaRegistryDate",
-    "localeDataMode", "producerImplementation", "producerVersion",
+    // `ianaClosureSource` joined in M-R S11: the registry snapshot supplies the File-Date and this
+    // names the JDK the closure was actually measured against. Deliberately NOT in the manifest's
+    // compared identity set — `ianaDataFingerprint` already refuses a mismatched closure.
+    "behavioralVectorsVersion", "cardinalityMode", "ianaClosureSource", "ianaDataFingerprint",
+    "ianaRegistryDate", "localeDataMode", "producerImplementation", "producerVersion",
   ]);
 });

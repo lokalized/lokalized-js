@@ -14,7 +14,7 @@ imports are not so confined: `catalog.js` and `parse-file.js` reach `../core/ind
 `tools/graph-walk.mjs` strips comments before it walks, for exactly this reason.
 
 **The corpus is the specification.** `../lokalized-spec/generated/behavioral-vectors.json` records
-what lokalized-java 3.0.0 actually does for 2,363 cases. Where this document and the corpus disagree,
+what lokalized-java 3.0.0 actually does for 2,379 cases. Where this document and the corpus disagree,
 the corpus wins and the disagreement is a finding worth reporting.
 
 ---
@@ -45,7 +45,7 @@ export function candidateChain(lookupTag, supported, fallbackLocale, tiebreakers
 `matchType` values are the JS spellings: `none`, `exact`, `canonical`, `cldr-fallback`,
 `likely-subtag`, `extended-range`, `primary-language`, `wildcard`.
 
-**Verify against** the corpus's `matchFor` cases (304) and the `resolution.direct.*` seed rows, whose
+**Verify against** the corpus's `matchFor` cases (310) and the `resolution.direct.*` seed rows, whose
 `attemptedLocales` are a PREFIX of what `candidateChain` produces — the walk stops at the first
 catalog holding the key, or when the fallback policy declines to continue. The document said
 "exactly" here until 2026-09-17 while saying "the prefix actually visited" at the end of the same
@@ -108,7 +108,7 @@ specify — see **What this document does not specify**, below.
 
 **Verify against** the corpus `fixtures`. Note what that is NOT: "every fixture must parse" is false
 and was stated here until 2026-09-17 as "a strong self-test available immediately". Measured: 2,059
-catalogs across the 584 fixtures, of which 1,959 parse and 100 are REFUSED — the corpus carries
+catalogs across the 586 fixtures, of which 1,959 parse and 100 are REFUSED — the corpus carries
 malformed input on purpose, because refusing it is behaviour under test. The self-test is
 the corpus's own recorded verdict per case, which is what `npm run conformance` runs.
 

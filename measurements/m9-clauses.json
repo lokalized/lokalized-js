@@ -1,11 +1,11 @@
 {
   "formatVersion": 1,
   "milestone": "M9",
-  "note": "Derived from plan v7's M9 row (:2925) and the plan sections it governs \u2014 3.4 (the negotiate surface), 6.3/6.4/6.5 (the examples, preload and cache correctness), 2.3/3.6 (the exact-locale merge) and 9.2 (scenario 6). A clause is PROVEN only where a gate exists on disk AND an ablation was performed with its red named; 'nothing contradicts it' is not a verdict. This ledger is NOT a ratchet: a verdict may move in either direction, and freezing it would make the honest direction the expensive one.",
+  "note": "Derived from plan v7's M9 row (:2925) and the plan sections it governs — 3.4 (the negotiate surface), 6.3/6.4/6.5 (the examples, preload and cache correctness), 2.3/3.6 (the exact-locale merge) and 9.2 (scenario 6). A clause is PROVEN only where a gate exists on disk AND an ablation was performed with its red named; 'nothing contradicts it' is not a verdict. This ledger is NOT a ratchet: a verdict may move in either direction, and freezing it would make the honest direction the expensive one.",
   "tally": {
     "PROVEN": 32,
-    "NOT-PROVEN": 1,
-    "DEFERRED": 1
+    "NOT-PROVEN": 2,
+    "DEFERRED": 0
   },
   "clauses": [
     {
@@ -19,7 +19,7 @@
         "test/negotiate-options.test.js"
       ],
       "ablation": "M9 S6: 24 ablations of the whole-list solver were designed by six blind lenses and MEASURED, each in its own throwaway copy with the control proved green first (2117 passed / exit 0) and re-proved after restore. 23 turned corpus cases RED, from 1 to 78 FAILED: the strict unmatched result 77, the fallbackLocale field on a no-match 78, consideredLocales on a no-match 77, the equivalence insert position 46, the derived diagnostic 42, advancing past an unmatched range 38, effectiveWeight 37, tiebreaker declared order 28, tier order 23, class order 22, cascade order 20, the weight governor 11, prefix truncation 10, the equal-weight tie order 9, the insertion point 7, wildcard matchType 7, the requested-range echo order 6, class weight 5, the dedup key 3, leading and non-initial wildcards 2 each, the singleton stop 1, fallback candidate election 1.",
-      "evidenceLine": "The earlier NOT-PROVEN was the S8 shape: a green channel with no perturbation recorded. 23 of 24 ablations now name their reds, with sample failing ids per row. THE TWENTY-FOURTH IS THE FINDING AND IS RECORDED RATHER THAN DROPPED: deleting `.sort(compareTags)` from `sortedSupportedTags` leaves conformance BYTE-IDENTICAL at 2117/0 \u2014 and the agent did not stop at the zero. Instrumented, that function is called 3,111 times during a conformance run and the input order differs from sorted ZERO times, on two full runs: every fixture's catalog set is already authored sorted. Replayed through an ingress that does not pre-sort, 116 cases would move. The property IS gated, by the test suite rather than the corpus: the same ablation reds `reports consideredLocales as the deduplicated, tag-sorted supported set`, `matchFor against the corpus`, and the M9 S2 delegation probe \u2014 3 tests, with conformance unmoved."
+      "evidenceLine": "The earlier NOT-PROVEN was the S8 shape: a green channel with no perturbation recorded. 23 of 24 ablations now name their reds, with sample failing ids per row. THE TWENTY-FOURTH IS THE FINDING AND IS RECORDED RATHER THAN DROPPED: deleting `.sort(compareTags)` from `sortedSupportedTags` leaves conformance BYTE-IDENTICAL at 2117/0 — and the agent did not stop at the zero. Instrumented, that function is called 3,111 times during a conformance run and the input order differs from sorted ZERO times, on two full runs: every fixture's catalog set is already authored sorted. Replayed through an ingress that does not pre-sort, 116 cases would move. The property IS gated, by the test suite rather than the corpus: the same ablation reds `reports consideredLocales as the deduplicated, tag-sorted supported set`, `matchFor against the corpus`, and the M9 S2 delegation probe — 3 tests, with conformance unmoved."
     },
     {
       "id": 2,
@@ -30,7 +30,7 @@
         "npm run conformance",
         "test/negotiate.test.js"
       ],
-      "ablation": "M9 S2 C3: moving the 4,096 code-unit cap from the RAW value to the normalized one reds `applies the 4,096 code-unit cap to the RAW value, before normalization` in test/negotiate.test.js \u2014 a pre-existing gate, not one written for the ablation.",
+      "ablation": "M9 S2 C3: moving the 4,096 code-unit cap from the RAW value to the normalized one reds `applies the 4,096 code-unit cap to the RAW value, before normalization` in test/negotiate.test.js — a pre-existing gate, not one written for the ablation.",
       "evidenceLine": "21/21 `acceptLanguage` corpus cases plus `test/negotiate.test.js`'s guard-order rows. The ablation is recorded in planning/M9-STATUS.md's S2 table and named the red it produced."
     },
     {
@@ -43,7 +43,7 @@
         "test/negotiate.test.js"
       ],
       "ablation": "M9 S2 C1: making `forAcceptLanguage` fabricate a fallback MATCH instead of carrying an unmatched diagnostic reds 14 tests. C4: giving `bestMatchForAcceptLanguage` a private guard chain missing the 32-range cap reds the cross-door test.",
-      "evidenceLine": "Five refusal classes, one shared predicate (`usableAcceptLanguageRanges`), and a cross-door invariant asserting both doors agree on which catalog answers over every probe \u2014 with an anti-vacuity check that the probe set selects more than one locale."
+      "evidenceLine": "Five refusal classes, one shared predicate (`usableAcceptLanguageRanges`), and a cross-door invariant asserting both doors agree on which catalog answers over every probe — with an anti-vacuity check that the probe set selects more than one locale."
     },
     {
       "id": 4,
@@ -77,8 +77,8 @@
       "gates": [
         "test/negotiate-options.test.js"
       ],
-      "ablation": "M9 S2 C11: reversing `consideredLocales` in the negotiator's own `matchFor` reds both delegation probes. C10 DID NOT FIRE first \u2014 dropping the tiebreaker list changed nothing over a `{en, fr, fr-CA}` probe space \u2014 and a second configuration `{en, fr-CA, fr-FR}`, where `matchFor(\"fr\")` must ELECT, makes it red.",
-      "evidenceLine": "20 tags x 2 configurations compared byte-for-byte against `strings.getDirectLocaleContext(tag).localeMatch`, with the probe space asserted to reach all four match types and both doors asserted to refuse an ill-formed tag with the same class AND message \u2014 three `x-lvariant` tags Java ANSWERS as the control. This closes the M9 scope map's blocker 4."
+      "ablation": "M9 S2 C11: reversing `consideredLocales` in the negotiator's own `matchFor` reds both delegation probes. C10 DID NOT FIRE first — dropping the tiebreaker list changed nothing over a `{en, fr, fr-CA}` probe space — and a second configuration `{en, fr-CA, fr-FR}`, where `matchFor(\"fr\")` must ELECT, makes it red.",
+      "evidenceLine": "20 tags x 2 configurations compared byte-for-byte against `strings.getDirectLocaleContext(tag).localeMatch`, with the probe space asserted to reach all four match types and both doors asserted to refuse an ill-formed tag with the same class AND message — three `x-lvariant` tags Java ANSWERS as the control. This closes the M9 scope map's blocker 4."
     },
     {
       "id": 7,
@@ -89,7 +89,7 @@
         "npm run diff:language-range",
         "npm run diff:check"
       ],
-      "ablation": "S31: renaming every `RangeError` the negotiator throws to `TypeError`, messages byte-identical, left the differential at 6037/6037 exit 0 \u2014 it dropped the refusal CLASS. Fixed as a mapping; the same rename now exits 1 with 71 unexplained.",
+      "ablation": "S31: renaming every `RangeError` the negotiator throws to `TypeError`, messages byte-identical, left the differential at 6037/6037 exit 0 — it dropped the refusal CLASS. Fixed as a mapping; the same rename now exits 1 with 71 unexplained.",
       "evidenceLine": "6,037/6,037 identical over a probe space derived from the JDK's OWN equivalence keys by reflection, which is what caught four missing closure classes and re-pinned the artifact 802 -> 806. Its RESULT is re-checked without a JDK by `diff:check`, which is in verify and (since M9 S1) in CI."
     },
     {
@@ -101,7 +101,7 @@
         "npm run conformance",
         "tools/conformance.mjs"
       ],
-      "ablation": "M7: `DECLARED_MESSAGE_DIVERGENCES` was negative-tested both ways \u2014 an undeclared divergence fails the run and so does a declaration that has stopped diverging, with a passing control between them.",
+      "ablation": "M7: `DECLARED_MESSAGE_DIVERGENCES` was negative-tested both ways — an undeclared divergence fails the run and so does a declaration that has stopped diverging, with a passing control between them.",
       "evidenceLine": "243/263 cause messages GATED. The Java message selects the row, the JS message is pinned exactly, and a stale declaration fails."
     },
     {
@@ -148,7 +148,7 @@
         "test/allowlist-type-surface.test.js"
       ],
       "ablation": "M9 S2 C5: replacing them with literals reds both constant tests.",
-      "evidenceLine": "Re-exported from `internal/runtime-metadata.js` \u2014 a zero-import leaf \u2014 rather than from core, so the subpath pays one module. S28's UNDELIVERED category entry for negotiate's IANA half was deleted, which is the record."
+      "evidenceLine": "Re-exported from `internal/runtime-metadata.js` — a zero-import leaf — rather than from core, so the subpath pays one module. S28's UNDELIVERED category entry for negotiate's IANA half was deleted, which is the record."
     },
     {
       "id": 13,
@@ -205,7 +205,7 @@
         "test/example-edge.test.js"
       ],
       "ablation": "M9 S1 A1: keying by `match.locale` alone reds 5, led by `two headers with an identical narrow context are owed different bytes`. A8/D4: a view that ignores the requested ranges reds the same pair, which is what makes the fixture load-bearing rather than decorative.",
-      "evidenceLine": "`fr-CH` and `fr-BE` both select `fr` by the same `cldr-fallback` match type, so the selected locale, the match type and the whole serialized SSR stamp are identical \u2014 and the rendered pages are not."
+      "evidenceLine": "`fr-CH` and `fr-BE` both select `fr` by the same `cldr-fallback` match type, so the selected locale, the match type and the whole serialized SSR stamp are identical — and the rendered pages are not."
     },
     {
       "id": 18,
@@ -241,7 +241,7 @@
         "test/example-server.test.js"
       ],
       "ablation": "M9 S6: each capability is REMOVED from the global object in its own child process, before the worker's module graph is imported, and the request must then fail rather than render. Seven rows red (TextDecoder, TextEncoder, ReadableStream, Response, Request, AbortController, AbortSignal); WebCrypto fails CLOSED with the library's own DigestUnavailableError; removing global `fetch` with NO injected transport changes the failure from `fetch failed` to `transport is not a function`. The control renders in the same harness, and an eighth row proves an injected transport does not hide the other four.",
-      "evidenceLine": "The earlier NOT-PROVEN rested on the argument that a graph using neither `TextDecoder` nor `fetch` 'would fail to run at all rather than fail a named test' \u2014 which is an argument that the property is untestable, and it was wrong: it is testable by removing the capability and requiring the failure. ATTRIBUTION IS STATED RATHER THAN IMPLIED: the WebCrypto row belongs unambiguously to `lokalized/load` and the `fetch` row to the worker's own `env.fetch ?? fetch`; the other rows are attributed to the DEPLOYMENT, because with `ReadableStream` absent a `Response` cannot carry a body at all and no probe can separate worker from loader from transport."
+      "evidenceLine": "The earlier NOT-PROVEN rested on the argument that a graph using neither `TextDecoder` nor `fetch` 'would fail to run at all rather than fail a named test' — which is an argument that the property is untestable, and it was wrong: it is testable by removing the capability and requiring the failure. ATTRIBUTION IS STATED RATHER THAN IMPLIED: the WebCrypto row belongs unambiguously to `lokalized/load` and the `fetch` row to the worker's own `env.fetch ?? fetch`; the other rows are attributed to the DEPLOYMENT, because with `ReadableStream` absent a `Response` cannot carry a body at all and no probe can separate worker from loader from transport."
     },
     {
       "id": 21,
@@ -272,7 +272,7 @@
         "test/example-server.test.js"
       ],
       "ablation": "M9 S1 A11: preloading a url that is not the digest-bound one reds all three preload seam tests.",
-      "evidenceLine": "The server computes its links from `fetchSet` \u2014 the loader's own planner \u2014 and the test compares them against the client's recorded `requestedFiles` AND against what actually left the client, url for url and in order. Two halves that are each green alone and had never been compared."
+      "evidenceLine": "The server computes its links from `fetchSet` — the loader's own planner — and the test compares them against the client's recorded `requestedFiles` AND against what actually left the client, url for url and in order. Two halves that are each green alone and had never been compared."
     },
     {
       "id": 24,
@@ -284,8 +284,8 @@
         "test/example-server.test.js",
         "npm test"
       ],
-      "ablation": "Seven ablations, all firing, control clean \u2014 and J1 is the mutation the BROWSER control actually measured. Dropping `crossorigin` from the emitted preload reds 'their attribute set is the one the browser measurement was taken against'; adding an `integrity` attribute reds that and the integrity test; changing `as=\"fetch\"` to `as=\"script\"` reds the attribute set; changing the loader's default to `credentials: \"include\"` reds the anonymous-mode test. Three more attack the RECORD rather than the code: removing its control arm, recording that control arm as 1 (reused, so it controls nothing), and recording a matched arm as 2 each red 'it carries a control arm that was NOT reused'. A behaviour-preserving comment is exit 0.",
-      "evidenceLine": "CLOSED by M-D S22, in a real browser. Plan 6.3:2179-2183 names four things that must match for a preload to be reused; three were already checked in Node and the fourth \u2014 whether the browser genuinely reuses the entry \u2014 is what both clauses were held on. Measured on Chrome 152 over a trustworthy origin, with the preloads observed to have landed (4 of 4) before the loader ran so a reuse cannot be confused with a race: the three MATCHED urls produce ONE performance.getEntriesByType('resource') entry each, initiator `link`, no 'fetch' entry at all. THE CONTROL IS WHAT MAKES THAT READABLE: a fourth url preloaded WITHOUT `crossorigin`, so its CORS mode does not match the loader's, produces TWO entries with initiators `link+fetch` \u2014 and Chrome names the cause itself ('is found, but is not used because the request credentials mode does not match'), while emitting no such warning for the three matched urls. Recorded in measurements/preload-reuse.json with the attribute set it was taken against; test/preload-reuse.test.js is the half that runs without a browser and GATES on that attribute set moving, on the deterministic-and-machine-independent reasoning scenario:2k uses for its catalog digest rather than 0a's report-only rule for source graphs."
+      "ablation": "Seven ablations, all firing, control clean — and J1 is the mutation the BROWSER control actually measured. Dropping `crossorigin` from the emitted preload reds 'their attribute set is the one the browser measurement was taken against'; adding an `integrity` attribute reds that and the integrity test; changing `as=\"fetch\"` to `as=\"script\"` reds the attribute set; changing the loader's default to `credentials: \"include\"` reds the anonymous-mode test. Three more attack the RECORD rather than the code: removing its control arm, recording that control arm as 1 (reused, so it controls nothing), and recording a matched arm as 2 each red 'it carries a control arm that was NOT reused'. A behaviour-preserving comment is exit 0.",
+      "evidenceLine": "CLOSED by M-D S22, in a real browser. Plan 6.3:2179-2183 names four things that must match for a preload to be reused; three were already checked in Node and the fourth — whether the browser genuinely reuses the entry — is what both clauses were held on. Measured on Chrome 152 over a trustworthy origin, with the preloads observed to have landed (4 of 4) before the loader ran so a reuse cannot be confused with a race: the three MATCHED urls produce ONE performance.getEntriesByType('resource') entry each, initiator `link`, no 'fetch' entry at all. THE CONTROL IS WHAT MAKES THAT READABLE: a fourth url preloaded WITHOUT `crossorigin`, so its CORS mode does not match the loader's, produces TWO entries with initiators `link+fetch` — and Chrome names the cause itself ('is found, but is not used because the request credentials mode does not match'), while emitting no such warning for the three matched urls. Recorded in measurements/preload-reuse.json with the attribute set it was taken against; test/preload-reuse.test.js is the half that runs without a browser and GATES on that attribute set moving, on the deterministic-and-machine-independent reasoning scenario:2k uses for its catalog digest rather than 0a's report-only rule for source graphs."
     },
     {
       "id": 25,
@@ -296,7 +296,7 @@
         "test/example-server.test.js"
       ],
       "ablation": "M9 S1 A12: inserting a per-request `createStrings` call reds the AST rule, which asserts the ONLY enclosing scope of a `createStrings` call in the server example is `startBookshop`.",
-      "evidenceLine": "A behavioural test cannot see this \u2014 a server that rebuilt per request renders identically and passes every other assertion in the file \u2014 so the property is checked where it is visible, on `test/ssr-graph.test.js`'s precedent."
+      "evidenceLine": "A behavioural test cannot see this — a server that rebuilt per request renders identically and passes every other assertion in the file — so the property is checked where it is visible, on `test/ssr-graph.test.js`'s precedent."
     },
     {
       "id": 26,
@@ -306,7 +306,7 @@
       "gates": [
         "test/merge-parsed-files.test.js"
       ],
-      "ablation": "M9 S3 E6: comparing by primary language reds 4. E5 DID NOT FIRE \u2014 comparing the locale RAW changed nothing, because `parseStrings` normalizes at its own door \u2014 and a hand-built `ParsedStringsFile` spelled `EN-us`, with an `EN-gb` control, is the input that reaches the merge's own normalizer.",
+      "ablation": "M9 S3 E6: comparing by primary language reds 4. E5 DID NOT FIRE — comparing the locale RAW changed nothing, because `parseStrings` normalizes at its own door — and a hand-built `ParsedStringsFile` spelled `EN-us`, with an `EN-gb` control, is the input that reaches the merge's own normalizer.",
       "evidenceLine": "`pt`/`pt-PT` refused with both tags named; `nb`/`no`, `en`/`en-US` and `zh-Hans`/`zh-Hant` refused; `iw`/`he` merged, because normalization is CLDR-canonical."
     },
     {
@@ -317,7 +317,7 @@
       "gates": [
         "test/merge-parsed-files.test.js"
       ],
-      "ablation": "M9 S3 E1: skipping the equality check \u2014 last-write-wins \u2014 reds 6. E2: honouring keyed-record ORDER reds the placeholder-order merge. E3: ignoring ARRAY order reds the alternatives conflict. E4: a hand-written `key`+`translation` field list reds 4.",
+      "ablation": "M9 S3 E1: skipping the equality check — last-write-wins — reds 6. E2: honouring keyed-record ORDER reds the placeholder-order merge. E3: ignoring ARRAY order reds the alternatives conflict. E4: a hand-written `key`+`translation` field list reds 4.",
       "evidenceLine": "The predicate's SHAPE was measured against `lokalized-java` 3.0.0's own `LocalizedString#equals` on the pinned JDK: placeholder-map and translations-map order EQUAL, alternatives order NOT EQUAL, commentary compared. A predicate honouring map order would be strictly stricter than Java."
     },
     {
@@ -344,7 +344,7 @@
     },
     {
       "id": 30,
-      "statement": "Scenario 6 \u2014 edge/server full-range negotiation atop the shared validity/IANA closure \u2014 is frozen, recorded, and re-checked by a machine.",
+      "statement": "Scenario 6 — edge/server full-range negotiation atop the shared validity/IANA closure — is frozen, recorded, and re-checked by a machine.",
       "verdict": "PROVEN",
       "slice": "M9 S4",
       "gates": [
@@ -357,7 +357,7 @@
     },
     {
       "id": 31,
-      "statement": "Every symbol the plan declares \u2014 by plan 3.1's table and by signature across its eleven other sections \u2014 is delivered or carries a falsifiable disposition.",
+      "statement": "Every symbol the plan declares — by plan 3.1's table and by signature across its eleven other sections — is delivered or carries a falsifiable disposition.",
       "verdict": "PROVEN",
       "slice": "M9 S3",
       "gates": [
@@ -365,7 +365,7 @@
         "test/plan-surface.test.js",
         "test/allowlist-type-surface.test.js"
       ],
-      "ablation": "M9 S3 E13: implementing `mergeParsedStringsFiles` without EXPORTING it reds both surface gates, naming `parse:mergeParsedStringsFiles`. The first attempt was a false negative because the copy's `types/*.d.ts` predated the mutation \u2014 S25's rule, applied.",
+      "ablation": "M9 S3 E13: implementing `mergeParsedStringsFiles` without EXPORTING it reds both surface gates, naming `parse:mergeParsedStringsFiles`. The first attempt was a false negative because the copy's `types/*.d.ts` predated the mutation — S25's rule, applied.",
       "evidenceLine": "Both OWED tables are empty: `declared-surface` held thirteen names on 2026-09-10, `plan-surface` held thirty. Promised-but-undelivered: 0."
     },
     {
@@ -378,31 +378,31 @@
         "measurements/differentials.json"
       ],
       "ablation": "S31, six ablations all firing: a missing record, a recorded RED, an omitted entry, an invented one, and a differential whose TOOL digest moved since its last Java run each fail without Java. The tool-digest arm fired for real when `diff:language-range` changed.",
-      "evidenceLine": "Blocker 3 of the M9 scope map asked whether \"recorded\" meant machine-re-checked. It does, and M9 S1 closed the other half by adding `diff:check` to CI, where it had never run \u2014 it was in `verify` and in neither CI list."
+      "evidenceLine": "Blocker 3 of the M9 scope map asked whether \"recorded\" meant machine-re-checked. It does, and M9 S1 closed the other half by adding `diff:check` to CI, where it had never run — it was in `verify` and in neither CI list."
     },
     {
       "id": 33,
       "statement": "The pinned IANA/JDK-compatibility closure is generated from a registry snapshot recording `File-Date` and source SHA-256, with explicit JDK-compatibility override rows.",
-      "verdict": "DEFERRED",
-      "slice": "maintainer",
-      "gates": [],
-      "ablation": "",
-      "evidenceLine": "Blocker 2 of the M9 scope map, measured rather than inferred: `ianaRegistryFileDate` is null, `source` is `jdk-oracle`, `jdkCompatibilityOverrides` is empty. The port-vs-JDK axis is real and green (clause 7); the REGISTRY axis does not exist. Either the JDK is accepted as the sole authority in writing or the snapshot is acquired \u2014 maintainer decision A11 already chose `jdk-oracle:21.0.11` for the stamp field, which is evidence of intent but is not the same decision.",
-      "deferral": {
-        "whileTrue": "ianaRegistryAxisAbsent"
-      }
+      "verdict": "NOT-PROVEN",
+      "slice": "M-R S11 (the registry axis now exists; the generation direction does not match)",
+      "gates": [
+        "../lokalized-spec/tools/iana-oracle/registry.mjs",
+        "../lokalized-spec/generated/iana-registry-overrides.json"
+      ],
+      "ablation": "Reconstruction IS the check and it is two-sided: applying all 156 overrides to the registry-derived closure must reproduce the JDK artifact byte-identically, and an override that changes nothing is reported. A missing row leaves a difference; a padded row is named. Re-derived on every `npm run check`. Measured while building it: Corretto 27 yields 812 entries against 21's 806 — six added (dyl, enm, sgn-dyl, sgn-zhk, yol, zhk), zero changed, zero removed — and zero corpus cases touch any of them.",
+      "evidenceLine": "RE-VERDICTED 2026-09-19 from DEFERRED, because the ground it rested on has gone: the clause ledger's own `ianaRegistryAxisAbsent` predicate fired on the first run after the snapshot landed, which is the M-D S21 staleness machinery working as designed. EVERY ARTIFACT THE CLAUSE NAMES NOW EXISTS: `tools/iana-oracle/language-subtag-registry.txt` is the real registry (File-Date 2026-09-17, 9,296 records, 731,819 bytes, sha256 755fad43...), `generated/iana-registry-overrides.json` holds 156 explicit JDK-compatibility override rows (81 order-only, 37 JDK-only, 26 registry-only, 12 membership), and the equality is proven by RECONSTRUCTION rather than inspection. NOT PROVEN ANYWAY, and the gap is one word: the clause says the closure 'is GENERATED FROM' the snapshot plus overrides, and it is not — `build.mjs` still generates it from the JDK by exhaustive probe and the registry reconstruction VERIFIES that result. Those are different directions and this project does not close a clause by reading a weaker sentence than the one written. What would close it is small and is the maintainer's to authorise, because it inverts a documented decision: make `registry.mjs --write` produce the artifact from registry+overrides and demote the JDK probe to the check. The reconstruction already proves the two produce identical bytes, so the flip costs nothing in behaviour — it costs the property IANA-PROVENANCE.md argues for, that deriving from the oracle makes divergence structurally impossible."
     },
     {
       "id": 34,
-      "statement": "The blessed `localeLookupFor` memo (plan 3.4:864) is taken or permanently declined, and any cache that is taken meets plan 2.2:150-156 \u2014 per-instance deterministic LRU keyed by normalized requested tag, at most 256 retained entries, a test-only probe, a conforming disabled branch, and a 4,096 -> 40,960 heap protocol on both branches.",
+      "statement": "The blessed `localeLookupFor` memo (plan 3.4:864) is taken or permanently declined, and any cache that is taken meets plan 2.2:150-156 — per-instance deterministic LRU keyed by normalized requested tag, at most 256 retained entries, a test-only probe, a conforming disabled branch, and a 4,096 -> 40,960 heap protocol on both branches.",
       "verdict": "PROVEN",
       "slice": "M9 S5",
       "gates": [
         "test/candidate-chain-memo.test.js",
         "test/cache-bounds.test.js"
       ],
-      "ablation": "M9 S5, seven ablations: removing the 256 ceiling reds 4; FIFO instead of LRU reds the re-touch test; the disabled branch caching anyway reds its own; a module-scope map shared across instances reds 4; not freezing the cached chain reds the freeze test in either branch. TWO DID NOT FIRE FIRST: keying on the caller's raw spelling (because `forLocale` normalizes at its own door, so the probe tested that helper \u2014 the raw option object reaches the key, and the mutation then reds) and the freeze (no behavioural test can see it, so the property is asserted directly).",
-      "evidenceLine": "3.4's memo is DECLINED PERMANENTLY on a measurement: instrumented over 1,440 lookups across 100 SSR renders, 80 edge preserve-arm renders and 60 redirect targets, the instance-locale arm it caches was hit ZERO times, so it is inert for the server/edge packaging the deferral cited. Plan 2.2:150's candidate-chain LRU was taken instead \u2014 6 recomputations per SSR render over 4 distinct tags, 8.8% of end-to-end server time; memoized, supplied-match lookups 33,579 -> 3,738 ns (-88.9%). Conformance byte-identical at 2,117/0 across the change."
+      "ablation": "M9 S5, seven ablations: removing the 256 ceiling reds 4; FIFO instead of LRU reds the re-touch test; the disabled branch caching anyway reds its own; a module-scope map shared across instances reds 4; not freezing the cached chain reds the freeze test in either branch. TWO DID NOT FIRE FIRST: keying on the caller's raw spelling (because `forLocale` normalizes at its own door, so the probe tested that helper — the raw option object reaches the key, and the mutation then reds) and the freeze (no behavioural test can see it, so the property is asserted directly).",
+      "evidenceLine": "3.4's memo is DECLINED PERMANENTLY on a measurement: instrumented over 1,440 lookups across 100 SSR renders, 80 edge preserve-arm renders and 60 redirect targets, the instance-locale arm it caches was hit ZERO times, so it is inert for the server/edge packaging the deferral cited. Plan 2.2:150's candidate-chain LRU was taken instead — 6 recomputations per SSR render over 4 distinct tags, 8.8% of end-to-end server time; memoized, supplied-match lookups 33,579 -> 3,738 ns (-88.9%). Conformance byte-identical at 2,117/0 across the change."
     }
   ]
 }

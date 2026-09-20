@@ -1,11 +1,11 @@
 {
-  "recordedAt": "2026-09-17T16:16:44.484Z",
-  "sourceSha256": "cb6905b918de2b2a4d7c23c2485724af3b8b0d0d15e234bb00ee4bd20daace3c",
+  "recordedAt": "2026-09-20T03:00:13.848Z",
+  "sourceSha256": "f2f0dafe8cd96eec076ddd58754e1e2ddd7ba9fb12039a2bbb835951d0b412b2",
   "differentials": {
     "load": {
       "exit": 0,
       "headline": "41 identical — every probe's locales, keys, PARSED CONTENT, failure",
-      "toolSha256": "0f09ded96119893a8565022a83b89fe5f13a2dcee54c1b2685a2fe7f1b55368d",
+      "toolSha256": "2b0e319dedc5c5cab4d96459ce1dd02c9b635fc3a456225d0c8f6019c5517325",
       "facts": {
         "exercised": {
           "probes": 41,
@@ -20,22 +20,22 @@
     },
     "likely-subtag": {
       "exit": 0,
-      "headline": "cells           246967 = 35281 probes x 7 consumers",
+      "headline": "cells           246988 = 35284 probes x 7 consumers",
       "toolSha256": "59adb4c417de34e59db6e43793b1a89b72cdb40e4785a315c4423b9b54d76f12"
     },
     "lookup": {
       "exit": 0,
-      "headline": "end-to-end lookup differential against lokalized-3.0.0 on the pinned JDK: 320234/520597 well-formed lookups identical over 6789 tag(s) x 10 catalog set(s) x 11 shape(s) (3 keys x 2 lookup ingresses, p",
-      "toolSha256": "c4c1bf7772ed9baf044598a1d023ffc899fc676242aaaa41f3ae8d2924d3f4c6"
+      "headline": "end-to-end lookup differential against lokalized-3.1.0-SNAPSHOT on the pinned JDK: 367316/597080 well-formed lookups identical over 6813 tag(s) x 11 catalog set(s) x 11 shape(s) (3 keys x 2 lookup ing",
+      "toolSha256": "585d08f7c1b6825fe3dc11d623ad6701ca8e794dd0952ee0929732d8931b2562"
     },
     "direct-tag": {
       "exit": 0,
-      "headline": "Locale.forLanguageTag differential against Java on the pinned JDK: 46400/46400 well-formed tags identical, 0 declared divergence(s), 0 open port defect(s) over 0 probe(s), 0 unexplained; 83 ill-formed",
+      "headline": "Locale.forLanguageTag differential against Java on the pinned JDK: 46418/46418 well-formed tags identical, 0 declared divergence(s), 0 open port defect(s) over 0 probe(s), 0 unexplained; 83 ill-formed",
       "toolSha256": "ad00e2f30b9800ac79cbc1ecab4c04165ca5183de5aad9e6321e0740aac8954a"
     },
     "language-range": {
       "exit": 0,
-      "headline": "Locale.LanguageRange.parse differential against Java on the pinned JDK: 6037/6037 identical, 0 known divergence(s), 0 open port defect(s) over 0 probe(s), 0 unexplained",
+      "headline": "Locale.LanguageRange.parse differential against Java on the pinned JDK: 6110/6110 identical, 0 known divergence(s), 0 open port defect(s) over 0 probe(s), 0 unexplained",
       "toolSha256": "1b24a11587b795e6fef7ae8faf70d469da98d7cb9e125441906694b728ccf271"
     },
     "tokenizer": {

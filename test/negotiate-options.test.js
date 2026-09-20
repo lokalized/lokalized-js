@@ -335,11 +335,15 @@ describe("the IANA constants plan 3.4:914-915 declares on this subpath", () => {
     assert.ok(ianaRegistryDate.length > 0 && ianaDataFingerprint.length > 0);
   });
 
-  test("`ianaRegistryDate` is deliberately not date-shaped", () => {
-    // Maintainer decision A11: there is no pinned registry snapshot, so there is no `File-Date` to
-    // report, and inventing a plausible one is the defect class this project has caught five times.
-    assert.equal(ianaRegistryDate, "jdk-oracle:21.0.11");
-    assert.doesNotMatch(ianaRegistryDate, /^\d{4}-\d{2}-\d{2}$/);
+  test("`ianaRegistryDate` IS the pinned snapshot's File-Date", () => {
+    // **REVERSED IN M-R S11, and the old name was the whole point of the test.** It read
+    // "deliberately not date-shaped": maintainer decision A11 kept `jdk-oracle:<version>` because
+    // there was no pinned registry snapshot and inventing a plausible date is a defect class this
+    // project has caught five times. M-R S11 pinned a real snapshot — File-Date 2026-09-17, with
+    // 156 reconstruction-verified JDK-compatibility overrides — so the reason for A11 is gone and
+    // the maintainer took the date. Asserted date-SHAPED here and asserted EQUAL to the artifact's
+    // own File-Date in `test/runtime-metadata.test.js`, so this cannot drift from the snapshot.
+    assert.match(ianaRegistryDate, /^\d{4}-\d{2}-\d{2}$/);
   });
 });
 

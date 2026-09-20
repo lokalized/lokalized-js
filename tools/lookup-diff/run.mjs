@@ -307,11 +307,12 @@
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createStrings } from "../../src/core/index.js";
 import { normalizeTag } from "../../src/internal/locale.js";
+import { oracleJar } from "../oracle-jar.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -321,12 +322,19 @@ const specDir = process.env.LOKALIZED_SPEC_DIR
 const javaDir = process.env.LOKALIZED_JAVA_DIR
   ? resolve(process.env.LOKALIZED_JAVA_DIR)
   : resolve(root, "../lokalized-java");
-const JAR = process.env.LOKALIZED_JAR ?? join(javaDir, "target/lokalized-3.0.0.jar");
+const { jar: JAR, problem: JAR_PROBLEM } = oracleJar(javaDir);
 const JDK = process.env.LOKALIZED_ORACLE_JDK ?? "/Users/agents/Java/amazon-corretto-21.jdk/Contents/Home";
 
 const version = spawnSync(join(JDK, "bin/java"), ["-version"], { encoding: "utf8" });
 if (version.status !== 0) {
   console.error(`pinned JDK not usable at ${JDK}\nset LOKALIZED_ORACLE_JDK, or skip this differential`);
+  process.exit(2);
+}
+// THIS TOOL HAD NO JAR GUARD AT ALL -- it went straight to `javac -cp <jar>`, so an absent or
+// ambiguous oracle surfaced as a compiler error about a missing symbol rather than as the one
+// sentence that says what to do. Its sibling `load-diff` had the guard; this one did not.
+if (JAR_PROBLEM !== null) {
+  console.error(`the oracle jar could not be resolved: ${JAR_PROBLEM}`);
   process.exit(2);
 }
 
@@ -506,6 +514,35 @@ const CATALOG_SETS = [
     tiebreakers: { en: ["en-x-lvariant-NY", "en", "en-US"] },
     strings: catalogs(["en", "en-US", "fr"], ["en", "fr"]),
   },
+  {
+    // **THIS TOOL DROVE THE EXACT DOOR A LIVE DEFECT LIVED BEHIND AND WAS BLIND TO IT — not to the
+    // registry delta, to THE WHOLE EQUIVALENCE MECHANISM.** `LookupDiff.java` calls
+    // `strings.matchFor(Locale.forLanguageTag(tag))` and the runner compares it against
+    // `getDirectLocaleContext`, which resolves through the reduced IANA identity table. Measured in
+    // M-R S13: deleting the eight registry-only rows left this differential BYTE-IDENTICAL, and so
+    // did disabling the resolver outright, over 521,829 lookups reporting 0 unexplained.
+    //
+    // The cause is the catalog sets, not the tag space: of the thirteen catalog tags across the ten
+    // sets above, ZERO is an equivalence partner of any other tag in the table, so no expansion can
+    // change a selection anywhere. All eight delta tags were already in the probe space — they
+    // arrive from the corpus fixtures at runtime — and had nothing to match.
+    //
+    // **THE PROBE MUST BE SUFFIXED AND SO MUST THE CATALOG.** Bare `mgp` against `mrd-US` does not
+    // diverge: the class member is `mrd` and the catalog is `mrd-US`. `mgp-US` against `mrd-US`
+    // exercises the prefix walk this door gained in S13, which the corpus's two bare `-locale` rows
+    // cannot reach. Bare `mgp` stays in the tag space as the control that must remain green.
+    //
+    // `nsl` IS THE SECOND CONTROL AND IT IS THE ONE THAT PINS WHICH TABLE ANSWERS: `nsl`/`sgn-no`
+    // is in the JDK's own table and NOT in `jdkAbsentTags`, so it stays green under a mutation that
+    // removes only the registry rows. Checked for the vacuity trap first — on the pinned Corretto
+    // 21 `forLanguageTag("sgn-NO")` stays `sgn-NO` and does not collapse the pair the way
+    // `sgn-dyl`/`dyl` and `bh`/`bih` do, which is why those two pairs cannot be fixtures at all.
+    name: "iana-equivalence-partner",
+    fallback: "fr",
+    instance: "fr",
+    tiebreakers: null,
+    strings: catalogs(["fr", "mrd-US", "nsl"], ["fr"]),
+  },
 ];
 
 // ---------------------------------------------------------------------------------------------
@@ -582,6 +619,13 @@ function probes() {
     "cel-gaulish", "no-bok", "no-nyn", "zh-guoyu", "zh-hakka", "zh-min", "zh-min-nan", "zh-xiang",
     "en-GB-oed", "sgn-BE-FR", "sgn-US", "zh-cmn", "zh-cmn-Hans-CN", "zh-yue", "zh-nan"])
     set.add(tag);
+
+  // (4b) THE IANA EQUIVALENCE PROBES, paired with the `iana-equivalence-partner` catalog set above.
+  // `mgp-US`/`mrd-US` are the suffixed forms that reach the reduced table's prefix walk; the bare
+  // forms are controls that must stay green whichever way the walk is written; `nsl`/`sgn-NO` is
+  // the JDK-table control that separates "the equivalence mechanism works" from "the REGISTRY rows
+  // are consulted".
+  for (const tag of ["mgp", "mgp-US", "mrd", "mrd-US", "nsl", "sgn-NO"]) set.add(tag);
 
   // (5) EXTENSIONS AND PRIVATE USE: the `u`/`t`/`a` singletons including the two the compatibility
   // synthesis produces, keyword ordering (a `-u-` payload is a SET and a MAP, so two spellings are
@@ -1753,7 +1797,11 @@ try {
   );
 
   console.log(
-    `end-to-end lookup differential against lokalized-3.0.0 on the pinned JDK: ` +
+    // THE VERSION IS READ OFF THE JAR THIS RUN ACTUALLY LOADED. It was the literal "lokalized-3.0.0"
+    // and stayed that way when the oracle became 3.1.0-SNAPSHOT -- a headline naming the wrong
+    // oracle, recorded verbatim into measurements/differentials.json, in the one field a later
+    // reader uses to know what was compared.
+    `end-to-end lookup differential against ${basename(JAR, ".jar")} on the pinned JDK: ` +
       `${wellFormedAgree}/${wellFormedCompared} well-formed lookups identical over ` +
       `${tags.length} tag(s) x ${CATALOG_SETS.length} catalog set(s) x ${PROBE_SHAPES.length} shape(s) ` +
       `(${new Set(

@@ -184,11 +184,15 @@ if (gc) {
 
 const record = {
   scenario: "6",
-  revision: 1,
-  frozenAt: "2026-09-15",
+  revision: 2,
+  frozenAt: "2026-09-19",
   note: "No thresholds, by the precedent of M7 clause 19 as amended (A3) and M8's A4: recorded and " +
     "ratcheted where a ratchet exists, reported where none does. Frozen at M9 S4 rather than before " +
-    "M9 started, which plan 9.2:2818 asked for; the deviation is the record.",
+    "M9 started, which plan 9.2:2818 asked for; the deviation is the record. " +
+    "REVISION 2 (M-R S13): the scenario's own subject -- 'the shared validity/IANA closure' -- was " +
+    "re-pinned from the JDK's table to lokalized-java 3.1.0's registry-sourced one, 806 -> 814 " +
+    "classes. That is an ENVIRONMENT change by this tool's own rule, so revision 1's figures are " +
+    "not comparable with these and the bump says so rather than a rebaseline quietly absorbing it.",
   recipe: RECIPE,
   recipeSha256,
   fixtureSha256: fixtureDigest(),

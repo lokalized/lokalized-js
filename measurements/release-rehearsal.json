@@ -30,8 +30,8 @@
         "specifier": "lokalized",
         "file": "dist/browser/lokalized.js",
         "files": 1,
-        "rawBytes": 187717,
-        "brotliBytes": 55518,
+        "rawBytes": 188092,
+        "brotliBytes": 55838,
         "exports": 70,
         "loadedInBrowser": true
       },
@@ -39,8 +39,8 @@
         "specifier": "lokalized/core",
         "file": "dist/browser/core.js",
         "files": 7,
-        "rawBytes": 186889,
-        "brotliBytes": 55401,
+        "rawBytes": 187263,
+        "brotliBytes": 55593,
         "exports": 21,
         "loadedInBrowser": true
       },
@@ -48,8 +48,8 @@
         "specifier": "lokalized/parse",
         "file": "dist/browser/parse.js",
         "files": 5,
-        "rawBytes": 163059,
-        "brotliBytes": 49356,
+        "rawBytes": 163391,
+        "brotliBytes": 49628,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -57,8 +57,8 @@
         "specifier": "lokalized/load",
         "file": "dist/browser/load.js",
         "files": 7,
-        "rawBytes": 181470,
-        "brotliBytes": 54493,
+        "rawBytes": 181844,
+        "brotliBytes": 54582,
         "exports": 10,
         "loadedInBrowser": true
       },
@@ -75,8 +75,8 @@
         "specifier": "lokalized/negotiate",
         "file": "dist/browser/negotiate.js",
         "files": 3,
-        "rawBytes": 110170,
-        "brotliBytes": 34585,
+        "rawBytes": 110996,
+        "brotliBytes": 34844,
         "exports": 6,
         "loadedInBrowser": true
       },
@@ -84,8 +84,8 @@
         "specifier": "lokalized/data/ordinal",
         "file": "dist/browser/data/ordinal.js",
         "files": 8,
-        "rawBytes": 193597,
-        "brotliBytes": 57038,
+        "rawBytes": 193971,
+        "brotliBytes": 57075,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -93,11 +93,12 @@
         "specifier": "lokalized/data/ranges",
         "file": "dist/browser/data/ranges.js",
         "files": 8,
-        "rawBytes": 196125,
-        "brotliBytes": 57075,
+        "rawBytes": 196499,
+        "brotliBytes": 57232,
         "exports": 2,
         "loadedInBrowser": true
       }
-    ]
+    ],
+    "sizesRecordedFor": "M-R S13: the IANA closure grows 806 -> 818 (twelve JDK-absent tags, four recovered by seeding the probe space from the oracle's own keys) and src/internal/locale.js gains Java's prefix walk at the single-locale door"
   }
 }

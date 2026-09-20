@@ -103,6 +103,7 @@ import { fileURLToPath } from "node:url";
 
 import { PROBES } from "./probes.mjs";
 import { oracleFieldProblems, recordingOracleRows } from "../oracle-field-coverage.mjs";
+import { oracleJar } from "../oracle-jar.mjs";
 
 /**
  * Emitted by the Java oracle and deliberately NOT compared, each with the reason it cannot be.
@@ -113,7 +114,7 @@ const UNCOMPARED_ORACLE_FIELDS = {};
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
 const javaDir = join(root, "..", "lokalized-java");
-const JAR = process.env.LOKALIZED_JAR ?? join(javaDir, "target/lokalized-3.0.0.jar");
+const { jar: JAR, problem: JAR_PROBLEM } = oracleJar(javaDir);
 const JDK = process.env.LOKALIZED_ORACLE_JDK ?? "/Users/agents/Java/amazon-corretto-21.jdk/Contents/Home";
 
 const version = spawnSync(join(JDK, "bin/java"), ["-version"], { encoding: "utf8" });
@@ -121,8 +122,8 @@ if (version.status !== 0) {
   console.error(`pinned JDK not usable at ${JDK}\nset LOKALIZED_ORACLE_JDK, or skip this differential`);
   process.exit(2);
 }
-if (!existsSync(JAR)) {
-  console.error(`the oracle jar is missing at ${JAR}\nbuild lokalized-java, or set LOKALIZED_JAR`);
+if (JAR_PROBLEM !== null) {
+  console.error(`the oracle jar could not be resolved: ${JAR_PROBLEM}`);
   process.exit(2);
 }
 

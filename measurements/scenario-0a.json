@@ -9,19 +9,19 @@
     {
       "label": "root + raw-text catalog",
       "modules": 31,
-      "sourceBytes": 764556,
-      "importMs": 0.306,
-      "constructionMs": 0.1248,
-      "firstRenderMs": 0.3205,
-      "retainedBytes": 77168
+      "sourceBytes": 770591,
+      "importMs": 0.479,
+      "constructionMs": 0.144,
+      "firstRenderMs": 0.3695,
+      "retainedBytes": 83808
     },
     {
       "label": "core + parsed equivalent",
       "modules": 30,
-      "sourceBytes": 753943,
-      "importMs": 0.7,
-      "constructionMs": 0.371,
-      "firstRenderMs": 0.3086,
+      "sourceBytes": 759978,
+      "importMs": 0.881,
+      "constructionMs": 0.4289,
+      "firstRenderMs": 0.3672,
       "retainedBytes": 463152
     }
   ],
@@ -467,6 +467,27 @@
     {
       "reason": "M-R S8: likely-subtags.js is re-encoded structurally — 7,788 rows in 25 KB of source instead of 158 KB, decoding to output byte-identical to the pinned CLDR artifact. The browser root bundle falls 322,509 -> 187,679 minified and 73,653 -> 55,610 brotli, -24.5% on the wire. Conformance byte-identical at 2,150/0/0.",
       "growth": []
+    },
+    {
+      "reason": "M-R S11: runtime-metadata.js gained the ianaClosureSource field and a real File-Date for ianaRegistryDate, after the maintainer took the pinned-IANA-snapshot decision. +1,572 source bytes; no module joined any graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 764556 -> 766128 bytes",
+        "core + parsed equivalent: source graph grew 753943 -> 755515 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S13: lokalized-java 3.1.0's registry-sourced IANA table — the reduced identity table in src/internal/locale.js grows 269 -> 277 rows (+955 B in every graph)",
+      "growth": [
+        "root + raw-text catalog: source graph grew 766128 -> 767083 bytes",
+        "core + parsed equivalent: source graph grew 755515 -> 756470 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S13: the IANA closure 806 -> 818 classes (twelve JDK-absent tags; four recovered by seeding the probe space from the oracle's own key list) plus Java's prefix walk at the single-locale door in src/internal/locale.js",
+      "growth": [
+        "root + raw-text catalog: source graph grew 767083 -> 770591 bytes",
+        "core + parsed equivalent: source graph grew 756470 -> 759978 bytes"
+      ]
     }
   ],
   "browser": {

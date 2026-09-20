@@ -91,10 +91,10 @@ test("clause 5: the manifest format carries the IANA identity, and a DISAGREEING
   // FIRST HALF: a manifest claiming a DIFFERENT IANA identity is REFUSED — not dropped, not
   // believed. Dropping it was the old behaviour and it is exactly the silent-acceptance this
   // change exists to end.
-  const disagreeing = /** @type {any} */ ({ ...manifest(), ianaRegistryDate: "jdk-oracle:17.0.1" });
+  const disagreeing = /** @type {any} */ ({ ...manifest(), ianaRegistryDate: "1999-01-01" });
   disagreeing.catalogFingerprint =
     computeCatalogIdentity(catalogIdentityInputFor(disagreeing)).catalogFingerprint;
-  assert.throws(() => validateStringsManifest(disagreeing), /published against IANA jdk-oracle:17\.0\.1/,
+  assert.throws(() => validateStringsManifest(disagreeing), /published against IANA 1999-01-01/,
     "a manifest from a different IANA closure must be refused, before any I/O");
 
   // SECOND HALF, AND IT IS THE EXCLUSION TEST FOR THE NEW FIELDS: the build identity is compared

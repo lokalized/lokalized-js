@@ -54,7 +54,7 @@ const OTHER_IANA = "f".repeat(64);
 rewriteInCopy("src/internal/runtime-metadata.js", `producerVersion: "${RUNTIME_METADATA.producerVersion}"`,
   `producerVersion: "${OTHER_VERSION}"`);
 rewriteInCopy("src/internal/runtime-metadata.js", RUNTIME_METADATA.ianaDataFingerprint, OTHER_IANA);
-rewriteInCopy("src/internal/runtime-metadata.js", RUNTIME_METADATA.ianaRegistryDate, "jdk-oracle:0.0.0");
+rewriteInCopy("src/internal/runtime-metadata.js", RUNTIME_METADATA.ianaRegistryDate, "1999-01-01");
 rewriteInCopy("src/internal/runtime-metadata.js",
   `behavioralVectorsVersion: "${RUNTIME_METADATA.behavioralVectorsVersion}"`,
   'behavioralVectorsVersion: "0.0.0-other-copy"');

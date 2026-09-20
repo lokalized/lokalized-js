@@ -44,7 +44,7 @@
  * has to be named separately.
  */
 
-import { decode as decodeRangeEquivalents } from "../data/iana-range-equivalents.js";
+import { decode as decodeRangeEquivalents, decodeJdkAbsentTags } from "../data/iana-range-equivalents.js";
 import { matchFor, matchForRanges, normalizeTag } from "../internal/locale.js";
 import { RUNTIME_METADATA } from "../internal/runtime-metadata.js";
 import {
@@ -59,6 +59,28 @@ import {
  * this module so a future import into `src/index.js` fails a test rather than a byte ratchet.
  */
 const RANGE_EQUIVALENTS = decodeRangeEquivalents();
+
+/**
+ * **THE PORT CARRIES TWO EXPANSION TABLES BECAUSE lokalized-java 3.1.0 DOES.**
+ *
+ * `java.util.Locale.LanguageRange.parse` is what a Java CALLER uses to build the list it hands
+ * `matchFor`; `IanaLanguageEquivalents.parse` -- the library's own registry-sourced table -- is
+ * what `LocaleMatcher#bestMatchForAcceptLanguage` and `DefaultStrings#addParsedLanguageRangeIdenti-
+ * ties` use INSIDE the library. `VectorOracle.languageRangesFrom` states the split from the other
+ * side: a `matchFor` case's string input is parsed "before the library is entered".
+ *
+ * So `parseLanguageRanges` -- the public analogue of the JDK's parse, and what
+ * `tools/conformance.mjs:3909` calls exactly where the oracle calls `LanguageRange.parse` -- must
+ * NOT see these keys, while the two internal doors must. Collapsing the two answers the recorded
+ * Java question with the wrong channel: measured, `matchFor {"languageRanges":"mgp"}` then reports
+ * `exact` over an expanded `[mgp, mrd]` where Java reports `canonical` over the single range it was
+ * given, and `iana-equivalence.registry-gap.{mgp,yol}-ranges` are the two cases that say so.
+ *
+ * DERIVED, never hand-listed: lokalized-spec's `tools/iana-oracle/build.mjs` extracts BOTH closures
+ * every run and refuses to emit unless the library's is a strict superset of the JDK's with every
+ * shared class identical, so this set is the whole of the difference between them.
+ */
+const JDK_ABSENT_TAGS = decodeJdkAbsentTags();
 
 /** RFC 4647 caps nothing, but `LocaleMatcher` and plan 3.3 both cap a public request at 32 members. */
 const MAXIMUM_LANGUAGE_RANGES = 32;
@@ -318,15 +340,28 @@ function recoverLanguageEquivalents(key, equivalenceClass) {
  * range, so the first occurrence is at index 0 and the two are the same operation.
  *
  * @param {string} range lowercased
+ * @param {boolean} registryAware `true` models `IanaLanguageEquivalents.parse` (the library's own
+ *   registry-sourced table), `false` models the JDK's. See `JDK_ABSENT_TAGS`.
  * @returns {readonly string[] | null}
  */
-function equivalentsForLanguage(range) {
+function equivalentsForLanguage(range, registryAware) {
 	let prefix = range;
 
 	while (prefix.length > 0) {
 		const equivalenceClass = RANGE_EQUIVALENTS.get(prefix);
 
-		if (equivalenceClass !== undefined) {
+		// A key the JDK's table does not carry is INVISIBLE to the JDK's walk, not a stopping point
+		// it declines to use: the walk keeps dropping subtags and may still find a shorter key. So
+		// this skips rather than returns.
+		//
+		// **THAT DISTINCTION IS NOT OBSERVABLE TODAY AND THE ABLATION SAID SO** — returning `null`
+		// here instead of skipping leaves conformance at 2,162/0, every test green, and
+		// `diff:language-range` at 6,086/6,086. All eight delta tags are bare two- and three-letter
+		// language subtags, so there is no shorter prefix for the walk to go on and find. The skip
+		// is written this way because it is what the JDK's table does, not because anything here
+		// discriminates it; a delta tag with a hyphen in it would make the two differ, and nothing
+		// warns when one arrives.
+		if (equivalenceClass !== undefined && (registryAware || !JDK_ABSENT_TAGS.has(prefix))) {
 			const suffix = range.slice(prefix.length);
 			return recoverLanguageEquivalents(prefix, equivalenceClass)
 				.map((equivalent) => equivalent + suffix);
@@ -501,6 +536,21 @@ function javaDoubleText(value) {
  * @throws {RangeError} `IllegalArgumentException`, with Java's message
  */
 export function parseLanguageRanges(header) {
+	return parseRanges(header, false);
+}
+
+/**
+ * The body of both parses. `registryAware` picks which of the two tables described at
+ * `JDK_ABSENT_TAGS` the language-prefix arm walks; everything else -- the grammar, the weights, the
+ * insertion positions, the region/variant arm -- is identical, because in Java it is literally the
+ * same `LanguageRange.parse` code reading a different equivalence map.
+ *
+ * @param {string} header
+ * @param {boolean} registryAware
+ * @returns {readonly WeightedLanguageRange[]}
+ * @throws {RangeError}
+ */
+function parseRanges(header, registryAware) {
 	if (typeof header !== "string") throw new RangeError("An Accept-Language header must be a string");
 
 	let ranges = header.replaceAll(" ", "").toLowerCase();
@@ -559,7 +609,7 @@ export function parseLanguageRanges(header) {
 		const regionVariant = equivalentForRegionAndVariant(range);
 		if (regionVariant !== null) insert(regionVariant);
 
-		for (const equivalent of equivalentsForLanguage(range) ?? []) {
+		for (const equivalent of equivalentsForLanguage(range, registryAware) ?? []) {
 			insert(equivalent);
 			const derived = equivalentForRegionAndVariant(equivalent);
 			if (derived !== null) insert(derived);
@@ -637,7 +687,7 @@ export function parseLanguageRanges(header) {
  */
 function pinnedRangeEquivalents(range) {
 	try {
-		return parseLanguageRanges(range).map((member) => member.range);
+		return parseRanges(range, true).map((member) => member.range);
 	} catch (error) {
 		// Java's own catch, and it is not a swallow: the caller has already recorded the range itself
 		// as an identity, so "the JDK could not re-expand this form" leaves exactly what Java leaves.
@@ -922,7 +972,7 @@ function usableAcceptLanguageRanges(acceptLanguage) {
 	let ranges;
 
 	try {
-		ranges = parseLanguageRanges(normalized);
+		ranges = parseRanges(normalized, true);
 	} catch (error) {
 		// Java catches `IllegalArgumentException | IndexOutOfBoundsException` — the parser's own
 		// refusals and nothing else. Narrowed to `RangeError` here for the same reason: a `TypeError`

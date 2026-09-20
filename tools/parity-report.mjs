@@ -84,6 +84,11 @@ const referenceJdk = (() => {
 })();
 
 const core = await import("../src/core/index.js");
+// `ianaClosureSource` is INTERNAL — it names which implementation produced the pinned closure,
+// which a release declaration needs and a consumer has no use for. Read from the internal module
+// rather than exported from `core`, because widening the package surface to feed a build tool is
+// the wrong direction and would touch a derived allowlist for no consumer's benefit.
+const { RUNTIME_METADATA } = await import("../src/internal/runtime-metadata.js");
 
 /**
  * Every field, with the obligation it discharges and — where it is null — why.
@@ -117,7 +122,10 @@ const FIELDS = [
     reason: "plan :2395 has each pinned Java reference tag publish an immutable " +
       "`lokalized-porting-contracts-<version>.tar.gz`; no such archive exists in any of the three " +
       "repositories. It is the Java side's to publish, so this stays null rather than being " +
-      "substituted with a digest over something else." },
+      "substituted with a digest over something else. NOT to be confused with the spec repo's " +
+      "`dist/lokalized-data-<cldr>.tar`, which is plan M1's narrower data-only archive: that one " +
+      "exists and is reproducible, and substituting its digest here would answer a different " +
+      "question with a real-looking number." },
 
   { name: "requirementsSha256", obligation: 2, value: digestOf(join(spec, "pre-m0/bootstrap.requirements.candidate.json")),
     note: "plan 8.6's `requirements.json` is `pre-m0/bootstrap.requirements.candidate.json` here: " +
@@ -172,11 +180,20 @@ const FIELDS = [
   { name: "dataFingerprint", obligation: 3, value: core.dataFingerprint },
 
   { name: "ianaRegistryDate", obligation: 4, value: core.ianaRegistryDate,
-    note: "plan 7.3 defines this as the `File-Date` of a pinned IANA registry snapshot. There is no " +
-      "snapshot: the closure comes from the JDK oracle directly, so the value is deliberately not " +
-      "date-shaped. Keeping `jdk-oracle:<version>` rather than inventing a plausible date is " +
-      "amendment A9's decision." },
+    note: "plan 7.3 defines this as the `File-Date` of a pinned IANA registry snapshot, and there " +
+      "now IS one: `lokalized-spec/tools/iana-oracle/language-subtag-registry.txt`, File-Date " +
+      "2026-09-17, 9,296 records. THIS NOTE USED TO SAY THE OPPOSITE — \"There is no snapshot: the " +
+      "closure comes from the JDK oracle directly, so the value is deliberately not date-shaped\" — " +
+      "which was true under amendment A9 and was falsified by M-R S11 pinning the snapshot, while " +
+      "the note shipped on beside the date-shaped value it denied. The oracle moved again in S13: " +
+      "the closure is lokalized-java's own registry-sourced table, named by `ianaClosureSource`." },
   { name: "ianaDataFingerprint", obligation: 4, value: core.ianaDataFingerprint },
+  { name: "ianaClosureSource", obligation: 4, value: RUNTIME_METADATA.ianaClosureSource,
+    note: "WHICH IMPLEMENTATION PRODUCED THE PINNED CLOSURE, which the registry File-Date does not " +
+      "say and the fingerprint identifies without naming. Two builds sharing a File-Date can carry " +
+      "different closures; this names the oracle, and it is derived from the spec artifact's own " +
+      "`libraryVersion` rather than restated — it read `jdk-corretto:21.0.11` for a slice after " +
+      "the oracle stopped being the JDK, because nothing compared it to anything." },
   { name: "referenceJdkVendor", obligation: 4, value: referenceJdk.vendor,
     note: "plan :2612 pins an Eclipse Temurin image and every oracle recording in this project was " +
       "made on Amazon Corretto. The value is what was actually used; the divergence is the point of " +
@@ -320,7 +337,26 @@ if (write) {
   let recorded = "";
   try { recorded = readFileSync(OUTPUT, "utf8"); }
   catch { problems.push(`${OUTPUT} does not exist. Re-record with: node tools/parity-report.mjs --write`); }
-  if (recorded && recorded !== serialized)
+
+  // **THE COMMIT SHAs ARE EXCLUDED FROM THE COMPARISON, AND WITHOUT THIS EVERY COMMIT REDS THE
+  // BUILD.** They are pack-time facts: `prepack` regenerates the report as its last step, so the
+  // copy that ships always names the commit it shipped from. The copy in the tree cannot, because
+  // it is written BEFORE the commit that contains it — a report pinning HEAD is stale the instant
+  // it is committed, and `npm run verify` would go red on a clean tree for no defect at all.
+  // Found by noticing the maintainer's own commits had moved HEAD under a report recorded minutes
+  // earlier; it would have reded their next commit rather than mine.
+  //
+  // Everything else IS compared byte-for-byte, which is what keeps the volatility argument honest:
+  // the exclusion is three named fields, not a general tolerance.
+  const PER_COMMIT = ["implementationCommit", "dataCommit", "javaReferenceCommit",
+    "javaReferenceTagCommit", "sourceDateEpoch"];
+  const withoutCommits = (/** @type {string} */ json) => {
+    if (!json) return json;
+    const parsed = JSON.parse(json);
+    for (const field of PER_COMMIT) if (field in parsed.fields) parsed.fields[field] = "<per-commit>";
+    return JSON.stringify(parsed, null, 2);
+  };
+  if (recorded && withoutCommits(recorded) !== withoutCommits(serialized))
     problems.push("the recorded parity declaration is not what this run produces — either the build " +
       "moved and it must be re-recorded deliberately, or something non-deterministic has entered it");
 }

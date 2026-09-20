@@ -1,8 +1,8 @@
 {
   "scenario": "6",
-  "revision": 1,
-  "frozenAt": "2026-09-15",
-  "note": "No thresholds, by the precedent of M7 clause 19 as amended (A3) and M8's A4: recorded and ratcheted where a ratchet exists, reported where none does. Frozen at M9 S4 rather than before M9 started, which plan 9.2:2818 asked for; the deviation is the record.",
+  "revision": 2,
+  "frozenAt": "2026-09-19",
+  "note": "No thresholds, by the precedent of M7 clause 19 as amended (A3) and M8's A4: recorded and ratcheted where a ratchet exists, reported where none does. Frozen at M9 S4 rather than before M9 started, which plan 9.2:2818 asked for; the deviation is the record. REVISION 2 (M-R S13): the scenario's own subject -- 'the shared validity/IANA closure' -- was re-pinned from the JDK's table to lokalized-java 3.1.0's registry-sourced one, 806 -> 814 classes. That is an ENVIRONMENT change by this tool's own rule, so revision 1's figures are not comparable with these and the bump says so rather than a rebaseline quietly absorbing it.",
   "recipe": {
     "scenario": "6",
     "description": "edge/server full-range negotiation atop the shared validity/IANA closure",
@@ -31,29 +31,29 @@
   },
   "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
   "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
-  "closureClasses": 806,
-  "closureBytes": 23482,
+  "closureClasses": 818,
+  "closureBytes": 24142,
   "node": [
     {
       "label": "edge worker",
       "modules": 46,
-      "sourceBytes": 995963,
+      "sourceBytes": 1005814,
       "nodeBuiltinEdges": 0,
-      "ianaClosureBytes": 23482,
-      "importMs": 0.4445
+      "ianaClosureBytes": 24142,
+      "importMs": 0.5002
     },
     {
       "label": "server renderer",
       "modules": 53,
-      "sourceBytes": 1075476,
+      "sourceBytes": 1085327,
       "nodeBuiltinEdges": 10,
-      "ianaClosureBytes": 23482,
-      "importMs": 15.7062
+      "ianaClosureBytes": 24142,
+      "importMs": 17.653
     }
   ],
-  "negotiateMsPerHeader": 0.05688,
-  "firstRenderMs": 0.834,
-  "retainedBytes": -15560,
+  "negotiateMsPerHeader": 0.05785,
+  "firstRenderMs": 0.9175,
+  "retainedBytes": -13744,
   "requestsPerRender": {
     "fr-CA": 4,
     "fr-CH": 4,
@@ -149,6 +149,33 @@
     {
       "reason": "M-R S8: likely-subtags.js is re-encoded structurally — 7,788 rows in 25 KB of source instead of 158 KB, decoding to output byte-identical to the pinned CLDR artifact. The browser root bundle falls 322,509 -> 187,679 minified and 73,653 -> 55,610 brotli, -24.5% on the wire. Conformance byte-identical at 2,150/0/0.",
       "growth": []
+    },
+    {
+      "reason": "M-R S11: runtime-metadata.js gained the ianaClosureSource field and a real File-Date for ianaRegistryDate, after the maintainer took the pinned-IANA-snapshot decision. +1,572 source bytes; no module joined any graph.",
+      "growth": [
+        "edge worker: source graph grew 995963 -> 997535 bytes",
+        "server renderer: source graph grew 1075476 -> 1077048 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S13: the IANA closure moved from the JDK's table to lokalized-java 3.1.0's registry-sourced one (806 -> 814 classes, 23482 -> 23998 B); revision 1 -> 2 because the closure IS this scenario's environment",
+      "growth": [
+        "the IANA closure was re-pinned (806 -> 814 classes)",
+        "edge worker: source graph grew 997535 -> 1001697 bytes",
+        "edge worker: the IANA closure's share grew 23482 -> 23998 bytes",
+        "server renderer: source graph grew 1077048 -> 1081210 bytes",
+        "server renderer: the IANA closure's share grew 23482 -> 23998 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S13: the IANA closure 806 -> 818 classes (twelve JDK-absent tags; four recovered by seeding the probe space from the oracle's own key list) plus Java's prefix walk at the single-locale door in src/internal/locale.js; revision 2 already records the closure re-pin as an environment change",
+      "growth": [
+        "the IANA closure was re-pinned (814 -> 818 classes)",
+        "edge worker: source graph grew 1001697 -> 1005814 bytes",
+        "edge worker: the IANA closure's share grew 23998 -> 24142 bytes",
+        "server renderer: source graph grew 1081210 -> 1085327 bytes",
+        "server renderer: the IANA closure's share grew 23998 -> 24142 bytes"
+      ]
     }
   ]
 }

@@ -56,7 +56,7 @@ function manifest(overrides = {}) {
 /** The five that did not exist in the format before, each with a value this build does not have. */
 const NEW_FIELDS = /** @type {[string, unknown, RegExp][]} */ ([
   ["behavioralVectorsVersion", "99.0.0", /published against IANA .* and vectors 99\.0\.0/],
-  ["ianaRegistryDate", "jdk-oracle:17.0.1", /published against IANA jdk-oracle:17\.0\.1/],
+  ["ianaRegistryDate", "1999-01-01", /published against IANA 1999-01-01/],
   ["ianaDataFingerprint", "f".repeat(64), /published against IANA .* and vectors/],
   // The two fixed literals are a different fact from a version disagreement and say so separately:
   // a manifest declaring `localeDataMode: "host"` came from an implementation that classifies
@@ -149,6 +149,6 @@ test("the generator emits all seven, and its own validator is what proves it", a
 
   // THEY COME FROM THE BUILD, NEVER FROM THE CALLER. A generator option for any of these would let a
   // publisher claim an identity their build does not have, which is the defect this closes.
-  assert.equal(identity.ianaRegistryDate, "jdk-oracle:21.0.11",
-    "and it is the jdk-oracle pin, not a date — there is no IANA registry snapshot to date");
+  assert.equal(identity.ianaRegistryDate, "2026-09-17",
+    "and it IS the pinned registry snapshot's File-Date — M-R S11 pinned one");
 });

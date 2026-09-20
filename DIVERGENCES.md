@@ -5,7 +5,7 @@
      this file. Regenerate with `node tools/divergences.mjs --write`. -->
 
 This package is a port of [lokalized-java](https://github.com/lokalized/lokalized-java) 3.0.0 and
-matches it on 2150 recorded behaviours. Where it does not, the
+matches it on 2166 recorded behaviours. Where it does not, the
 difference is deliberate and listed here.
 
 ## Features with no counterpart here

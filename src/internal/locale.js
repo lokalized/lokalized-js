@@ -32,7 +32,22 @@ import { javaSplit, jdkLanguageSubtag, jdkLanguageTag, parseJdkTag, renderJdkTag
  * selects a loaded `nsl` even though CLDR maps `sgn-NO` to `nsi`. Java consults both tables, so a
  * port that has only the CLDR aliases gets that case wrong.
  *
- * Slice: the pinned registry has 806 classes; only two kinds of entry can ever be observed here, so
+ * **SINCE lokalized-java 3.1.0 THE PINNED CLOSURE IS THE LIBRARY'S OWN, NOT THE JDK'S**, and the
+ * library uses two tables: `java.util.Locale.LanguageRange.parse` for a list the CALLER built, and
+ * its registry-sourced `IanaLanguageEquivalents.parse` inside `bestMatchForAcceptLanguage` and
+ * `DefaultStrings#addParsedLanguageRangeIdentities`. THIS table is the reduction of the SECOND one,
+ * because that is the method the identity channel below ports; `lokalized/negotiate` carries the
+ * full closure plus the eight-tag delta that tells its public parse which keys the JDK's table
+ * lacks. The eight all survive the reduction, so a `mgp` request finds a loaded `mrd` at the
+ * single-locale door exactly as it does at the whole-list one.
+ *
+ * **THAT SENTENCE WAS TRUE OF THE BARE FORM ONLY WHEN IT WAS WRITTEN, AND IT IS THE SENTENCE THAT
+ * WOULD HAVE STOPPED THE NEXT READER LOOKING.** It reasons about which KEYS survive the reduction
+ * and says nothing about the LOOKUP SHAPE, which is where a real divergence was: see
+ * `REDUCED_RANGE_EQUIVALENTS` below, which was an exact lookup against Java's prefix walk until
+ * M-R S13. It now holds for a suffixed request too.
+ *
+ * Slice: the pinned registry has 814 classes; only two kinds of entry can ever be observed here, so
  * the rest are omitted.
  *   - keys are restricted to tags that survive `normalizeTag` (`jdkLanguageTag(k) === k`), because
  *     every range this kernel builds is an already-normalized locale tag — grandfathered forms
@@ -68,7 +83,9 @@ export const IANA_RANGE_EQUIVALENTS = new Map([
 	["bfi", ["bfi", "sgn-gb"]],
 	["bfy", ["bfy", "ppa"]],
 	["bgm", ["bgm", "bcg"]],
+	["bh", ["bh", "bih"]],
 	["bic", ["bic", "bir"]],
+	["bih", ["bih", "bh"]],
 	["bir", ["bir", "bic"]],
 	["bjd", ["bjd", "drl"]],
 	["blg", ["blg", "snb", "iba"]],
@@ -106,6 +123,7 @@ export const IANA_RANGE_EQUIVALENTS = new Map([
 	["dz", ["dz", "adp"]],
 	["eko", ["eko", "nte"]],
 	["ema", ["ema", "uok"]],
+	["enm", ["enm", "yol"]],
 	["fsl", ["fsl", "sgn-fx", "sgn-fr"]],
 	["gal", ["gal", "ilw"]],
 	["gav", ["gav", "dev"]],
@@ -167,8 +185,11 @@ export const IANA_RANGE_EQUIVALENTS = new Map([
 	["lrr", ["lrr", "yma"]],
 	["meg", ["meg", "cir"]],
 	["mfs", ["mfs", "sgn-mx"]],
+	["mgp", ["mgp", "mrd"]],
 	["mo", ["mo", "ro"]],
 	["mom", ["mom", "cjr"]],
+	["mrd", ["mrd", "mgp"]],
+	["mrh", ["mrh", "shl"]],
 	["mry", ["mry", "myt", "mst"]],
 	["ms-de", ["ms-de", "ms-dd"]],
 	["ms-fr", ["ms-fr", "ms-fx"]],
@@ -246,6 +267,7 @@ export const IANA_RANGE_EQUIVALENTS = new Map([
 	["sgn-tl", ["sgn-tl", "sgn-tp"]],
 	["sgn-us", ["sgn-us", "ase"]],
 	["sgn-za", ["sgn-za", "sfs"]],
+	["shl", ["shl", "mrh"]],
 	["skk", ["skk", "thx", "jeg", "oyb"]],
 	["smd", ["smd", "kmb"]],
 	["snb", ["snb", "blg", "iba"]],
@@ -303,6 +325,7 @@ export const IANA_RANGE_EQUIVALENTS = new Map([
 	["ybd", ["ybd", "ccq", "rki"]],
 	["yma", ["yma", "lrr"]],
 	["ymt", ["ymt", "mtm"]],
+	["yol", ["yol", "enm"]],
 	["yos", ["yos", "zom"]],
 	["yue-de", ["yue-de", "yue-dd"]],
 	["yue-fr", ["yue-fr", "yue-fx"]],
@@ -652,19 +675,56 @@ function extlangEquivalentLanguageRangeFor(range) {
  * `DefaultStrings#addParsedLanguageRangeIdentities`, whose body is `LanguageRange.parse(range)` — so
  * this is the JDK's IANA equivalence expansion, not a CLDR alias lookup.
  *
- * The DEFAULT resolver is the reduced inline table read by exact lookup, which is all the locale
- * ingress can ever need: the ranges `matchFor` builds are normalized locale tags, so the entries
- * dropped from the table are unreachable from it. `lokalized/negotiate` supplies the full pinned
- * closure instead, because a RAW RFC 4647 range is not a normalized tag and reaches entries this
- * table does not carry. Two corpus cases prove that is not hypothetical: `no-bok-no` expands through
+ * The DEFAULT resolver is the reduced inline table, which is all the locale ingress can ever need
+ * for its KEYS: the ranges `matchFor` builds are normalized locale tags, so the entries dropped from
+ * the table are unreachable from it. `lokalized/negotiate` supplies the full pinned closure instead,
+ * because a RAW RFC 4647 range is not a normalized tag and reaches entries this table does not
+ * carry. Two corpus cases prove that is not hypothetical: `no-bok-no` expands through
  * `no-bok -> nb` and `sgn-be-fr-x-a` through `sgn-be-fr -> sfb`, and neither key survives the
  * reduction.
+ *
+ * **IT WAS AN EXACT LOOKUP UNTIL M-R S13 AND THAT WAS A LIVE DIVERGENCE FROM JAVA.**
+ * `IanaLanguageEquivalents.equivalentsForLanguage` is a longest-known-PREFIX walk: it drops one
+ * trailing subtag at a time, stops at the first key it finds, and re-appends the remainder. A bare
+ * `Map.get` answers the bare tag and nothing else, so `matchFor("mgp-001")` over a loaded `mrd-001`
+ * answered `none` where Java answers `CANONICAL`. **Measured at 48 divergent rows across nine
+ * directed pairs and eight language families, of which SIX PRE-DATE the registry change** — `nsl`
+ * and `sgn-no` are the pre-existing instance, and they are the proof this is a standing defect the
+ * new data widened rather than collateral of it. The reasoning that kept the exact lookup was about
+ * which KEYS the reduction drops, and it was silently carried over to the LOOKUP SHAPE, which is a
+ * different question.
+ *
+ * **WALKING A REDUCED TABLE IS SAFE HERE, AND IT IS CHECKABLE RATHER THAN ARGUABLE.** The hazard
+ * would be a walk that stops at a SHORTER prefix than Java's walk over the full closure and
+ * substitutes at the wrong boundary. It cannot happen: no key of the 814-class closure has a
+ * strictly shorter prefix present in this table, and every key here is a closure key — so this walk
+ * either finds Java's prefix or finds nothing. `test/locale.test.js` asserts both halves of that.
+ * What remains is a MISS, never a wrong answer: the dropped keys (`no-bok`, `sgn-be-fr`) and the
+ * dropped class MEMBERS (`sgn-nsl`) cannot name a loaded catalog anyway, because a catalog tag has
+ * been through `normalizeTag`.
  *
  * @typedef {(range: string) => readonly string[] | null} RangeEquivalentResolver
  */
 
 /** @type {RangeEquivalentResolver} */
-const REDUCED_RANGE_EQUIVALENTS = (range) => IANA_RANGE_EQUIVALENTS.get(lower(range)) ?? null;
+const REDUCED_RANGE_EQUIVALENTS = (range) => {
+	let prefix = lower(range);
+
+	while (prefix.length > 0) {
+		const equivalenceClass = IANA_RANGE_EQUIVALENTS.get(prefix);
+
+		if (equivalenceClass !== undefined) {
+			const suffix = lower(range).slice(prefix.length);
+			return equivalenceClass.map((equivalent) => equivalent + suffix);
+		}
+
+		const index = prefix.lastIndexOf("-");
+		if (index === -1) break;
+		prefix = prefix.slice(0, index);
+	}
+
+	return null;
+};
 
 /**
  * @param {string} range

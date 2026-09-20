@@ -34,6 +34,17 @@ import { graphBytes } from "./graph-walk.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const problems = [];
+
+// A deliberate write, with the reason kept in the artifact -- `scenario:0a`'s shape. A write with
+// no reason is refused rather than defaulted, because "why did this grow" is the only thing the
+// field is for.
+const rewriteSizes = process.argv.includes("--write");
+const rewriteReason = process.argv.includes("--reason")
+  ? process.argv[process.argv.indexOf("--reason") + 1] ?? null : null;
+if (rewriteSizes && !rewriteReason) {
+  console.error("--write needs --reason \"what grew and why\"; the reason is kept in the artifact");
+  process.exit(2);
+}
 const site = mkdtempSync(join(tmpdir(), "lokalized-release-"));
 
 try {
@@ -133,6 +144,15 @@ try {
   // that is deterministic and machine-independent — which files an entry pulls and how many bytes
   // they are — on `scenario:2k`'s reasoning, not `scenario:0a`'s report-only rule: a graph size is
   // not a timing, and the tarball being compared is built right here.
+  // **THE SIZE COLUMNS RE-RECORD THROUGH `--write --reason`, AND NOTHING ELSE IN THE CAPTURE DOES.**
+  // Every other ratchet here (`scenario:0a`, `scenario:2k`, `conformance`) takes a deliberate write
+  // with a kept reason, and this one did not: the six numbers had to be transcribed from this
+  // tool's own output by hand, which is the "composed a value from a summary instead of reading
+  // it" mistake this project has recorded five times. The write is narrow ON PURPOSE -- it touches
+  // `files`/`rawBytes`/`brotliBytes` and NOTHING the browser measured. A capture that 404ed, or
+  // rendered the fallback, or loaded a file the tarball lacks is still a hard failure, so this
+  // cannot be used to silence a stale capture: it only re-states numbers it just derived itself.
+  const sizeDrift = [];
   for (const entry of record.browser.entries) {
     if (!files.includes(entry.file)) continue;   // already reported, and graphBytes would throw
     const walked = graphBytes(installed, entry.file);
@@ -140,14 +160,26 @@ try {
       Buffer.concat(walked.files.map((/** @type {string} */ f) => readFileSync(f))),
       { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }).length;
     if (walked.modules !== entry.files)
-      problems.push(`the rehearsal records ${entry.specifier} as ${entry.files} file(s); ` +
-        `the packed artifact reaches ${walked.modules}`);
+      sizeDrift.push([entry, "files", walked.modules,
+        `the rehearsal records ${entry.specifier} as ${entry.files} file(s); ` +
+          `the packed artifact reaches ${walked.modules}`]);
     if (walked.bytes !== entry.rawBytes)
-      problems.push(`the rehearsal records ${entry.specifier} at ${entry.rawBytes} raw byte(s); ` +
-        `the packed artifact is ${walked.bytes}`);
+      sizeDrift.push([entry, "rawBytes", walked.bytes,
+        `the rehearsal records ${entry.specifier} at ${entry.rawBytes} raw byte(s); ` +
+          `the packed artifact is ${walked.bytes}`]);
     if (squeezed !== entry.brotliBytes)
-      problems.push(`the rehearsal records ${entry.specifier} at ${entry.brotliBytes} brotli byte(s); ` +
-        `the packed artifact is ${squeezed}`);
+      sizeDrift.push([entry, "brotliBytes", squeezed,
+        `the rehearsal records ${entry.specifier} at ${entry.brotliBytes} brotli byte(s); ` +
+          `the packed artifact is ${squeezed}`]);
+  }
+
+  if (sizeDrift.length > 0 && rewriteSizes) {
+    for (const [entry, field, value] of sizeDrift) entry[field] = value;
+    record.browser.sizesRecordedFor = rewriteReason;
+    writeFileSync(join(root, "measurements/release-rehearsal.json"), `${JSON.stringify(record, null, 2)}\n`);
+    console.log(`re-recorded ${sizeDrift.length} size field(s): ${rewriteReason}`);
+  } else {
+    for (const [, , , message] of sizeDrift) problems.push(message);
   }
 
   /* 7. the parity declaration and the divergence document, as the tarball carries them */
