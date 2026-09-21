@@ -180,7 +180,8 @@ const FIELDS = [
       "and is computed here rather than copied from the null." },
   { name: "selectionRecordSha256", obligation: 2, value: digestOf(join(spec, "pre-m0/selection-record.draft.json")),
     note: "SELF-SUPERSEDING, and nothing else records that. The selection record must itself carry " +
-      "`profileRegistrySha256` and `bootstrapRequirementsSha256`, which are null today; filling " +
+      "`profileRegistrySha256` and `bootstrapRequirementsSha256`. They were null when this note was " +
+      "written and were filled on 2026-09-20; filling " +
       "them with their computed values changes this digest. So this value is guaranteed to move " +
       "when the record is completed, and a reader comparing it later must expect that." },
   { name: "activeRequirementIds", obligation: 2,
@@ -261,8 +262,10 @@ const FIELDS = [
     note: "no xfail mechanism exists, so there is no metadata to carry. See `xfailedIds`." },
   { name: "sourceDateEpoch", obligation: 6,
     value: (() => { try { return Number(execFileSync("git", ["-C", root, "log", "-1", "--format=%ct"], GIT).trim()); } catch { return null; } })(),
-    note: "derived from the COMMIT, because the package is at 0.0.0 with no release tag. When a " +
-      "release tag exists this should prefer it; recorded here rather than left to be discovered." },
+    note: "derived from the COMMIT, because no git release tag exists — measured, `git tag` is " +
+      "empty. The package left 0.0.0 for 1.0.0-rc.1 on 2026-09-20 and that changed nothing " +
+      "here: a VERSION is not a TAG, and this field wants the commit a tag would point at. " +
+      "When a release tag exists this should prefer it; recorded rather than left to be found." },
 ];
 
 

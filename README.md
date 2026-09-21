@@ -6,13 +6,17 @@ Lokalized keeps locale-specific grammar out of your application code. Plural rul
 grammatical case, formality and the rest live **with the translations**, where a translator can reach
 them — not scattered through conditionals in your components.
 
-This is a JavaScript port of [lokalized-java](https://www.lokalized.com), behaviour-for-behaviour.
+This is a JavaScript port of [lokalized-java](https://github.com/lokalized/lokalized-java), behaviour-for-behaviour.
 Every rule below is arbitrated against the Java implementation by an executed test corpus rather than
 by description.
 
 ```bash
-npm install lokalized
+npm install lokalized@1.0.0-rc.1
 ```
+
+The version is pinned because that is all there is: `1.0.0-rc.1` is a release candidate published
+under the `next` dist-tag, so there is no `latest` yet and a bare `npm install lokalized` will not
+resolve. When 1.0.0 ships it becomes `latest` and the bare form works.
 
 Requires Node 20+ or any modern browser. **Zero dependencies.** ESM only.
 Node 20 reached end of life on 2026-04-30 and the floor names it because a great many projects
@@ -2565,8 +2569,8 @@ The host in these examples is jsDelivr, which serves any published npm package a
 `https://cdn.jsdelivr.net/npm/<package>@<version>/<path>` — no account, no configuration. It was
 chosen over unpkg on one measurement that decides it for this package: **unpkg does not serve
 brotli**, and the second column of the size table below is brotli. Substitute your own host freely;
-the paths are what matter. **`lokalized` is not on the registry yet, so these URLs resolve once it
-is published** — until then, use the `./node_modules/…` form, which needs no network at all.
+the paths are what matter. These URLs name a published version, so they resolve as written; the
+`./node_modules/…` form below needs no network at all and is the one to use offline.
 
 **Pin an exact version. Never `latest`.** A moving target is a catalog format and a pinned CLDR
 snapshot changing under a page you already shipped, and this library's whole premise is that two
@@ -2578,7 +2582,7 @@ No modules, no import map, no build step — `lokalized.global.js` is a classic 
 one global:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/lokalized.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/lokalized.global.js"></script>
 <script>
   const strings = lokalized.createStrings({
     strings: { en: { Hi: "Hello {{name}}" }, fr: { Hi: "Bonjour {{name}}" } },
@@ -2610,7 +2614,7 @@ write the URL, you need no map at all:
 
 ```html
 <script type="module">
-  import { createStrings } from "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/lokalized.js";
+  import { createStrings } from "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/lokalized.js";
 
   const strings = createStrings({
     strings: { en: { Hi: "Hello {{name}}" }, fr: { Hi: "Bonjour {{name}}" } },
@@ -2656,14 +2660,14 @@ The same eight over the network:
 <script type="importmap">
 {
   "imports": {
-    "lokalized":                "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/lokalized.js",
-    "lokalized/core":           "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/core.js",
-    "lokalized/parse":          "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/parse.js",
-    "lokalized/load":           "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/load.js",
-    "lokalized/ssr":            "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/ssr.js",
-    "lokalized/negotiate":      "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/negotiate.js",
-    "lokalized/data/ordinal":   "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/data/ordinal.js",
-    "lokalized/data/ranges":    "https://cdn.jsdelivr.net/npm/lokalized@0.0.0/dist/browser/data/ranges.js"
+    "lokalized":                "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/lokalized.js",
+    "lokalized/core":           "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/core.js",
+    "lokalized/parse":          "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/parse.js",
+    "lokalized/load":           "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/load.js",
+    "lokalized/ssr":            "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/ssr.js",
+    "lokalized/negotiate":      "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/negotiate.js",
+    "lokalized/data/ordinal":   "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/data/ordinal.js",
+    "lokalized/data/ranges":    "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/data/ranges.js"
   }
 }
 </script>
@@ -2964,11 +2968,11 @@ second table. Both columns are re-derived on every run, so they describe this co
 
 | import | minified | brotli |
 |---|---|---|
-| `import { createStrings } from "lokalized"` | 185,091 | 54,936 |
-| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 109,865 | 34,296 |
+| `import { createStrings } from "lokalized"` | 185,096 | 54,844 |
+| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 109,870 | 34,329 |
 | `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,630 | 2,002 |
 | `import { GENDER_FEMININE } from "lokalized"` | 2,350 | 914 |
-| the four above, in one bundle | 243,173 | 67,973 |
+| the four above, in one bundle | 243,178 | 67,942 |
 <!-- bundle-table:end -->
 
 <!-- dist-table:start -->
@@ -2978,15 +2982,15 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 
 | load | files | raw | brotli |
 |---|---|---|---|
-| `lokalized` | 1 | 188,092 | 55,753 |
-| `lokalized/core` | 7 | 187,263 | 55,561 |
+| `lokalized` | 1 | 188,097 | 55,763 |
+| `lokalized/core` | 7 | 187,268 | 55,554 |
 | `lokalized/parse` | 5 | 163,391 | 49,628 |
-| `lokalized/load` | 7 | 181,844 | 54,577 |
+| `lokalized/load` | 7 | 181,849 | 54,637 |
 | `lokalized/ssr` | 2 | 7,186 | 2,246 |
-| `lokalized/negotiate` | 3 | 110,996 | 34,861 |
-| `lokalized/data/ordinal` | 8 | 193,971 | 57,098 |
-| `lokalized/data/ranges` | 8 | 196,499 | 57,196 |
-| `lokalized.global.js`, the classic script | 1 | 264,048 | 72,362 |
+| `lokalized/negotiate` | 3 | 111,001 | 34,910 |
+| `lokalized/data/ordinal` | 8 | 193,976 | 57,162 |
+| `lokalized/data/ranges` | 8 | 196,504 | 57,240 |
+| `lokalized.global.js`, the classic script | 1 | 264,053 | 72,257 |
 <!-- dist-table:end -->
 
 **What a no-build page downloads.** The table above is what a bundler produces from the source; this
@@ -3004,7 +3008,7 @@ larger, so a figure quoted in it overstates what a visitor on a modern CDN actua
 not printed here, because a number nothing re-derives is how this section came to be wrong before.
 
 Three things are worth reading off that table. **Half of the root bundle is one pinned CLDR table** —
-replacing `likely-subtags` with an empty one takes the same bundle from 185,091 to 162,162 minified
+replacing `likely-subtags` with an empty one takes the same bundle from 185,096 to 162,167 minified
 bytes, which is the price of resolving `fr-CH` to `fr` without asking the host. **The tables are
 shared, not duplicated**: adding three more subpaths to the root costs 58,082 bytes, not another
 whole copy. And **`lokalized/ssr` carries no pinned data at all**, which is what lets the stamp
@@ -3030,7 +3034,7 @@ Object.keys(await import("lokalized/ssr"));   // => ["createSsrStamp", "validate
 ```
 
 `sideEffects` is declared `false` and bundlers honour it — removing that field takes the
-single-constant import from 2,350 to 78,582 minified bytes, 33× larger.
+single-constant import from 2,350 to 78,587 minified bytes, 33× larger.
 
 ---
 
@@ -3300,7 +3304,7 @@ convention: importing the root never pulls the ordinal or range tables into your
 
 ## What this port does and does not do
 
-It reproduces `lokalized-java` 3.0.0's behaviour, including its messages, wherever a Java counterpart
+It reproduces `lokalized-java` 3.1.0's behaviour, including its messages, wherever a Java counterpart
 exists. Where the two must differ, the difference is declared rather than incidental:
 
 - **Error types use JavaScript names with Java's shape.** Java's `IllegalArgumentException` for a

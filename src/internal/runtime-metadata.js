@@ -40,7 +40,7 @@ export const RUNTIME_METADATA = Object.freeze({
   // `package.json`'s version, compared EXACTLY by strict v1 hydration (plan 6.4). A release that
   // bumps the package and forgets this line would make every stamp claim the old build; the test
   // reads `package.json` so that cannot happen quietly.
-  producerVersion: "0.0.0",
+  producerVersion: "1.0.0-rc.1",
 
   // `lokalized-spec generated/behavioral-vectors.json`'s own `behavioralVectorsVersion`.
   behavioralVectorsVersion: "1.0.0",

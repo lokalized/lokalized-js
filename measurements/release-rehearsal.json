@@ -30,8 +30,8 @@
         "specifier": "lokalized",
         "file": "dist/browser/lokalized.js",
         "files": 1,
-        "rawBytes": 188092,
-        "brotliBytes": 55753,
+        "rawBytes": 188097,
+        "brotliBytes": 55763,
         "exports": 70,
         "loadedInBrowser": true
       },
@@ -39,8 +39,8 @@
         "specifier": "lokalized/core",
         "file": "dist/browser/core.js",
         "files": 7,
-        "rawBytes": 187263,
-        "brotliBytes": 55561,
+        "rawBytes": 187268,
+        "brotliBytes": 55554,
         "exports": 21,
         "loadedInBrowser": true
       },
@@ -57,8 +57,8 @@
         "specifier": "lokalized/load",
         "file": "dist/browser/load.js",
         "files": 7,
-        "rawBytes": 181844,
-        "brotliBytes": 54577,
+        "rawBytes": 181849,
+        "brotliBytes": 54637,
         "exports": 10,
         "loadedInBrowser": true
       },
@@ -75,8 +75,8 @@
         "specifier": "lokalized/negotiate",
         "file": "dist/browser/negotiate.js",
         "files": 3,
-        "rawBytes": 110996,
-        "brotliBytes": 34861,
+        "rawBytes": 111001,
+        "brotliBytes": 34910,
         "exports": 6,
         "loadedInBrowser": true
       },
@@ -84,8 +84,8 @@
         "specifier": "lokalized/data/ordinal",
         "file": "dist/browser/data/ordinal.js",
         "files": 8,
-        "rawBytes": 193971,
-        "brotliBytes": 57098,
+        "rawBytes": 193976,
+        "brotliBytes": 57162,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -93,12 +93,12 @@
         "specifier": "lokalized/data/ranges",
         "file": "dist/browser/data/ranges.js",
         "files": 8,
-        "rawBytes": 196499,
-        "brotliBytes": 57196,
+        "rawBytes": 196504,
+        "brotliBytes": 57240,
         "exports": 2,
         "loadedInBrowser": true
       }
     ],
-    "sizesRecordedFor": "M-R S14: the registry snapshot's SHA-256 now travels with the closure (clause 33 conjunct 2) and the data lock references the 130 override rows (conjunct 3)"
+    "sizesRecordedFor": "version 0.0.0 -> 1.0.0-rc.1 for the first publish: producerVersion is a source string in every browser bundle, so every entry grew by exactly 5 raw bytes"
   }
 }

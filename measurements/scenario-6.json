@@ -37,23 +37,23 @@
     {
       "label": "edge worker",
       "modules": 46,
-      "sourceBytes": 1005814,
+      "sourceBytes": 1005819,
       "nodeBuiltinEdges": 0,
       "ianaClosureBytes": 24142,
-      "importMs": 0.5002
+      "importMs": 0.4938
     },
     {
       "label": "server renderer",
       "modules": 53,
-      "sourceBytes": 1085327,
+      "sourceBytes": 1085332,
       "nodeBuiltinEdges": 10,
       "ianaClosureBytes": 24142,
-      "importMs": 17.653
+      "importMs": 17.167
     }
   ],
-  "negotiateMsPerHeader": 0.05785,
-  "firstRenderMs": 0.9175,
-  "retainedBytes": -13744,
+  "negotiateMsPerHeader": 0.06068,
+  "firstRenderMs": 0.9008,
+  "retainedBytes": -15256,
   "requestsPerRender": {
     "fr-CA": 4,
     "fr-CH": 4,
@@ -175,6 +175,13 @@
         "edge worker: the IANA closure's share grew 23998 -> 24142 bytes",
         "server renderer: source graph grew 1081210 -> 1085327 bytes",
         "server renderer: the IANA closure's share grew 23998 -> 24142 bytes"
+      ]
+    },
+    {
+      "reason": "version 0.0.0 -> 1.0.0-rc.1 for the first publish: producerVersion is a source string, +5 bytes in every graph reaching src/internal/runtime-metadata.js",
+      "growth": [
+        "edge worker: source graph grew 1005814 -> 1005819 bytes",
+        "server renderer: source graph grew 1085327 -> 1085332 bytes"
       ]
     }
   ]

@@ -1,7 +1,6 @@
 {
   "name": "lokalized",
-  "version": "0.0.0",
-  "private": true,
+  "version": "1.0.0-rc.1",
   "description": "Natural-sounding software translations for JavaScript.",
   "license": "Apache-2.0",
   "type": "module",
@@ -116,6 +115,8 @@
     "url": "git+https://github.com/lokalized/lokalized-js.git"
   },
   "homepage": "https://www.lokalized.com",
+  "bugs": { "url": "https://github.com/lokalized/lokalized-js/issues" },
+  "publishConfig": { "tag": "next" },
   "keywords": [
     "i18n",
     "l10n",

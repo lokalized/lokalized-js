@@ -4,14 +4,14 @@
   "planSection": "8.5",
   "status": "incomplete",
   "fields": {
-    "implementationVersion": "0.0.0",
+    "implementationVersion": "1.0.0-rc.1",
     "packageName": "lokalized",
-    "packageVersion": "0.0.0",
-    "implementationCommit": "bdba141ecfe68ca2d02c3a327973be2ff5183b21",
+    "packageVersion": "1.0.0-rc.1",
+    "implementationCommit": "decda6390ff0317b1b7a83770b8b1794fe006c6d",
     "javaReferenceCommit": "a91925827b3000148bddf36de5e738ed55e8408f",
     "javaReferenceVersion": "3.1.0-SNAPSHOT",
     "javaReferenceTagCommit": "c971f071ded30562acf627c07e5767389d57f84b",
-    "dataCommit": "17b3507b7d18a3ec5b2b44391ae28a30a0616a36",
+    "dataCommit": "810cfaa0cf4d29450977365abf7371fd0c9692fe",
     "portingContractArchiveDigest": null,
     "requirementsSha256": "649fabc4a99cac5798747ed17af05752d63388813ce4b54e084a74b632952136",
     "selectedReleaseProfileId": "strict-parity-0.x-draft",
@@ -4612,7 +4612,7 @@
       ]
     },
     "xfailMetadata": [],
-    "sourceDateEpoch": 1789919226
+    "sourceDateEpoch": 1789922002
   },
   "undetermined": [
     {
@@ -4643,7 +4643,7 @@
     "requirementsSha256": "plan 8.6's `requirements.json` is `pre-m0/bootstrap.requirements.candidate.json` here: the successor registry revision 8.6 describes has not been produced, so this is the digest of the candidate the project actually has.",
     "selectedReleaseProfileId": "read from a selection record whose own `status` is `draft-unapproved`; the id is selected, the selection is not approved. See `releaseProfileApproved`.",
     "profileRegistrySha256": "the selection record carries null for this; it is computable from the file that exists and is computed here rather than copied from the null.",
-    "selectionRecordSha256": "SELF-SUPERSEDING, and nothing else records that. The selection record must itself carry `profileRegistrySha256` and `bootstrapRequirementsSha256`, which are null today; filling them with their computed values changes this digest. So this value is guaranteed to move when the record is completed, and a reader comparing it later must expect that.",
+    "selectionRecordSha256": "SELF-SUPERSEDING, and nothing else records that. The selection record must itself carry `profileRegistrySha256` and `bootstrapRequirementsSha256`. They were null when this note was written and were filled on 2026-09-20; filling them with their computed values changes this digest. So this value is guaranteed to move when the record is completed, and a reader comparing it later must expect that.",
     "activeRequirementIds": "which reading governs `active` is undecided: every activation milestone has arrived by M-R, so the frontier reading admits all of them, while zero rows are reviewed, so the review reading admits none. Recorded as both rather than as one number that would be right by accident. Also measured: 0 of these ids match plan 8.6's mandated immutable form `LJ-<AREA>-NNN` — every one is `BOOT-M0-NNNN`.",
     "ianaRegistryDate": "plan 7.3 defines this as the `File-Date` of a pinned IANA registry snapshot, and there now IS one: `lokalized-spec/tools/iana-oracle/language-subtag-registry.txt`, File-Date 2026-09-17, 9,296 records. THIS NOTE USED TO SAY THE OPPOSITE — \"There is no snapshot: the closure comes from the JDK oracle directly, so the value is deliberately not date-shaped\" — which was true under amendment A9 and was falsified by M-R S11 pinning the snapshot, while the note shipped on beside the date-shaped value it denied. The oracle moved again in S13: the closure is lokalized-java's own registry-sourced table, named by `ianaClosureSource`.",
     "ianaClosureSource": "WHICH IMPLEMENTATION PRODUCED THE PINNED CLOSURE, which the registry File-Date does not say and the fingerprint identifies without naming. Two builds sharing a File-Date can carry different closures; this names the oracle, and it is derived from the spec artifact's own `libraryVersion` rather than restated — it read `jdk-corretto:21.0.11` for a slice after the oracle stopped being the JDK, because nothing compared it to anything.",
@@ -4652,7 +4652,7 @@
     "xfailedIds": "empty because THERE IS NO XFAIL MECHANISM, not because nothing is xfailed: zero of the corpus's cases carry an `xfail` field. \"No failures\" and \"no mechanism\" are different facts and a release report must not blur them.",
     "unsupportedIds": "\"unsupported\" here is the NOT-IMPLEMENTED-YET bucket, which is what `npm run conformance` reports and what 8.5's strict-partition rule is about. The artifact's own `unsupportedIds` field is a wider 213 = 43 refused by design + 170 with no JVM counterpart; both are carried separately below so the two senses cannot be confused.",
     "xfailMetadata": "no xfail mechanism exists, so there is no metadata to carry. See `xfailedIds`.",
-    "sourceDateEpoch": "derived from the COMMIT, because the package is at 0.0.0 with no release tag. When a release tag exists this should prefer it; recorded here rather than left to be discovered."
+    "sourceDateEpoch": "derived from the COMMIT, because no git release tag exists — measured, `git tag` is empty. The package left 0.0.0 for 1.0.0-rc.1 on 2026-09-20 and that changed nothing here: a VERSION is not a TAG, and this field wants the commit a tag would point at. When a release tag exists this should prefer it; recorded rather than left to be found."
   },
   "strictPartition": {
     "met": true,

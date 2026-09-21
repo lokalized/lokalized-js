@@ -9,19 +9,19 @@
     {
       "label": "root + raw-text catalog",
       "modules": 31,
-      "sourceBytes": 770591,
-      "importMs": 0.479,
-      "constructionMs": 0.144,
-      "firstRenderMs": 0.3695,
-      "retainedBytes": 83808
+      "sourceBytes": 770596,
+      "importMs": 0.43,
+      "constructionMs": 0.1847,
+      "firstRenderMs": 0.3758,
+      "retainedBytes": 70960
     },
     {
       "label": "core + parsed equivalent",
       "modules": 30,
-      "sourceBytes": 759978,
-      "importMs": 0.881,
-      "constructionMs": 0.4289,
-      "firstRenderMs": 0.3672,
+      "sourceBytes": 759983,
+      "importMs": 0.814,
+      "constructionMs": 0.4065,
+      "firstRenderMs": 0.366,
       "retainedBytes": 463152
     }
   ],
@@ -488,6 +488,13 @@
         "root + raw-text catalog: source graph grew 767083 -> 770591 bytes",
         "core + parsed equivalent: source graph grew 756470 -> 759978 bytes"
       ]
+    },
+    {
+      "reason": "version 0.0.0 -> 1.0.0-rc.1 for the first publish: producerVersion is a source string, +5 bytes in every graph reaching src/internal/runtime-metadata.js",
+      "growth": [
+        "root + raw-text catalog: source graph grew 770591 -> 770596 bytes",
+        "core + parsed equivalent: source graph grew 759978 -> 759983 bytes"
+      ]
     }
   ],
   "browser": {
@@ -499,23 +506,23 @@
       {
         "label": "root + raw-text catalog",
         "resources": 31,
-        "encodedBytes": 887090,
-        "decodedBytes": 887090,
-        "coldImportMs": 25.8,
+        "encodedBytes": 770596,
+        "decodedBytes": 770596,
+        "coldImportMs": 36.7,
         "importMs": 1.6,
-        "constructionMs": 0.2,
-        "firstRenderMs": 0.5,
+        "constructionMs": 0.4,
+        "firstRenderMs": 0.9,
         "firstRender": "I read 3 books"
       },
       {
         "label": "core + parsed equivalent",
         "resources": 30,
-        "encodedBytes": 876724,
-        "decodedBytes": 876724,
-        "coldImportMs": 21,
-        "importMs": 2.5,
-        "constructionMs": 0.9,
-        "firstRenderMs": 0.8,
+        "encodedBytes": 759983,
+        "decodedBytes": 759983,
+        "coldImportMs": 38.4,
+        "importMs": 3.6,
+        "constructionMs": 1.6,
+        "firstRenderMs": 1.4,
         "firstRender": "I read 3 books"
       }
     ]

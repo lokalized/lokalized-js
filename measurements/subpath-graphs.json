@@ -151,16 +151,19 @@
     },
     {
       "reason": "M-R S13: the IANA closure 806 -> 818 classes (twelve JDK-absent tags; four recovered by seeding the probe space from the oracle's own key list) plus Java's prefix walk at the single-locale door in src/internal/locale.js"
+    },
+    {
+      "reason": "version 0.0.0 -> 1.0.0-rc.1 for the first publish: producerVersion is a source string, +5 bytes in every graph that reaches src/internal/runtime-metadata.js"
     }
   ],
   "subpaths": {
     "lokalized": {
       "modules": 31,
-      "bytes": 770591
+      "bytes": 770596
     },
     "lokalized/core": {
       "modules": 30,
-      "bytes": 759978
+      "bytes": 759983
     },
     "lokalized/parse": {
       "modules": 29,
@@ -168,7 +171,7 @@
     },
     "lokalized/load": {
       "modules": 38,
-      "bytes": 664083
+      "bytes": 664088
     },
     "lokalized/ssr": {
       "modules": 3,
@@ -176,19 +179,19 @@
     },
     "lokalized/negotiate": {
       "modules": 16,
-      "bytes": 297911
+      "bytes": 297916
     },
     "lokalized/node": {
       "modules": 41,
-      "bytes": 698503
+      "bytes": 698508
     },
     "lokalized/data/ordinal": {
       "modules": 33,
-      "bytes": 790317
+      "bytes": 790322
     },
     "lokalized/data/ranges": {
       "modules": 33,
-      "bytes": 795190
+      "bytes": 795195
     }
   }
 }
