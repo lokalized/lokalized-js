@@ -14,9 +14,11 @@ by description.
 npm install lokalized@1.0.0-rc.1
 ```
 
-The version is pinned because that is all there is: `1.0.0-rc.1` is a release candidate published
-under the `next` dist-tag, so there is no `latest` yet and a bare `npm install lokalized` will not
-resolve. When 1.0.0 ships it becomes `latest` and the bare form works.
+**Pin the version.** `1.0.0-rc.1` is a release candidate, published under the `next` dist-tag — but
+npm sets `latest` to the first version of a package whatever tag you publish it under, so a bare
+`npm install lokalized` resolves to this release candidate today rather than failing. Measured
+against the registry on 2026-09-21: `{ next: 1.0.0-rc.1, latest: 1.0.0-rc.1 }`. Naming the version
+is how you say which one you meant, and it is what this document's CDN section asks for too.
 
 Requires Node 20+ or any modern browser. **Zero dependencies.** ESM only.
 Node 20 reached end of life on 2026-04-30 and the floor names it because a great many projects
