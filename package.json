@@ -67,7 +67,7 @@
     "check:readme:packed": "node tools/readme-newcomer.mjs",
     "example:server": "node examples/server/server.js",
     "test": "node --test",
-    "verify": "npm run check && npm run types && npm run check:examples && npm run check:readme && npm run check:readme:packed && npm run check:bundle && npm run declarations && npm run check:readonly && npm run check:dist && npm run check:release && npm test && npm run size:graph && npm run subpath:graphs && npm run likely-subtag-consumers && npm run conformance && npm run divergences && npm run parity:check && npm run diff:check && npm run check:i18next && npm run scenario:0a && npm run scenario:2k && npm run scenario:6 && npm run scenario:concurrency && npm run scenario:peak-memory && npm run clause:ledger && npm run spike:placeholders",
+    "verify": "npm run check && npm run types && npm run check:examples && npm run check:readme && npm run check:readme:packed && npm run check:bundle && npm run declarations && npm run check:readonly && npm run check:dist && npm run check:release && npm run smoke:worker && npm test && npm run size:graph && npm run subpath:graphs && npm run likely-subtag-consumers && npm run conformance && npm run divergences && npm run check:reference-lock && npm run parity:check && npm run diff:check && npm run check:i18next && npm run scenario:0a && npm run scenario:0b && npm run scenario:2k && npm run scenario:6 && npm run scenario:concurrency && npm run scenario:peak-memory && npm run clause:ledger && npm run spike:placeholders",
     "likely-subtag-consumers": "node tools/likely-subtag-consumers.mjs",
     "conformance": "node tools/conformance.mjs",
     "conformance:write": "node tools/conformance.mjs --write",
@@ -95,6 +95,7 @@
     "check:dist": "node tools/build-browser.mjs",
     "subset": "node tools/subset-likely-subtags.mjs",
     "check:release": "node tools/release-check.mjs",
+    "smoke:worker": "node tools/worker-smoke.mjs",
     "build:browser": "node tools/build-browser.mjs --write",
     "diff:all": "node tools/differentials.mjs --run",
     "diff:check": "node tools/differentials.mjs --check",
@@ -103,20 +104,29 @@
     "check:bundle": "node tools/bundle-sizes.mjs",
     "parity": "node tools/parity-report.mjs",
     "divergences": "node tools/divergences.mjs",
-    "parity:check": "node tools/parity-report.mjs --check"
+    "parity:check": "node tools/parity-report.mjs --check",
+    "serve:0b": "node tools/browser-0b/serve.mjs",
+    "scenario:0b": "node tools/scenario-0b.mjs",
+    "check:reference-lock": "node tools/reference-runtime-lock.mjs",
+    "reference-lock": "node tools/reference-runtime-lock.mjs --write"
   },
   "devDependencies": {
     "@types/node": "20.19.43",
     "esbuild": "0.28.2",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "workerd": "1.20260922.1"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lokalized/lokalized-js.git"
   },
   "homepage": "https://www.lokalized.com",
-  "bugs": { "url": "https://github.com/lokalized/lokalized-js/issues" },
-  "publishConfig": { "tag": "next" },
+  "bugs": {
+    "url": "https://github.com/lokalized/lokalized-js/issues"
+  },
+  "publishConfig": {
+    "tag": "next"
+  },
   "keywords": [
     "i18n",
     "l10n",

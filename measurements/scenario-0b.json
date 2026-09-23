@@ -1,0 +1,433 @@
+{
+  "formatVersion": 1,
+  "note": "Scenario 0b, measured against the real production host. REPORTED, never thresholded — A7 declined to freeze any, so this cannot close M8 clauses 84-87. Re-checked by tools/scenario-0b.mjs, which touches no network.",
+  "recipe": {
+    "revision": 2,
+    "packRecipe": "the published npm tarball, unmodified: lokalized@1.0.0-rc.1, sha256 dbe58b36…, verified byte-identical to the locally gated build",
+    "importRecipe": "ES module import of dist/browser/lokalized.js and dist/browser/load.js, plus their transitive chunks",
+    "loaderGraph": "loadStrings(manifest, 'fr') over a four-catalog manifest; requested fr, sibling fr-CA, fallback en",
+    "streamingLimitArm": "after the scenario and its controls, loadStrings(manifest, 'fr', { limits: { maximumInputBytes } }) twice, each on its own token: one byte under fr's manifest-declared decoded size (must refuse fr alone at stage `limit`) and at it (must load). The limit counts what the loader streams, which on a compressing host is the decoded body, so a wire-byte count would accept both",
+    "codeOrigin": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/",
+    "catalogOrigin": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/",
+    "requiredHostHeaders": [
+      "timing-allow-origin",
+      "access-control-allow-origin",
+      "content-encoding",
+      "cache-control"
+    ],
+    "cacheState": "a cold browser HTTP cache over a warm CDN edge, which is what a first-time visitor meets. The page runs from a top-level site this browser has not visited (http://<name>.localhost:8713); Chromium keys its HTTP cache by top-level site, so that partition holds nothing for any URL here, the transitively-imported chunks included. A per-run `?0b=<run>` query additionally busts every URL the page controls. The cold-arm check VERIFIES the result per resource; DNS and connection state are not controlled, so latency is reported and never read as cold.",
+    "preloadState": "fr and fr-CA preloaded WITH crossorigin (CORS mode matches the loader, so reuse is expected); en preloaded WITHOUT it as the mismatch control, which must NOT be reused",
+    "region": "RECORDED, never pinned: a CDN answers from the edge nearest the runner and this project does not select one",
+    "harness": "tools/browser-0b/{serve.mjs,index.html,manifest.json}, driven in a real browser. The summary covers requests STARTED before the render returns; the controls and the streaming-limit arm start after it and are recorded but not summed",
+    "hostThresholds": null,
+    "hostThresholdsNote": "A7 declined to freeze any threshold, so plan :2861's seventh freeze item has no value. M8 clauses 84-87 therefore cannot close by running this, and nothing here should be read as meeting a number."
+  },
+  "recipeSha256": "af65c158595cd9e1caca22dfbb108eb196075be1e1e8cd2d66570de0f2579612",
+  "hostPreconditions": {
+    "contentEncoding": "br",
+    "code": {
+      "content-encoding": "br",
+      "timing-allow-origin": "*",
+      "access-control-allow-origin": "*",
+      "cache-control": "public, max-age=31536000, s-maxage=31536000, immutable",
+      "x-jsd-version-type": "version"
+    },
+    "catalogs": {
+      "content-encoding": "br",
+      "timing-allow-origin": "*",
+      "access-control-allow-origin": "*",
+      "cache-control": "public, max-age=31536000, s-maxage=31536000, immutable",
+      "x-jsd-version-type": "commit"
+    },
+    "catalogsPinnedToCommit": true
+  },
+  "capture": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.2553.13 Chrome/152.0.7977.76 Safari/537.36",
+    "origins": {
+      "page": "http://zb-r2a.localhost:8713",
+      "code": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/",
+      "catalogs": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/",
+      "blindControl": "http://localhost:8714/no-timing-allow-origin.json"
+    },
+    "resources": [
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r2a-cold",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 7.8,
+        "initiatorType": "link",
+        "transferSize": 687,
+        "encodedBodySize": 387,
+        "decodedBodySize": 909,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 99.6
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r2a-cold",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 7.9,
+        "initiatorType": "link",
+        "transferSize": 671,
+        "encodedBodySize": 371,
+        "decodedBodySize": 876,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 99.3
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r2a-cold",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 7.9,
+        "initiatorType": "link",
+        "transferSize": 0,
+        "encodedBodySize": 0,
+        "decodedBodySize": 0,
+        "deliveryType": "",
+        "responseStatus": 0,
+        "readable": false,
+        "durationMs": 120.9
+      },
+      {
+        "url": "http://zb-r2a.localhost:8713/manifest.json",
+        "origin": "local-control",
+        "phase": "scenario",
+        "startMs": 11.9,
+        "initiatorType": "fetch",
+        "transferSize": 1651,
+        "encodedBodySize": 1351,
+        "decodedBodySize": 1351,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 3.4
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/lokalized.js?0b=r2a-cold",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 16.5,
+        "initiatorType": "script",
+        "transferSize": 66066,
+        "encodedBodySize": 65766,
+        "decodedBodySize": 188097,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 117.8
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/load.js?0b=r2a-cold",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 144.7,
+        "initiatorType": "script",
+        "transferSize": 7678,
+        "encodedBodySize": 7378,
+        "decodedBodySize": 20448,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 28.5
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-KSXV2EIX.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 173.9,
+        "initiatorType": "script",
+        "transferSize": 1498,
+        "encodedBodySize": 1198,
+        "decodedBodySize": 2481,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 25.8
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-QU3LBEYR.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 174,
+        "initiatorType": "script",
+        "transferSize": 779,
+        "encodedBodySize": 479,
+        "decodedBodySize": 659,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 22.9
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-AJGDCACK.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 174,
+        "initiatorType": "script",
+        "transferSize": 581,
+        "encodedBodySize": 281,
+        "decodedBodySize": 397,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 25.9
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-ZZZNP6PS.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 174,
+        "initiatorType": "script",
+        "transferSize": 787,
+        "encodedBodySize": 487,
+        "decodedBodySize": 959,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 25.9
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-XKUWI26D.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 174,
+        "initiatorType": "script",
+        "transferSize": 23063,
+        "encodedBodySize": 22763,
+        "decodedBodySize": 75744,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 31.6
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-4KMHTUBO.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 174.1,
+        "initiatorType": "script",
+        "transferSize": 34488,
+        "encodedBodySize": 34188,
+        "decodedBodySize": 81161,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 29.3
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r2a-cold",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 217.3,
+        "initiatorType": "fetch",
+        "transferSize": 659,
+        "encodedBodySize": 359,
+        "decodedBodySize": 839,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 20.9
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r2a-cold",
+        "origin": "production-host",
+        "phase": "after-render",
+        "startMs": 244.5,
+        "initiatorType": "fetch",
+        "transferSize": 0,
+        "encodedBodySize": 387,
+        "decodedBodySize": 909,
+        "deliveryType": "cache",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 0.5
+      },
+      {
+        "url": "http://localhost:8714/no-timing-allow-origin.json",
+        "origin": "local-control",
+        "phase": "after-render",
+        "startMs": 245.4,
+        "initiatorType": "fetch",
+        "transferSize": 0,
+        "encodedBodySize": 0,
+        "decodedBodySize": 0,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": false,
+        "durationMs": 1.2
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r2a-cold-limit-908",
+        "origin": "production-host",
+        "phase": "after-render",
+        "startMs": 248.1,
+        "initiatorType": "fetch",
+        "transferSize": 687,
+        "encodedBodySize": 387,
+        "decodedBodySize": 909,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 18.8
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r2a-cold-limit-908",
+        "origin": "production-host",
+        "phase": "after-render",
+        "startMs": 248.2,
+        "initiatorType": "fetch",
+        "transferSize": 671,
+        "encodedBodySize": 371,
+        "decodedBodySize": 876,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 25.1
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r2a-cold-limit-908",
+        "origin": "production-host",
+        "phase": "after-render",
+        "startMs": 248.3,
+        "initiatorType": "fetch",
+        "transferSize": 659,
+        "encodedBodySize": 359,
+        "decodedBodySize": 839,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 27.1
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r2a-cold-limit-909",
+        "origin": "production-host",
+        "phase": "after-render",
+        "startMs": 276.5,
+        "initiatorType": "fetch",
+        "transferSize": 687,
+        "encodedBodySize": 387,
+        "decodedBodySize": 909,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 18.4
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r2a-cold-limit-909",
+        "origin": "production-host",
+        "phase": "after-render",
+        "startMs": 276.5,
+        "initiatorType": "fetch",
+        "transferSize": 671,
+        "encodedBodySize": 371,
+        "decodedBodySize": 876,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 20.9
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r2a-cold-limit-909",
+        "origin": "production-host",
+        "phase": "after-render",
+        "startMs": 276.6,
+        "initiatorType": "fetch",
+        "transferSize": 659,
+        "encodedBodySize": 359,
+        "decodedBodySize": 839,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 20.8
+      }
+    ],
+    "controls": {
+      "preload": {
+        "matched": {
+          "fr.json": 1,
+          "fr-CA.json": 1
+        },
+        "mismatched": {
+          "en.json": 2
+        }
+      },
+      "secondLoad": {
+        "newEntries": 1,
+        "transferSize": 0,
+        "servedFromCache": true
+      },
+      "blind": {
+        "fetched": true,
+        "encodedBodySize": 0,
+        "decodedBodySize": 0,
+        "isBlind": true
+      }
+    },
+    "render": {
+      "locale": "fr",
+      "key": "Cart.Items",
+      "rendered": "Votre panier contient 3 livres.",
+      "renderedTheKeyBack": false,
+      "coldImportMs": 197.6,
+      "loadMs": 25.8,
+      "firstUsableRenderMs": 228
+    },
+    "problems": [],
+    "cacheBuster": {
+      "parameter": "0b",
+      "value": "r2a-cold",
+      "appliedTo": "every production-host URL"
+    },
+    "streamingLimits": {
+      "inEffect": {
+        "maximumInputBytes": 8388608,
+        "maximumReaderCharacters": 8388608,
+        "maximumJsonNestingDepth": 64,
+        "maximumTotalInputBytes": 33554432,
+        "maximumLocalizedStringsFiles": 256,
+        "maximumTranslationNodes": 100000,
+        "maximumWarnings": 1000
+      },
+      "subject": {
+        "locale": "fr",
+        "manifestDecodedBytes": 909
+      },
+      "arms": [
+        {
+          "maximumInputBytes": 908,
+          "outcome": "refused",
+          "error": "StringsLoadingError",
+          "failures": [
+            {
+              "locale": "fr",
+              "stage": "limit",
+              "message": "fr: body exceeds the maximum of 908 bytes"
+            }
+          ]
+        },
+        {
+          "maximumInputBytes": 909,
+          "outcome": "loaded",
+          "failures": []
+        }
+      ]
+    },
+    "coldArm": {
+      "contaminated": false,
+      "examined": 11,
+      "cachedResources": [],
+      "noteOnLimits": "the cache-buster cannot reach transitively-imported chunks; they are cold only if the page's top-level site is new to this browser, which is what this check verifies"
+    },
+    "summary": {
+      "requestCount": 12,
+      "requestsAfterRenderExcluded": 7,
+      "encodedBytes": 133657,
+      "decodedBytes": 372570,
+      "transferBytes": 136957
+    }
+  }
+}

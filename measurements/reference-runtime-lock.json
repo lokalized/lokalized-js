@@ -1,0 +1,18 @@
+{
+  "formatVersion": 1,
+  "jdk": {
+    "vendor": "Amazon.com Inc.",
+    "version": "21.0.11",
+    "buildString": "Corretto-21.0.11.10.1",
+    "versionDate": "2026-04-21",
+    "architecture": "aarch64",
+    "imageDigest": null,
+    "imageDigestNote": "plan 8.4 asks for an immutable IMAGE digest, which presumes a container. This reference is a JDK installed on the host, so there is no image and none is invented. `releaseFileSha256` pins the distribution's own identity instead and is named differently so it cannot be read as the thing the plan asked for.",
+    "releaseFileSha256": "31c8dd26f07b2bd2c394663b57a93879ea139f525c76c730b13956890c151239",
+    "divergenceFromPlan": "plan :2612 pins Eclipse Temurin; this is Amazon Corretto. Blocker B8, the maintainer's to resolve. Recorded here so the lock is not mistaken for compliance."
+  },
+  "javaReference": {
+    "version": "3.1.0-SNAPSHOT",
+    "commit": "a91925827b3000148bddf36de5e738ed55e8408f"
+  }
+}

@@ -23,6 +23,7 @@
  *   node tools/release-check.mjs
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -60,6 +61,47 @@ try {
   const asJson = /\[\s*\{[^]*\}\s*\]\s*$/.exec(packOutput);
   if (!asJson) throw new Error(`npm pack --json printed no JSON array:\n${packOutput.slice(-400)}`);
   const packed = JSON.parse(asJson[0])[0];
+
+  /*
+   * REPRODUCIBILITY — the ninth of plan :2769's nine, and the one that had no implementation.
+   *
+   * The property held and NOTHING CHECKED IT: a grep for `reproducib` across tools/, test/,
+   * .github/ and package.json found the word once, in this file's own docblock, quoting the list it
+   * was missing from. That is the shape this project keeps finding — a claim whose only evidence is
+   * the sentence making it.
+   *
+   * PACK A SECOND TIME AND COMPARE. Into a DIFFERENT destination, because comparing a file with
+   * itself is the vacuous version of this check and would pass over a packer that embedded a
+   * timestamp.
+   *
+   * WHAT THIS DOES AND DOES NOT PROVE, since the distinction is the whole value. It proves
+   * same-runtime determinism, which is what a release gate can enforce on the machine it runs on.
+   * It does NOT prove reproducibility ACROSS runtimes — M-R-PLAN:47 names that as the narrower real
+   * question. That was MEASURED separately on 2026-09-22 across five installed runtimes (node
+   * 20.20.2, 22.14.0, 24.10.0, 24.18.0, 24.20.0, spanning npm 10.8.2 to 11.19.0): all five produced
+   * `cdd4a368…`, 1,915,922 bytes. It holds; it is recorded in M-R-STATUS.md; and it is not asserted
+   * here, because a gate cannot install four other runtimes and this one must not imply it did.
+   */
+  {
+    const again = join(site, "repro");
+    mkdirSync(again, { recursive: true });
+    const secondOutput = execFileSync("npm", ["pack", "--json", "--pack-destination", again],
+      { cwd: root, encoding: "utf8" });
+    const secondJson = /\[\s*\{[^]*\}\s*\]\s*$/.exec(secondOutput);
+    if (!secondJson) throw new Error("the second `npm pack --json` printed no JSON array");
+    const secondName = JSON.parse(secondJson[0])[0].filename;
+    const first = join(site, packed.filename);
+    const second = join(again, secondName);
+    if (first === second) throw new Error("the reproducibility check packed to the same path twice, so it compares a file with itself");
+    const digest = (/** @type {string} */ path) => createHash("sha256").update(readFileSync(path)).digest("hex");
+    const [a, b] = [digest(first), digest(second)];
+    if (a !== b)
+      problems.push(`\`npm pack\` is not reproducible on this runtime: two consecutive packs of an ` +
+        `unchanged tree differ (${a.slice(0, 12)} vs ${b.slice(0, 12)}). Plan :2769 requires release ` +
+        "verification to check reproducibility, and a release whose bytes depend on when it was built " +
+        "cannot be verified by anyone else.");
+    else console.log(`  reproducible: two packs of an unchanged tree agree, sha256 ${a.slice(0, 12)}`);
+  }
   const app = join(site, "app");
   mkdirSync(app, { recursive: true });
   writeFileSync(join(app, "package.json"), JSON.stringify({

@@ -24,8 +24,9 @@
  *   node tools/divergences.mjs --write    re-record it
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { CONSTRUCT_REFUSAL_ADAPTATIONS } from "./construct-refusals.mjs";
@@ -35,8 +36,33 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUTPUT = join(root, "DIVERGENCES.md");
 const problems = [];
 
-const tables = JSON.parse(execFileSync("node", [join(root, "tools/conformance.mjs"), "--dump-divergences"],
-  { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 }));
+/**
+ * THE TABLES ARRIVE THROUGH A FILE, NOT THROUGH A PIPE, AND THE REASON IS A LIVE DEFECT THIS
+ * REPLACES.
+ *
+ * `execFileSync(..., { encoding: "utf8" })` TRUNCATES THIS PAYLOAD AT EXACTLY 8192 BYTES ON NODE 20
+ * AND 22, and does not on 24. Measured 2026-09-22 across five installed runtimes: the dump is 9,273
+ * bytes, so node 20 and 22 both die with `SyntaxError: Unterminated string in JSON at position
+ * 8192` while 24 succeeds. `maxBuffer` was already 32 MB and is irrelevant — this is the pipe, not
+ * the buffer cap.
+ *
+ * **IT BROKE `prepack`, AND THEREFORE PACKING, ON THE DECLARED `engines.node` FLOOR.** Every gate
+ * that runs `npm pack` — `check:release`, `check:readme:packed`, `check:bundle` — sits in CI's
+ * matrix job on node 20, 22, 24 and current. The payload grew past 8 KiB as divergence declarations
+ * were added, and nothing announced the crossing.
+ *
+ * The shell-out itself is KEPT deliberately: M-R S10 put these tables in `conformance.mjs` and gave
+ * it `--dump-divergences` precisely so a reviewer reads `git diff tools/conformance.mjs` for
+ * weakened rules, and a 153-line relocation would read like one. Only the transport changes.
+ */
+const dumpPath = join(tmpdir(), `lokalized-divergences-${process.pid}.json`);
+try {
+  execFileSync("node", [join(root, "tools/conformance.mjs"), "--dump-divergences"],
+    { stdio: ["ignore", openSync(dumpPath, "w"), "inherit"] });
+  var tables = JSON.parse(readFileSync(dumpPath, "utf8"));
+} finally {
+  rmSync(dumpPath, { force: true });
+}
 
 const conformance = JSON.parse(readFileSync(join(root, "measurements/conformance.json"), "utf8"));
 

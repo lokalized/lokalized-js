@@ -1,0 +1,42 @@
+{
+  "formatVersion": 1,
+  "catalogVersion": "2867bff2ca88",
+  "catalogFingerprint": "6f5595dbb579cbdbb05168471c8e5a2ebb80a83f23561ca47609255a47ca6fa1",
+  "cldrVersion": "48.2",
+  "dataFingerprint": "9b4f24165b6dd1ee6dbb5f0822abc7bcde49c5b94d35903045826b45e1f30e68",
+  "behavioralVectorsVersion": "1.0.0",
+  "localeDataMode": "pinned",
+  "cardinalityMode": "exact",
+  "ianaRegistryDate": "2026-09-17",
+  "ianaDataFingerprint": "42a658b350903ec3697499ecce103a08021cc4588ef60014045cf391786073c0",
+  "fallbackLocale": "en",
+  "baseUrl": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/",
+  "files": {
+    "en": {
+      "url": "en.json",
+      "sha256": "a95a252f098b398dd0e4e28b02a7e147a7974516ac4bffa765fb92b1f8f2260e",
+      "decodedBytes": 839
+    },
+    "es": {
+      "url": "es.json",
+      "sha256": "9519a5a19f93ba7bf0e097080806c1f1626a30484be2c60490efac897208c2d5",
+      "decodedBytes": 884
+    },
+    "fr": {
+      "url": "fr.json",
+      "sha256": "7ac1a1b5b8fe035a3765f26c0765c47a1c7b55725fbce8718dd9038c8d507bc1",
+      "decodedBytes": 909
+    },
+    "fr-CA": {
+      "url": "fr-CA.json",
+      "sha256": "4f7dc061c7cb68831f6361b15269a9594259dbcc1bc20ef0f17f4856c84fe93e",
+      "decodedBytes": 876
+    }
+  },
+  "tiebreakers": {
+    "fr": [
+      "fr",
+      "fr-CA"
+    ]
+  }
+}

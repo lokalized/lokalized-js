@@ -154,6 +154,9 @@
     },
     {
       "reason": "version 0.0.0 -> 1.0.0-rc.1 for the first publish: producerVersion is a source string, +5 bytes in every graph that reaches src/internal/runtime-metadata.js"
+    },
+    {
+      "reason": "M-R S24: two shipped docblocks still said ianaRegistryDate is 'NOT A DATE' / 'jdk-oracle:21.0.11'; it has been the pinned registry's File-Date since M-R S11. Comment text only: negotiate +11 bytes, load shorter."
     }
   ],
   "subpaths": {
@@ -171,7 +174,7 @@
     },
     "lokalized/load": {
       "modules": 38,
-      "bytes": 664088
+      "bytes": 663976
     },
     "lokalized/ssr": {
       "modules": 3,
@@ -179,7 +182,7 @@
     },
     "lokalized/negotiate": {
       "modules": 16,
-      "bytes": 297916
+      "bytes": 297927
     },
     "lokalized/node": {
       "modules": 41,

@@ -68,10 +68,9 @@
  * @property {"pinned"} localeDataMode
  * @property {"exact"} cardinalityMode
  * @property {string} ianaRegistryDate
- *   NOT A DATE, and the field name is plan 5.1's rather than this port's. There is no pinned IANA
- *   registry snapshot to take a `File-Date` from — the closure comes from the JDK oracle — so this
- *   carries the pin that does exist, spelled `jdk-oracle:<version>` precisely so no reader or parser
- *   can mistake it for one. See `src/internal/runtime-metadata.js`.
+ *   The `File-Date` of the pinned IANA Language Subtag Registry snapshot, as `YYYY-MM-DD`. It
+ *   carried `jdk-oracle:<version>` until that snapshot was pinned (M-R S11), and a manifest from
+ *   before then still does. See `src/internal/runtime-metadata.js`.
  * @property {string} ianaDataFingerprint
  * @property {string} fallbackLocale
  * @property {string} baseUrl

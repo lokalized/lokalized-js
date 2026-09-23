@@ -1197,9 +1197,9 @@ export function forAcceptLanguage(negotiator, acceptLanguage) {
  * the SAME constants core exports rather than a second copy, and `test/negotiate-options.test.js`
  * asserts the equality so a future divergence is a red test rather than two plausible strings.
  *
- * `ianaRegistryDate` is `jdk-oracle:21.0.11` and is deliberately not date-shaped — maintainer
- * decision A11, recorded because inventing a plausible `File-Date` for a registry snapshot that does
- * not exist is the defect class this project has caught five times.
+ * `ianaRegistryDate` is the pinned IANA registry snapshot's `File-Date`, a real `YYYY-MM-DD`. It
+ * read `jdk-oracle:21.0.11` until that snapshot existed — A11 refused to invent a date for a snapshot
+ * that did not — and M-R S11 pinned one, which is when it became a date.
  */
 export const ianaRegistryDate = RUNTIME_METADATA.ianaRegistryDate;
 

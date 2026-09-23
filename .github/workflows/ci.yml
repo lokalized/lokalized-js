@@ -28,14 +28,14 @@ jobs:
       run:
         working-directory: lokalized-js
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           path: lokalized-js
           # Plan validators reject shallow repositories: they verify capacity
           # and start-record commit ancestry with `git merge-base --is-ancestor`.
           fetch-depth: 0
       - name: Check out the behavioral corpus and pinned artifacts
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: lokalized/lokalized-spec
           # THE REF IS LOAD-BEARING. `lokalized-spec`'s DEFAULT branch (`main`) holds two files,
@@ -52,56 +52,16 @@ jobs:
           # this picks it up without another edit.
           token: ${{ secrets.SPEC_REPO_TOKEN || github.token }}
       # Fail HERE, naming the cause, rather than 10 minutes later as 44 anonymous skips. A checkout
-      # that succeeds says the ref resolved, NOT that it carried what the gates read.
+      # that succeeds says the ref resolved, NOT that it carried what the gates read — and carrying
+      # the files is not carrying the right REVISION. Both halves, and the reasoning for each, now
+      # live in the script, because `publish.yml` needs exactly this check and a second copy of 46
+      # lines of shell is a copy that drifts.
       - name: Verify the corpus checkout carries what the gates read
-        run: |
-          missing=0
-          for required in \
-            generated/behavioral-vectors.json \
-            generated/iana-language-range-equivalents.json \
-            symbol-allowlist.json \
-            vendor/lokalized-java/src/build/resources/cldr/cldr-conformance-vectors.json \
-            vendor/lokalized-java/src/build/resources/cldr/cldr-locale-data.json
-          do
-            if [ ! -f "../lokalized-spec/$required" ]; then
-              echo "::error::lokalized-spec checked out but $required is missing"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            echo "The checkout resolved but does not carry the artifacts. Almost certainly the REF:"
-            echo "  ref in use: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}"
-            echo "  set the SPEC_REPO_REF repository variable to the branch holding the corpus."
-            exit 1
-          fi
+        env:
+          SPEC_REPO_REF: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
+        run: node tools/check-spec-checkout.mjs
 
-          # **AND CARRYING THE FILES IS NOT CARRYING THE RIGHT REVISION.** The five checks above
-          # pass over ANY revision of the spec that has the files, which is every revision of this
-          # branch — so a stale ref sails through and fails ten minutes later as a parity partition
-          # count nobody reads as a checkout problem. Measured 2026-09-20: a run resolved a spec 16
-          # cases behind, reported `2137/2137` where the tree records 2153, and the first red was
-          # `check:readme:packed`. Three gates were queued to fail for one cause, none naming it.
-          #
-          # `measurements/conformance.json#corpusSha256` is the port's own record of WHICH corpus
-          # every ratchet in this repository was measured against — `tools/conformance.mjs` already
-          # refuses to run when it moves, deliberately. This asserts the same equality at checkout,
-          # where the remedy is one variable rather than a re-record.
-          recorded=$(node -p "require('./measurements/conformance.json').corpusSha256")
-          live=$(sha256sum ../lokalized-spec/generated/behavioral-vectors.json | cut -d' ' -f1)
-          if [ "$recorded" != "$live" ]; then
-            echo "::error::the spec checkout is not the corpus this build's records were made against"
-            echo "  ref in use:       ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}"
-            echo "  corpus recorded:  $recorded"
-            echo "  corpus checked out: $live"
-            echo ""
-            echo "Either the ref is stale — clear the SPEC_REPO_REF repository variable so the"
-            echo "workflow default applies, or point it at the branch holding the current corpus —"
-            echo "or the spec moved deliberately and this repo owes a conformance re-record."
-            exit 1
-          fi
-          echo "corpus checkout OK — $(echo "$live" | cut -c1-8), the revision this build records against"
-
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node }}
       - run: npm ci || npm install
@@ -157,6 +117,13 @@ jobs:
       # compared without a browser, on scenario:0a's rule that a green run must not need a person.
       - name: Release verification against the installed tarball
         run: npm run check:release
+      # Plan 6.5's worker smoke test in the NAMED runtime (workerd, A29), from the packed tarball,
+      # unbundled: M8's load-only graph and M9's edge example, each probe answered by workerd AND by
+      # Node over the same package and required to agree byte-for-byte, at two compatibility dates —
+      # 2024-01-01, where workerd itself refuses a `node:` import, and a current one. The workerd
+      # binary is the pinned devDependency `npm ci` installs; its absence FAILS rather than skips.
+      - name: Worker smoke test in workerd from the packed tarball
+        run: npm run smoke:worker
       # A SKIP IS A GATE THAT STOPPED GATING. Each corpus-driven test skips when the sibling spec
       # checkout is absent, which is right for a bare local clone and WRONG here: with the spec
       # checked out above, nothing may skip. Asserting that is what stops a silently shrinking suite
@@ -212,6 +179,13 @@ jobs:
       - name: Divergence document is what the declared records produce
         run: npm run divergences
 
+      # Plan 8.4's reference-runtime lock. This is the step that lets a runner with NO JDK and no
+      # lokalized-java checkout catch a perturbed reference field: before it existed, the parity
+      # report's oracle-derived values were carried from the record with nothing to carry them
+      # against, and M-R S13 measured a perturbed `referenceJdkVendor` exiting 0 here.
+      - name: The parity declaration repeats the pinned Java/JDK references
+        run: npm run check:reference-lock
+
       - name: Release parity declaration is what this build produces
         run: npm run parity:check
       # The nine differentials need the pinned JDK, which CI provisions none of — but their RECORDED
@@ -230,6 +204,13 @@ jobs:
         run: npm run check:i18next
       - name: Scenario 0a static integration measurement
         run: npm run scenario:0a
+      # Scenario 0b re-checks its RECORD and touches no network: the browser half ran against the
+      # real host once, and what runs here is whether that record is still the recipe's, its cold arm
+      # clean, its three controls and its streaming-limit boundary all discriminating. A4 made this
+      # the bar 0b had to clear when it landed — the one scenario:2k had failed, being in neither
+      # list. It could not join while its only record was a warm run the check correctly refused.
+      - name: Scenario 0b production-host network delivery (record re-check)
+        run: npm run scenario:0b
       # M7 clause 19 as amended: the 2,000-key budgets are RECORDED and the recording is re-checked,
       # rather than being a JSON file somebody wrote once. This step cannot fail on a timing — the
       # only thing that fails it is a catalog digest that no longer matches the recorded one, which
@@ -333,10 +314,10 @@ jobs:
   packed:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           # THE FLOOR, deliberately: a fresh installer on the oldest supported runtime is
           # exactly what a packed-artifact check is for. Tracks engines.node's lower bound.

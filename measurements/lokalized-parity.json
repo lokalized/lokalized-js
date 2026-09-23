@@ -7,7 +7,7 @@
     "implementationVersion": "1.0.0-rc.1",
     "packageName": "lokalized",
     "packageVersion": "1.0.0-rc.1",
-    "implementationCommit": "decda6390ff0317b1b7a83770b8b1794fe006c6d",
+    "implementationCommit": "2867bff2ca8867a6fd1984aeb1a5de36c983d4d4",
     "javaReferenceCommit": "a91925827b3000148bddf36de5e738ed55e8408f",
     "javaReferenceVersion": "3.1.0-SNAPSHOT",
     "javaReferenceTagCommit": "c971f071ded30562acf627c07e5767389d57f84b",
@@ -4612,13 +4612,13 @@
       ]
     },
     "xfailMetadata": [],
-    "sourceDateEpoch": 1789922002
+    "sourceDateEpoch": 1790041975
   },
   "undetermined": [
     {
       "field": "portingContractArchiveDigest",
       "obligation": "exact implementation, Java reference, and data commit SHAs plus the porting-contract archive digest",
-      "reason": "plan :2395 has each pinned Java reference tag publish an immutable `lokalized-porting-contracts-<version>.tar.gz`; no such archive exists in any of the three repositories. It is the Java side's to publish, so this stays null rather than being substituted with a digest over something else. NOT to be confused with the spec repo's `dist/lokalized-data-<cldr>.tar`, which is plan M1's narrower data-only archive: that one exists and is reproducible, and substituting its digest here would answer a different question with a real-looking number."
+      "reason": "plan :2395 has each pinned Java reference tag publish an immutable `lokalized-porting-contracts-<version>.tar.gz`; no such archive exists in any of the three repositories. The maintainer decided on 2026-09-22 that 1.0.0 does not wait for it: the archive carries the requirement registry this release ships without, and is post-1.0 work. It is the Java side's to publish, so this stays null rather than being substituted with a digest over something else. NOT to be confused with the spec repo's `dist/lokalized-data-<cldr>.tar`, which is plan M1's narrower data-only archive: that one exists and is reproducible, and substituting its digest here would answer a different question with a real-looking number."
     },
     {
       "field": "activeEvidenceIds",

@@ -4,21 +4,57 @@
 # standing credential: anyone who can run a workflow, or who reads it out of a compromised action,
 # can publish as the owner. Trusted publishing exchanges a short-lived GitHub OIDC token for a
 # scoped npm credential at the moment of publishing, so there is nothing to leak between releases.
-# It is also plan 9.1's last bullet, which M-R clause 14 records as having had zero implementation.
+# It is also plan 9.1's last bullet. That clause closes only when a real publish runs through here and
+# the registry reports an attestation — this file existing is not the same as having been used.
+#
+# **TWO JOBS, AND THE SPLIT IS ITSELF THE SECURITY PROPERTY.** `id-token: write` is granted per JOB,
+# and GitHub exports ACTIONS_ID_TOKEN_REQUEST_URL / ACTIONS_ID_TOKEN_REQUEST_TOKEN to EVERY step of a
+# job that holds it. npm's exchange needs nothing else (lib/utils/oidc.js:63-142): GET that URL with
+# `?audience=npm:registry.npmjs.org`, POST the result to
+# `/-/npm/v1/oidc/token/exchange/package/lokalized`, and the response `token` IS a publish credential
+# for this package. So ANY code running in that job can publish as the owner. The first draft of this
+# file ran, inside it, `npm ci` (which executes esbuild's install script — `package-lock.json` marks
+# `node_modules/esbuild` `hasInstallScript: true`), a SECOND repository's `npm ci`, and all of
+# `verify`'s sub-gates. Now the credentialed job downloads a tarball, re-checks its digest, and runs
+# one `npm publish`. Publishing a TARBALL executes no lifecycle scripts at all — `npm`'s
+# `lib/commands/publish.js:99` and `:215` gate prepublishOnly/publish/postpublish on
+# `spec.type === 'directory'`, and `libnpmpack/lib/index.js:19` gates prepack the same way — so the
+# credentialed job runs no repository code and no dependency code.
 #
 # **THE DIGEST INPUT IS THE POINT, and it rests on a measurement.** `npm pack` here is REPRODUCIBLE:
 # a full `prepack` (tsc, esbuild, divergences) run at a different path produced a tarball
 # BYTE-IDENTICAL to the one npm is serving for 1.0.0-rc.1 — sha256 `dbe58b36…`, and npm's own sha1
 # agreed. So this workflow can refuse to publish bytes that are not the bytes a person verified.
 # Without that measurement the input would be theatre; with it, moving the build into CI costs
-# nothing, because CI can prove it built the same artifact.
+# nothing, because CI can prove it built the same artifact. The digest is checked in BOTH jobs, and
+# the second check is the load-bearing one: it means the bytes that reach the registry are the bytes
+# whose digest the releaser typed, whatever the build job did.
 #
-# **PROVENANCE IS DELIBERATELY NOT REQUESTED ON THE COMMAND LINE.** Read from the installed npm
-# (`lib/utils/oidc.js:145-162`): under OIDC npm enables provenance ITSELF, but only when
-# `config.isDefault('provenance')` — that is, only when `--provenance` was NOT passed — and only
-# when the GitHub repository is public AND the npm package is public. Passing the flag skips that
-# guarded path. So the flag is omitted and the run REPORTS what npm decided, rather than asserting
-# provenance it might not have produced.
+# **PROVENANCE IS REQUESTED EXPLICITLY, AND THIS FILE ONCE ARGUED THE OPPOSITE.** The previous header
+# said the flag was omitted so that npm's own guarded auto-enable would run. The premise was true and
+# the inference from it was backwards. Read from the installed npm: the auto-enable block at
+# `lib/utils/oidc.js:144-168` sits entirely inside `try { … } catch (error) { log.verbose(…) }`, so
+# every way it can miss — a JWT it cannot split, `repository_visibility !== 'public'`, a
+# `getVisibility()` that throws — leaves provenance unset and the publish PROCEEDS. The version is
+# then immutable and unattested. Passing the flag is the opposite: `libnpmpublish/lib/publish.js:137`
+# takes the `provenance === true` branch and `ensureProvenanceGeneration` (`:178-228`) THROWS
+# `EUSAGE` inside `buildMetadata`, which is awaited at `:44` — before the PUT at `:54`. And the flag
+# costs nothing in authentication: the token exchange at `oidc.js:113-142` is OUTSIDE the
+# `isDefaultProvenance` guard. So the flag converts a silent fail-open into a pre-publish refusal.
+#
+# **WHAT THIS FILE CANNOT DO FOR ITSELF — two external preconditions, neither visible to any gate.**
+#  1. `workflow_dispatch` only registers once this file exists on the repository's DEFAULT branch
+#     (`master`). While it lives only on a feature branch there is no "Run workflow" button and the
+#     REST dispatch returns 422; naming a `ref` does not relax it. The run then executes the SELECTED
+#     ref's copy of this file and checks out that ref, so the file can land on `master` ahead of the
+#     code — but dispatch against the branch carrying the version, not against an empty `master`.
+#     The path must stay exactly `.github/workflows/publish.yml`: npm's trusted publisher matches the
+#     workflow FILENAME, and a rename fails the exchange with an auth error that never mentions it.
+#  2. `environment: npm-publish` below is INERT until it is configured in repository settings. Give
+#     it required reviewers and a deployment-branch rule, and register the same environment name on
+#     npm's trusted publisher. That is the only restriction that survives an edited workflow body:
+#     dispatching needs write access, not admin, and `actions/checkout` takes the dispatched ref, so
+#     nothing asserted INSIDE this file constrains whose bytes get built.
 name: Publish
 
 on:
@@ -38,52 +74,59 @@ on:
         required: true
         default: next
 
+# The floor for any job that does not name its own. Deliberately WITHOUT `id-token`, so a job added
+# later cannot inherit the ability to mint a publish credential; the one job that needs it asks.
 permissions:
   contents: read
-  # The whole mechanism. Without this the OIDC request has no token to exchange and npm falls back
-  # to looking for a credential that this workflow deliberately does not have.
-  id-token: write
 
 jobs:
-  publish:
+  # ---------------------------------------------------------------------------------------------
+  # BUILD AND VERIFY. Runs every piece of untrusted code — dependency install scripts, both
+  # repositories' trees, all of `verify` — and holds NO credential of any kind.
+  # ---------------------------------------------------------------------------------------------
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: lokalized-js
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           path: lokalized-js
           fetch-depth: 0
+          # actions/checkout otherwise leaves an `http.extraheader` bearing the job's token in
+          # `.git/config`, and this job then runs `npm ci` (which executes an install script) and
+          # every `verify` gate over that tree. Nothing here fetches or pushes afterwards; the deep
+          # clone is for the plan validators, which read history locally.
+          persist-credentials: false
 
       # `npm run verify` is the whole point of publishing from here rather than a laptop, and it
-      # needs the corpus. Mirrors ci.yml's checkout, including the ref that is load-bearing there.
+      # needs the corpus. Mirrors ci.yml's checkout AND the guard ci.yml wraps around it — the first
+      # draft copied the checkout alone, which is how the release path came to have the weaker check.
       - name: Check out the behavioral corpus and pinned artifacts
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: lokalized/lokalized-spec
           ref: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
           path: lokalized-spec
           fetch-depth: 1
           token: ${{ secrets.SPEC_REPO_TOKEN || github.token }}
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - name: Verify the corpus checkout carries what the gates read
+        env:
+          SPEC_REPO_REF: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
+        run: node tools/check-spec-checkout.mjs
+
+      # NO `registry-url:`. That input exists only to make setup-node write an `.npmrc` carrying
+      # `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` and point NPM_CONFIG_USERCONFIG at it.
+      # This workflow has no such token, and a config line naming one is exactly what it claims not
+      # to have. The default registry is registry.npmjs.org regardless.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-
-      # Trusted publishing landed in npm 11.5.1. An older npm does not fail with "OIDC unsupported";
-      # it looks for a token, finds none, and reports an authentication error that reads like a
-      # misconfigured secret. Fail here, naming the real cause.
-      - name: npm must be new enough to exchange an OIDC token
-        run: |
-          have=$(npm --version)
-          echo "npm $have"
-          node -e '
-            const [have, need] = [process.argv[1], "11.5.1"].map((v) => v.split(".").map(Number));
-            const older = have.some((n, i) => n !== need[i] && n < need[i] && have.slice(0, i).every((m, j) => m === need[j]));
-            if (older) { console.error(`::error::npm ${process.argv[1]} cannot do trusted publishing; 11.5.1+ is required`); process.exit(1); }
-          ' "$have"
 
       - run: npm ci
       - name: Install the spec repo's own dependencies
@@ -98,11 +141,12 @@ jobs:
       - name: The requested version must be the one in package.json
         env:
           ASKED: ${{ inputs.version }}
+          DISPATCHED_REF: ${{ github.ref_name }}
         run: |
           declared=$(node -p "require('./package.json').version")
           echo "package.json says $declared; the request says $ASKED"
           if [ "$declared" != "$ASKED" ]; then
-            echo "::error::package.json is $declared but the run requested $ASKED"
+            echo "::error::package.json on ref '$DISPATCHED_REF' is $declared but the run requested $ASKED. If that ref is not the one carrying the release, re-dispatch against the branch that is."
             exit 1
           fi
 
@@ -137,6 +181,15 @@ jobs:
           VERSION: ${{ inputs.version }}
           EXPECTED: ${{ inputs.sha256 }}
         run: |
+          # `sha256sum` and `shasum -a 256` — the two commands this input's own description names —
+          # print `<digest>  <filename>`, so a pasted line arrives with a trailing filename. Take the
+          # first field and refuse anything that is not 64 hex characters, because the alternative is
+          # a digest mismatch that reads like a reproducibility failure rather than a typo.
+          EXPECTED=$(printf '%s' "$EXPECTED" | awk '{print $1}')
+          case "$EXPECTED" in
+            [0-9a-fA-F]*) [ ${#EXPECTED} -eq 64 ] || { echo "::error::sha256 input is ${#EXPECTED} characters, not 64"; exit 1; } ;;
+            *) echo "::error::sha256 input does not look like a digest: $EXPECTED"; exit 1 ;;
+          esac
           npm pack --pack-destination . --silent
           # `sha256sum` is coreutils and always present on a Linux runner; `shasum` is perl's and is
           # the macOS habit this was first written with.
@@ -149,20 +202,124 @@ jobs:
           fi
           echo "byte-identical to the verified tarball"
 
-      # NO NODE_AUTH_TOKEN, and no `env:` block at all. The credential comes from the OIDC exchange
-      # npm performs itself using ACTIONS_ID_TOKEN_REQUEST_URL, which `id-token: write` provides.
-      # `--provenance` is omitted on purpose; see the header.
+      - name: Hand the tarball to the publishing job
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tarball
+          path: lokalized-js/lokalized-${{ inputs.version }}.tgz
+          if-no-files-found: error
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------------------------
+  # PUBLISH. Holds the OIDC permission and runs NO repository code, NO dependency code and no
+  # lifecycle script. Every step here is either a pinned action or one command over a tarball.
+  # ---------------------------------------------------------------------------------------------
+  publish:
+    needs: [build]
+    runs-on: ubuntu-latest
+    # See precondition 2 in the header: inert until configured, and the only restriction that an
+    # edited workflow body cannot remove.
+    environment: npm-publish
+    permissions:
+      contents: read
+      # The whole mechanism. Without this the OIDC request has no token to exchange and npm falls
+      # back to looking for a credential that this workflow deliberately does not have.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: tarball
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      # Trusted publishing landed in npm 11.5.1. An older npm does not fail with "OIDC unsupported";
+      # it looks for a token, finds none, and reports an authentication error that reads like a
+      # misconfigured secret. Fail here, naming the real cause.
+      - name: npm must be new enough to exchange an OIDC token
+        run: |
+          have=$(npm --version)
+          echo "npm $have"
+          node -e '
+            // Drop any prerelease suffix BEFORE comparing. `"11.5.0-pre.0".split(".").map(Number)`
+            // is [11, 5, NaN, 0], and every comparison against NaN is false — so the first version
+            // of this guard could not fire on exactly the npm it most needed to reject.
+            const parse = (v) => String(v).split("-")[0].split(".").map((n) => Number(n) || 0);
+            const [have, need] = [process.argv[1], "11.5.1"].map(parse);
+            const older = [0, 1, 2].some((i) =>
+              have.slice(0, i).every((n, j) => n === need[j]) && (have[i] ?? 0) < need[i]);
+            if (older) { console.error(`::error::npm ${process.argv[1]} cannot do trusted publishing; 11.5.1+ is required`); process.exit(1); }
+          ' "$have"
+
+      # THE SECOND DIGEST CHECK, and it is the one that matters. The build job is a lot of moving
+      # parts; this asserts that what reaches the registry is the byte sequence whose digest a person
+      # typed into the dispatch form, independent of everything that produced it.
+      - name: These are the bytes the releaser verified
+        env:
+          VERSION: ${{ inputs.version }}
+          EXPECTED: ${{ inputs.sha256 }}
+        run: |
+          got=$(sha256sum "lokalized-$VERSION.tgz" | cut -d' ' -f1)
+          echo "downloaded $got"
+          echo "expected   $EXPECTED"
+          if [ "$got" != "$EXPECTED" ]; then
+            echo "::error::the tarball handed over by the build job is not the one you verified"
+            exit 1
+          fi
+
+      # `--tag` is passed unconditionally below, and a CLI flag REMOVES the matching key from
+      # `publishConfig` before it is flattened (lib/commands/publish.js:294-305) — so passing it
+      # disables package.json's `publishConfig: {"tag": "next"}` safety net. npm will not catch a
+      # wrong value either: `semver.validRange("latest")` is null, so publish.js:88's range guard
+      # does not fire. Restore the net here, and make it stricter than it was.
+      - name: The dist-tag must be one of two, and must suit the version
+        env:
+          VERSION: ${{ inputs.version }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          node -e '
+            const [version, tag] = process.argv.slice(1);
+            const prerelease = version.includes("-");
+            if (tag !== "next" && tag !== "latest") {
+              console.error(`::error::dist-tag "${tag}" is not one of: next, latest`);
+              process.exit(1);
+            }
+            if (prerelease && tag === "latest") {
+              console.error(`::error::${version} is a prerelease and would become the default install under "latest"; publish it under "next"`);
+              process.exit(1);
+            }
+            console.log(`dist-tag ${tag} suits ${version}`);
+          ' "$VERSION" "$TAG"
+
+      # NO NODE_AUTH_TOKEN, and no credential in `env:`. The token comes from the OIDC exchange npm
+      # performs itself using ACTIONS_ID_TOKEN_REQUEST_URL, which `id-token: write` provides.
+      # `--provenance` is REQUESTED, not left to npm's silent auto-enable; see the header.
+      # `--access public` keeps the provenance prerequisite off a registry visibility lookup.
       - name: Publish
         env:
           VERSION: ${{ inputs.version }}
           TAG: ${{ inputs.tag }}
-        run: npm publish "lokalized-$VERSION.tgz" --tag "$TAG"
+        run: npm publish "lokalized-$VERSION.tgz" --tag "$TAG" --provenance --access public
 
-      - name: Report what the registry now says, including whether provenance was attached
+      # `--provenance` already refuses BEFORE the PUT if it cannot generate an attestation, so this
+      # cannot prevent an unattested publish — the version is immutable by the time it runs. What it
+      # can do is turn "nobody noticed the registry dropped it" into a red run. Retried, because
+      # registry reads lag a write by seconds and a spurious red on a publish workflow is its own
+      # kind of noise.
+      - name: Report what the registry now says, and fail if provenance is not there
         env:
           VERSION: ${{ inputs.version }}
         run: |
           npm view "lokalized@$VERSION" dist-tags version
-          echo "--- provenance:"
-          npm view "lokalized@$VERSION" --json \
-            | node -p "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); d.dist?.attestations ? JSON.stringify(d.dist.attestations, null, 2) : 'NONE RECORDED — npm did not attach provenance. Check that both the GitHub repository and the npm package are public.'"
+          for attempt in 1 2 3; do
+            if npm view "lokalized@$VERSION" --json \
+              | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); if(!d.dist?.attestations){process.exit(1);} console.log(JSON.stringify(d.dist.attestations,null,2));'
+            then
+              exit 0
+            fi
+            echo "no attestations recorded yet (attempt $attempt of 3)"
+            sleep 10
+          done
+          echo "::error::published, but the registry records NO provenance attestation for lokalized@$VERSION. The version is immutable; investigate before the next release."
+          exit 1

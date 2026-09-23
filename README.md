@@ -25,6 +25,10 @@ Node 20 reached end of life on 2026-04-30 and the floor names it because a great
 still run it — nothing here needs a newer runtime, and CI proves that on a `20` leg. Choose it
 deliberately.
 
+One worker runtime is tested: Cloudflare's open-source `workerd`, running the packed package's
+files unbundled and required to answer every probe exactly as Node does (`npm run smoke:worker`,
+in CI). Nothing here tests any other worker runtime.
+
 Every code sample below is executed by `npm run check:readme`, and every output it claims is
 asserted — so a sample that has gone stale fails the build rather than misleading you.
 

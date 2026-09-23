@@ -156,7 +156,9 @@ const FIELDS = [
   { name: "portingContractArchiveDigest", obligation: 1, value: null,
     reason: "plan :2395 has each pinned Java reference tag publish an immutable " +
       "`lokalized-porting-contracts-<version>.tar.gz`; no such archive exists in any of the three " +
-      "repositories. It is the Java side's to publish, so this stays null rather than being " +
+      "repositories. The maintainer decided on 2026-09-22 that 1.0.0 does not wait for it: the " +
+      "archive carries the requirement registry this release ships without, and is post-1.0 work. " +
+      "It is the Java side's to publish, so this stays null rather than being " +
       "substituted with a digest over something else. NOT to be confused with the spec repo's " +
       "`dist/lokalized-data-<cldr>.tar`, which is plan M1's narrower data-only archive: that one " +
       "exists and is reproducible, and substituting its digest here would answer a different " +
