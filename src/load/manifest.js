@@ -143,9 +143,9 @@ function assertRuntimeCompatible(manifest) {
 
   // THE OTHER FIVE OF THE SEVEN, and they are here because two was not enough. M-D S27 measured the
   // asymmetry: an SSR stamp carries all seven build-identity fields and a manifest carried two, so
-  // **two builds differing only in their pinned IANA closure published indistinguishable manifests
+  // **two builds differing only in their pinned IANA data published indistinguishable manifests
   // and loaded each other's catalogs without complaint.** Range equivalence and whole-list matching
-  // come from that closure, so the catalogs a visitor is served can be chosen differently by the two
+  // come from that data, so the catalogs a visitor is served can be chosen differently by the two
   // builds while every file digest matches.
   //
   // FIXED LITERALS FIRST, each its own test, because they are different facts. A manifest declaring
@@ -163,10 +163,11 @@ function assertRuntimeCompatible(manifest) {
     throw configurationError(
       `A manifest's behavioralVectorsVersion must be a version; ` +
       `received ${JSON.stringify(manifest.behavioralVectorsVersion)}`);
-  // DELIBERATELY NOT DATE-SHAPED. The build's own value is `jdk-oracle:21.0.11`, a recorded
-  // maintainer decision resting on there being no registry snapshot to date. A `\d{4}-\d{2}-\d{2}`
-  // rule here would make the generator refuse its own output, and the wording says "identity string"
-  // so the message never teaches a shape the format does not have.
+  // DELIBERATELY NOT DATE-SHAPED, and the reason is history rather than today's value. The build's
+  // own value read `jdk-oracle:21.0.11` until M-R S11 pinned a registry snapshot, and a
+  // `\d{4}-\d{2}-\d{2}` rule written then would have made the generator refuse its own output. It is
+  // a date now (plan 5.1's File-Date), but the equality below is what binds a manifest to this build,
+  // so a shape rule would add a second refusal for a value that is already compared exactly.
   if (typeof manifest.ianaRegistryDate !== "string" || manifest.ianaRegistryDate.length === 0)
     throw configurationError(
       `A manifest's ianaRegistryDate must be a non-empty identity string; ` +
@@ -187,7 +188,7 @@ function assertRuntimeCompatible(manifest) {
       `${manifest.behavioralVectorsVersion}, and this build carries ` +
       `${RUNTIME_METADATA.ianaRegistryDate} / ${RUNTIME_METADATA.ianaDataFingerprint.slice(0, 12)}… ` +
       `and vectors ${RUNTIME_METADATA.behavioralVectorsVersion}. Range equivalence and whole-list ` +
-      `matching come from that closure, so the two builds can negotiate a visitor to different ` +
+      `matching come from that IANA data, so the two builds can negotiate a visitor to different ` +
       `catalogs even though every file digest matches.`,
     );
 }

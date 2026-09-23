@@ -239,7 +239,7 @@ export async function createStringsManifestFromDirectory(directory, options) {
     cldrVersion: pinnedProvenance().cldrVersion,
     dataFingerprint: pinnedProvenance().dataFingerprint,
     // THE OTHER FIVE, from the renderer's own pinned identity for the same reason. These are what
-    // make two builds distinguishable when the CLDR pair agrees and the IANA closure does not —
+    // make two builds distinguishable when the CLDR pair agrees and the IANA data does not —
     // the gap M-D S27 measured, where a manifest carried two of the seven the SSR stamp carries.
     // They are NOT generator OPTIONS: a caller who could supply them could publish a manifest
     // claiming an identity its build does not have, which is the defect this closes rather than a

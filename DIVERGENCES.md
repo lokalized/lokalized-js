@@ -5,7 +5,7 @@
      this file. Regenerate with `node tools/divergences.mjs --write`. -->
 
 This package is a port of [lokalized-java](https://github.com/lokalized/lokalized-java) 3.1.0 and
-matches it on 2166 recorded behaviours. Where it does not, the
+matches it on 2168 recorded behaviours. Where it does not, the
 difference is deliberate and listed here.
 
 ## Features with no counterpart here
@@ -102,4 +102,20 @@ JavaScript has one number type where Java has `Integer`, `Long`, `Double` and `F
 | `1` (integer) | `1` | `1` |
 
 If your catalogs render a Java `Double`, format it yourself before interpolating.
+
+## Java API this package declines
+
+Public Java API with no counterpart here, by decision rather than by construction. Each row comes from lokalized-spec's `java-surface-amendments.json`, and `npm run divergences` fails if this package grows the counterpart while the row still says it has none.
+
+| Java | why there is no counterpart |
+|---|---|
+| `Strings.Builder#languageRangeEquivalents(LanguageRangeEquivalents)`, `LanguageRangeEquivalents.JDK` | No JavaScript counterpart. lokalized-js always takes IANA language-range equivalences from the pinned registry, which is Java's default IANA_REGISTRY setting, and offers no JDK setting: JavaScript has no JDK, so such a setting could only ever mean JDK 21. (A30, lokalized-java 3.1.0) |
+
+## Answers that depend on the JDK version
+
+This package models JDK 21, the JDK every check here pins. lokalized-java answers with the JDK it runs on, so on a different JDK these differ.
+
+| input | lokalized-java, by JDK | this package |
+|---|---|---|
+| a range made only of hyphens, e.g. `parseLanguageRanges("-")` | JDK 17 and 21: `ArrayIndexOutOfBoundsException` `Index 0 out of bounds for length 0`; JDK 25, 26 and 27: `IllegalArgumentException` `range=-` | `RangeError` `Index 0 out of bounds for length 0` (JDK 21's answer) |
 

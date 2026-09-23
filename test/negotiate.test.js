@@ -27,16 +27,18 @@
  */
 
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { createStrings } from "../src/core/index.js";
 import { createLocaleNegotiator, forAcceptLanguage, parseLanguageRanges } from "../src/negotiate/index.js";
-import { decode as decodeRangeEquivalents, decodeJdkAbsentTags } from "../src/data/iana-range-equivalents.js";
+import { decodeLanguageEquivalents } from "../src/data/iana-range-equivalents.js";
+import { decodeRegionVariantEquivalents } from "../src/data/iana-identity-equivalents.js";
 import { normalizeTag } from "../src/internal/locale.js";
+import { IANA_EQUIVALENCES_ARTIFACT, specPath } from "../tools/iana-artifact.mjs";
 
-/** The pinned 806-class closure, read once: the recovery check below walks all of it. */
-const RANGE_EQUIVALENTS = decodeRangeEquivalents();
-const JDK_ABSENT_TAGS = decodeJdkAbsentTags();
+/** The full registry language table, read once: several checks below walk all of it. */
+const LANGUAGE_EQUIVALENTS = decodeLanguageEquivalents();
 
 /** @param {Record<string, unknown>} options */
 const negotiatorFor = (options) => createLocaleNegotiator(
@@ -89,6 +91,26 @@ describe("the RFC 4647 extended-range grammar", () => {
 
     // The control: nine characters is too long, eight is not.
     assert.doesNotThrow(() => match("abcdefgh"));
+  });
+
+  it("refuses a range of hyphens only with Java's out-of-bounds message, at both doors", () => {
+    // `String#split("-")` drops trailing empties, so `-` leaves NO subtags and Java's `subtags[0]`
+    // throws `ArrayIndexOutOfBoundsException` before any grammar rule runs. This port said
+    // `range=-` until A30; lokalized-spec's model (whose answer the spec's JDK check measured the
+    // library giving) is what `test/iana-model-parity.test.js` found it disagreeing with. No corpus
+    // case carries such a range.
+    const outOfBounds = { name: "RangeError", message: "Index 0 out of bounds for length 0" };
+    for (const range of ["-", "---"]) {
+      assert.throws(() => match(range), outOfBounds, `${range} at the object door`);
+      assert.throws(() => parseLanguageRanges(range), outOfBounds, `${range} at the header door`);
+    }
+    // The controls: an EMPTY range still splits to one empty subtag (Java's no-match special case),
+    // and a leading hyphen still leaves a subtag, so both are the grammar's refusal.
+    assert.throws(() => parseLanguageRanges(""), { name: "RangeError", message: "range=" });
+    assert.throws(() => match("-a"), { name: "RangeError", message: "range=-a" });
+    // And the fail-soft door still answers the fallback for it.
+    assert.equal(createLocaleNegotiator({ supportedLocales: ["en", "fr"], fallbackLocale: "en" })
+      .bestMatchForAcceptLanguage("-"), "en");
   });
 
   it("rejects a weight outside 0.0..1.0 and accepts the endpoints", () => {
@@ -175,10 +197,10 @@ describe("the two ingresses are separate, and must stay separate", () => {
   });
 });
 
-describe("the pinned IANA closure, which the root graph's reduced table does not carry", () => {
+describe("the full IANA table, which the root graph's direct-match projection does not carry", () => {
   it("expands a range through the longest matching PREFIX, not by exact lookup", () => {
-    // `no-bok` is not a normalized locale tag, so the reduced table inlined in `src/internal/
-    // locale.js` drops it; the pinned 806-class closure keeps it, and the JDK finds it by truncating
+    // `no-bok` is not a normalized locale tag, so the root's direct-match projection drops it; the
+    // full registry table behind this subpath keeps it, and the parse finds it by truncating
     // `no-bok-no` one subtag at a time. Without the prefix walk the range expands to nothing and
     // `nb-NO` is unreachable. Corpus case `m3b-canonicalization.compound-alias-no-bok`.
     const negotiator = negotiatorFor({ fallbackLocale: "en", locale: "en", strings: catalog(["en", "nb-NO"]) });
@@ -360,240 +382,188 @@ describe("the two solver rules the corpus cannot check", () => {
   });
 });
 
-describe("the generated IANA closure module", () => {
-  it("matches the spec's pinned artifact entry for entry", async () => {
-    // Same rule as `test/locale.test.js`'s check on the reduced inline table: generated data is only
-    // trustworthy while something fails on drift. `lokalized-spec` regenerates the artifact from the
-    // JDK oracle, so a rebuild that changed a class must break here rather than quietly change an
-    // answer. Skipped, not failed, when the sibling spec checkout is absent — a standalone clone of
-    // this repo still runs its own suite.
-    const { readFile } = await import("node:fs/promises");
-    const { resolve } = await import("node:path");
-    const path = process.env.LOKALIZED_SPEC_DIR
-      ? resolve(process.env.LOKALIZED_SPEC_DIR, "generated/iana-language-range-equivalents.json")
-      : resolve(new URL("../", import.meta.url).pathname, "../lokalized-spec/generated/iana-language-range-equivalents.json");
+describe("the generated IANA language table module", () => {
+  /**
+   * Generated data is only trustworthy while something fails on drift. `tools/gen-iana-data.js
+   * --check` (run by `test/generated-data.test.js`) proves the module decodes back to the artifact it
+   * was generated from; this proves the DECODED table is the artifact's classes read the way the spec
+   * says a consumer reads them — each member's equivalents are its class minus itself, order kept —
+   * so a change to the decode rule, and not only to the data, breaks here.
+   *
+   * SKIPPED, visibly, when the sibling spec checkout is absent: a standalone clone of this repository
+   * still runs its own suite, and CI fails on any skip, so the skip cannot hide there. (It used to
+   * RETURN early instead, which reported a pass over a check that never ran.)
+   */
+  const artifactPath = specPath(IANA_EQUIVALENCES_ARTIFACT);
+  const skip = existsSync(artifactPath) ? false : `lokalized-spec not found at ${artifactPath}`;
 
-    /** @type {any} */
-    let artifact = null;
-    try { artifact = JSON.parse(await readFile(path, "utf8")); } catch { /* sibling absent */ }
-    if (artifact === null) return;
+  it("IS the spec artifact: every member to its class minus itself, in class order", { skip }, () => {
+    /** @type {{ languageEquivalenceClasses: string[][], regionVariantEquivalents: [string, string][] }} */
+    const artifact = JSON.parse(readFileSync(artifactPath, "utf8"));
+    const expected = new Map();
+    for (const members of artifact.languageEquivalenceClasses)
+      for (const key of members) expected.set(key, members.filter((member) => member !== key));
 
-    const { decode } = await import("../src/data/iana-range-equivalents.js");
-    assert.deepEqual(
-      [...decode().entries()].sort(),
-      Object.entries(artifact.equivalents).sort(),
-    );
-    assert.equal(decode().size, 818);
+    assert.ok(expected.size > 0, "the artifact carries no language class; the reader is looking at the wrong file");
+    assert.deepEqual([...LANGUAGE_EQUIVALENTS.entries()].sort(), [...expected.entries()].sort());
+    assert.deepEqual(decodeRegionVariantEquivalents(), artifact.regionVariantEquivalents,
+      "the region/variant substitutions differ from the artifact's, in content or ORDER");
+  });
 
-    // The delta ships with the table and is the artifact's, not this file's.
-    assert.deepEqual([...decodeJdkAbsentTags()].sort(), [...artifact.jdkAbsentTags].sort());
+  it("carries region/variant substitutions closed under reversal, one per subtag", () => {
+    const pairs = decodeRegionVariantEquivalents();
+    assert.ok(pairs.length > 0);
+    assert.equal(new Set(pairs.map(([from]) => from)).size, pairs.length, "a subtag is substituted twice");
+    for (const [from, to] of pairs)
+      assert.ok(pairs.some(([back, forth]) => back === to && forth === from), `${from} -> ${to} has no reverse`);
   });
 });
 
 /**
- * M7 A4 — `Locale.LanguageRange.parse`, the region/variant map, and the fail-soft header door.
+ * M7 A4's header parser, AS AMENDED BY A30: `parseLanguageRanges` is lokalized-java 3.1.0's
+ * `LocaleMatcher#parseLanguageRanges` on the default `IANA_REGISTRY` setting — the JDK's
+ * `LanguageRange.parse` grammar over the pinned registry's language table.
  *
- * `tools/language-range-diff/run.mjs` is the primary check on this parser: 6,037 probes against the
- * real JDK method on the pinned Corretto 21, of which the corpus supplies fewer than a hundred. What
- * lives here is what a differential CANNOT check — the recovery's totality over the pinned artifact,
- * and the properties of the two doors ABOVE the parser, which have no JDK counterpart to compare to
- * because `bestMatchForAcceptLanguage` is lokalized's own method and not the JDK's.
+ * `test/iana-model-parity.test.js` holds it to lokalized-spec's executable model over the spec's whole
+ * probe space, and `tools/language-range-diff/` holds it to lokalized-java itself on the pinned JDK.
+ * What lives here are named rows a reader can check by eye, the properties of the doors ABOVE the
+ * parser, which have no JDK counterpart because `bestMatchForAcceptLanguage` is lokalized's own
+ * method, and the region/variant rows that must stay green inside `npm test` because neither
+ * differential runs in `verify` without its oracle.
  *
  * Every ablation named below was measured by making the edit and re-running, not reasoned about.
  */
-describe("parseLanguageRanges — the recovery of the JDK's language-equivalence maps", () => {
-  it("re-derives every one of the pinned classes the JDK's table carries, from its own recovered equivalents", () => {
-    // TOTAL, not a sample. The parser does not carry `singleEquivMap`/`multiEquivsMap`; it recovers
-    // them by inverting `parse`'s insertion order out of each recorded class. That inversion is the
-    // one genuinely clever step in the slice, and a clever step with no total check is how a
-    // plausible-looking wrong table ships. Re-parsing each key must reproduce its class byte for
-    // byte, because `parse(key)` is literally what the artifact recorded.
-    //
-    // ABLATED, and the numbers are measured rather than argued: replacing the recovery with
-    // `equivalenceClass.slice(1)` — treating the class as if it were the raw language-equivalents
-    // array — mis-reparses 123 of the 806 keys, turns this test red, turns the JDK differential red
-    // on 849 probes (re-measured against the re-pinned 806-class artifact; it was 728 against the
-    // 802-class one, and carrying the old figure forward is how these notes go stale), and turns
-    // 22 RECORDED CASES red as well (`browser-chooser.alias.zh-cmn-*`,
-    // `.conflict.nsl-*`, the `ingress-matrix-java.extlang.*` family). So this one is not a
-    // corpus-invisible rule — it is checked three ways over — and the note is here to say which of
-    // A4's rules the corpus can see, because most of the neighbouring ones it cannot.
-    //
-    // **SCOPED TO THE JDK'S OWN KEYS SINCE lokalized-java 3.1.0, and the exclusion is the subject of
-    // the test below rather than a hole here.** The artifact is the LIBRARY's table now, which is a
-    // superset: `parse(key)` reproducing the class holds for every key the JDK also has, and is
-    // deliberately FALSE for the eight it does not, because the public parse models the JDK's.
-    const classes = [...RANGE_EQUIVALENTS.entries()];
-    assert.equal(classes.length, 818);
+describe("parseLanguageRanges — one registry parse, at every door", () => {
+  it("parses every registry subtag into its class, in parse's insertion order", () => {
+    // TOTAL, not a sample. `parse(K)` places `K` first and inserts each other member at index 1 in
+    // class order, so the list is `K` followed by the others REVERSED. Keys whose class carries a
+    // region/variant subtag are excluded because their substitutions interleave (the rows below pin
+    // those); the exclusion is DERIVED from the pairs, not listed, and bounded so it cannot swallow
+    // the table.
+    const subtags = decodeRegionVariantEquivalents().map(([from]) => from);
+    const substitutable = (/** @type {string} */ member) =>
+      subtags.some((subtag) => `${member}-`.includes(`${subtag}-`));
 
-    const jdkClasses = classes.filter(([key]) => !JDK_ABSENT_TAGS.has(key));
-    assert.equal(jdkClasses.length, 806);
-
-    const wrong = jdkClasses
-      .map(([key, expected]) => [key, expected, parseLanguageRanges(key).map((m) => m.range)])
-      .filter(([, expected, actual]) => JSON.stringify(expected) !== JSON.stringify(actual));
-
-    assert.deepEqual(wrong, [], "keys whose recovered equivalents do not re-parse to their class");
-  });
-
-  /**
-   * **THE TWO PARSE CHANNELS, AND NOTHING ELSE IN THE REPOSITORY CAN SEE THE DIFFERENCE.**
-   *
-   * lokalized-java 3.1.0 expands a range through the JDK's `Locale.LanguageRange.parse` when the
-   * CALLER builds the list, and through its own registry-sourced `IanaLanguageEquivalents.parse`
-   * inside `bestMatchForAcceptLanguage` and `DefaultStrings#addParsedLanguageRangeIdentities`.
-   *
-   * The corpus arbitrates ONE of those halves. `iana-equivalence.registry-gap.{mgp,yol}-ranges` go
-   * red if the public parse starts expanding, because `VectorOracle.languageRangesFrom` hands Java
-   * the JDK's list and the runner hands the port `parseLanguageRanges`'s. **The header half it
-   * cannot see at all**: the four `acceptLanguage` cases record only `bestMatch`, and both channels
-   * answer `enm` — one by expanding the range list, the other because the identity channel finds
-   * the equivalence anyway. MEASURED, not assumed: wiring the header door to the JDK-only parse
-   * leaves all 2,162 corpus cases passing and turns exactly this test red.
-   *
-   * So the two are asserted where they DIVERGE — `matchType` and the echoed range list — and not on
-   * the selected locale, which agrees either way and would make the whole test vacuous.
-   */
-  it("expands a registry-only equivalence at the header door and NOT at the public parse", () => {
-    const negotiator = createLocaleNegotiator({ supportedLocales: ["en", "enm"], fallbackLocale: "en" });
-
-    // ANTI-VACUITY FIRST. If the delta were empty, or named a tag with no class, every assertion
-    // below would hold over a port with one table and the split would be untested.
-    assert.ok(JDK_ABSENT_TAGS.size > 0, "the artifact records no JDK-absent tag, so there is no split to test");
-    assert.ok(JDK_ABSENT_TAGS.has("yol"), "yol is the probe this test is built on");
-    assert.deepEqual(RANGE_EQUIVALENTS.get("yol"), ["yol", "enm"]);
-
-    // The public door is the JDK's: it walks PAST a key the JDK's table does not carry.
-    assert.deepEqual(parseLanguageRanges("yol"), [{ range: "yol", weight: 1 }]);
-
-    // The header door is the library's, so the equivalent arrives as a second REQUESTED range and
-    // the match is exact against it.
-    const header = forAcceptLanguage(negotiator, "yol").localeMatch;
-    assert.equal(header.locale, "enm");
-    assert.equal(header.matchType, "exact");
-    assert.deepEqual(header.requestedLanguageRanges,
-      [{ range: "yol", weight: 1 }, { range: "enm", weight: 1 }]);
-
-    // And the ranges door, handed the caller's single range, reaches the same catalog through the
-    // identity channel instead — Java's `CANONICAL`, over the one range it was given.
-    const ranges = negotiator.matchForLanguageRanges([{ range: "yol", weight: 1 }]);
-    assert.equal(ranges.locale, "enm");
-    assert.equal(ranges.matchType, "canonical");
-    assert.deepEqual(ranges.requestedLanguageRanges, [{ range: "yol", weight: 1 }]);
-
-    // THE CONTROL: a tag the JDK's own table DOES carry must expand at both doors, or the two
-    // assertions above are satisfied by a parser that expands nothing.
-    assert.deepEqual(parseLanguageRanges("in"),
-      [{ range: "in", weight: 1 }, { range: "id", weight: 1 }]);
-  });
-
-  /**
-   * **EVERY DELTA TAG, not the one the walkthrough above uses.** Measured: deleting any one of
-   * `bh`, `bih`, `enm`, `mrd`, `mrh` or `shl` from the set the public parse consults leaves
-   * conformance at 2,162/0 and the whole suite green — only `diff:language-range` reds, and that
-   * runs in neither `verify` nor CI. Two of the twelve (`mgp`, `yol`) are reachable by a
-   * CI-runnable gate, through the two `-ranges` and two `-locale` corpus rows. This loop is the
-   * gate for the rest.
-   */
-  it("withholds every JDK-absent tag from the public parse, and expands every one internally", () => {
-    assert.ok(JDK_ABSENT_TAGS.size >= 12,
-      `only ${JDK_ABSENT_TAGS.size} JDK-absent tag(s); the artifact declared 12 when this was written`);
-
-    const leaked = [];
-    const notExpanded = [];
-    const collapsed = [];
-
-    for (const tag of JDK_ABSENT_TAGS) {
-      const members = RANGE_EQUIVALENTS.get(tag);
-      assert.ok(members !== undefined, `${tag} is declared JDK-absent and is not a key of the table`);
-
-      // **A PAIR THAT COLLAPSES UNDER `forLanguageTag` CANNOT BE PROBED THROUGH A CATALOG SET, and
-      // the exclusion is derived rather than named.** `sgn-dyl` normalizes to `dyl`, so a fixture
-      // offering both offers ONE locale and the match is exact by accident — the expansion is not
-      // what answered. M-R S12 recorded the same fact when it declined to author corpus rows for
-      // this pair. Listing `dyl`/`zhk` here by hand would go stale the moment the registry moves;
-      // the condition is what is true.
-      if (normalizeTag(tag) === normalizeTag(/** @type {string} */ (members[1]))) {
-        collapsed.push([tag, members[1]]);
+    const wrong = [];
+    const excluded = [];
+    for (const [key, others] of LANGUAGE_EQUIVALENTS) {
+      const actual = parseLanguageRanges(key).map((member) => member.range);
+      if ([key, ...others].some(substitutable)) {
+        excluded.push(key);
+        // Still a SUPERSET: every class member is reached even where substitutions interleave.
+        if (![key, ...others].every((member) => actual.includes(member))) wrong.push([key, actual]);
         continue;
       }
-
-      // The public door is the JDK's: the tag alone, never its class.
-      const publicRanges = parseLanguageRanges(tag).map((member) => member.range);
-      if (publicRanges.length !== 1 || publicRanges[0] !== tag) leaked.push([tag, publicRanges]);
-
-      // The identity channel is the library's, probed through a PUBLIC door rather than the
-      // internal helper, so this is a path a consumer can actually reach.
-      const negotiator = createLocaleNegotiator({
-        supportedLocales: ["en", members[1]], fallbackLocale: "en" });
-      const match = negotiator.matchForLanguageRanges([{ range: tag, weight: 1 }]);
-      if (match.locale !== members[1]) notExpanded.push([tag, members[1], match.locale]);
+      if (JSON.stringify(actual) !== JSON.stringify([key, ...[...others].reverse()])) wrong.push([key, actual]);
     }
 
-    assert.deepEqual(leaked, [], "tags the public parse expanded, where it models the JDK's table");
-    assert.deepEqual(notExpanded, [], "tags the identity channel failed to expand");
-
-    // The excluded set is asserted, not silently dropped: an exclusion that grew to swallow the
-    // whole delta would leave both comparisons above trivially empty.
-    assert.ok(collapsed.length * 2 < JDK_ABSENT_TAGS.size,
-      `${collapsed.length} of ${JDK_ABSENT_TAGS.size} delta tags were excluded as collapsing pairs; ` +
+    assert.deepEqual(wrong, [], "registry subtags whose parse is not their class in insertion order");
+    assert.ok(excluded.length * 10 < LANGUAGE_EQUIVALENTS.size,
+      `${excluded.length} of ${LANGUAGE_EQUIVALENTS.size} keys excluded as region/variant-bearing; ` +
       "the probe is being emptied by its own exclusion");
-    for (const [tag, member] of collapsed)
-      assert.equal(normalizeTag(tag), normalizeTag(member),
-        `${tag}/${member} was excluded as a collapsing pair and does not collapse`);
   });
 
   /**
-   * **THE DELTA IS CONSULTED AT EVERY PREFIX POSITION, not only when it IS the whole range.** The
-   * walk tests `!JDK_ABSENT_TAGS.has(prefix)` inside the loop; applying it only when
-   * `prefix === range` — the natural mis-reading of "this tag is withheld" — passes every bare-tag
-   * probe above and leaks on a suffixed one, which is what a real `Accept-Language` carries.
+   * **THE ONE DELIBERATE CHANGE A30 MADE TO A DEFAULT ANSWER, pinned at every door.**
+   *
+   * Until 1.0.0-rc.1 the public parse modelled the JDK's `LanguageRange.parse`, which on JDK 21 has no
+   * `yol`/`enm` class, while the header door and the identity channel already read the registry. The
+   * corpus now records the public parse EXPANDING: `iana-equivalence.registry-gap.yol-ranges` answers
+   * EXACT on `enm` over `[yol, enm]` (it answered CANONICAL over `[yol]` before A30), and
+   * `.yol-explicit-ranges` keeps the caller-built one-range list answering CANONICAL. Both are
+   * asserted here because they diverge on `matchType` and the echoed ranges while selecting the SAME
+   * locale — asserting the locale alone would make this test vacuous.
    */
-  it("withholds a JDK-absent prefix from a SUFFIXED range too", () => {
-    assert.deepEqual(parseLanguageRanges("yol-x-a"), [{ range: "yol-x-a", weight: 1 }]);
+  it("expands yol at the public parse, the header door, and in a list built from the public parse", () => {
+    const negotiator = createLocaleNegotiator({ supportedLocales: ["en", "enm"], fallbackLocale: "en" });
 
-    // Control: a JDK-carried prefix must still substitute under the same suffix, or this passes
-    // over a parser that simply stopped expanding suffixed ranges.
+    assert.deepEqual(LANGUAGE_EQUIVALENTS.get("yol"), ["enm"], "yol is the probe this test is built on");
+    assert.deepEqual(parseLanguageRanges("yol"), [{ range: "yol", weight: 1 }, { range: "enm", weight: 1 }]);
+
+    // A list the CALLER built with the public parse: the equivalent is a second REQUESTED range and
+    // the match is exact against it — the rebuilt corpus answer.
+    const parsed = negotiator.matchForLanguageRanges(parseLanguageRanges("yol"));
+    assert.equal(parsed.locale, "enm");
+    assert.equal(parsed.matchType, "exact");
+    assert.deepEqual(parsed.requestedLanguageRanges, [{ range: "yol", weight: 1 }, { range: "enm", weight: 1 }]);
+
+    // The header door parses the same way.
+    const header = forAcceptLanguage(negotiator, "yol").localeMatch;
+    assert.equal(header.matchType, "exact");
+    assert.deepEqual(header.requestedLanguageRanges, parsed.requestedLanguageRanges);
+
+    // A caller who writes the ONE range object reaches the same catalog through the identity channel
+    // instead — CANONICAL over the single range it was given.
+    const explicit = negotiator.matchForLanguageRanges([{ range: "yol", weight: 1 }]);
+    assert.equal(explicit.locale, "enm");
+    assert.equal(explicit.matchType, "canonical");
+    assert.deepEqual(explicit.requestedLanguageRanges, [{ range: "yol", weight: 1 }]);
+
+    // THE CONTROL: a class every JDK also carries expands the same way, so the rows above are about
+    // the registry table rather than about expansion in general.
+    assert.deepEqual(parseLanguageRanges("in"), [{ range: "in", weight: 1 }, { range: "id", weight: 1 }]);
+  });
+
+  /**
+   * **EVERY CLASS, not the one the walkthrough above uses.** The twelve JDK-21-absent tags (`bh`,
+   * `bih`, `dyl`, `enm`, `mgp`, `mrd`, `mrh`, `sgn-dyl`, `sgn-zhk`, `shl`, `yol`, `zhk`) are not
+   * named anywhere in this file: a regression to a JDK-shaped table withholds some classes, and
+   * walking all of them is what finds it without knowing which.
+   */
+  it("expands every registry class at the public parse and through the identity channel", () => {
+    const notParsed = [];
+    const notMatched = [];
+    const collapsed = [];
+    let probed = 0;
+
+    for (const [tag, others] of LANGUAGE_EQUIVALENTS) {
+      const parsed = parseLanguageRanges(tag).map((member) => member.range);
+      if (!others.every((other) => parsed.includes(other))) notParsed.push([tag, parsed]);
+
+      // **A MEMBER THAT COLLAPSES ONTO THE TAG UNDER `normalizeTag` CANNOT BE PROBED THROUGH A
+      // CATALOG SET, and the exclusion is derived rather than named.** `ar-aao` normalizes to `aao`
+      // and `sgn-dyl` to `dyl`, so a fixture offering both offers ONE locale and the match is exact
+      // by accident. Most classes are extlang or grandfathered pairs of exactly that kind; the probe
+      // takes the first member that stays distinct, and a class with none is recorded, not dropped.
+      const partner = others.find((other) => normalizeTag(other) !== normalizeTag(tag));
+      if (partner === undefined) { collapsed.push(tag); continue; }
+
+      // A fallback that shares no language with the pair, so a CLDR-fallback answer cannot pass for
+      // the IANA equivalence (`en-gb-oxendict` over `[en, en-gb-oed]` answers `en` for that reason).
+      const fallback = tag.startsWith("en") || partner.startsWith("en") ? "fr" : "en";
+      const match = createLocaleNegotiator({ supportedLocales: [fallback, partner], fallbackLocale: fallback })
+        .matchForLanguageRanges([{ range: tag, weight: 1 }]);
+      if (match.locale !== normalizeTag(partner)) notMatched.push([tag, partner, match.locale]);
+      probed += 1;
+    }
+
+    assert.deepEqual(notParsed, [], "registry subtags whose public parse omits a class member");
+    assert.deepEqual(notMatched, [], "registry subtags the identity channel failed to match to a class member");
+    // The probed share is asserted, so an exclusion that grew to swallow the table cannot leave both
+    // comparisons above trivially empty. MEASURED 267 of 781 probed, 514 collapsing.
+    assert.ok(probed * 4 > LANGUAGE_EQUIVALENTS.size,
+      `only ${probed} of ${LANGUAGE_EQUIVALENTS.size} registry subtags could be probed through a catalog set`);
+    for (const tag of collapsed)
+      for (const other of /** @type {string[]} */ (LANGUAGE_EQUIVALENTS.get(tag)))
+        assert.equal(normalizeTag(other), normalizeTag(tag), `${tag} was excluded and ${other} does not collapse onto it`);
+  });
+
+  /**
+   * **THE PREFIX WALK SUBSTITUTES UNDER A SUFFIX**, which is what a real `Accept-Language` carries.
+   * A walk that only consulted the table when the prefix IS the whole range passes every bare-tag
+   * probe above and misses these.
+   */
+  it("substitutes a registry prefix under a suffix", () => {
+    assert.deepEqual(parseLanguageRanges("yol-x-a"),
+      [{ range: "yol-x-a", weight: 1 }, { range: "enm-x-a", weight: 1 }]);
     assert.deepEqual(parseLanguageRanges("in-x-a"),
       [{ range: "in-x-a", weight: 1 }, { range: "id-x-a", weight: 1 }]);
   });
 
-  /**
-   * **THE PRECONDITION UNDER WHICH `equivalentsForLanguage`'s SKIP IS UNTESTABLE, asserted so it
-   * cannot lapse in silence.** That walk SKIPS a JDK-absent key and keeps dropping subtags, where
-   * STOPPING is the other plausible reading. Measured twice — at eight delta tags and again at
-   * twelve — the two are indistinguishable, and the source says so rather than claiming coverage.
-   *
-   * The first measurement recorded the reason as "all delta tags are bare two- and three-letter
-   * subtags", and the very next regeneration of the artifact added `sgn-dyl` and `sgn-zhk`. The
-   * spelling was never the point: a shorter prefix PRESENT IN THE TABLE is, because that is the
-   * only thing a continued walk could find. This asserts that property instead.
-   */
-  it("no JDK-absent key has a shorter prefix in the table, which is why skip and stop agree", () => {
-    const reachable = [];
-
-    for (const tag of JDK_ABSENT_TAGS) {
-      let prefix = tag;
-      for (;;) {
-        const index = prefix.lastIndexOf("-");
-        if (index === -1) break;
-        prefix = prefix.slice(0, index);
-        if (RANGE_EQUIVALENTS.has(prefix)) reachable.push([tag, prefix]);
-      }
-    }
-
-    assert.deepEqual(reachable, [],
-      "a JDK-absent key now has a shorter prefix in the table, so SKIP and STOP no longer agree in " +
-      "equivalentsForLanguage. The skip is the correct model of a table that lacks the key; give it " +
-      "a behavioural probe and correct that function's note, which records the two as " +
-      "indistinguishable.");
-  });
-
   it("applies the region/variant map, which no corpus row can see", () => {
-    // The gap A4 closes, and the reason this slice ships a JDK differential at all. All thirteen
-    // pairs M7-PLAN.md enumerates, plus the FOURTEENTH the plan and this module's own earlier note
-    // both missed: `-mm` -> `-bu`. `LocaleEquivalentMaps.java:815-828` writes fourteen entries and
-    // sizes the map `HashMap.newHashMap(14)`.
+    // The gap A4 closed. All fourteen substitutions, now read from the spec artifact's
+    // `regionVariantEquivalents` (A30) rather than a source literal; M7-PLAN.md enumerated thirteen
+    // and this module's own earlier note named the wrong fourteenth, which is why every pair is a row.
     const ranges = (/** @type {string} */ header) => parseLanguageRanges(header).map((m) => m.range);
 
     assert.deepEqual(ranges("de-DE"), ["de-de", "de-dd"]);
@@ -630,8 +600,8 @@ describe("parseLanguageRanges — the recovery of the JDK's language-equivalence
     // Hash order reaches `-tl` (position 2) before `-de` (position 8) and answers `sgn-de-tp`;
     // source order reaches `-de` (position 5) first and answers `sgn-dd-tl`.
     //
-    // ABLATED: source order leaves the corpus at 1,914 passed / 0 FAILED — it is entirely
-    // corpus-invisible — and turns the JDK differential red on 88 probes and this row red on one.
+    // ABLATED (M7): source order left the corpus at 1,914 passed / 0 FAILED — it is entirely
+    // corpus-invisible — and turned the JDK differential red on 88 probes and this row red on one.
     // Read the LAST member: `sgn-dd-fr` is `-de` rewritten, which means `-de` was reached before
     // `-fr`. Source order would have produced `sgn-de-fx` there instead. (The four members between
     // are `sgn-de`'s own language equivalents `gsg`/`sgn-gsg`, each with its own region rewrite —
@@ -655,14 +625,14 @@ describe("parseLanguageRanges — the recovery of the JDK's language-equivalence
     // neither hash order nor source order — leaves both rows above green and the whole of
     // `test/negotiate.test.js` at exit 0, while it really does change the answer: `sgn-fx-fr` reads
     // `-fx` first and rewrites to `sgn-fr-fr` where the pinned JDK's order reads `-fr` first and
-    // gives `sgn-fx-fx`. `npm run diff:language-range` catches that permutation and names it
-    // (ordered-pair comparison against the JDK's own `regionVariantEquivMap`, exit 1) — but it needs
-    // the pinned JDK and is NOT part of `npm run verify`, so without this row the default gate is
-    // blind to a real behavioral change.
+    // gives `sgn-fx-fx`. `npm run diff:language-range` catches that permutation and names it — but it
+    // needs the pinned JDK and is NOT part of `npm run verify`. Since A30 `test/iana-model-parity.test.js`
+    // catches it too, JDK-free, because the spec's probe space carries every ordered pair; this row is
+    // kept because it names the answer a reader can check.
     //
     // Oracle-backed, not port-derived: `sgn-fx-fr` is a member of the differential's own probe space
     // (`run.mjs`'s `inputs()` emits `sgn${subtag}${second}` for every ordered pair of the fourteen),
-    // so this expectation is Java's, confirmed by a green 6,037/6,037 run on the pinned Corretto 21.
+    // so this expectation is Java's.
     assert.deepEqual(parseLanguageRanges("sgn-fx-fr").map((m) => m.range), ["sgn-fx-fr", "sgn-fx-fx"]);
   });
 });
@@ -746,7 +716,7 @@ describe("bestMatchForAcceptLanguage — the fail-soft door", () => {
 
   it("contradicts matchForLanguageRanges on the same 33-range header, deliberately", () => {
     // THE CONTRADICTION M7-PLAN.md calls out, and the two halves must BOTH hold: this header's 13
-    // members expand through the IANA closure to 33 ranges. Through `matchFor(List)` that THROWS;
+    // members expand through the IANA table to 33 ranges. Through `matchFor(List)` that THROWS;
     // through the fail-soft door it answers the configured fallback. A single shared limit rule
     // produces one or the other, never both.
     const header = "he,id,yi,cmn,yue,nan,hak,jbo,tlh,gan,wuu,hsn,ase,fr;q=0.1";

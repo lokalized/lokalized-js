@@ -1,8 +1,8 @@
 {
   "scenario": "6",
-  "revision": 2,
+  "revision": 3,
   "frozenAt": "2026-09-19",
-  "note": "No thresholds, by the precedent of M7 clause 19 as amended (A3) and M8's A4: recorded and ratcheted where a ratchet exists, reported where none does. Frozen at M9 S4 rather than before M9 started, which plan 9.2:2818 asked for; the deviation is the record. REVISION 2 (M-R S13): the scenario's own subject -- 'the shared validity/IANA closure' -- was re-pinned from the JDK's table to lokalized-java 3.1.0's registry-sourced one, 806 -> 814 classes. That is an ENVIRONMENT change by this tool's own rule, so revision 1's figures are not comparable with these and the bump says so rather than a rebaseline quietly absorbing it.",
+  "note": "No thresholds, by the precedent of M7 clause 19 as amended (A3) and M8's A4: recorded and ratcheted where a ratchet exists, reported where none does. Frozen at M9 S4 rather than before M9 started, which plan 9.2:2818 asked for; the deviation is the record. REVISION 2 (M-R S13): the scenario's own subject -- 'the shared validity/IANA closure' -- was re-pinned from the JDK's table to lokalized-java 3.1.0's registry-sourced one, 806 -> 814 classes. That is an ENVIRONMENT change by this tool's own rule, so revision 1's figures are not comparable with these and the bump says so rather than a rebaseline quietly absorbing it. REVISION 3 (A30): the subject moved again, and further -- the IANA data is now GENERATED from the pinned registry snapshot with no JDK, as 369 ordered classes in two modules (the full table behind lokalized/negotiate, a direct-match projection plus the region/variant substitutions in the root), where revision 2 measured an 818-entry probed closure in one. closureClasses now counts classes, not entries, and closureBytes sums both modules. Another environment change by this tool's own rule.",
   "recipe": {
     "scenario": "6",
     "description": "edge/server full-range negotiation atop the shared validity/IANA closure",
@@ -31,29 +31,29 @@
   },
   "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
   "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
-  "closureClasses": 818,
-  "closureBytes": 24142,
+  "closureClasses": 369,
+  "closureBytes": 11358,
   "node": [
     {
       "label": "edge worker",
-      "modules": 46,
-      "sourceBytes": 1005819,
+      "modules": 47,
+      "sourceBytes": 976227,
       "nodeBuiltinEdges": 0,
-      "ianaClosureBytes": 24142,
-      "importMs": 0.4938
+      "ianaClosureBytes": 11358,
+      "importMs": 0.5658
     },
     {
       "label": "server renderer",
-      "modules": 53,
-      "sourceBytes": 1085332,
+      "modules": 54,
+      "sourceBytes": 1055737,
       "nodeBuiltinEdges": 10,
-      "ianaClosureBytes": 24142,
-      "importMs": 17.167
+      "ianaClosureBytes": 11358,
+      "importMs": 17.6017
     }
   ],
-  "negotiateMsPerHeader": 0.06068,
-  "firstRenderMs": 0.9008,
-  "retainedBytes": -15256,
+  "negotiateMsPerHeader": 0.06474,
+  "firstRenderMs": 1.0065,
+  "retainedBytes": -13840,
   "requestsPerRender": {
     "fr-CA": 4,
     "fr-CH": 4,
@@ -182,6 +182,20 @@
       "growth": [
         "edge worker: source graph grew 1005814 -> 1005819 bytes",
         "server renderer: source graph grew 1085327 -> 1085332 bytes"
+      ]
+    },
+    {
+      "reason": "A30, revision 3: the IANA data is generated from the registry snapshot as 369 ordered classes in two modules (full table behind negotiate; direct-match projection + region/variant substitutions in the root). +1 module per variant (the root projection module); source graphs shrink 1,005,819 -> 975,992 and 1,085,332 -> 1,055,502; IANA bytes 24,142 -> 11,358 summed over both modules",
+      "growth": [
+        "edge worker: module count grew 46 -> 47",
+        "server renderer: module count grew 53 -> 54"
+      ]
+    },
+    {
+      "reason": "A30 follow-up: src/internal/locale.js's docblock re-states the 88 single-locale divergences from a re-measurement (22,493 door-grid pairs; mgp/mrd 28, mrh/shl 28, enm/yol 28, nsl/sgn-no 4), replacing an unreproducible 2,396-probe breakdown. +235 comment bytes; no code and no module moved",
+      "growth": [
+        "edge worker: source graph grew 975992 -> 976227 bytes",
+        "server renderer: source graph grew 1055502 -> 1055737 bytes"
       ]
     }
   ]

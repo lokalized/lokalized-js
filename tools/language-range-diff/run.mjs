@@ -2,7 +2,17 @@
 // @ts-check
 /**
  * Differentially tests `lokalized/negotiate`'s `parseLanguageRanges` against the REAL
- * `java.util.Locale.LanguageRange.parse` on the pinned JDK.
+ * lokalized-java 3.1.0 `LocaleMatcher#parseLanguageRanges` on the pinned JDK.
+ *
+ * **RE-AIMED AT AMENDMENT A30.** Until then the oracle was `java.util.Locale.LanguageRange.parse`,
+ * because the port's public parse modelled the JDK's own table. A30 made the pinned IANA registry the
+ * source of the equivalences for every port; lokalized-java 3.1.0 ships a public
+ * `parseLanguageRanges` that reads it (its default `LanguageRangeEquivalents.IANA_REGISTRY` setting)
+ * and the port models THAT. So the oracle is the library's public method on a default `Strings`, from
+ * the jar `tools/oracle-jar.mjs` resolves, and the JDK's own parse is still emitted beside it — as
+ * `jdk` on every row — only so the run can COUNT the probes where the registry and the running JDK
+ * disagree (`registryVsJdk` in the `##diff-facts` line). That count is the anti-vacuity term: zero
+ * would mean the probe space never reaches a tag JDK 21's table lacks, and the re-aim proved nothing.
  *
  * WHY THIS EXISTS, when 2,303 recorded cases already run. A4 is the one slice the corpus cannot
  * verify. `sun.util.locale.LocaleEquivalentMaps.regionVariantEquivMap` rewrites a REGION or VARIANT
@@ -12,7 +22,7 @@
  * the answer for a range carrying two of its subtags, and of `getExtentionKeyIndex`, which suppresses
  * it inside a singleton extension. Each of those is a silent answer change in a real request handler.
  *
- * So the oracle here is the JDK method itself, on the probe space the corpus does not reach:
+ * So the oracle here is the Java method itself, on the probe space the corpus does not reach:
  *
  *   node tools/language-range-diff/run.mjs
  *
@@ -30,18 +40,23 @@
  * `lv-ltg` — two of which ADDED a member the JDK does not return and two of which LOST one it does.
  * Every corpus row stayed green throughout, before and after.
  *
- * Those four are now CLOSED at the source: `lokalized-spec/tools/iana-oracle/candidates.mjs` seeds
- * its probe space from the same JDK keys, `build.mjs` asserts that every one of them produced a
- * closure entry, and the re-pinned artifact carries 806 classes instead of 802. `OPEN_PORT_DEFECTS`
- * is empty as a result, and its emptiness is a measurement — the four entries had to be deleted in
- * the same change, because their own staleness check fails the run once they stop diverging.
+ * Those four were CLOSED at the source, in the spec's probe space and then the artifact it produced
+ * (806 classes where there had been 802), and `OPEN_PORT_DEFECTS` emptied as a result — the four
+ * entries had to be deleted in the same change, because their own staleness check fails the run once
+ * they stop diverging. Since A30 there is no probed artifact at all: the table is GENERATED from the
+ * registry, so a gap in a probe space can only hide a defect in a CHECK, never put one in the data —
+ * and this space is seeded from the artifact's, the library's and the JDK's keys together.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { decodeRegionVariantEquivalents } from "../../src/data/iana-identity-equivalents.js";
+import { IANA_EQUIVALENCES_ARTIFACT, specPath } from "../iana-artifact.mjs";
 import { oracleFieldProblems, recordingOracleRows } from "../oracle-field-coverage.mjs";
+import { oracleJar } from "../oracle-jar.mjs";
 
 /** Emitted by the oracle and deliberately not compared, each with the reason. Checked both ways. */
 const UNCOMPARED_ORACLE_FIELDS = {};
@@ -49,6 +64,7 @@ const UNCOMPARED_ORACLE_FIELDS = {};
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
 const specDir = process.env.LOKALIZED_SPEC_DIR ? resolve(process.env.LOKALIZED_SPEC_DIR) : resolve(root, "../lokalized-spec");
+const javaDir = process.env.LOKALIZED_JAVA_DIR ? resolve(process.env.LOKALIZED_JAVA_DIR) : resolve(root, "../lokalized-java");
 const JDK = process.env.LOKALIZED_ORACLE_JDK ?? "/Users/agents/Java/amazon-corretto-21.jdk/Contents/Home";
 
 const version = spawnSync(join(JDK, "bin/java"), ["-version"], { encoding: "utf8" });
@@ -56,53 +72,93 @@ if (version.status !== 0) {
   console.error(`pinned JDK not usable at ${JDK}\nset LOKALIZED_ORACLE_JDK, or skip this differential`);
   process.exit(2);
 }
+// The oracle is a LIBRARY method now, so an absent or ambiguous jar names its own remedy here rather
+// than surfacing as a compiler error about a missing symbol (`lookup-diff`'s lesson).
+const { jar: JAR, problem: JAR_PROBLEM } = oracleJar(javaDir);
+if (JAR_PROBLEM !== null) {
+  console.error(`the oracle jar could not be resolved: ${JAR_PROBLEM}`);
+  process.exit(2);
+}
+const LIBRARY = basename(/** @type {string} */ (JAR), ".jar");
+
+/**
+ * **THE JAR MUST BE AT LEAST AS NEW AS THE SOURCES IT IS RECORDED AS.** The run records lokalized-java's
+ * `librarySourcesSha256` (below), computed from `src/main`, while it EXECUTES the jar — and nothing
+ * tied the two: a source edit with no `mvn package` would run the old bytes and record them under the
+ * new sources' digest, green. The spec builder found the jar dated Sep 19 behind the 3.1.0 sources once
+ * already. So any file under `src/main` modified after the jar refuses the run, naming it and the
+ * remedy. A modification time is a proxy — it cannot see a jar built from OTHER sources — but it is
+ * the failure that has actually happened, and the recorded digest is what a reader compares.
+ */
+{
+  const jarTime = statSync(/** @type {string} */ (JAR)).mtimeMs;
+  /** @type {string[]} */
+  const newer = [];
+  const walk = (/** @type {string} */ directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (statSync(path).mtimeMs > jarTime) newer.push(path);
+    }
+  };
+  walk(join(javaDir, "src/main"));
+  if (newer.length > 0) {
+    console.error(`the oracle jar ${JAR} is OLDER than ${newer.length} lokalized-java source file(s), e.g. ` +
+      `${newer.slice(0, 3).join(", ")}.\nIt would run the old bytes and record them under the new sources' digest. ` +
+      `Rebuild it ('mvn -o package' in ${javaDir}) and re-run.`);
+    process.exit(2);
+  }
+}
+
+/**
+ * lokalized-java's `librarySourcesSha256`, by lokalized-spec's recipe (`tools/vector-oracle/build.mjs`,
+ * `tools/iana-oracle/build.mjs`): the digest of the JCS list of `{path, sha256}` over
+ * `src/main/java/com/lokalized`. Recorded in `##diff-facts`, so the differential record names the Java
+ * build it ran against in the same terms the corpus does, and `diff:check` can hold the two equal.
+ */
+const LIBRARY_SOURCES_SHA256 = (() => {
+  const sha256 = (/** @type {Buffer | string} */ bytes) => createHash("sha256").update(bytes).digest("hex");
+  const sources = join(javaDir, "src/main/java/com/lokalized");
+  const listing = readdirSync(sources).sort().map((file) => `{"path":${JSON.stringify(file)},"sha256":${JSON.stringify(sha256(readFileSync(join(sources, file))))}}`);
+  return sha256(Buffer.from(`[${listing.join(",")}]`, "utf8"));
+})();
 
 /**
  * The fourteen region/variant subtags, which is what the corpus never reaches.
  *
  * Hand-typed, but no longer TRUSTED: section (2c) below re-derives this list from the JDK's own
  * `regionVariantEquivMap` on every run and aborts if it has drifted. Before that check existed this
- * array and the port's `REGION_VARIANT_EQUIVALENTS` were two independent transcriptions verified once
- * by hand — the same "probe space is a guess" shape as the four language keys this tool caught, and
- * one that had already been mis-enumerated once as thirteen subtags with `-zr` missing.
+ * array and the port's table were two independent transcriptions verified once by hand — the same
+ * "probe space is a guess" shape as the four language keys this tool caught, and one that had already
+ * been mis-enumerated once as thirteen subtags with `-zr` missing.
  */
 const REGION_VARIANT = ["-alalc97", "-bu", "-cd", "-dd", "-de", "-fr", "-fx", "-heploc", "-mm", "-tl", "-tp", "-yd", "-ye", "-zr"];
 
 /**
- * The port's `REGION_VARIANT_EQUIVALENTS`, read out of its source text.
+ * The port's region/variant substitutions, in attempt order.
  *
- * Read rather than imported because the table is module-private in `src/negotiate/index.js` and must
- * stay that way — exporting it to make this check convenient would add a public symbol that
- * `symbol-allowlist.json` does not permit, which is a worse trade than parsing a literal. THROWS if
- * the literal cannot be found: a check that silently compares against an empty list has stopped
- * checking, which is the failure this whole section exists to prevent.
+ * IMPORTED since A30. They were a module-private source literal in `src/negotiate/index.js`, which
+ * this tool regex-read rather than export a symbol `symbol-allowlist.json` does not permit; A30
+ * generated them into `src/data/iana-identity-equivalents.js` from lokalized-spec's artifact, whose
+ * decoder is an internal module export and not a package export, so importing it costs no surface.
+ * THROWS on an empty list: a check that compares against nothing has stopped checking.
  *
  * @returns {[string, string][]}
  */
 function portRegionVariantEquivalents() {
-  const source = readFileSync(join(root, "src/negotiate/index.js"), "utf8");
-  const literal = /const REGION_VARIANT_EQUIVALENTS = \[([\s\S]*?)\];/.exec(source);
-  if (!literal)
-    throw new Error(
-      "could not find `const REGION_VARIANT_EQUIVALENTS = [...]` in src/negotiate/index.js; " +
-        "this differential's region/variant check would compare against nothing",
-    );
-
-  const pairs = [...literal[1].matchAll(/\["(-[a-z0-9]+)",\s*"(-[a-z0-9]+)"\]/g)].map(
-    (match) => /** @type {[string, string]} */ ([match[1], match[2]]),
-  );
+  const pairs = decodeRegionVariantEquivalents();
   if (pairs.length === 0)
-    throw new Error("REGION_VARIANT_EQUIVALENTS was found but parsed to zero pairs");
-
+    throw new Error("src/data/iana-identity-equivalents.js decoded to zero region/variant pairs");
   return pairs;
 }
 
 /**
- * Every string the corpus hands to `LanguageRange.parse`, plus the probes it never reaches.
+ * Every string the corpus hands to a range parse, plus the probes it never reaches.
  *
  * @param {string[]} jdkKeys every key of the JDK's own equivalence tables, from the oracle itself
+ * @param {string[]} libraryKeys every key of lokalized-java's registry table, from the oracle itself
  */
-function inputs(jdkKeys) {
+function inputs(jdkKeys, libraryKeys) {
   const corpus = JSON.parse(readFileSync(join(specDir, "generated/behavioral-vectors.json"), "utf8"));
   /** @type {Set<string>} */
   const set = new Set();
@@ -120,25 +176,30 @@ function inputs(jdkKeys) {
       if (spec && typeof spec.ranges === "string") set.add(spec.ranges);
   }
 
-  // (2) The pinned closure, bare and suffixed. `-hans`, `-us`, `-1901` and `-x-a` are a script, a
-  // region, a variant and a singleton extension — the four shapes that make the prefix walk, the
-  // region/variant map and `getExtentionKeyIndex` disagree with each other.
-  const closure = JSON.parse(readFileSync(join(specDir, "generated/iana-language-range-equivalents.json"), "utf8"));
-  const keys = Object.keys(closure.equivalents ?? closure);
-
-  // (2b) AND the JDK's OWN keys, which is not the same set and is the one that matters.
+  // (2) THREE KEY SETS, bare and suffixed: every member of the spec artifact's registry classes (what
+  // the port's table is generated from), every key of lokalized-java's own table (the oracle's), and
+  // every key of the JDK's (what a JDK-shaped caller sends, and where `registryVsJdk` comes from).
+  // Until A30 the first was the 818-entry probed closure's keys; the artifact replaced it.
   //
-  // Deriving the probe space from the pinned artifact alone is the `zh-123` shape at the level of the
-  // harness: a key the artifact is MISSING is a key the differential never asks about, so the one
-  // failure mode the artifact actually has is the one failure mode the space cannot see. It had four.
-  // The JDK's table is the oracle, so the oracle names the probes.
-  for (const key of [...keys, ...jdkKeys]) {
-    set.add(key);
-    // `-hans`/`-hant` are scripts that are THEMSELVES part of longer keys (`cmn-hans`), which is how
-    // the prefix walk's early return becomes observable; `-us`, `-1901` and `-x-a` are a region, a
-    // variant and a singleton extension, where no longer key exists and the walk must fall through.
-    for (const suffix of ["-hans", "-hant", "-us", "-1901", "-x-a"]) set.add(key + suffix);
-  }
+  // Deriving the probe space from ONE implementation's table is the `zh-123` shape at the level of the
+  // harness: a key that table is MISSING is a key the differential never asks about. It happened
+  // twice, once in each direction (`cmn-hans`/`cmn-hant`/`lv-lvs`/`lv-ltg` unprobed while the JDK was
+  // the oracle, `dyl`/`sgn-dyl`/`zhk`/`sgn-zhk` once the library was), so no table names the space
+  // alone.
+  //
+  // `-hans`/`-hant` are scripts that are THEMSELVES part of longer keys (`cmn-hans`), which is how the
+  // prefix walk's early return becomes observable; `-us`, `-1901` and `-x-a` are a region, a variant
+  // and a singleton extension, where no longer key exists and the walk must fall through; and each
+  // region/variant subtag makes the NESTED substitution — a language equivalent AND a region rewrite
+  // in one range (`mgp-bu` -> `mrd-mm`) — observable.
+  const artifact = JSON.parse(readFileSync(specPath(IANA_EQUIVALENCES_ARTIFACT), "utf8"));
+  if (!Array.isArray(artifact.languageEquivalenceClasses) || artifact.languageEquivalenceClasses.length === 0)
+    throw new Error(`${specPath(IANA_EQUIVALENCES_ARTIFACT)} carries no languageEquivalenceClasses; ` +
+      "the probe space would silently lose the port's own table");
+  const artifactKeys = artifact.languageEquivalenceClasses.flat();
+
+  for (const key of [...artifactKeys, ...libraryKeys, ...jdkKeys])
+    for (const suffix of ["", "-hans", "-hant", "-us", "-1901", "-x-a", ...REGION_VARIANT]) set.add(key + suffix);
 
   // (3) The region/variant map, which is the whole reason this differential exists: every subtag on
   // a plain language, on a language that also carries a script, behind a singleton extension (where
@@ -171,6 +232,10 @@ function inputs(jdkKeys) {
     "fr;q=0.5,fr;q=0.9", "es,fr,de", "de;q=0.8,fr;q=0.9,en;q=0.7", "*", "*-ch", "de-*", "x-foo-*",
     "en-*;q=1,en-US;q=0", "de;q=0.8,\tfr;q=0.9", " de;q=0.8, fr;q=0.9", "\tfr\t,de;q=0.1", "\nfr",
     "de;q=0.8,f\tr;q=0.9", "abcdefghi", "ab-cdefghij", "a", "a-b", "1", "1-a", "a-1", "zh-123",
+    // A RANGE OF HYPHENS ONLY splits to NO subtags in Java, and the JDK 21 constructor's `subtags[0]`
+    // throws `ArrayIndexOutOfBoundsException` — the one refusal here that is not `range=…`. Added at
+    // A30, when the spec's model and the port were found to disagree on exactly `-` and `---`.
+    "-", "---", "-a", "a-", "fr,-", "-;q=0.5",
     "he,id,yi,cmn,yue,nan,hak,jbo,tlh,gan,wuu,hsn,ase,fr;q=0.1",
     "he,id,yi,cmn,yue,nan,jbo,tlh,gan,wuu,hsn,ase,fr;q=0.9,de;q=0.8,es;q=0.7,it;q=0.6",
   ]) set.add(header);
@@ -256,13 +321,11 @@ const KNOWN_DIVERGENCES = {};
  * probed and never reached the artifact. The generator's losslessness check could not catch it: it
  * verifies that every PROBED range reconstructs, so a range nobody probed is outside what it checks.
  *
- * THE FIX, landed in the spec repo and measured rather than argued: `candidates.mjs` now seeds its
- * space from the JDK's own equivalence-map keys — the same reflection this differential does, on the
- * JDK's INPUT data rather than on the artifact under test — and `build.mjs` now ASSERTS that every
- * one of the 769 produced a closure entry, so the artifact can no longer be blind to its own gaps.
- * Re-extracting added exactly those 4 entries (802 -> 806, raw closure 18,371 -> 18,375) and changed
- * or removed nothing else. `lokalized-js/tools/gen-iana-data.js` re-emits
- * `src/data/iana-range-equivalents.js` from the re-pinned artifact.
+ * THE FIX, landed in the spec repo at the time and measured rather than argued: the probed closure's
+ * candidate space was seeded from the JDK's own equivalence-map keys and every one of the 769 was
+ * asserted to produce an entry. Re-extracting added exactly those 4 entries (802 -> 806) and changed
+ * or removed nothing else. (A30 has since retired the probed closure: the data is generated from the
+ * registry snapshot, and this history is kept for the shape of the mistake, which recurs.)
  *
  * The machinery below stays, empty, for the next one. Each entry is a FAMILY, not a single string:
  * a missing key poisons every longer range that walks through it, so `cmn-hans` owned `cmn-hans-us`,
@@ -283,17 +346,24 @@ const defectFamily = (/** @type {string} */ input) =>
 const work = mkdtempSync(join(tmpdir(), "lokalized-rangediff-"));
 try {
   const classesOut = join(work, "classes");
-  const compile = spawnSync(join(JDK, "bin/javac"), ["-d", classesOut, join(here, "LanguageRangeDiff.java")], { encoding: "utf8" });
+  const compile = spawnSync(join(JDK, "bin/javac"), ["-cp", /** @type {string} */ (JAR), "-d", classesOut, join(here, "LanguageRangeDiff.java")], { encoding: "utf8" });
   if (compile.status !== 0) throw new Error(`oracle compilation failed:\n${compile.stderr}`);
 
   // `LocaleEquivalentMaps` is JDK-internal, so reading its key set needs the module opened. Both flags
-  // are required: `--add-exports` to name the class, `--add-opens` for `setAccessible`.
+  // are required: `--add-exports` to name the class, `--add-opens` for `setAccessible`. The library's
+  // own table is package-private in `com.lokalized`, which is why the harness lives in that package.
   const OPENS = ["--add-exports", "java.base/sun.util.locale=ALL-UNNAMED", "--add-opens", "java.base/sun.util.locale=ALL-UNNAMED"];
+  const classpath = `${classesOut}:${JAR}`;
   const keysPath = join(work, "jdk-keys.txt");
   const regionPath = join(work, "jdk-region-variant.txt");
-  const keyRun = spawnSync(join(JDK, "bin/java"), [...OPENS, "-cp", classesOut, "com.lokalized.LanguageRangeDiff", "--keys", keysPath, regionPath], { encoding: "utf8" });
-  if (keyRun.status !== 0) throw new Error(`could not read the JDK's own equivalence keys, so the probe space would be incomplete:\n${keyRun.stderr}`);
+  const libraryKeysPath = join(work, "library-keys.txt");
+  const libraryRegionPath = join(work, "library-region-variant.txt");
+  const keyRun = spawnSync(join(JDK, "bin/java"), [...OPENS, "-cp", classpath, "com.lokalized.LanguageRangeDiff",
+    "--keys", keysPath, regionPath, libraryKeysPath, libraryRegionPath], { encoding: "utf8" });
+  if (keyRun.status !== 0) throw new Error(`could not read the JDK's and the library's equivalence keys, so the probe space would be incomplete:\n${keyRun.stderr}`);
   const jdkKeys = readFileSync(keysPath, "utf8").split("\n").filter(Boolean);
+  // A SET, never an order: the library's table is a `HashMap`, so its iteration order means nothing.
+  const libraryKeys = readFileSync(libraryKeysPath, "utf8").split("\n").filter(Boolean).sort();
 
   // (2c) THE THIRD EQUIVALENCE TABLE, re-derived rather than transcribed.
   //
@@ -341,16 +411,28 @@ try {
         `half of this file was rewritten to close`,
     );
 
+  // THREE ORDERED LISTS MUST BE ONE since A30, and they are three INDEPENDENT derivations: the
+  // port's generated pairs (from the spec artifact, whose order is authored in lokalized-spec's
+  // `tools/iana-oracle/jdk-compatibility.json`, taken from the JDK's own map); lokalized-java's
+  // `REGION_VARIANT_EQUIVALENTS` (derived independently by its own generator from its vendored
+  // registry copy, as a model of the JDK's HashMap iteration order — it reads no spec file); and the
+  // JDK's own map. The port disagreeing alone is a stale generated module or authored input;
+  // lokalized-java disagreeing alone is its model of the JDK's order going wrong.
+  const libraryRegionVariant = readFileSync(libraryRegionPath, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => /** @type {[string, string]} */ (/** @type {unknown} */ (line.split("\t"))));
   const portRegionVariant = portRegionVariantEquivalents();
-  if (JSON.stringify(portRegionVariant) !== JSON.stringify(jdkRegionVariant))
-    throw new Error(
-      `src/negotiate/index.js's REGION_VARIANT_EQUIVALENTS does not match the pinned JDK's ` +
-        `regionVariantEquivMap, compared as an ordered list of pairs.\n` +
-        `  JDK  (${jdkRegionVariant.length}): ${jdkRegionVariant.map((p) => p.join("=")).join(" ")}\n` +
-        `  port (${portRegionVariant.length}): ${portRegionVariant.map((p) => p.join("=")).join(" ")}`,
-    );
+  for (const [name, pairs] of /** @type {[string, [string, string][]][]} */ ([["lokalized-java", libraryRegionVariant], ["the pinned JDK", jdkRegionVariant]]))
+    if (JSON.stringify(portRegionVariant) !== JSON.stringify(pairs))
+      throw new Error(
+        `src/data/iana-identity-equivalents.js's region/variant substitutions do not match ${name}'s, ` +
+          `compared as an ordered list of pairs.\n` +
+          `  ${name} (${pairs.length}): ${pairs.map((p) => p.join("=")).join(" ")}\n` +
+          `  port (${portRegionVariant.length}): ${portRegionVariant.map((p) => p.join("=")).join(" ")}`,
+      );
 
-  const probes = inputs(jdkKeys);
+  const probes = inputs(jdkKeys, libraryKeys);
 
   // BOTH TABLES ARE CHECKED AGAINST THE PROBE SPACE BEFORE ANYTHING RUNS, because the staleness
   // machinery below can only see a key the probe space actually contains.
@@ -386,7 +468,7 @@ try {
   const outPath = join(work, "java.jsonl");
   writeFileSync(inPath, `${probes.map((p) => JSON.stringify(p)).join("\n")}\n`, "utf8");
 
-  const run = spawnSync(join(JDK, "bin/java"), ["-cp", classesOut, "com.lokalized.LanguageRangeDiff", inPath, outPath], { encoding: "utf8" });
+  const run = spawnSync(join(JDK, "bin/java"), ["-cp", classpath, "com.lokalized.LanguageRangeDiff", inPath, outPath], { encoding: "utf8", maxBuffer: 64e6 });
   if (run.status !== 0) throw new Error(`oracle execution failed:\n${run.stderr}`);
 
   const { parseLanguageRanges } = await import("../../src/negotiate/index.js");
@@ -401,11 +483,19 @@ try {
 
   let same = 0;
 /**
- * Java's refusal class, mapped to the JS name the port raises for it. One entry, because Java raises
- * one class here; an UNMAPPED type reaches the comparison verbatim and fails the run loudly rather
- * than being waved through, which is the half that keeps this from rotting into an always-true test.
+ * Java's refusal class, mapped to the JS name the port raises for it. An UNMAPPED type reaches the
+ * comparison verbatim and fails the run loudly rather than being waved through, which is the half that
+ * keeps this from rotting into an always-true test. TWO entries since A30: a range of hyphens only
+ * throws `ArrayIndexOutOfBoundsException` from the JDK 21 `LanguageRange` constructor, and the
+ * fail-soft door catches both classes as the parser's own refusals, so the port raises `RangeError`
+ * for both, with Java's message.
  */
-const JS_CLASS_FOR_JAVA = { "java.lang.IllegalArgumentException": "RangeError" };
+const JS_CLASS_FOR_JAVA = {
+  "java.lang.IllegalArgumentException": "RangeError",
+  "java.lang.ArrayIndexOutOfBoundsException": "RangeError",
+};
+  /** Probes where lokalized-java's registry parse and the JDK's own parse answer differently. */
+  let registryVsJdk = 0;
 
   const differences = [];
   /** @type {{input: string, wanted: unknown, actual: unknown, family: string}[]} */
@@ -453,6 +543,11 @@ const JS_CLASS_FOR_JAVA = { "java.lang.IllegalArgumentException": "RangeError" }
     const wanted = row.ok
       ? { ok: true, ranges: row.ranges }
       : { ok: false, error: row.error, errorClass: JS_CLASS_FOR_JAVA[row.errorType] ?? `UNMAPPED:${row.errorType}` };
+    // The JDK's own parse is COUNTED, never compared: the port does not model it (A30), and the count
+    // is what says this probe space reaches the tags where the registry and JDK 21 part company.
+    const jdk = row.jdk;
+    const library = row.ok ? { ok: true, ranges: row.ranges } : { ok: false, error: row.error, errorType: row.errorType };
+    if (JSON.stringify(jdk) !== JSON.stringify(library)) registryVsJdk += 1;
     const deliberate = Object.hasOwn(KNOWN_DIVERGENCES, row.in);
     const family = defectFamily(row.in);
     if (JSON.stringify(actual) === JSON.stringify(wanted)) {
@@ -481,17 +576,25 @@ const JS_CLASS_FOR_JAVA = { "java.lang.IllegalArgumentException": "RangeError" }
 
   const known = Object.keys(KNOWN_DIVERGENCES).length - stale.filter((i) => Object.hasOwn(KNOWN_DIVERGENCES, i)).length;
   const families = Object.keys(OPEN_PORT_DEFECTS).filter((k) => defects.some((d) => d.family === k));
-  console.log(`Locale.LanguageRange.parse differential against Java on the pinned JDK: ` +
+  console.log(`LocaleMatcher#parseLanguageRanges differential against ${LIBRARY} on the pinned JDK: ` +
     `${same}/${rows.length} identical, ${known} known divergence(s), ` +
-    `${families.length} open port defect(s) over ${defects.length} probe(s), ${differences.length} unexplained`);
+    `${families.length} open port defect(s) over ${defects.length} probe(s), ${differences.length} unexplained; ` +
+    `${registryVsJdk} probe(s) where the registry and the JDK's own LanguageRange.parse differ`);
+  // FACTS for `diff:check` (no JDK): `registryVsJdk` of ZERO would mean the re-aim changed nothing
+  // this space can see, and `regionVariantPairs` of zero that the ordered-pair check compared nothing.
+  // `oracle` names the Java build: `diff:check` requires its `librarySourcesSha256` to be the corpus's.
+  console.log(`##diff-facts ${JSON.stringify({
+    exercised: { probes: rows.length, registryVsJdk, regionVariantPairs: portRegionVariant.length },
+    defects: { unexplained: differences.length },
+    oracle: { library: LIBRARY, librarySourcesSha256: LIBRARY_SOURCES_SHA256 },
+  })}`);
 
   const show = (/** @type {{input: string, wanted: unknown, actual: unknown}} */ d) =>
     console.log(`\n  ${JSON.stringify(d.input)}\n    java ${JSON.stringify(d.wanted)}\n    js   ${JSON.stringify(d.actual)}`);
 
   if (defects.length) {
     console.log(`\nOPEN PORT DEFECTS (${families.length}) — triaged, root cause known, NOT fixed here.`);
-    console.log(`Root cause: lokalized-spec/tools/iana-oracle/candidates.mjs never probes these ranges,`);
-    console.log(`so they are missing from the pinned closure. See OPEN_PORT_DEFECTS in this file.`);
+    console.log(`See OPEN_PORT_DEFECTS in this file for each family's root cause.`);
     for (const key of families) {
       const members = defects.filter((d) => d.family === key);
       console.log(`\n[${key}] ${OPEN_PORT_DEFECTS[key]}`);

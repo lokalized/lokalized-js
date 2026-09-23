@@ -24,8 +24,15 @@
  * scenario 0b the same shape. Freezing a number nobody has a basis for would be the third thing on
  * this project to look like a gate and check nothing.
  *
- *   DETERMINISTIC — modules, source bytes, the closure's byte share, requests per render, and the
+ *   DETERMINISTIC — modules, source bytes, the IANA data's byte share, requests per render, and the
  *   two digests — RATCHET: growth or drift fails the run until it is re-recorded with a reason.
+ *
+ * "CLOSURE" in the frozen recipe and in the record's field names is the plan's word (9.2:2818) and
+ * the pre-A30 artifact's. Since A30 the IANA data is TWO generated modules — the full registry table
+ * behind `lokalized/negotiate` and the direct-match projection in the root — and `closureBytes` /
+ * `ianaClosureBytes` sum whichever of them a graph reaches, while `closureClasses` counts the full
+ * table's distinct equivalence classes (it counted the old closure's ENTRIES, 818, which is why the
+ * re-pin to 369 is a revision and not a comparison).
  *   TIMINGS AND HEAP are machine-dependent and are REPORTED, never gated.
  *
  * **THE PROOF OBLIGATION A3 AND A7 BOTH CREATED IS DISCHARGED AT BIRTH.** Both amendments turned on
@@ -89,7 +96,7 @@ const { publishCatalogs } = await import(new URL("../examples/server/publish.js"
 const { handleRequest } = await import(new URL("../examples/edge/worker.js", import.meta.url).href);
 const { createLocaleNegotiator, forAcceptLanguage } = await import(new URL("../src/negotiate/index.js", import.meta.url).href);
 const { localeConfigurationForManifest } = await import(new URL("../src/load/index.js", import.meta.url).href);
-const { decode: decodeClosure } = await import(new URL("../src/data/iana-range-equivalents.js", import.meta.url).href);
+const { decodeLanguageEquivalents } = await import(new URL("../src/data/iana-range-equivalents.js", import.meta.url).href);
 
 const BASE = "https://cdn.example/v1/";
 const published = await publishCatalogs({ catalogVersion: "scenario-6", publicationBaseUrl: BASE });
@@ -122,9 +129,14 @@ async function render(header) {
 
 // ---- graph figures, deterministic ------------------------------------------------------------
 
-const CLOSURE = "src/data/iana-range-equivalents.js";
-const closureBytes = Buffer.byteLength(readFileSync(resolve(root, CLOSURE), "utf8"));
-const closureClasses = decodeClosure().size;
+/** Both generated IANA modules (A30): the full table (negotiate) and the direct-match projection (root). */
+const IANA_MODULES = ["src/data/iana-range-equivalents.js", "src/data/iana-identity-equivalents.js"];
+const ianaBytes = Object.fromEntries(IANA_MODULES.map((module) =>
+  [module, Buffer.byteLength(readFileSync(resolve(root, module), "utf8"))]));
+const closureBytes = IANA_MODULES.reduce((sum, module) => sum + /** @type {number} */ (ianaBytes[module]), 0);
+/** Distinct classes: a class is a member plus its others, so its sorted member set names it. */
+const closureClasses = new Set([.../** @type {Map<string, string[]>} */ (decodeLanguageEquivalents())]
+  .map(([key, others]) => JSON.stringify([key, ...others].sort()))).size;
 
 /** @type {any[]} */
 const variants = [];
@@ -138,7 +150,8 @@ for (const variant of RECIPE.variants) {
     modules: graph.files.length,
     sourceBytes: graph.bytes,
     nodeBuiltinEdges: graph.builtins.length,
-    ianaClosureBytes: graph.files.includes(CLOSURE) ? closureBytes : 0,
+    ianaClosureBytes: IANA_MODULES.filter((module) => graph.files.includes(module))
+      .reduce((sum, module) => sum + /** @type {number} */ (ianaBytes[module]), 0),
     importMs,
   });
 }
@@ -184,7 +197,7 @@ if (gc) {
 
 const record = {
   scenario: "6",
-  revision: 2,
+  revision: 3,
   frozenAt: "2026-09-19",
   note: "No thresholds, by the precedent of M7 clause 19 as amended (A3) and M8's A4: recorded and " +
     "ratcheted where a ratchet exists, reported where none does. Frozen at M9 S4 rather than before " +
@@ -192,7 +205,12 @@ const record = {
     "REVISION 2 (M-R S13): the scenario's own subject -- 'the shared validity/IANA closure' -- was " +
     "re-pinned from the JDK's table to lokalized-java 3.1.0's registry-sourced one, 806 -> 814 " +
     "classes. That is an ENVIRONMENT change by this tool's own rule, so revision 1's figures are " +
-    "not comparable with these and the bump says so rather than a rebaseline quietly absorbing it.",
+    "not comparable with these and the bump says so rather than a rebaseline quietly absorbing it. " +
+    "REVISION 3 (A30): the subject moved again, and further -- the IANA data is now GENERATED from the " +
+    "pinned registry snapshot with no JDK, as 369 ordered classes in two modules (the full table behind " +
+    "lokalized/negotiate, a direct-match projection plus the region/variant substitutions in the root), " +
+    "where revision 2 measured an 818-entry probed closure in one. closureClasses now counts classes, " +
+    "not entries, and closureBytes sums both modules. Another environment change by this tool's own rule.",
   recipe: RECIPE,
   recipeSha256,
   fixtureSha256: fixtureDigest(),
@@ -246,10 +264,11 @@ if (baseline) {
     frozen.push(`the fixture changed (${String(baseline.fixtureSha256).slice(0, 16)} -> ` +
       `${record.fixtureSha256.slice(0, 16)}). Every figure below was measured against different bytes.`);
 
-  // 3. THE PINNED CLOSURE. The scenario is defined as being measured ATOP it, so a re-pinned closure
+  // 3. THE PINNED IANA DATA. The scenario is defined as being measured ATOP it, so re-pinned data
   //    is a different measurement even when every other input is identical.
-  if (baseline.closureClasses !== closureClasses)
-    frozen.push(`the IANA closure was re-pinned (${baseline.closureClasses} -> ${closureClasses} classes)`);
+  if (baseline.closureClasses !== closureClasses && baseline.revision === record.revision)
+    frozen.push(`the IANA closure was re-pinned (${baseline.closureClasses} -> ${closureClasses} classes) ` +
+      `while revision stayed ${record.revision}; that is an environment change, so bump it`);
 
   // 4. DETERMINISTIC GROWTH.
   console.log(`\ndrift against the recorded baseline:`);

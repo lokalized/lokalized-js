@@ -15,8 +15,11 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
+import { decodeLanguageEquivalents } from "../src/data/iana-range-equivalents.js";
+import { decodeRegionVariantEquivalents } from "../src/data/iana-identity-equivalents.js";
+import { createLocaleNegotiator, parseLanguageRanges } from "../src/negotiate/index.js";
 import {
-	IANA_RANGE_EQUIVALENTS,
+	IANA_IDENTITY_EQUIVALENTS,
 	candidateChain,
 	matchFor,
 	maximize,
@@ -25,7 +28,7 @@ import {
 	primaryLanguage,
 } from "../src/internal/locale.js";
 import { canonicalLanguageTag } from "../src/internal/locale-cldr.js";
-import { javaSplit, jdkLanguageTag } from "../src/internal/locale-jdk-tag.js";
+import { javaSplit } from "../src/internal/locale-jdk-tag.js";
 
 /**
  * The sibling spec checkout, guarded.
@@ -561,95 +564,85 @@ describe("candidateChain against the corpus", { skip: corpusSkip }, () => {
 	});
 });
 
-// A DIFFERENT spec artifact from the corpus above, so it needs its own guard: `corpusSkip` covers
-// `behavioral-vectors.json` and says nothing about the pinned IANA registry.
-const ianaRegistryPath = new URL(
-	"../../lokalized-spec/generated/iana-language-range-equivalents.json", import.meta.url);
-const ianaSkip = existsSync(ianaRegistryPath)
-	? false
-	: "pinned IANA registry not found at ../lokalized-spec/generated/iana-language-range-equivalents.json";
+/**
+ * THE DIRECT-MATCH IANA TABLE — the projection of the registry's full table that core's automatic
+ * single-locale matcher walks (`IANA_IDENTITY_EQUIVALENTS`, generated into
+ * `src/data/iana-identity-equivalents.js` by `tools/gen-iana-data.js`).
+ *
+ * Its CONTENT is `tools/gen-iana-data.js --check`'s to gate (run by `test/generated-data.test.js`):
+ * that tool derives the projection from the spec artifact and refuses a module that does not decode
+ * back to it. A second copy of that recipe here would be a transcription, and was deleted with A30.
+ * What is here is what a recipe check cannot see — whether the DOOR that reads the table answers as
+ * Java does. MEASURED in M-R S13: a port carrying all the right rows and simply not consulting some of
+ * them left conformance green and the suite green. A recipe check is not a behaviour check.
+ */
+describe("the direct-match IANA identity table", () => {
+	const full = decodeLanguageEquivalents();
 
-describe("the inlined IANA language-range equivalence table", { skip: ianaSkip }, () => {
-	it("matches the spec's pinned registry, restricted to normalized tags", () => {
-		const registry = JSON.parse(readFileSync(new URL(
-			"../../lokalized-spec/generated/iana-language-range-equivalents.json", import.meta.url), "utf8"));
+	it("is an order-preserving projection of the full registry table", () => {
+		assert.ok(IANA_IDENTITY_EQUIVALENTS.size > 0);
+		const notProjected = [];
 
-		/** @param {string} tag */
-		const normalized = (tag) => jdkLanguageTag(tag).toLowerCase() === tag;
-
-		/** @type {Map<string, string[]>} */
-		const expected = new Map();
-
-		for (const [tag, equivalents] of Object.entries(registry.equivalents)) {
-			if (!normalized(tag)) continue;
-			const kept = /** @type {string[]} */ (equivalents).filter((value) => value === tag || normalized(value));
-			if (kept.length > 1) expected.set(tag, kept);
+		for (const [key, others] of IANA_IDENTITY_EQUIVALENTS) {
+			const fullOthers = full.get(key);
+			// A subsequence of the key's full class, in the full class's order.
+			let cursor = 0;
+			const subsequence = fullOthers !== undefined && others.every((member) => {
+				while (cursor < fullOthers.length && fullOthers[cursor] !== member) cursor += 1;
+				return cursor++ < fullOthers.length;
+			});
+			if (!subsequence) notProjected.push([key, others, fullOthers]);
 		}
 
-		assert.deepEqual([...IANA_RANGE_EQUIVALENTS.entries()].sort(), [...expected.entries()].sort());
+		assert.deepEqual(notProjected, [], "identity rows that are not an order-preserving subsequence of the full table");
 	});
 
 	/**
-	 * **THE TABLE'S CONTENT WAS GATED AND ITS USE WAS NOT, AND THAT HID A LIVE DIVERGENCE.**
-	 *
-	 * The test above is a derivation comparison: it re-applies the reduction to the spec artifact and
-	 * asserts the Map equals it. It exercises no door. Measured in M-R S13: a port that carries all
-	 * 277 correct rows and simply STOPS CONSULTING the eight the registry change added leaves
-	 * `npm run conformance` at 2,162/0 and the entire suite green, while `matchFor("mgp")` answers
-	 * `none`. A recipe check is not a behaviour check.
-	 *
-	 * What the door must do is `IanaLanguageEquivalents.equivalentsForLanguage`: a longest-known-
-	 * PREFIX walk, not an exact lookup. The port did the latter until M-R S13.
-	 *
-	 * **THE PAIR SET IS DERIVED, because a list written to the three classes this change added would
-	 * go green over the one that pre-dates it.** `nsl` <-> `sgn-no` is in the JDK's own table and was
-	 * diverging before any registry data arrived — CLDR sends `sgn-NO` to `nsi`, so canonicalization
-	 * does not cover it, which is exactly the case `src/internal/locale.js`'s own header calls out as
-	 * where CLDR and IANA genuinely disagree. Deriving on "the two members do not share a CLDR
-	 * canonical form" finds it and rots correctly when the pinned registry moves.
+	 * The walk reads a PROJECTION where Java's reads the full table, so the hazard is a walk that
+	 * stops at a SHORTER prefix and substitutes at the wrong boundary. `tools/gen-iana-data.js` refuses
+	 * to emit such a projection; this asserts the property of what shipped, against the full table
+	 * this repository also ships, so it needs no spec checkout.
+	 */
+	it("cannot stop at a prefix Java's walk would have passed", () => {
+		const shadowed = [];
+		for (const key of full.keys()) {
+			if (IANA_IDENTITY_EQUIVALENTS.has(key)) continue;
+			for (let index = key.lastIndexOf("-"); index > 0; index = key.lastIndexOf("-", index - 1))
+				if (IANA_IDENTITY_EQUIVALENTS.has(key.slice(0, index))) shadowed.push([key, key.slice(0, index)]);
+		}
+		assert.deepEqual(shadowed, [],
+			"full-table keys the projection dropped whose shorter prefix it kept; the reduced walk would substitute early");
+	});
+
+	/**
+	 * **THE PAIR SET IS DERIVED, because a list written to the classes a change added would go green
+	 * over the one that pre-dates it.** `nsl` <-> `sgn-no` was diverging before any registry data
+	 * arrived — CLDR sends `sgn-NO` to `nsi`, so canonicalization does not cover it, which is exactly the
+	 * case `src/internal/locale.js` calls out as where CLDR and IANA genuinely disagree. Deriving on "the
+	 * two members do not share a CLDR canonical form" finds it and rots correctly when the registry moves.
 	 */
 	describe("the single-locale door walks prefixes, as Java's does", () => {
 		/** Directed pairs the table carries that CLDR canonicalization does NOT already unify. */
-		const ianaOnlyPairs = [...IANA_RANGE_EQUIVALENTS.entries()].flatMap(([tag, members]) =>
-			members.filter((member) => member !== tag && !canonicallyEquivalent(tag, member))
-				.map((member) => [tag, member]));
-
-		/**
-		 * **ONE DERIVED PAIR IS EXCLUDED, AND THE EXCLUSION IS ASSERTED RATHER THAN APPLIED.**
-		 * `und-hepburn-heploc` <-> `und-hepburn-alalc97` is a VARIANT equivalence on an undetermined
-		 * primary language. Measured on the pinned Corretto 21 against the 3.1.0-SNAPSHOT classes,
-		 * Java answers `null`/`NONE` for it at this door, bare and suffixed alike — even though
-		 * `LanguageRange.parse` expands it — so the port agreeing is correct and requiring a match
-		 * would be a red test against faithful behaviour.
-		 *
-		 * It is split out instead of filtered away, and the excluded pair's own answer is pinned
-		 * below: a silent `filter` would let this door start matching `und-*` without anything
-		 * noticing, which is how a declared exception outlives the fact it rests on.
-		 */
-		const undetermined = ([tag]) => tag.startsWith("und");
-		const matchable = ianaOnlyPairs.filter((pair) => !undetermined(pair));
-		const unmatchable = ianaOnlyPairs.filter(undetermined);
+		const ianaOnlyPairs = [...IANA_IDENTITY_EQUIVALENTS.entries()].flatMap(([tag, others]) =>
+			others.filter((member) => !canonicallyEquivalent(tag, member)).map((member) => [tag, member]));
 
 		it("finds a suffixed equivalent, for every pair CLDR does not already unify", () => {
-			// ANTI-VACUITY FIRST: an empty derivation would make every assertion below hold trivially,
-			// and the derivation is the whole reason this is not a hand-written list of three.
-			assert.ok(ianaOnlyPairs.length >= 9,
-				`only ${ianaOnlyPairs.length} IANA-only pair(s) derived; the table carried 9 when this was written`);
+			// ANTI-VACUITY FIRST: an empty derivation would make every assertion below hold trivially.
+			// MEASURED 8 at A30 (it read 9 while the table carried an `und-hepburn` variant row, an
+			// artefact of the probed closure; that pair's Java answer is pinned in its own test now).
+			assert.ok(ianaOnlyPairs.length >= 8,
+				`only ${ianaOnlyPairs.length} IANA-only pair(s) derived; the table carried 8 when this was written`);
 
 			// The pre-existing instance must be IN the derived set, or the set was built to fit the
-			// classes this change added and would go green over the defect that predates it.
+			// classes a change added and would go green over the defect that predates it.
 			assert.ok(ianaOnlyPairs.some(([tag, member]) => tag === "nsl" && member === "sgn-no"),
 				"nsl -> sgn-no is the pair that predates the registry change; it must be derived, not omitted");
 
-			// **THE SUFFIX IS PRIVATE-USE ON PURPOSE, AND A REGION SUFFIX IS THE TRAP.** The first
-			// probe written for this used `-001`, which makes `sgn-no-001` a tag with TWO regions:
-			// ill-formed, so both this port and Java refuse it and the one pre-existing pair drops
-			// out of the comparison entirely. A `-x-a` private-use subtag is well-formed after any
-			// well-formed tag, so the derived set stays whole. This project's own lesson, inside the
-			// probe written to measure the gap — the reviewer who found the defect hit it too.
-			assert.ok(matchable.length >= 8, `only ${matchable.length} matchable pair(s) derived`);
-
-			const wrong = matchable
+			// **THE SUFFIX IS PRIVATE-USE ON PURPOSE, AND A REGION SUFFIX IS THE TRAP.** `-001` makes
+			// `sgn-no-001` a tag with TWO regions: ill-formed, so both this port and Java refuse it and
+			// the pre-existing pair drops out of the comparison entirely. `-x-a` is well-formed after
+			// any well-formed tag, so the derived set stays whole.
+			const wrong = ianaOnlyPairs
 				.map(([tag, member]) => {
 					const match = matchFor(`${tag}-x-a`, ["en", `${member}-x-a`], "en", {});
 					return [`${tag}-x-a`, `${member}-x-a`, match.locale, match.matchType];
@@ -657,17 +650,6 @@ describe("the inlined IANA language-range equivalence table", { skip: ianaSkip }
 				.filter(([, want, got]) => got === null || got.toLowerCase() !== want.toLowerCase());
 
 			assert.deepEqual(wrong, [], "suffixed requests that did not reach their equivalent catalog");
-		});
-
-		it("pins the undetermined-language pair Java also refuses, so the exclusion cannot rot", () => {
-			assert.ok(unmatchable.length >= 1,
-				"the und-rooted pair is the reason the split exists; deriving none means the table changed");
-
-			for (const [tag, member] of unmatchable) {
-				const match = matchFor(`${tag}-x-a`, ["en", `${member}-x-a`], "en", {});
-				assert.equal(match.locale, null,
-					`${tag}-x-a reached ${match.locale}; real Java answers NONE here, measured on the pinned JDK`);
-			}
 		});
 
 		it("answers the bare form too, and refuses a tag in no class", () => {
@@ -678,40 +660,119 @@ describe("the inlined IANA language-range equivalence table", { skip: ianaSkip }
 
 		it("a CLDR-unified pair matches either way, which is why it is the control and not the probe", () => {
 			// `aam`/`aas` is in the table AND unified by CLDR, so it would pass over an exact-lookup
-			// port as well. Keeping it here says so explicitly: it proves the fixture shape is sound
-			// and proves NOTHING about the walk, which is what the derived set above is for.
+			// port as well. It proves the fixture shape is sound and NOTHING about the walk.
 			assert.equal(matchFor("aam-x-a", ["en", "aas-x-a"], "en", {}).locale, "aas-x-a");
 			assert.ok(canonicallyEquivalent("aam", "aas"));
 		});
+	});
 
-		/**
-		 * The walk reads a REDUCED table where Java's reads the full 814-class closure, so the hazard
-		 * is a walk that stops at a SHORTER prefix and substitutes at the wrong boundary. These two
-		 * assertions are what make that impossible rather than unlikely, and they are checked against
-		 * the spec artifact rather than argued in a comment.
-		 */
-		it("cannot stop at a prefix Java's walk would have passed", { skip: ianaSkip }, () => {
-			const registry = JSON.parse(readFileSync(new URL(
-				"../../lokalized-spec/generated/iana-language-range-equivalents.json", import.meta.url), "utf8"));
-			const closureKeys = new Set(Object.keys(registry.equivalents));
+	/**
+	 * **JAVA'S ROWS FOR THE ONE THING BOTH DOORS SHARE, and therefore the one thing comparing them
+	 * cannot see.** A language equivalent COMBINED with a region or variant substitution: `mgp-BU` over
+	 * a loaded `mrd-MM` needs the `mgp`->`mrd` class AND the `-bu`->`-mm` substitution applied to the
+	 * derived member (`languageRangeExpansions`' nested step).
+	 *
+	 * MEASURED against lokalized-java 3.1.0 (`target/classes`) on the pinned Corretto 21 through
+	 * `Strings#matchFor(Locale)`, one catalog per locale plus the fallback. Before A30 the table here
+	 * was pre-expanded and carried such combinations only where its probe space happened to include
+	 * them: that port answered NONE on all four probe rows below, and on 88 of the 22,493 pairs of
+	 * the door grid below (mgp/mrd 28, mrh/shl 28, enm/yol 28, nsl/sgn-no 4), where Java answers
+	 * CANONICAL — measured 2026-09-23 by answering that grid with both ports and with Java. The
+	 * corpus and `diff:lookup` saw none of them. The whole-list door agreed with the old answers too,
+	 * because it shares the expansion, so the grid below could not have caught it either.
+	 *
+	 * The undetermined-language pair is the opposite direction, and it is pinned so a door that started
+	 * matching `und-*` would be noticed: Java answers NONE for it, bare and suffixed, although its parse
+	 * expands it.
+	 */
+	it("combines a language equivalent with a region/variant substitution, as Java does", () => {
+		/** @type {[string, string[], string, string | null, string][]} request, catalogs, fallback, Java's locale, Java's type */
+		const javaRows = [
+			["mgp-BU", ["en", "mrd-MM"], "en", "mrd-MM", "canonical"],
+			["mrh-BU", ["en", "shl-MM"], "en", "shl-MM", "canonical"],
+			["yol-heploc", ["fr", "enm-alalc97"], "fr", "enm-alalc97", "canonical"],
+			["nsl-heploc", ["en", "sgn-NO-alalc97"], "en", "sgn-NO-alalc97", "canonical"],
+			// Controls: the language class alone, and the region substitution alone.
+			["mgp-BU", ["en", "mrd-BU"], "en", "mrd-BU", "canonical"],
+			["es-BU", ["en", "es-MM"], "en", "es-MM", "canonical"],
+			// Java answers nothing for the undetermined-language variant pair, bare and suffixed.
+			["und-hepburn-heploc", ["en", "und-hepburn-alalc97"], "en", null, "none"],
+			["und-hepburn-heploc-x-a", ["en", "und-hepburn-alalc97-x-a"], "en", null, "none"],
+		];
 
-			const notInClosure = [...IANA_RANGE_EQUIVALENTS.keys()].filter((key) => !closureKeys.has(key));
-			assert.deepEqual(notInClosure, [], "reduced keys absent from the closure the walk models");
+		const wrong = javaRows
+			.map(([request, catalogs, fallback, locale, matchType]) => {
+				const match = matchFor(request, catalogs, fallback, {});
+				return [request, catalogs, `${locale}/${matchType}`, `${match.locale}/${match.matchType}`];
+			})
+			.filter(([, , java, port]) => java !== port);
 
-			// For every closure key, no STRICTLY SHORTER prefix of it may exist in the reduced table:
-			// if one did, this walk would substitute there while Java's walk stopped at the longer key.
-            const shadowed = [];
-			for (const key of closureKeys) {
-				let prefix = key;
-				for (;;) {
-					const index = prefix.lastIndexOf("-");
-					if (index === -1) break;
-					prefix = prefix.slice(0, index);
-					if (IANA_RANGE_EQUIVALENTS.has(prefix)) shadowed.push([key, prefix]);
+		assert.deepEqual(wrong, [], "single-locale answers that differ from lokalized-java 3.1.0's, measured on the pinned JDK");
+	});
+
+	/**
+	 * **THE TWO DOORS AGREE ON EVERY ONE-MEMBER REQUEST, over every registry subtag.** The single-locale
+	 * door walks the PROJECTION; the whole-list door walks the FULL table through `parseLanguageRanges`.
+	 * The projection is exact AS MEASURED rather than by construction, and this is the measurement: for
+	 * every full-table key crossed with no suffix, a private-use suffix and each region/variant subtag,
+	 * normalized as a locale, each normalized member of its parse offered as a catalog beside a fallback,
+	 * both doors must select the same locale with the same match type.
+	 *
+	 * BLIND BY CONSTRUCTION to a defect in the expansion both doors share (removing the nested
+	 * region/variant step leaves this at 0 differences, measured); the Java rows above and
+	 * `test/iana-model-parity.test.js` carry that. What this catches is a PROJECTION that drops a member
+	 * a door can reach — MEASURED at design time: removing the `mgp`/`mrd` class from the identity
+	 * module alone gives 60 differing pairs here.
+	 */
+	it("the single-locale door equals the whole-list door on one-member requests", () => {
+		const suffixes = ["", "-x-a", ...decodeRegionVariantEquivalents().map(([from]) => from)];
+		const differing = [];
+		// Different keys normalize to the same request, so the loop meets many (request, catalog) pairs
+		// more than once; both doors answer a pair from those two values alone, so each is probed ONCE
+		// and `pairs` counts DISTINCT pairs — the unit the comments in `src/internal/locale.js` and
+		// `tools/lookup-diff/run.mjs` state.
+		const seen = new Set();
+		let pairs = 0;
+		let differences = 0;
+
+		for (const key of full.keys())
+			for (const suffix of suffixes) {
+				let request;
+				try { request = normalizeTag(key + suffix).toLowerCase(); } catch { continue; }
+
+				const catalogs = new Set();
+				for (const { range } of parseLanguageRanges(request))
+					try { catalogs.add(normalizeTag(range)); } catch { /* not a locale; cannot be a catalog */ }
+
+				for (const catalog of catalogs) {
+					const pair = `${request}\u0000${catalog}`;
+					if (seen.has(pair)) continue;
+					seen.add(pair);
+					const fallback = catalog.toLowerCase().startsWith("en") ? "fr" : "en";
+					/** @type {string} */
+					let single;
+					/** @type {string} */
+					let whole;
+					try {
+						const match = matchFor(request, [fallback, catalog], fallback, {});
+						single = `${match.locale}/${match.matchType}`;
+					} catch (error) { single = `threw ${/** @type {Error} */ (error).message}`; }
+					try {
+						const match = createLocaleNegotiator({ supportedLocales: [fallback, catalog], fallbackLocale: fallback })
+							.matchForLanguageRanges([{ range: request, weight: 1 }]);
+						whole = `${match.locale}/${match.matchType}`;
+					} catch (error) { whole = `threw ${/** @type {Error} */ (error).message}`; }
+					pairs += 1;
+					if (single === whole) continue;
+					differences += 1;
+					if (differing.length < 20) differing.push([request, catalog, single, whole]);
 				}
 			}
-			assert.deepEqual(shadowed, [],
-				"closure keys whose shorter prefix is in the reduced table; the reduced walk would substitute early");
-		});
+
+		assert.deepEqual(differing, [], `${differences} one-member request(s) the two doors answer differently (first 20 shown)`);
+		// MEASURED 22,493 distinct pairs (30,684 loop visits before de-duplication) at A30; a floor well
+		// below, so the anti-vacuity term fires on a broken probe rather than on a registry that shrank.
+		// This line read 22,864 until the A30 follow-up, a number neither count had ever been.
+		assert.ok(pairs >= 15_000, `only ${pairs} (request, catalog) pairs probed; the grid is not being built`);
 	});
 });

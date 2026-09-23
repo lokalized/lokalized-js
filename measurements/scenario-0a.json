@@ -8,21 +8,21 @@
   "node": [
     {
       "label": "root + raw-text catalog",
-      "modules": 31,
-      "sourceBytes": 770596,
-      "importMs": 0.43,
-      "constructionMs": 0.1847,
-      "firstRenderMs": 0.3758,
-      "retainedBytes": 70960
+      "modules": 32,
+      "sourceBytes": 770908,
+      "importMs": 0.383,
+      "constructionMs": 0.1417,
+      "firstRenderMs": 0.3248,
+      "retainedBytes": 76912
     },
     {
       "label": "core + parsed equivalent",
-      "modules": 30,
-      "sourceBytes": 759983,
-      "importMs": 0.814,
-      "constructionMs": 0.4065,
-      "firstRenderMs": 0.366,
-      "retainedBytes": 463152
+      "modules": 31,
+      "sourceBytes": 760291,
+      "importMs": 0.896,
+      "constructionMs": 0.409,
+      "firstRenderMs": 0.3443,
+      "retainedBytes": 466064
     }
   ],
   "rebaselines": [
@@ -494,6 +494,22 @@
       "growth": [
         "root + raw-text catalog: source graph grew 770591 -> 770596 bytes",
         "core + parsed equivalent: source graph grew 759978 -> 759983 bytes"
+      ]
+    },
+    {
+      "reason": "A30: +1 generated root module, src/data/iana-identity-equivalents.js (the IANA direct-match projection plus the 14 region/variant substitutions), replacing a 277-row table that was inlined in src/internal/locale.js; +77/+73 bytes net after the inline table left and the A30 docblocks arrived. The browser half is now STALE (reported, not gated)",
+      "growth": [
+        "root + raw-text catalog: source graph grew 770596 -> 770673 bytes",
+        "root + raw-text catalog: module count grew 31 -> 32",
+        "core + parsed equivalent: source graph grew 759983 -> 760056 bytes",
+        "core + parsed equivalent: module count grew 30 -> 31"
+      ]
+    },
+    {
+      "reason": "A30 follow-up: src/internal/locale.js's docblock re-states the 88 single-locale divergences from a re-measurement (22,493 door-grid pairs; mgp/mrd 28, mrh/shl 28, enm/yol 28, nsl/sgn-no 4), replacing an unreproducible 2,396-probe breakdown. +235 comment bytes; no code and no module moved",
+      "growth": [
+        "root + raw-text catalog: source graph grew 770673 -> 770908 bytes",
+        "core + parsed equivalent: source graph grew 760056 -> 760291 bytes"
       ]
     }
   ],

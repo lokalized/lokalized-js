@@ -183,7 +183,7 @@ test("the root graph carries no optional plural data", () => {
     //
     // The `from`-only walk had a silent hole, measured rather than supposed: inserting
     // `import "../data/iana-range-equivalents.js";` at the top of `src/core/index.js` left this test
-    // 4/4 GREEN and `scenario:0a` reporting 25 root modules, while the 806-class table was genuinely
+    // 4/4 GREEN and `scenario:0a` reporting 25 root modules, while the full IANA table was genuinely
     // in the root graph at runtime. Written `import { decode } from "…"` the same line WAS caught —
     // the control that makes the first measurement mean something. A dynamic `import("…")` was the
     // same hole again.
@@ -199,16 +199,17 @@ test("the root graph carries no optional plural data", () => {
       }
   }
 
-  // `data/iana-range-equivalents.js` joins the list at M7 A2: the 806-class IANA closure belongs to
-  // `lokalized/negotiate` by plan 3.1, and the root graph carries only the reduced slice inlined in
-  // `src/internal/locale.js`. Naming it here is what keeps it out — the byte ratchet would not.
+  // `data/iana-range-equivalents.js` joins the list at M7 A2: the FULL IANA language table belongs to
+  // `lokalized/negotiate` by plan 3.1 (:359, :1700), and the root graph carries only the direct-match
+  // projection — inlined in `src/internal/locale.js` until A30, `data/iana-identity-equivalents.js`
+  // since. Naming the full table here is what keeps it out — the byte ratchet would not.
   //
   // `negotiate/index.js` ITSELF joins at M9 S2, and the reason is a new import edge that did not
   // exist before: plan 3.4:904-913's `forLanguageRanges` and `forAcceptLanguage` are per-call option
   // helpers, which is exactly the shape somebody re-exports from the root for convenience. Plan
   // 3.4:933 says why not — they exist "so the browser/root graph does not contain the whole-list
-  // solver" — and the closure entry above would catch that one import and not, say, a root that
-  // re-exported the helpers while the closure moved somewhere else.
+  // solver" — and the table entry above would catch that one import and not, say, a root that
+  // re-exported the helpers while the table moved somewhere else.
   for (const forbidden of ["ordinal-rules.js", "cardinal-ranges.js", "data/ordinal.js", "data/ranges.js",
     "data/iana-range-equivalents.js", "negotiate/index.js"])
     assert.ok(
@@ -236,8 +237,8 @@ test("the root graph carries no optional plural data", () => {
   // root. Plan 3.4 requires the loaded branch to compare a loader result against "the rendering
   // core's own constants" and to fail with a ConfigurationError when they differ — so core must
   // carry the pinned `cldrVersion`/`dataFingerprint`, and threading them in from a caller would
-  // let the caller defeat the check it exists to make. 469 bytes of two strings; the 806-class
-  // tables this gate was written for are still absent, which is the property it is really pinning.
+  // let the caller defeat the check it exists to make. 469 bytes of two strings; the full IANA
+  // table this gate was written for is still absent, which is the property it is really pinning.
   //
   // 28 -> 29 at M8 S10, and the one module is `src/internal/runtime-metadata.js` (~3.4 KB, of which
   // the literals are under 200 bytes). Same trade as `provenance.js` one paragraph up, for the same
@@ -246,7 +247,14 @@ test("the root graph carries no optional plural data", () => {
   // works if the renderer is the party that holds the identity. It carries no table — seven strings
   // — and `test/runtime-metadata.test.js` pins every one of them to `package.json` or a
   // `lokalized-spec` lock, so it cannot drift into being a second source of truth.
-  assert.equal(reached.size, 31, "the root module graph changed size");
+  //
+  // 31 -> 32 at A30, and the one module is `src/data/iana-identity-equivalents.js` (~3.6 KB): the
+  // direct-match projection core's single-locale matcher walks plus the fourteen region/variant
+  // substitutions. It REPLACED a 277-row table inlined in `src/internal/locale.js` since M7 — a
+  // generated table living in hand-written source "only because this milestone ships no such
+  // module" — so the root carries LESS IANA data than before, now in the module it always belonged
+  // in, and the list below names it.
+  assert.equal(reached.size, 32, "the root module graph changed size");
 
   // The exact set of generated tables the root pulls in. `scenario:0a`'s byte ratchet is a PROXY for
   // this invariant, and a weak one: it is re-recorded whenever hand-written code legitimately grows,
@@ -264,6 +272,10 @@ test("the root graph carries no optional plural data", () => {
       "data/aliases-script.js",
       "data/aliases-variant.js",
       "data/cardinal.js",
+      // ADDED AT A30: the IANA direct-match projection and the region/variant substitutions, which
+      // core's automatic single-locale matcher reads on every request (plan 5.1). The FULL table
+      // (`data/iana-range-equivalents.js`) stays forbidden above.
+      "data/iana-identity-equivalents.js",
       "data/likely-subtags.js",
       "data/parents.js",
       // ADDED AT M8 S9, and it is not a table: 469 bytes carrying the pinned `cldrVersion` and

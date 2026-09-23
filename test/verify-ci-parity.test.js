@@ -156,7 +156,10 @@ const SPEC_GATE_EXCLUSIONS = [
   { gate: "check:registry", why: "resolves the plan through scripts/planning-path.mjs; exits 2 when it is absent" },
   { gate: "check:documentation-topics", why: "derives the obligation from the plan's milestone rows; exits 2 without it" },
   { gate: "check:parity-obligations", why: "derives plan 8.5's bullets from the plan text; exits 2 without it" },
-  { gate: "check:iana", why: "drives the pinned JDK against lokalized-java's classes; exits 1 naming the JDK path" },
+  // Since A30 `check:iana` is the JDK CHECK on data a JDK-free generator produced (that generator's
+  // own `--check` is `check:iana-registry`, which CI runs). Re-measured 2026-09-23: exit 2, status
+  // `cannot-run`, naming the JDK path — it used to exit 1.
+  { gate: "check:iana", why: "drives the pinned JDK against lokalized-java's classes and the registry-generated artifact; exits 2 (status cannot-run) naming the JDK path" },
   { gate: "check:vectors", why: "drives the pinned JDK to re-emit the corpus; exits 1 naming the JDK path" },
   { gate: "check:datalock", why: "hashes real source files out of the sibling lokalized-java, which CI does not check out; exits 1 with ENOENT naming GeneratedCldrLocaleData.java" },
 ];

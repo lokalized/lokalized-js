@@ -39,9 +39,10 @@ minification into whatever a consumer bundles.
 IANA language range equivalents
 -------------------------------
 
-`src/data/iana-range-equivalents.js` is NOT CLDR data. It encodes the language
-range equivalence closure that lokalized-java applies, generated from a pinned
-IANA Language Subtag Registry snapshot. See THIRD-PARTY-NOTICES.md.
+`src/data/iana-range-equivalents.js` and `src/data/iana-identity-equivalents.js`
+are NOT CLDR data. They encode the language range equivalences lokalized-java
+applies, generated without a JDK from a pinned IANA Language Subtag Registry
+snapshot. See THIRD-PARTY-NOTICES.md.
 
 minimal-json
 ------------

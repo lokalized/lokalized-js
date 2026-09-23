@@ -31,12 +31,21 @@ own.
 
 ## IANA language range equivalents
 
-`src/data/iana-range-equivalents.js` is generated and is NOT CLDR data. It encodes 818 language
-range equivalence classes, recorded by exhaustively probing lokalized-java 3.1.0-SNAPSHOT's own
-equivalence table; the values are that library's, and the tags probed were drawn from the CLDR data
-above together with the library's own table keys. That table is generated from the IANA Language
-Subtag Registry snapshot pinned at File-Date 2026-09-17, so this artifact is anchored to a registry
-release rather than to a JDK build, and it records that date.
+`src/data/iana-range-equivalents.js` and `src/data/iana-identity-equivalents.js` are generated and
+are NOT CLDR data. They are derived from the IANA Language Subtag Registry.
+
+Source: https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
+
+Pinned snapshot: File-Date `2026-09-17`, SHA-256
+`755fad43283be7b41ebe3c89ad054b6eaf928f404f9c0edb74799e0eab74beb1`.
+
+Derived from it: the first module encodes 781 language subtags in 369 equivalence classes; the
+second encodes the subset core's single-locale matcher reads (243 subtags in 115 classes) together
+with the 14 region and variant substitutions. Both are generated with no JDK, through
+lokalized-spec's `generated/iana-language-equivalences.json`, and each module records the
+snapshot's File-Date and SHA-256. The order in which the region and variant substitutions are tried
+is not stated by the registry; it follows the JDK's own table, so that answers agree with
+lokalized-java's.
 
 ## minimal-json
 

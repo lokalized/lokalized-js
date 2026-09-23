@@ -30,8 +30,8 @@
         "specifier": "lokalized",
         "file": "dist/browser/lokalized.js",
         "files": 1,
-        "rawBytes": 188097,
-        "brotliBytes": 55763,
+        "rawBytes": 183771,
+        "brotliBytes": 54701,
         "exports": 70,
         "loadedInBrowser": true
       },
@@ -39,8 +39,8 @@
         "specifier": "lokalized/core",
         "file": "dist/browser/core.js",
         "files": 7,
-        "rawBytes": 187268,
-        "brotliBytes": 55554,
+        "rawBytes": 182951,
+        "brotliBytes": 54683,
         "exports": 21,
         "loadedInBrowser": true
       },
@@ -48,8 +48,8 @@
         "specifier": "lokalized/parse",
         "file": "dist/browser/parse.js",
         "files": 5,
-        "rawBytes": 163391,
-        "brotliBytes": 49628,
+        "rawBytes": 159124,
+        "brotliBytes": 48596,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -57,8 +57,8 @@
         "specifier": "lokalized/load",
         "file": "dist/browser/load.js",
         "files": 7,
-        "rawBytes": 181849,
-        "brotliBytes": 54637,
+        "rawBytes": 177534,
+        "brotliBytes": 53636,
         "exports": 10,
         "loadedInBrowser": true
       },
@@ -75,8 +75,8 @@
         "specifier": "lokalized/negotiate",
         "file": "dist/browser/negotiate.js",
         "files": 3,
-        "rawBytes": 111001,
-        "brotliBytes": 34910,
+        "rawBytes": 89117,
+        "brotliBytes": 31204,
         "exports": 6,
         "loadedInBrowser": true
       },
@@ -84,8 +84,8 @@
         "specifier": "lokalized/data/ordinal",
         "file": "dist/browser/data/ordinal.js",
         "files": 8,
-        "rawBytes": 193976,
-        "brotliBytes": 57162,
+        "rawBytes": 189659,
+        "brotliBytes": 56140,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -93,12 +93,14 @@
         "specifier": "lokalized/data/ranges",
         "file": "dist/browser/data/ranges.js",
         "files": 8,
-        "rawBytes": 196504,
-        "brotliBytes": 57240,
+        "rawBytes": 192187,
+        "brotliBytes": 56255,
         "exports": 2,
         "loadedInBrowser": true
       }
     ],
-    "sizesRecordedFor": "version 0.0.0 -> 1.0.0-rc.1 for the first publish: producerVersion is a source string in every browser bundle, so every entry grew by exactly 5 raw bytes"
+    "sizesRecordedFor": "A30 follow-up: a comment-only edit to src/internal/locale.js renamed the content-hashed chunks the split entries import (measured: identical minified bytes, different chunk names), so six entries' brotli sizes moved while every raw size stayed put; the browser capture was NOT re-driven",
+    "capturedAgainst": null,
+    "capturedAgainstNote": "The browser half was captured before this field existed: the record first carries it at lokalized-js e702166 (2026-09-19), and its size columns have been re-recorded since through --write, which does not re-drive the browser (M-R S13, M-R S14, 1.0.0-rc.1, A30, and the A30 follow-up named in sizesRecordedFor). Nothing records a re-drive, so the capture is not known to describe any bundle this tarball carries."
   }
 }

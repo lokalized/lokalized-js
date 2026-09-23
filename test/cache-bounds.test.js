@@ -4,10 +4,10 @@
  * CACHE BOUNDS UNDER ADVERSARIAL TAGS — the M7 row's "cache bounds survive adversarial tags".
  *
  * WHAT IS ACTUALLY CACHED, enumerated rather than assumed. M7-PLAN.md's C2 row says "no tag-keyed
- * cache exists today"; that is stale, and this file is the correction. Exactly FOUR things in
+ * cache exists today"; that is stale, and this file is the correction. Exactly THREE things in
  * `src/` GROW AT RUNTIME — re-derived by reading every module-scope `Map`/`Set` in the package and
- * every closure that outlives a call, not by trusting an earlier list — and only the third was added
- * by M7. (The other memos in the port are per-CALL and retain nothing between calls: `projectNode`'s
+ * every closure that outlives a call, not by trusting an earlier list. (There were four until A30:
+ * see the note between items 2 and 3.) (The other memos in the port are per-CALL and retain nothing between calls: `projectNode`'s
  * in `src/parse/index.js`, the `built`/`validatedDepth` pair threaded through
  * `src/internal/catalog.js`'s builder, and the `expanded` map plus `IsolatedValue.rendered` inside
  * one `render()` in `src/internal/interpolate.js`. Everything else at module scope — the RTL script
@@ -28,11 +28,12 @@
  *      instead is the property that actually protects anything and that a probe can see — the
  *      UNSUPPORTED tag space, which is the one an attacker can spell without limit, cannot grow
  *      retained memory. That ablation now fails.
- *   3. `src/negotiate/index.js` `RECOVERED_LANGUAGE_EQUIVALENTS` — added by M7 A4. NOT keyed on
- *      caller input: its keys are prefixes found in the pinned 806-class IANA closure, so its size
- *      is bounded by the artifact and an attacker cannot add a key. It carries no eviction and needs
- *      none; that is a property of the key space, and it is asserted below rather than argued.
- *   4. `src/core/index.js`'s `chainMemo` — added by M9 S5, plan 2.2:150's blessed candidate-chain
+ *      (`src/negotiate/index.js`'s `RECOVERED_LANGUAGE_EQUIVALENTS` was the third until A30: a memo
+ *      of language equivalents recovered from the probed closure, keyed only by artifact keys. A30
+ *      replaced the closure with registry classes the parse reads directly, so there is nothing to
+ *      recover and the memo is gone; both IANA tables are now decoded once at module load and never
+ *      written to again, like every other pinned table.)
+ *   3. `src/core/index.js`'s `chainMemo` — added by M9 S5, plan 2.2:150's blessed candidate-chain
  *      LRU. ONE PER `Strings` INSTANCE, keyed on the normalized lookup tag, which IS caller input —
  *      so it carries a hard 256-entry ceiling with strict-LRU eviction, and its whole contract is
  *      gated by `test/candidate-chain-memo.test.js`, including a 4,096-tag sweep, the surviving key
@@ -186,10 +187,10 @@ describe("cache bounds survive adversarial tags", () => {
     assert.equal(cardinalityForNumber(2, "cy").name, "CARDINALITY_TWO");
   });
 
-  it("the negotiator's IANA recovery memo is keyed by the PINNED closure, not by caller input", async () => {
-    // Its keys come from `RANGE_EQUIVALENTS.get(prefix)` succeeding, so only the 806 artifact keys
-    // can ever be inserted. Sweeping ranges that are NOT in the closure must therefore add nothing —
-    // which is why it needs no eviction while the two above do.
+  it("the negotiator's IANA tables are fixed at module load, whatever a caller sends", async () => {
+    // Since A30 both IANA tables are decoded once and only read, so there is no key a caller can add.
+    // This sweep is what would notice a future memo keyed on caller input creeping into the parse —
+    // which is the shape the recovery memo it replaced had, bounded then only by the artifact's keys.
     const { createLocaleNegotiator } = await import("../src/negotiate/index.js");
     const negotiator = createLocaleNegotiator({
       fallbackLocale: "en",
@@ -200,7 +201,7 @@ describe("cache bounds survive adversarial tags", () => {
     for (let index = 0; index < 4096; index++)
       negotiator.bestMatchForLanguageRanges([{ range: `qaa-x-r${index % 26}${index}`, weight: 1 }]);
 
-    // A range that IS in the closure still answers correctly afterwards.
+    // A range that IS in the table still answers correctly afterwards.
     assert.equal(negotiator.bestMatchForAcceptLanguage("iw"), "en");
     assert.equal(negotiator.bestMatchForAcceptLanguage("fr-CA"), "fr");
   });

@@ -888,10 +888,11 @@ function phoneticResolverFor(spec) {
  * vocabulary, not library API — `languageRangeFrom` in `lokalized/negotiate` requires the object
  * form deliberately — so the translation belongs here, on the runner's side of the line.
  *
- * A HEADER STRING is not decoded here and never will be: `Locale.LanguageRange.parse` expands the
- * pinned IANA closure (measured on the pinned Corretto 21: `parse("iw")` is `[iw, he]`,
- * `parse("sgn-BE-FR")` is `[sgn-be-fr, sgn-sfb, sfb, sgn-be-fx]`), so a runner that split on commas
- * would be inventing a different answer and calling it the port's.
+ * A HEADER STRING is not decoded here and never will be: the oracle parses it with lokalized-java's
+ * public `LocaleMatcher#parseLanguageRanges` (since amendment A30; `LanguageRange.parse` before), which
+ * expands the pinned IANA registry's equivalences (`parse("iw")` is `[iw, he]`, `parse("sgn-BE-FR")`
+ * is `[sgn-be-fr, sgn-sfb, sfb, sgn-be-fx]`), so a runner that split on commas would be inventing a
+ * different answer and calling it the port's.
  */
 const rangeMemberFrom = (element) =>
   typeof element === "string" ? { range: element, weight: 1 } : { range: element.range, weight: element.weight };
@@ -2953,10 +2954,12 @@ function callOptionsFor(input, strings) {
     // Marked BEFORE any decision about them, cleared only where they are genuinely delivered below.
     undeliveredSelectionIds.add(currentCaseId);
 
-    // A HEADER STRING goes through `Locale.LanguageRange.parse`, ported in A4 -- never through a
-    // comma split here, which would be this runner inventing a range list and attributing it to the
-    // port: the parser applies the pinned IANA closure, so `"iw"` is `[iw, he]` and `"sgn-BE-FR"` is
-    // four members, and it refuses shapes a split would happily accept.
+    // A HEADER STRING goes through the port's `parseLanguageRanges`, ported in A4 and re-aimed at A30
+    // to lokalized-java's `LocaleMatcher#parseLanguageRanges`, which is what the oracle now calls
+    // here -- never through a comma split, which would be this runner inventing a range list and
+    // attributing it to the port: the parser applies the pinned IANA registry's equivalences, so
+    // `"iw"` is `[iw, he]` and `"sgn-BE-FR"` is four members, and it refuses shapes a split would
+    // happily accept.
     if (!negotiateApi?.createLocaleNegotiator || !negotiateApi?.parseLanguageRanges)
       unsupported("createLocaleNegotiator is not implemented");
 

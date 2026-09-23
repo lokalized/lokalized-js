@@ -157,44 +157,50 @@
     },
     {
       "reason": "M-R S24: two shipped docblocks still said ianaRegistryDate is 'NOT A DATE' / 'jdk-oracle:21.0.11'; it has been the pinned registry's File-Date since M-R S11. Comment text only: negotiate +11 bytes, load shorter."
+    },
+    {
+      "reason": "A30: the IANA data is generated from the pinned registry snapshot. +1 generated root module in every subpath reaching the kernel (src/data/iana-identity-equivalents.js: the direct-match projection plus the 14 region/variant substitutions, replacing a 277-row table inlined in src/internal/locale.js); negotiate's full table re-encoded as 369 classes (297,927 -> 268,076 B there); net growth elsewhere is docblock prose recording the change"
+    },
+    {
+      "reason": "A30 follow-up: src/internal/locale.js's docblock re-states the 88 single-locale divergences from a re-measurement (22,493 door-grid pairs; mgp/mrd 28, mrh/shl 28, enm/yol 28, nsl/sgn-no 4), replacing an unreproducible 2,396-probe breakdown. +235 comment bytes; no code and no module moved"
     }
   ],
   "subpaths": {
     "lokalized": {
-      "modules": 31,
-      "bytes": 770596
+      "modules": 32,
+      "bytes": 770908
     },
     "lokalized/core": {
-      "modules": 30,
-      "bytes": 759983
+      "modules": 31,
+      "bytes": 760291
     },
     "lokalized/parse": {
-      "modules": 29,
-      "bytes": 577244
+      "modules": 30,
+      "bytes": 579162
     },
     "lokalized/load": {
-      "modules": 38,
-      "bytes": 663976
+      "modules": 39,
+      "bytes": 664405
     },
     "lokalized/ssr": {
       "modules": 3,
       "bytes": 33699
     },
     "lokalized/negotiate": {
-      "modules": 16,
-      "bytes": 297927
+      "modules": 17,
+      "bytes": 268311
     },
     "lokalized/node": {
-      "modules": 41,
-      "bytes": 698508
+      "modules": 42,
+      "bytes": 698934
     },
     "lokalized/data/ordinal": {
-      "modules": 33,
-      "bytes": 790322
+      "modules": 34,
+      "bytes": 790634
     },
     "lokalized/data/ranges": {
-      "modules": 33,
-      "bytes": 795195
+      "modules": 34,
+      "bytes": 795507
     }
   }
 }

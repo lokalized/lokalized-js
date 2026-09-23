@@ -31,8 +31,9 @@ export const withoutComments = (text) =>
  *
  * `from "…"` alone is NOT enough, and the gap was silent rather than theoretical. Measured: inserting
  * `import "../data/iana-range-equivalents.js";` at the top of `src/core/index.js` left this walk
- * reporting 25 root modules and `test/pinned-data-only.test.js` 4/4 GREEN, while the 23 KB 806-class
- * table was genuinely in the root graph at runtime — the containment claim these gates exist to make.
+ * reporting 25 root modules and `test/pinned-data-only.test.js` 4/4 GREEN, while the full IANA table
+ * (23 KB and 806 classes as it then was) was genuinely in the root graph at runtime — the containment
+ * claim these gates exist to make.
  * The same line written `import { decode } from "…"` was caught, which is the control that makes the
  * first measurement mean something. A dynamic `import("…")` had the identical hole.
  *

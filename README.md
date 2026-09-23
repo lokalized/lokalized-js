@@ -709,9 +709,10 @@ catalogs from disk rather than over HTTP.
 
 ## Negotiating from `Accept-Language`
 
-`lokalized/negotiate` carries the full RFC 4647 solver — q-values, wildcards, and the pinned IANA
-equivalence closure. It is a **separate entry point on purpose**: the tables it needs are large, and
-keeping them out of the rendering graph is the reason you can ship the core to a browser.
+`lokalized/negotiate` carries the full RFC 4647 solver — q-values, wildcards, and the full IANA
+language-equivalence table generated from the pinned registry. It is a **separate entry point on
+purpose**: the whole-list solver is large, and keeping it out of the rendering graph is the reason you
+can ship the core to a browser.
 
 <!-- example: negotiate -->
 
@@ -2166,24 +2167,35 @@ against locales it did not download, while `getSupportedLocales()` is what arriv
 And `ianaRegistryDate` **is** the `File-Date` of the pinned IANA Language Subtag Registry snapshot
 this build was published against. It is provenance, not the data: two deployments could share a
 File-Date and still carry different language-range behaviour, which is what `ianaDataFingerprint` is
-for — that one fingerprints the closure itself, and the two are compared together.
+for — that one fingerprints the data itself, and the two are compared together.
 
-What the closure actually *is* deserves saying plainly, because the date alone implies more than it
-should. The equivalence data is **`lokalized-java`'s own registry-sourced table**, not the JDK's:
-as of lokalized-java 3.1.0 the library generates that table from the pinned registry snapshot
-rather than calling `java.util.Locale.LanguageRange.parse`, and this package's closure is derived
-by probing the library. Answering as `lokalized-java` answers is still the whole point — what
-changed is that `lokalized-java` stopped deferring to whichever registry snapshot happened to be
-baked into the running JVM.
+What the data actually *is* deserves saying plainly. The language-range equivalences are
+**generated from that registry snapshot, with no JDK**, by rules the spec states and publishes with
+the data: which registry tags are equivalent, the order each class is expanded in, and the region and
+variant substitutions (`-DE` and `-DD`, `-heploc` and `-alalc97`). The one thing the registry does
+not state is the order in which those substitutions are tried, so that order is written down once,
+taken from the JDK's own table so the answers agree with Java's. `lokalized-java` 3.1.0 generates
+its default table from the same snapshot, and the spec checks the two equal entry by entry, and the
+substitution order pair by pair. The JDK and the Java library are checks on the data, not its source.
 
-The registry and the shipped closure still differ, and every difference is enumerated and verified
-by reconstruction: applying those overrides to the registry's own closure reproduces the shipped
-one byte for byte. So the snapshot is a real, checkable anchor rather than a label.
+So `parseLanguageRanges` expands a range the same way on every runtime:
 
-The shipped closure and the JDK's own table disagree on a small, named set — `bh`/`bih`,
-`enm`/`yol`, `mgp`/`mrd`, `mrh`/`shl`, `dyl`/`sgn-dyl` and `zhk`/`sgn-zhk` — which is exactly the
-point of the change: a language deprecated after your JVM's bundled registry snapshot now resolves
-to its preferred form regardless of which JVM you run.
+<!-- example: iana-registry -->
+
+```js
+import { parseLanguageRanges } from "lokalized/negotiate";
+
+parseLanguageRanges("iw").map((range) => range.range);       // => ["iw", "he"]
+parseLanguageRanges("yol").map((range) => range.range);      // => ["yol", "enm"]
+parseLanguageRanges("de-DE").map((range) => range.range);    // => ["de-de", "de-dd"]
+```
+
+That is `lokalized-java`'s `LocaleMatcher#parseLanguageRanges` on its default setting. Java's own
+`Locale.LanguageRange.parse` reads the running JDK's table instead, and JDK 21's lacks twelve
+registry tags — `bh`/`bih`, `enm`/`yol`, `mgp`/`mrd`, `mrh`/`shl`, `dyl`/`sgn-dyl` and
+`zhk`/`sgn-zhk` — so on JDK 21 it answers `["yol"]` for the second line. `lokalized-java` can be
+switched back to the JDK's table (`Strings.Builder#languageRangeEquivalents`); this package has no
+such switch, because a JavaScript "JDK" table could only ever be JDK 21's, frozen.
 
 ---
 
@@ -2890,9 +2902,9 @@ caught as a fingerprint mismatch rather than going unnoticed.
 
 **A manifest carries all seven identity fields, and so does the SSR stamp. A `LoadedStrings` record
 carries two.** The manifest used to carry two as well, and the consequence was sharp enough to be
-worth remembering: two builds differing only in their pinned IANA closure published manifests that
+worth remembering: two builds differing only in their pinned IANA data published manifests that
 were indistinguishable and loaded each other's without complaint. Range equivalence and whole-list
-matching come from that closure, so the two builds could negotiate the same visitor to different
+matching come from that data, so the two builds could negotiate the same visitor to different
 catalogs while every file digest matched. The manifest door now compares all seven **before any
 I/O**, and the mismatch is refused with a sentence naming which pair disagreed.
 
@@ -2974,11 +2986,11 @@ second table. Both columns are re-derived on every run, so they describe this co
 
 | import | minified | brotli |
 |---|---|---|
-| `import { createStrings } from "lokalized"` | 185,096 | 54,844 |
-| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 109,870 | 34,329 |
+| `import { createStrings } from "lokalized"` | 180,770 | 53,949 |
+| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 87,962 | 30,674 |
 | `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,630 | 2,002 |
 | `import { GENDER_FEMININE } from "lokalized"` | 2,350 | 914 |
-| the four above, in one bundle | 243,178 | 67,942 |
+| the four above, in one bundle | 221,271 | 64,215 |
 <!-- bundle-table:end -->
 
 <!-- dist-table:start -->
@@ -2988,15 +3000,15 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 
 | load | files | raw | brotli |
 |---|---|---|---|
-| `lokalized` | 1 | 188,097 | 55,763 |
-| `lokalized/core` | 7 | 187,268 | 55,554 |
-| `lokalized/parse` | 5 | 163,391 | 49,628 |
-| `lokalized/load` | 7 | 181,849 | 54,637 |
+| `lokalized` | 1 | 183,771 | 54,701 |
+| `lokalized/core` | 7 | 182,951 | 54,683 |
+| `lokalized/parse` | 5 | 159,124 | 48,596 |
+| `lokalized/load` | 7 | 177,534 | 53,636 |
 | `lokalized/ssr` | 2 | 7,186 | 2,246 |
-| `lokalized/negotiate` | 3 | 111,001 | 34,910 |
-| `lokalized/data/ordinal` | 8 | 193,976 | 57,162 |
-| `lokalized/data/ranges` | 8 | 196,504 | 57,240 |
-| `lokalized.global.js`, the classic script | 1 | 264,053 | 72,257 |
+| `lokalized/negotiate` | 3 | 89,117 | 31,204 |
+| `lokalized/data/ordinal` | 8 | 189,659 | 56,140 |
+| `lokalized/data/ranges` | 8 | 192,187 | 56,255 |
+| `lokalized.global.js`, the classic script | 1 | 242,146 | 68,469 |
 <!-- dist-table:end -->
 
 **What a no-build page downloads.** The table above is what a bundler produces from the source; this
@@ -3014,9 +3026,9 @@ larger, so a figure quoted in it overstates what a visitor on a modern CDN actua
 not printed here, because a number nothing re-derives is how this section came to be wrong before.
 
 Three things are worth reading off that table. **Half of the root bundle is one pinned CLDR table** —
-replacing `likely-subtags` with an empty one takes the same bundle from 185,096 to 162,167 minified
+replacing `likely-subtags` with an empty one takes the same bundle from 180,770 to 157,841 minified
 bytes, which is the price of resolving `fr-CH` to `fr` without asking the host. **The tables are
-shared, not duplicated**: adding three more subpaths to the root costs 58,082 bytes, not another
+shared, not duplicated**: adding three more subpaths to the root costs 40,501 bytes, not another
 whole copy. And **`lokalized/ssr` carries no pinned data at all**, which is what lets the stamp
 module sit in a page that does no matching.
 
@@ -3040,7 +3052,7 @@ Object.keys(await import("lokalized/ssr"));   // => ["createSsrStamp", "validate
 ```
 
 `sideEffects` is declared `false` and bundlers honour it — removing that field takes the
-single-constant import from 2,350 to 78,587 minified bytes, 33× larger.
+single-constant import from 2,350 to 78,537 minified bytes, 33× larger.
 
 ---
 
@@ -3061,6 +3073,8 @@ already not loading them; if it names them from `toLanguageTag()`, they move ove
 | `Strings.Builder(...)...build()` | one options object: `createStrings({ … })` |
 | `Strings` **is a** `LocaleMatcher` | matching is a separate module: `createLocaleNegotiator(strings.getLocaleConfiguration())` |
 | `matchFor(Locale)` / `matchFor(List<LanguageRange>)` overloads | two names: `matchFor(tag)` and `matchForLanguageRanges(ranges)` |
+| `parseLanguageRanges(String)` on the default `LanguageRangeEquivalents.IANA_REGISTRY` | `parseLanguageRanges(header)` from `lokalized/negotiate`, the same registry table |
+| `Strings.Builder#languageRangeEquivalents(JDK)` | no counterpart — there is no JDK here to defer to |
 | `.localeSupplier(matcher -> …)` | `localeResolver`, called with **no arguments** — close over a negotiator instead |
 | `Optional<T>` | `null` |
 | enum constants | kebab-case strings for statuses and reasons; frozen records for language forms |
@@ -3298,7 +3312,7 @@ Every entry point is a separate subpath so you only pay for what you import.
 | `lokalized/parse` | `parseStrings`, `defineLocalizedString`, `defineCatalog`, `mergeParsedStringsFiles` |
 | `lokalized/load` | Manifest parsing, digest-verified fetching, catalog identity |
 | `lokalized/node` | Directory and file loaders, and the manifest generator |
-| `lokalized/negotiate` | The whole-list `Accept-Language` solver and the IANA closure |
+| `lokalized/negotiate` | The whole-list `Accept-Language` solver and the full IANA language table |
 | `lokalized/ssr` | The server-render stamp, for handing a verified catalog identity to the client |
 | `lokalized/data/ordinal` | Ordinal ("1st", "2nd") classification data — opt-in |
 | `lokalized/data/ranges` | Cardinal-range ("1–3 books") data — opt-in |

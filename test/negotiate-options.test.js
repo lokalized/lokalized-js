@@ -7,8 +7,8 @@
  * them on this subpath rather than on core: plan 3.4:933 — "`forLanguageRanges` and
  * `forAcceptLanguage` negotiate immediately and return core `localeMatch` options, so the
  * browser/root graph does not contain the whole-list solver." The alternative shape, handing core a
- * MATCHER and letting core call it, drags this module and its 806-class IANA closure into every
- * graph that can render.
+ * MATCHER and letting core call it, drags this module and its full IANA language table (and the
+ * whole-list solver) into every graph that can render.
  *
  * **AND THE TWO DOORS ONTO `Accept-Language` DISAGREE ON PURPOSE.** `bestMatchForAcceptLanguage`
  * fabricates: unusable input answers the configured fallback TAG. `forAcceptLanguage` does not:

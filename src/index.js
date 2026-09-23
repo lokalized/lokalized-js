@@ -22,7 +22,7 @@ export { createStrings } from "./core/index.js";
 // does not move. (It said "stays 25 root / 24 core" until 2026-09-17; the proposition held and the
 // figure had not been re-read since M2.) That is the half of the ratchet that keeps
 // `lokalized/negotiate` and its
-// 806-class IANA table out of the browser graph, and the chooser exists precisely so a browser does
+// full IANA language table out of the browser graph, and the chooser exists precisely so a browser does
 // not have to pull them in to pick a locale.
 export { chooseBrowserLocale, chooseLocaleForPreferredLanguages } from "./core/index.js";
 

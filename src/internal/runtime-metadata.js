@@ -16,7 +16,7 @@
  * holding the identity — so these live here, travel out through `getLoadVerification()`, and
  * `src/ssr/index.js` declares no constant of its own.
  *
- * ONE FIELD DIVERGES FROM THE PLAN AND IT IS A DECISION, NOT AN OVERSIGHT — see `ianaRegistryDate`.
+ * `ianaRegistryDate` DIVERGED FROM THE PLAN FOR A WHILE and no longer does — see its docblock.
  */
 
 /**
@@ -42,8 +42,10 @@ export const RUNTIME_METADATA = Object.freeze({
   // reads `package.json` so that cannot happen quietly.
   producerVersion: "1.0.0-rc.1",
 
-  // `lokalized-spec generated/behavioral-vectors.json`'s own `behavioralVectorsVersion`.
-  behavioralVectorsVersion: "1.0.0",
+  // `lokalized-spec generated/behavioral-vectors.json`'s own `behavioralVectorsVersion`. 1.1.0 since
+  // amendment A30: plan :2619 says a Java semantic change updates the vectors and this version in the
+  // same change, and A30 moved two recorded answers (`iana-equivalence.registry-gap.{mgp,yol}-ranges`).
+  behavioralVectorsVersion: "1.1.0",
 
   // Plan 5.1 declares both as root metadata for THIS build: the port classifies from pinned CLDR
   // data and its selectors are the exact digit-string/BigInt interpreter, never `Intl`. They are
@@ -53,63 +55,35 @@ export const RUNTIME_METADATA = Object.freeze({
   cardinalityMode: /** @type {const} */ ("exact"),
 
   /**
-   * **A RECORDED DIVERGENCE FROM PLAN 5.1, and it is the spec's decision rather than this port's.**
+   * The `File-Date` of the pinned IANA Language Subtag Registry snapshot — plan 5.1's definition,
+   * and since amendment A30 the whole of the data's provenance rather than a label beside it.
    *
-   * Plan 5.1 defines this field as "`File-Date` of the pinned IANA Language Subtag Registry
-   * snapshot". There is no such snapshot: `lokalized-spec generated/IANA-PROVENANCE.md:21` records
-   * that the range-equivalence closure is derived "directly from the JDK oracle by exhaustive probe"
-   * instead, and stated the cost in its own words — "`ianaRegistryFileDate` is `null`. The artifact
-   * is pinned to a JDK build, not to a registry release."
+   * **THE DATA IS GENERATED FROM THAT SNAPSHOT, WITH NO JDK.** lokalized-spec's
+   * `tools/iana-oracle/generate.mjs` reads `tools/iana-oracle/language-subtag-registry.txt`
+   * (`File-Date: 2026-09-17`, 9,296 records, sha256 `755fad43…`) plus ONE authored input — the order of
+   * the fourteen region/variant substitutions, `tools/iana-oracle/jdk-compatibility.json` — and emits
+   * `generated/iana-language-equivalences.json`, which `tools/gen-iana-data.js` encodes into
+   * `src/data/iana-{range,identity}-equivalents.js`. The JDK and lokalized-java are CHECKS on that
+   * output (`npm run check:iana` in the spec), not its source. Before A30 the table was recorded by
+   * probing an implementation — first the JDK, then lokalized-java — and this field spent a slice
+   * reading `jdk-oracle:21.0.11` because no snapshot existed to date it.
    *
-   * **THAT WAS TRUE UNTIL M-R S11, AND THE MAINTAINER DECIDED THE SPELLING THIS DOCBLOCK RECORDED
-   * AS OWED.** The registry snapshot §5.1 always wanted is now pinned —
-   * `lokalized-spec/tools/iana-oracle/language-subtag-registry.txt`, `File-Date: 2026-09-17`, 9,296
-   * records, sha256 `755fad43…` — so a real date exists to report and this field reports it, which
-   * is what plan 7.3 defines the field as.
+   * **WHY THE DATE IS SAFE TO COMPARE EVEN THOUGH IT DOES NOT DETERMINE THE DATA.** Two builds could
+   * share this File-Date and differ in the authored region/variant order. That is what
+   * `ianaDataFingerprint` is for: plan 5.1 :1680-1682 fingerprints the lock's projection, which binds
+   * the snapshot's digest, the compatibility input's digest and the artifact's digest together. The
+   * date is provenance; the fingerprint is the data.
    *
-   * **AND AS OF M-R S13 THE CLOSURE IS NOT THE JDK'S EITHER.** This paragraph used to open "THE
-   * CLOSURE IS STILL THE JDK'S, AND NOTHING HERE PRETENDS OTHERWISE" and it outlived its own fact
-   * by one slice: lokalized-java 3.1.0 carries a registry-sourced table and the pinned closure is
-   * now derived by probing THE LIBRARY. Parity with lokalized-java is still the product, so the
-   * behaviour tracks the reference implementation as it always did — what changed is which
-   * implementation the data is read out of. `generated/iana-registry-overrides.json` enumerates the
-   * 130 places the registry and the SHIPPED closure still disagree (it was 156 against the JDK's,
-   * and that number was stale here too), verified by RECONSTRUCTION — applying them to the registry
-   * closure reproduces the shipped artifact byte-identically — and `ianaClosureSource` below names
-   * the build those overrides were measured against.
-   *
-   * **WHY THE DATE IS SAFE TO COMPARE EVEN THOUGH IT DOES NOT DETERMINE THE CLOSURE.** Two builds
-   * could share this File-Date and carry different overrides. That is what `ianaDataFingerprint` is
-   * for: it fingerprints the closure itself, so the pair discriminates where the date alone would
-   * not. The date is provenance; the fingerprint is the data.
-   *
-   * The old value was `jdk-oracle:21.0.11`, and "oracle" there was the TESTING term — a reference
-   * implementation to compare against — never Oracle Corporation. No Oracle software is involved
-   * anywhere in this project: the JDK is Amazon Corretto, a build of OpenJDK under GPLv2 with the
-   * Classpath Exception, which this package neither ships nor links. The maintainer read it as the
-   * vendor, which is the second time a reader has, and that is reason enough for it to leave a wire
-   * value that ships to every consumer.
+   * "oracle", in this project's older texts, was the TESTING term — a reference implementation to
+   * compare against — never Oracle Corporation. No Oracle software is involved anywhere in this
+   * project: the JDK used for checks is Amazon Corretto, a build of OpenJDK under GPLv2 with the
+   * Classpath Exception, which this package neither ships nor links.
    */
   ianaRegistryDate: "2026-09-17",
 
-  /**
-   * The build the equivalence closure was measured against, and the overrides recorded for.
-   *
-   * **IT READ `jdk-corretto:21.0.11` AFTER THE ORACLE STOPPED BEING THE JDK, and nothing could see
-   * it.** These constants are hand-copied out of `lokalized-spec`'s artifacts with a comment naming
-   * where each came from, and no gate compared them to those artifacts — so the one field whose
-   * whole job is to say which implementation produced the closure went on naming the wrong one.
-   * `test/runtime-metadata.test.js` now derives all three from the spec, which is the repair; the
-   * corrected value is the same fix the artifact got, which records `libraryVersion` rather than
-   * leaving a consumer to guess which build of the library answered.
-   *
-   * INFORMATIONAL, and deliberately NOT part of the manifest's compared build-identity set: a
-   * different oracle produces a different closure, and `ianaDataFingerprint` already refuses that
-   * pairing. Adding an eighth compared field would be a second format change buying nothing the
-   * fingerprint does not already catch.
-   */
-  ianaClosureSource: "lokalized-java:3.1.0-SNAPSHOT",
-
-  // `lokalized-spec generated/iana-data-lock.json`'s `ianaDataFingerprint`.
-  ianaDataFingerprint: "42a658b350903ec3697499ecce103a08021cc4588ef60014045cf391786073c0",
+  // `lokalized-spec generated/iana-data-lock.json`'s `ianaDataFingerprint` (lock format 2), which
+  // `test/runtime-metadata.test.js` RECOMPUTES from the lock's plan :1680-1682 projection rather than
+  // copying. It moved at A30, so a manifest or SSR stamp produced by 1.0.0-rc.1 is refused by this
+  // build: its IANA data is different, which is what the fingerprint exists to say.
+  ianaDataFingerprint: "87b3a43b03f490206cead05d865357bd7cfc3953a52ec4d8405243f699385815",
 });

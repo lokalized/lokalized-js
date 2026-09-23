@@ -29,15 +29,25 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { IANA_SPEC_FILES } from "./iana-artifact.mjs";
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const spec = join(root, "..", "lokalized-spec");
 const ref = process.env.SPEC_REPO_REF || "(the workflow default)";
 
-/** The artifacts the gates actually read. Absent means the REF is wrong, not that the spec is broken. */
+/**
+ * The artifacts the gates actually read. Absent means the REF is wrong, not that the spec is broken.
+ *
+ * The IANA half comes from `tools/iana-artifact.mjs`, the one place every IANA reader here takes its
+ * paths from. It named the retired 818-entry closure until A30, and two of its readers degraded
+ * SILENTLY when that file moved — so the list a checkout is held to is the list the readers import.
+ */
 const REQUIRED = [
   "generated/behavioral-vectors.json",
-  "generated/iana-language-range-equivalents.json",
+  ...IANA_SPEC_FILES,
   "symbol-allowlist.json",
+  // `tools/divergences.mjs` takes its declined-Java-API rows from it (A30's declined JDK setting).
+  "java-surface-amendments.json",
   "vendor/lokalized-java/src/build/resources/cldr/cldr-conformance-vectors.json",
   "vendor/lokalized-java/src/build/resources/cldr/cldr-locale-data.json",
 ];

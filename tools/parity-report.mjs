@@ -102,11 +102,9 @@ const referenceJdk = (() => {
 })();
 
 const core = await import("../src/core/index.js");
-// `ianaClosureSource` is INTERNAL — it names which implementation produced the pinned closure,
-// which a release declaration needs and a consumer has no use for. Read from the internal module
-// rather than exported from `core`, because widening the package surface to feed a build tool is
-// the wrong direction and would touch a derived allowlist for no consumer's benefit.
-const { RUNTIME_METADATA } = await import("../src/internal/runtime-metadata.js");
+// (`ianaClosureSource` was read here from the internal runtime-metadata module until A30, which
+// retired it: the IANA data is generated from the registry snapshot, so no implementation produces it
+// and there is nothing for that field to name.)
 
 /**
  * Every field, with the obligation it discharges and — where it is null — why.
@@ -127,14 +125,33 @@ const FIELDS = [
 
   { name: "implementationCommit", obligation: 1, value: headOf(root) },
   { name: "javaReferenceCommit", obligation: 1, value: headOf(java),
-    note: "lokalized-java's HEAD, and the parity claim is now against 3.1.0 rather than the 3.0.0 " +
-      "tag — the maintainer's decision of 2026-09-20: this package is a port of lokalized-java " +
-      "3.1.0 once that is released. **THIS NOTE SAID THE OPPOSITE AND WAS FALSE IN BOTH HALVES.** " +
-      "It read \"TWO COMMITS AHEAD of the 3.0.0 tag … zero behavioural Java source differs — so " +
-      "the oracle's answers are the tag's\". Measured 2026-09-20: FOUR commits ahead, and " +
-      "src/main/java differs by +1,014/-23 lines, which is IanaLanguageEquivalents — a behavioural " +
-      "change that moves fourteen ranges. The answers recorded in the corpus are 3.1.0-SNAPSHOT's, " +
-      "not the tag's, and that is the point of the decision rather than a drift to reconcile." },
+    note: "lokalized-java's HEAD, and the parity claim is against 3.1.0 rather than the 3.0.0 tag — " +
+      "the maintainer's decision of 2026-09-20: this package is a port of lokalized-java 3.1.0 once " +
+      "that is released. Between the tag and 3.1.0 the Java sources change BEHAVIOUR, not only " +
+      "packaging: the registry-generated IanaLanguageEquivalents table, and at amendment A30 the " +
+      "LanguageRangeEquivalents setting and the public LocaleMatcher#parseLanguageRanges. The " +
+      "answers recorded in the corpus are that build's — the corpus names it by the digest of its " +
+      "sources, oracle.librarySourcesSha256 — not the tag's, and that is the point of the decision " +
+      "rather than a drift to reconcile. This note once said the opposite (\"zero behavioural Java " +
+      "source differs\"), and its correction then stated a literal diff size that went stale the " +
+      "next time the Java sources moved; it states no size now, so a later Java edit cannot " +
+      "falsify it." },
+  { name: "javaReferenceTreeClean", obligation: 1,
+    // MEASURED, not assumed: `javaReferenceCommit` is HEAD, and HEAD is the Java reference only when
+    // the library's sources are committed. `git status --porcelain -- src/main` counts staged,
+    // unstaged and untracked changes alike.
+    value: (() => {
+      try { return execFileSync("git", ["-C", java, "status", "--porcelain", "--", "src/main"], GIT).trim() === ""; }
+      catch { return null; }
+    })(),
+    reason: "absent only where the lokalized-java checkout is not beside this one",
+    note: "whether lokalized-java's src/main had no uncommitted change (staged, unstaged or untracked) " +
+      "when this was recorded. FALSE means javaReferenceCommit names a commit that does NOT contain the " +
+      "Java the corpus, check:iana and diff:language-range ran against — those name the build by its " +
+      "sources' digest, oracle.librarySourcesSha256, which stays exact either way. A verifier measured " +
+      "exactly that at A30: HEAD a919258 with the twelve A30 files staged and uncommitted. " +
+      "`npm run parity:check` REPORTS a false value and does not fail on it; the remedy is to commit " +
+      "lokalized-java, then re-run `npm run parity -- --write` and `npm run diff:all`." },
   { name: "javaReferenceVersion", obligation: 1,
     // Read from the oracle's own pom rather than restated. Null where lokalized-java is absent —
     // CI does not check it out — and carried from the record by `--check`, like every other
@@ -218,20 +235,19 @@ const FIELDS = [
   { name: "dataFingerprint", obligation: 3, value: core.dataFingerprint },
 
   { name: "ianaRegistryDate", obligation: 4, value: core.ianaRegistryDate,
-    note: "plan 7.3 defines this as the `File-Date` of a pinned IANA registry snapshot, and there " +
-      "now IS one: `lokalized-spec/tools/iana-oracle/language-subtag-registry.txt`, File-Date " +
-      "2026-09-17, 9,296 records. THIS NOTE USED TO SAY THE OPPOSITE — \"There is no snapshot: the " +
-      "closure comes from the JDK oracle directly, so the value is deliberately not date-shaped\" — " +
-      "which was true under amendment A9 and was falsified by M-R S11 pinning the snapshot, while " +
-      "the note shipped on beside the date-shaped value it denied. The oracle moved again in S13: " +
-      "the closure is lokalized-java's own registry-sourced table, named by `ianaClosureSource`." },
-  { name: "ianaDataFingerprint", obligation: 4, value: core.ianaDataFingerprint },
-  { name: "ianaClosureSource", obligation: 4, value: RUNTIME_METADATA.ianaClosureSource,
-    note: "WHICH IMPLEMENTATION PRODUCED THE PINNED CLOSURE, which the registry File-Date does not " +
-      "say and the fingerprint identifies without naming. Two builds sharing a File-Date can carry " +
-      "different closures; this names the oracle, and it is derived from the spec artifact's own " +
-      "`libraryVersion` rather than restated — it read `jdk-corretto:21.0.11` for a slice after " +
-      "the oracle stopped being the JDK, because nothing compared it to anything." },
+    note: "plan 7.3 defines this as the `File-Date` of a pinned IANA registry snapshot: " +
+      "`lokalized-spec/tools/iana-oracle/language-subtag-registry.txt`, File-Date 2026-09-17, " +
+      "9,296 records. Since amendment A30 the language-range equivalences are GENERATED from that " +
+      "snapshot with no JDK (lokalized-spec `generated/iana-language-equivalences.json`), and the " +
+      "JDK and lokalized-java are checks on the output rather than its source — so the date names " +
+      "the data's source outright. (This note once denied a snapshot existed, and then named an " +
+      "`ianaClosureSource` field recording which implementation the data was probed from; A30 " +
+      "retired both the probing and the field.)" },
+  { name: "ianaDataFingerprint", obligation: 4, value: core.ianaDataFingerprint,
+    note: "the lock's plan :1680-1682 projection fingerprint (lock format 2), which binds the " +
+      "snapshot's digest, the one authored input's digest (the region/variant substitution order) " +
+      "and the generated artifact's digest. It moved at A30, so a manifest or SSR stamp from " +
+      "1.0.0-rc.1 is refused by this build." },
   { name: "referenceJdkVendor", obligation: 4, value: referenceJdk.vendor,
     note: "plan :2612 pins an Eclipse Temurin image and every oracle recording in this project was " +
       "made on Amazon Corretto. The value is what was actually used; the divergence is the point of " +
@@ -399,7 +415,7 @@ const report = {
  * no other — which is the whole reason the authoring machine's run is the strict one and why
  * `--write` is a deliberate act rather than something `prepack` does behind a publish.
  */
-const ORACLE_DERIVED = ["javaReferenceCommit", "javaReferenceTagCommit", "javaReferenceVersion",
+const ORACLE_DERIVED = ["javaReferenceCommit", "javaReferenceTreeClean", "javaReferenceTagCommit", "javaReferenceVersion",
   "referenceJdkVendor", "referenceJdkVersion", "referenceJdkRuntimeVersion", "referenceJdkImageDigest"];
 
 if (check) {
@@ -527,6 +543,13 @@ if (write) {
 }
 
 console.log(`release parity declaration — ${pkg.name}@${pkg.version}, ${report.status}`);
+// REPORTED, NEVER GATED: a Java reference commit that does not contain the Java that ran is a
+// maintainer's commit away from being right, and `verify` must not go red waiting for it.
+if (FIELDS.find((field) => field.name === "javaReferenceTreeClean")?.value === false)
+  console.log("  REPORTED (not gated): javaReferenceTreeClean is false — lokalized-java's src/main had " +
+    "uncommitted changes when this was recorded, so javaReferenceCommit names a commit without the Java " +
+    "the corpus and the differentials ran against. Commit lokalized-java, then re-run " +
+    "`npm run parity -- --write` and `npm run diff:all`.");
 console.log(`  strict required partition: ${strictPartition.passingCount}/${strictPartition.requiredCount} passing, ` +
   `${strictPartition.failed} failed, ${strictPartition.xfailed} xfailed, ${strictPartition.notImplemented} unsupported` +
   ` — ${strictPartition.met ? "MET" : "NOT MET"}`);

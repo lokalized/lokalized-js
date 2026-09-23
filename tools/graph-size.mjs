@@ -298,6 +298,7 @@ const PURPOSE = {
   "src/data/valid-scripts.js": ["generated: IANA validity — script subtags", "always"],
   "src/data/valid-variants.js": ["generated: IANA validity — variant subtags", "always"],
   "src/data/rtl.js": ["generated: CLDR right-to-left scripts", "always: `bidi.js` resolves a locale's direction through it, via the likely-subtag script"],
+  "src/data/iana-identity-equivalents.js": ["generated: IANA direct-match equivalence classes + the 14 region/variant substitutions (A30; replaced a 277-row table inlined in `locale.js`)", "always: core's automatic single-locale matcher expands every request through it"],
 };
 
 /* ------------------------------------------------------------------ run */

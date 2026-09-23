@@ -1,7 +1,7 @@
 // @ts-check
 
 /**
- * lokalized/negotiate — RFC 4647, pinned IANA closure, header helpers.
+ * lokalized/negotiate — RFC 4647, the pinned IANA language table, header helpers.
  *
  * Deliberately outside the root graph (plan 3.1, enforced by the `scenario:0a` module ratchet):
  * nothing here may become reachable from `src/index.js`.
@@ -20,32 +20,29 @@
  * The whole N-member solver is wired up as of M7 A3 — group election, the semantic-member election,
  * the cell matrix, anchor reservation, the category-major heuristic passes, the governor sweep and
  * the serving cascade all live in `matchForRanges`. A4 adds the third door above them: the HEADER
- * parser (`Locale.LanguageRange.parse`, ported from `sun.util.locale.LocaleMatcher:440`) and the
- * fail-soft `bestMatchForAcceptLanguage` over it. So this module now has three ingresses and they
+ * parser (`parseLanguageRanges` — lokalized-java's `LocaleMatcher#parseLanguageRanges`, which is
+ * `sun.util.locale.LocaleMatcher:440`'s grammar over the pinned IANA registry) and the fail-soft
+ * `bestMatchForAcceptLanguage` over it. So this module now has three ingresses and they
  * are deliberately NOT interchangeable — the locale one normalizes, the list one is strict about
  * shape and count, and the header one refuses nothing and answers the fallback instead.
  *
  * THE CORPUS CANNOT VERIFY ALL OF A4. No fixture loads a `-DE`/`-FX`/`-BU`/`-TL`/`-YD`/`-CD`/
- * `-heploc` catalog and no case supplies such a range, so dropping the region/variant map leaves
- * every recorded row green while a real `de-DE` silently loses its `de-dd` member. That is what
- * `tools/language-range-diff/` exists for: it runs `Locale.LanguageRange.parse` on the pinned
- * Corretto 21 over every corpus header plus region and variant probes and requires byte equality.
+ * `-heploc` catalog and no case supplies such a range, so dropping the region/variant substitutions
+ * leaves every recorded row green while a real `de-DE` silently loses its `de-dd` member. Two
+ * instruments cover what the corpus cannot, and they answer different questions:
  *
- * THAT DIFFERENTIAL EXITS 0, and knowing why is part of reading this module. It reports
- * `6037/6037 identical, 0 known divergence(s), 0 open port defect(s) over 0 probe(s), 0
- * unexplained`. It did not always: it used to report 24 diverging probes in four families —
- * `cmn-hans`, `cmn-hant`, `lv-lvs`, `lv-ltg` — each a key of the JDK's own equivalence map that
- * `lokalized-spec/tools/iana-oracle/candidates.mjs` never probed, so the pinned artifact did not
- * carry it. Those were defects in the DATA, not in this file, and they are closed where they were
- * caused: the candidate space is now seeded from the JDK's own equivalence keys, `build.mjs` asserts
- * that every one of the 769 produced a closure entry, and the re-pinned artifact carries 806
- * classes. Note also that `diff:language-range` is NOT part of `npm run verify` — `verify` must run
- * in a checkout with no pinned Corretto 21 — so a green `verify` still says nothing about it and it
- * has to be named separately.
+ *  - `test/iana-model-parity.test.js`, in `npm test` and CI with NO JDK, holds `parseLanguageRanges`
+ *    to lokalized-spec's `tools/iana-oracle/model.mjs` over the exact probe space the spec's JDK check
+ *    ran — the model being what the spec's `npm run check:iana` holds lokalized-java's public parse to;
+ *  - `tools/language-range-diff/` (`npm run diff:language-range`, the pinned JDK) runs lokalized-java
+ *    3.1.0's own `LocaleMatcher#parseLanguageRanges` and compares directly, counting beside it where
+ *    the JDK's `LanguageRange.parse` answers differently. It is NOT part of `npm run verify` — `verify`
+ *    must run in a checkout with no pinned Corretto 21 — so its result is recorded by `npm run
+ *    diff:all` and re-checked, JDK-free, by `npm run diff:check`.
  */
 
-import { decode as decodeRangeEquivalents, decodeJdkAbsentTags } from "../data/iana-range-equivalents.js";
-import { matchFor, matchForRanges, normalizeTag } from "../internal/locale.js";
+import { decodeLanguageEquivalents } from "../data/iana-range-equivalents.js";
+import { languageRangeExpansions, matchFor, matchForRanges, normalizeTag } from "../internal/locale.js";
 import { RUNTIME_METADATA } from "../internal/runtime-metadata.js";
 import {
 	LOCALE_INGRESS_DESCRIPTION,
@@ -53,34 +50,19 @@ import {
 } from "../internal/locale-jdk-tag.js";
 
 /**
- * The pinned IANA range-equivalence closure, 806 classes, probed out of the JDK oracle itself
- * (`lokalized-spec generated/IANA-PROVENANCE.md`). It is loaded HERE and nowhere else: plan 3.1 keeps
- * the whole-list negotiator's tables out of the root graph, and `test/pinned-data-only.test.js` names
- * this module so a future import into `src/index.js` fails a test rather than a byte ratchet.
+ * The full IANA language table: 781 subtags in 369 ordered classes, generated from the pinned IANA
+ * Language Subtag Registry (amendment A30; lokalized-spec `generated/iana-language-equivalences.json`,
+ * encoded by `tools/gen-iana-data.js`). Each member maps to the OTHER members of its class, in class
+ * order — lokalized-java's `IanaLanguageEquivalents.LANGUAGE_EQUIVALENTS`, compared with it key by key
+ * by lokalized-spec's `npm run check:iana`.
+ *
+ * It is loaded HERE and nowhere else: plan 3.1 keeps the whole-list negotiator's tables out of the
+ * root graph, and `test/pinned-data-only.test.js` names this module so a future import into
+ * `src/index.js` fails a test rather than a byte ratchet. The root carries the direct-match
+ * projection instead (`src/data/iana-identity-equivalents.js`), along with the region/variant
+ * substitutions both doors share.
  */
-const RANGE_EQUIVALENTS = decodeRangeEquivalents();
-
-/**
- * **THE PORT CARRIES TWO EXPANSION TABLES BECAUSE lokalized-java 3.1.0 DOES.**
- *
- * `java.util.Locale.LanguageRange.parse` is what a Java CALLER uses to build the list it hands
- * `matchFor`; `IanaLanguageEquivalents.parse` -- the library's own registry-sourced table -- is
- * what `LocaleMatcher#bestMatchForAcceptLanguage` and `DefaultStrings#addParsedLanguageRangeIdenti-
- * ties` use INSIDE the library. `VectorOracle.languageRangesFrom` states the split from the other
- * side: a `matchFor` case's string input is parsed "before the library is entered".
- *
- * So `parseLanguageRanges` -- the public analogue of the JDK's parse, and what
- * `tools/conformance.mjs:3909` calls exactly where the oracle calls `LanguageRange.parse` -- must
- * NOT see these keys, while the two internal doors must. Collapsing the two answers the recorded
- * Java question with the wrong channel: measured, `matchFor {"languageRanges":"mgp"}` then reports
- * `exact` over an expanded `[mgp, mrd]` where Java reports `canonical` over the single range it was
- * given, and `iana-equivalence.registry-gap.{mgp,yol}-ranges` are the two cases that say so.
- *
- * DERIVED, never hand-listed: lokalized-spec's `tools/iana-oracle/build.mjs` extracts BOTH closures
- * every run and refuses to emit unless the library's is a strict superset of the JDK's with every
- * shared class identical, so this set is the whole of the difference between them.
- */
-const JDK_ABSENT_TAGS = decodeJdkAbsentTags();
+const LANGUAGE_EQUIVALENTS = /* @__PURE__ */ decodeLanguageEquivalents();
 
 /** RFC 4647 caps nothing, but `LocaleMatcher` and plan 3.3 both cap a public request at 32 members. */
 const MAXIMUM_LANGUAGE_RANGES = 32;
@@ -130,12 +112,29 @@ function isSubtagIllFormed(subtag, isFirstSubtag) {
  * door is the one whose refusals the corpus records verbatim, so the drift would be invisible on the
  * side that is checked.
  *
+ * **A RANGE MADE ONLY OF HYPHENS IS NOT REFUSED BY THE GRAMMAR AT ALL — on the pinned JDK 21.**
+ * The constructor splits with `String#split("-")`, which drops TRAILING empty strings, so `-` and
+ * `---` split to NO subtags and `subtags[0]` throws `ArrayIndexOutOfBoundsException` ("Index 0 out of
+ * bounds for length 0") before any grammar rule runs. lokalized-java 3.1.0's `parseLanguageRanges`
+ * javadoc records the same, and that JDK 25-27's constructor throws `IllegalArgumentException`
+ * instead; this port models JDK 21, as the corpus and every differential here do. It answered
+ * `range=-` until A30, and nothing could see it: no corpus case carries such a range and the old
+ * differential never probed one. lokalized-spec's `tools/iana-oracle/model.mjs` states Java's answer,
+ * the spec's JDK check measured lokalized-java giving it, and `test/iana-model-parity.test.js` found
+ * this door disagreeing on exactly those two probes. Same JS class as every other refusal here
+ * (`RangeError`, which the fail-soft door already treats as Java's `IndexOutOfBoundsException` arm),
+ * Java's message.
+ *
  * @param {string} range lowercased
  * @returns {void}
- * @throws {RangeError} `IllegalArgumentException("range=" + range)`
+ * @throws {RangeError} `IllegalArgumentException("range=" + range)`, or Java's
+ *   `ArrayIndexOutOfBoundsException` message for a range of hyphens only
  */
 function checkLanguageRangeGrammar(range) {
 	const subtags = range.split("-");
+	if (range.length > 0 && subtags.every((subtag) => subtag === ""))
+		throw new RangeError("Index 0 out of bounds for length 0");
+
 	let illFormed = isSubtagIllFormed(subtags[0] ?? "", true);
 
 	if (!illFormed)
@@ -147,232 +146,6 @@ function checkLanguageRangeGrammar(range) {
 
 	if (range.endsWith("-")) illFormed = true;
 	if (illFormed) throw new RangeError(`range=${range}`);
-}
-
-/**
- * `sun.util.locale.LocaleEquivalentMaps.regionVariantEquivMap`, in the ORDER `getEquivalentForRegionAndVariant`
- * walks it. Two facts about this table are easy to get wrong and both are load-bearing.
- *
- * IT HAS FOURTEEN ENTRIES, not thirteen. `LocaleEquivalentMaps.java:815-828` writes fourteen `put`s
- * and sizes the map `HashMap.newHashMap(14)`; M7-PLAN.md A4 said "13-entry" and cited `815-827`,
- * which is the same off-by-one twice: the citation stops one line short of the file. The puts are in
- * ALPHABETICAL order, so the line the citation drops — `:828` — is `-zr` -> `-cd`, and that is
- * exactly the key missing from the plan's enumeration at M7-PLAN.md open question 6. `-zr` -> `-cd`
- * is the fourteenth, and `sgn-ZR` -> `sgn-zr sgn-cd` is a real answer on the pinned Corretto 21.
- *
- * An earlier draft of this comment named `-mm` -> `-bu` as the fourteenth. That was wrong in both
- * senses available: `-mm` is `:823`, the ninth put, and the plan's thirteen already list it. Recorded
- * because the mistake is this project's named one — a comment written from the intent of a
- * measurement rather than from the measurement — committed inside the comment that boasts of
- * measuring. Both readings were re-derived by reflecting on `regionVariantEquivMap` directly.
- *
- * THE ORDER IS THE HASH ORDER, NOT THE SOURCE ORDER. `getEquivalentForRegionAndVariant` iterates
- * `keySet()` and returns on the FIRST subtag that occurs in the range, so a range containing two of
- * these subtags — `sgn-de-fr` contains both `-de` and `-fr` — gets a different answer under a
- * different iteration order. Measured on the pinned Corretto 21 by loading the same fourteen keys
- * into a `HashMap.newHashMap(14)` in source order and printing `keySet()`; the JDK differential then
- * confirms it end to end on `sgn-de-fr` and its siblings, which is what makes this a measurement
- * rather than a reading of `String.hashCode`.
- *
- * DECIDED AT M7 CLOSE: THIS STAYS A SOURCE LITERAL. It is not promoted to a generated artifact
- * under a lock the way the 806-class IANA closure is, and the reasons are specific to this table
- * rather than a general preference.
- *
- *  - **There is no upstream artifact to pin.** `src/data/iana-range-equivalents.js` is generated
- *    from a file `lokalized-spec` vendors and locks. This table's source is `sun.util.locale`, a
- *    JDK-internal class reachable only by reflection through `--add-opens`, and its ORDER is a
- *    `HashMap` iteration order — a property of the running JVM, not of any document. Pinning it as
- *    an artifact would freeze a transcription of something only an executing JDK can state.
- *  - **A lock would add a copy, not a check.** This table has already been mis-transcribed twice —
- *    enumerated as thirteen pairs with `-zr` missing, and named `-mm` as the fourteenth. A
- *    generated module plus a lock file makes three copies where there are two, and the checker
- *    would still have to run the JDK to be worth anything, which is exactly what the differential
- *    already does.
- *  - **Fourteen pairs against 806 classes.** The artifact machinery exists because a 23 KB table
- *    cannot be read by a reviewer. This one is four lines and its every entry is visible above.
- *
- * WHAT ACTUALLY GATES IT, and what each gate is worth — measured at M7 close, not argued:
- *
- *  - `npm run diff:language-range` re-derives `regionVariantEquivMap` from the pinned JDK on every
- *    run and compares this literal against it as an ORDERED LIST OF PAIRS, then probes every
- *    ordered pair of the fourteen end to end. **Ablation:** moving `["-fr", "-fx"]` to the end of
- *    the list exits 1 and prints both lists. It is the strongest gate and it needs the JDK.
- *  - `npm test` catches a missing or mis-paired entry (dropping `["-zr", "-cd"]` fails
- *    `test/negotiate.test.js`) and, since M7 close, a tail permutation too — the `sgn-fx-fr` row
- *    was added because that same `-fr` move left the whole suite GREEN while changing the answer.
- *    This matters because the differential is not part of `npm run verify`.
- *
- * So the literal is checked in two independent places, one of which runs in the default gate, and
- * neither is a transcription of the other. A pinned artifact would improve none of that.
- *
- * @type {readonly (readonly [string, string])[]}
- */
-const REGION_VARIANT_EQUIVALENTS = [
-	["-bu", "-mm"], ["-tl", "-tp"], ["-zr", "-cd"], ["-tp", "-tl"], ["-dd", "-de"], ["-mm", "-bu"],
-	["-cd", "-zr"], ["-de", "-dd"], ["-heploc", "-alalc97"], ["-alalc97", "-heploc"], ["-yd", "-ye"],
-	["-fr", "-fx"], ["-ye", "-yd"], ["-fx", "-fr"],
-];
-
-/** `Integer.MIN_VALUE`, the sentinel `getExtentionKeyIndex` returns for "no singleton extension". */
-const NO_EXTENSION_KEY = -2147483648;
-
-/**
- * `sun.util.locale.LocaleMatcher#getExtentionKeyIndex`, verbatim, misspelling included.
- *
- * It reports the index of the hyphen that introduces a SINGLETON subtag (`-x-`, `-u-`, …), found by
- * looking for two hyphens two characters apart. Java's `i - index` overflows on the first hyphen
- * because `index` starts at `Integer.MIN_VALUE`; the overflowed value cannot be 2 for any reachable
- * `i`, so the JS arithmetic — which does not overflow — takes the same branch on every input.
- *
- * @param {string} text
- * @returns {number}
- */
-function extensionKeyIndex(text) {
-	let index = NO_EXTENSION_KEY;
-
-	for (let position = 1; position < text.length; ++position)
-		if (text[position] === "-") {
-			if (position - index === 2) return index;
-			index = position;
-		}
-
-	return NO_EXTENSION_KEY;
-}
-
-/**
- * `sun.util.locale.LocaleMatcher#getEquivalentForRegionAndVariant`, verbatim.
- *
- * A SUBSTRING SEARCH, not a suffix test: the subtag may sit anywhere in the range as long as it ends
- * at the range's end or at a hyphen, and as long as it is not inside a singleton extension. So
- * `de-DE` yields `de-dd`, `sgn-be-fr` yields `sgn-be-fx`, and `de-x-fr` yields nothing.
- *
- * @param {string} range lowercased
- * @returns {string | null}
- */
-function equivalentForRegionAndVariant(range) {
-	const keyIndex = extensionKeyIndex(range);
-
-	for (const [subtag, equivalent] of REGION_VARIANT_EQUIVALENTS) {
-		const index = range.indexOf(subtag);
-		if (index === -1) continue;
-		if (keyIndex !== NO_EXTENSION_KEY && index > keyIndex) continue;
-
-		const end = index + subtag.length;
-		if (range.length === end || range[end] === "-")
-			return range.slice(0, index) + equivalent + range.slice(end);
-	}
-
-	return null;
-}
-
-/**
- * The raw `singleEquivMap`/`multiEquivsMap` value for one artifact key, recovered from the key's
- * recorded equivalence class.
- *
- * WHY A RECOVERY AND NOT A LOOKUP. The pinned artifact does not store the JDK's two language maps;
- * it stores, for each key, the whole LIST `Locale.LanguageRange.parse(key)` returned — which already
- * has the region/variant equivalents mixed in. `sgn-be-fr`'s class is
- * `[sgn-be-fr, sgn-sfb, sfb, sgn-be-fx]`, and `sgn-be-fx` is a REGION equivalent, not a language
- * one. Feeding that class back through `parse` as if it were `getEquivalentsForLanguage`'s output
- * would apply the region map twice and invent members the JDK never produces.
- *
- * The recovery inverts `parse`'s own insertion sequence. Every derived member is inserted at
- * `index + 1`, so the class is `[key]` followed by the insertions in REVERSE time order, and the
- * insertions are, in time order, `rv(key)` then — for each language equivalent `e` — `e` and then
- * `rv(e)`. Reversing the tail and walking it with `rv` in hand recovers `e₁, e₂, …` exactly.
- *
- * This is verified TOTALLY rather than argued: `test/negotiate.test.js` re-parses all 806 keys from
- * their recovered equivalents and requires the recorded class back, byte for byte. A key the
- * recovery got wrong turns that test red rather than shipping a plausible list.
- *
- * @type {Map<string, readonly string[]>}
- */
-const RECOVERED_LANGUAGE_EQUIVALENTS = new Map();
-
-/**
- * @param {string} key
- * @param {readonly string[]} equivalenceClass
- * @returns {readonly string[]}
- */
-function recoverLanguageEquivalents(key, equivalenceClass) {
-	const cached = RECOVERED_LANGUAGE_EQUIVALENTS.get(key);
-	if (cached !== undefined) return cached;
-
-	const insertions = equivalenceClass.slice(1).reverse();
-	const seen = new Set([key]);
-	/** @type {string[]} */
-	const equivalents = [];
-	let cursor = 0;
-
-	/** @param {string} range consume the region/variant equivalent `parse` would have inserted next */
-	const consumeRegionVariant = (range) => {
-		const equivalent = equivalentForRegionAndVariant(range);
-		if (equivalent === null || seen.has(equivalent)) return;
-		if (insertions[cursor] !== equivalent) return;
-		seen.add(equivalent);
-		++cursor;
-	};
-
-	consumeRegionVariant(key);
-
-	while (cursor < insertions.length) {
-		const equivalent = /** @type {string} */ (insertions[cursor++]);
-		equivalents.push(equivalent);
-		seen.add(equivalent);
-		consumeRegionVariant(equivalent);
-	}
-
-	RECOVERED_LANGUAGE_EQUIVALENTS.set(key, equivalents);
-	return equivalents;
-}
-
-/**
- * `sun.util.locale.LocaleMatcher#getEquivalentsForLanguage` — the LANGUAGE-PREFIX arm of the
- * equivalence expansion, and that arm ONLY. The region/variant arm is
- * `equivalentForRegionAndVariant` above and `parseLanguageRanges` composes the two.
- *
- * PREFIX SUBSTITUTION, not exact lookup — the artifact's own `closureSchema` says so. The JDK walks
- * the range from its full spelling down, dropping one trailing subtag at a time, stops at the FIRST
- * key it finds, and rewrites that prefix to each member of the class. So `sgn-be-fr-x-a` finds
- * `sgn-be-fr` and yields `sfb-x-a`, and `no-bok-no` finds `no-bok` and yields `nb-no`. An exact
- * lookup finds neither, and both are recorded corpus answers. `replaceFirstSubStringMatch` replaces
- * the first OCCURRENCE rather than the prefix, but the walk only ever hands it a prefix of the
- * range, so the first occurrence is at index 0 and the two are the same operation.
- *
- * @param {string} range lowercased
- * @param {boolean} registryAware `true` models `IanaLanguageEquivalents.parse` (the library's own
- *   registry-sourced table), `false` models the JDK's. See `JDK_ABSENT_TAGS`.
- * @returns {readonly string[] | null}
- */
-function equivalentsForLanguage(range, registryAware) {
-	let prefix = range;
-
-	while (prefix.length > 0) {
-		const equivalenceClass = RANGE_EQUIVALENTS.get(prefix);
-
-		// A key the JDK's table does not carry is INVISIBLE to the JDK's walk, not a stopping point
-		// it declines to use: the walk keeps dropping subtags and may still find a shorter key. So
-		// this skips rather than returns.
-		//
-		// **THAT DISTINCTION IS NOT OBSERVABLE TODAY AND THE ABLATION SAID SO** — returning `null`
-		// here instead of skipping leaves conformance at 2,162/0, every test green, and
-		// `diff:language-range` at 6,086/6,086. All eight delta tags are bare two- and three-letter
-		// language subtags, so there is no shorter prefix for the walk to go on and find. The skip
-		// is written this way because it is what the JDK's table does, not because anything here
-		// discriminates it; a delta tag with a hyphen in it would make the two differ, and nothing
-		// warns when one arrives.
-		if (equivalenceClass !== undefined && (registryAware || !JDK_ABSENT_TAGS.has(prefix))) {
-			const suffix = range.slice(prefix.length);
-			return recoverLanguageEquivalents(prefix, equivalenceClass)
-				.map((equivalent) => equivalent + suffix);
-		}
-
-		const index = prefix.lastIndexOf("-");
-		if (index === -1) break;
-		prefix = prefix.slice(0, index);
-	}
-
-	return null;
 }
 
 /**
@@ -497,12 +270,24 @@ function javaDoubleText(value) {
 }
 
 /**
- * `java.util.Locale.LanguageRange#parse(String)`, ported from `sun.util.locale.LocaleMatcher:440`.
+ * lokalized-java 3.1.0's `LocaleMatcher#parseLanguageRanges(String)` on its default
+ * `LanguageRangeEquivalents.IANA_REGISTRY` setting — which is `java.util.Locale.LanguageRange#parse`
+ * (`sun.util.locale.LocaleMatcher:440`) with ONE substitution: the language equivalences come from the
+ * pinned IANA registry instead of the running JDK's table.
+ *
+ * **THAT IS AMENDMENT A30, AND IT IS A DELIBERATE CHANGE.** Until 1.0.0-rc.1 this door modelled the
+ * JDK's own `LanguageRange.parse`, which on JDK 21 lacks twelve registry tags (`bh`, `bih`, `dyl`,
+ * `enm`, `mgp`, `mrd`, `mrh`, `sgn-dyl`, `sgn-zhk`, `shl`, `yol`, `zhk`), while the header door and the
+ * identity channel already used the registry. There is one parse now: `parseLanguageRanges("yol")` is
+ * `[yol, enm]`, as Java's public parse answers on every JDK. The JavaScript package has no JDK setting
+ * — a "JDK" table could only ever mean JDK 21's, frozen — so this is the whole of it. The spec's
+ * `tools/iana-oracle/model.mjs` states the same algorithm and `test/iana-model-parity.test.js` holds
+ * this function to it over the spec's probe space, with no JDK.
  *
  * This is the whole reason `lokalized/negotiate` exists as a separate subpath: it is the door an
- * `Accept-Language` field value comes through, and it drags the 806-class IANA closure in with it.
- * `DefaultStrings#addParsedLanguageRangeIdentities:2161-2172` calls the same method, so the pinned
- * closure and the region/variant map below reach MEMBER IDENTITIES too, not only headers.
+ * `Accept-Language` field value comes through, and it drags the full IANA language table in with it.
+ * `DefaultStrings#addParsedLanguageRangeIdentities` calls the same parse, so the table and the
+ * region/variant substitutions reach MEMBER IDENTITIES too, not only headers.
  *
  * Five details are each a recorded case, and each is the kind that reads as a detail until it moves
  * an answer:
@@ -531,26 +316,11 @@ function javaDoubleText(value) {
  * (member order is compared field for field) and a frozen array cannot be spliced into.
  *
  * @param {string} header an `Accept-Language` field value, or a single language range
- * @returns {readonly WeightedLanguageRange[]} the parsed members, in `LanguageRange.parse`'s own
- *   order
+ * @returns {readonly WeightedLanguageRange[]} the parsed members, in the order the grammar above
+ *   defines
  * @throws {RangeError} `IllegalArgumentException`, with Java's message
  */
 export function parseLanguageRanges(header) {
-	return parseRanges(header, false);
-}
-
-/**
- * The body of both parses. `registryAware` picks which of the two tables described at
- * `JDK_ABSENT_TAGS` the language-prefix arm walks; everything else -- the grammar, the weights, the
- * insertion positions, the region/variant arm -- is identical, because in Java it is literally the
- * same `LanguageRange.parse` code reading a different equivalence map.
- *
- * @param {string} header
- * @param {boolean} registryAware
- * @returns {readonly WeightedLanguageRange[]}
- * @throws {RangeError}
- */
-function parseRanges(header, registryAware) {
 	if (typeof header !== "string") throw new RangeError("An Accept-Language header must be a string");
 
 	let ranges = header.replaceAll(" ", "").toLowerCase();
@@ -606,14 +376,7 @@ function parseRanges(header, registryAware) {
 			seen.add(equivalent);
 		};
 
-		const regionVariant = equivalentForRegionAndVariant(range);
-		if (regionVariant !== null) insert(regionVariant);
-
-		for (const equivalent of equivalentsForLanguage(range, registryAware) ?? []) {
-			insert(equivalent);
-			const derived = equivalentForRegionAndVariant(equivalent);
-			if (derived !== null) insert(derived);
-		}
+		for (const equivalent of languageRangeExpansions(range, LANGUAGE_EQUIVALENTS)) insert(equivalent);
 	}
 
 	for (const member of list) Object.freeze(member);
@@ -622,8 +385,9 @@ function parseRanges(header, registryAware) {
 }
 
 /**
- * `DefaultStrings#addParsedLanguageRangeIdentities:2161-2172`, whose body is literally
- * `LanguageRange.parse(range)` inside a catch that keeps whatever identities the other probes found.
+ * `DefaultStrings#addParsedLanguageRangeIdentities`, whose body is lokalized-java's own parse of the
+ * range on the instance's `LanguageRangeEquivalents` setting (`IanaLanguageEquivalents.parse` by
+ * default) inside a catch that keeps whatever identities the other probes found.
  *
  * SHIPPED IN M7 A4, AND THIS IS A CHANGE OF POSITION worth stating: an earlier revision of this
  * module implemented the resolver as a bare prefix substitution over the pinned artifact and
@@ -644,50 +408,20 @@ function parseRanges(header, registryAware) {
  * a selection was seen to change; claiming the latter would be the over-claim this file has already
  * had to correct once. The differential, not a selection probe, is what checks it.
  *
- * NO DEFECT FAMILY SURVIVES: 6,037 of 6,037 probes are identical and the differential exits 0. Four
- * families used to survive — 24 diverging probes — and the history is kept here because the shape of
- * the mistake recurs, not because the divergence does.
- *
- * ONE CAUSE, TWO OPPOSITE SYMPTOMS, which is why neither could have been read off the other. Every
- * one of the four was a key of the JDK's OWN equivalence map — `singleEquivMap` holds
- * `cmn-hans` -> `zh-cmn-hans`, `cmn-hant` -> `zh-cmn-hant`, `lv-lvs` -> `lvs`, `lv-ltg` -> `ltg` —
- * that the pinned artifact did not carry, because `lokalized-spec/tools/iana-oracle/candidates.mjs`
- * crossed its `PREFIXES` only with LANGUAGES and listed no `lv` at all. The JDK's prefix walk RETURNS
- * at the longest key it finds, so a missing key changed the answer in whichever direction the
- * shorter key happened to point:
- *
- *   - OVER-expansion, `cmn-hans` / `cmn-hant`. Missing its own key, the walk fell through to `cmn`,
- *     whose class is `{zh-cmn, zh-guoyu}`, and this module answered `{cmn-hans, zh-cmn-hans,
- *     zh-guoyu-hans}` where the JDK answers `{cmn-hans, zh-cmn-hans}`. A member too many.
- *   - UNDER-expansion, `lv-lvs` / `lv-ltg`. `lv` is not a key either, so the walk found nothing and
- *     this module answered `{lv-lvs}` where the JDK answers `{lv-lvs, lvs}`. A member too few, and
- *     the consequence was concrete: a request for Latgalian never reached an `ltg` catalog.
- *
- * THE REASON THIS COMMENT ONCE GAVE WAS FALSE, and the correction is a measurement. It said the JDK
- * "drops `zh-guoyu-hans` as an ill-formed tag — a 4-alpha subtag after a variant", and called the
- * `cmn-hans` row a DELIBERATE DIVERGENCE on that basis. It is not: on the pinned Corretto 21
- * `new Locale.LanguageRange("zh-guoyu-hans")` constructs without complaint and
- * `parse("zh-guoyu-hans")` returns `[zh-guoyu-hans, zh-cmn-hans, cmn-hans]`. Nothing was ever dropped
- * for ill-formedness; the shorter-key fall-through above was the whole of it. A data defect wearing a
- * divergence's clothes, which is why `KNOWN_DIVERGENCES` requires a Java-source or JDK-measured
- * argument and not an explanation that merely sounds like one.
- *
- * THE CLOSE, and where it had to happen. Not by hand-editing the artifact — it reconstructed 802/802
- * of its own bare keys exactly and was not itself the source of the divergence; the PROBE SPACE that
- * produced it was. `candidates.mjs` now seeds that space from the JDK's own equivalence-map keys —
- * the JDK's INPUT data, so the space cannot be blind to a gap in the artifact the way one derived
- * from the artifact is — and `build.mjs` now asserts that all 769 keys produced a closure entry.
- * Re-extracting added exactly those 4 classes (802 -> 806) and changed nothing else.
- * `tools/gen-iana-data.js` re-emits `src/data/iana-range-equivalents.js` from the re-pinned
- * artifact; nothing in `src/` was edited to fix this. And the fix alone was not enough: the four
- * `OPEN_PORT_DEFECTS` entries had to be deleted in the same change, or their own staleness check
- * reports four STALE lines and the run still exits 1. That deletion is the record of the win.
+ * THE DATA IS NO LONGER PROBED, and the history is worth one paragraph because the shape recurs.
+ * Before A30 the table here was an 806-then-818-entry closure recorded by probing an implementation,
+ * and it went a milestone missing four keys of the JDK's own map (`cmn-hans`, `cmn-hant`, `lv-lvs`,
+ * `lv-ltg`) because the probe space was seeded from the wrong implementation's keys: `cmn-hans`
+ * fell through to `cmn` and gained a member too many, `lv-lvs` found nothing and lost one. The
+ * table is now GENERATED from the registry by stated rules, so a gap in a probe space can no longer
+ * become a gap in the data — only in a check, and the spec's probe space is seeded from the
+ * artifact's, the library's and the JDK's keys together (`tools/iana-oracle/candidates.mjs`).
  *
  * @type {import("../internal/locale.js").RangeEquivalentResolver}
  */
 function pinnedRangeEquivalents(range) {
 	try {
-		return parseRanges(range, true).map((member) => member.range);
+		return parseLanguageRanges(range).map((member) => member.range);
 	} catch (error) {
 		// Java's own catch, and it is not a swallow: the caller has already recorded the range itself
 		// as an identity, so "the JDK could not re-expand this form" leaves exactly what Java leaves.
@@ -972,7 +706,7 @@ function usableAcceptLanguageRanges(acceptLanguage) {
 	let ranges;
 
 	try {
-		ranges = parseRanges(normalized, true);
+		ranges = parseLanguageRanges(normalized);
 	} catch (error) {
 		// Java catches `IllegalArgumentException | IndexOutOfBoundsException` — the parser's own
 		// refusals and nothing else. Narrowed to `RangeError` here for the same reason: a `TypeError`
@@ -1086,7 +820,7 @@ export function createLocaleNegotiator(configuration) {
 		 * length cap, blank, normalizing to nothing, unparseable, or parsing to more than 32 members.
 		 * It is the mirror image of `matchForLanguageRanges`, which is strict about all of those, and
 		 * THE CONTRADICTION IS THE POINT — the corpus records the same 13-member header
-		 * (`he,id,yi,cmn,yue,nan,hak,jbo,tlh,gan,wuu,hsn,ase,fr;q=0.1`, which the IANA closure expands
+		 * (`he,id,yi,cmn,yue,nan,hak,jbo,tlh,gan,wuu,hsn,ase,fr;q=0.1`, which the IANA table expands
 		 * to 33) THROWING through `matchFor(List)` at `browser-chooser.limit.alias-expansion-crosses-
 		 * thirty-two` and RETURNING `ja` here at `accept-language.limit.thirty-three-expanded-ranges`.
 		 * A single shared limit rule cannot produce both. Its 32-member sibling
@@ -1119,7 +853,7 @@ export function createLocaleNegotiator(configuration) {
  *   `localeMatch` options, so the browser/root graph does not contain the whole-list solver."
  *
  * An application that wanted per-call whole-list negotiation without these would have to hand core a
- * MATCHER and let core call it — which puts this module, its 806-class IANA closure and the range
+ * MATCHER and let core call it — which puts this module, its full IANA language table and the range
  * solver into every graph that can render. Negotiating eagerly and handing core a plain
  * `localeMatch` keeps all of it on this side of the boundary. `test/pinned-data-only.test.js` names
  * `negotiate/index.js` among the modules the root graph may not reach, because a byte ratchet would
@@ -1182,7 +916,7 @@ export function forAcceptLanguage(negotiator, acceptLanguage) {
 
 /**
  * PLAN 3.4:914-915's TWO IANA CONSTANTS, re-exported here because this is the subpath that owns the
- * closure they describe.
+ * table they describe.
  *
  * Plan 3.1's `negotiate` row promises a category in as many words — "re-exports core's
  * `LanguageRange` type and IANA metadata" — and S28's category gate recorded the metadata half as
@@ -1203,5 +937,5 @@ export function forAcceptLanguage(negotiator, acceptLanguage) {
  */
 export const ianaRegistryDate = RUNTIME_METADATA.ianaRegistryDate;
 
-/** @see {@link ianaRegistryDate} — the pinned closure's content fingerprint. */
+/** @see {@link ianaRegistryDate} — the pinned IANA data's content fingerprint (plan 5.1 :1680-1682). */
 export const ianaDataFingerprint = RUNTIME_METADATA.ianaDataFingerprint;

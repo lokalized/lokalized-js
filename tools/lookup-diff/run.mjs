@@ -365,9 +365,9 @@ function catalogs(tags, withOnly) {
 }
 
 /**
- * SEVEN CATALOG SETS, each chosen to stop a chain at a DIFFERENT depth. (This said FIVE; the two
- * throwing sets described three paragraphs down were added inside the same batch and the count was
- * not carried through.) That is the axis this tool
+ * THE CATALOG SETS, each chosen to stop a chain at a DIFFERENT depth — counted by the headline, not
+ * here. (This said FIVE while there were seven, then SEVEN while there were eleven: a count in prose
+ * is the fastest-rotting claim there is, so it is no longer stated.) That is the axis this tool
  * adds and the reason a fixed fixture is not enough — see the header's measured {nn,nb,fr} / {en,fr}
  * split.
  *
@@ -385,7 +385,7 @@ function catalogs(tags, withOnly) {
  * check, and a differential that only ever used the default handler would gate two of the three
  * sites and believe it had gated three.
  *
- * THREE OF THE TEN EXIST TO BE REFUSED, and they are the axis this tool was missing. Every other
+ * THREE OF THEM EXIST TO BE REFUSED, and they are the axis this tool was missing. Every other
  * set here is keyed on WELL-FORMED locales — fr, nb, nn, en, en-US, en-US-POSIX, ja, ja-JP, th,
  * th-TH, zh-Hans, zh-Hant — so the `C` line, whose own header promises that "a set Java refuses and
  * the port accepts (or the reverse) is a defect in its own right and must never be silently
@@ -533,15 +533,34 @@ const CATALOG_SETS = [
     // cannot reach. Bare `mgp` stays in the tag space as the control that must remain green.
     //
     // `nsl` IS THE SECOND CONTROL AND IT IS THE ONE THAT PINS WHICH TABLE ANSWERS: `nsl`/`sgn-no`
-    // is in the JDK's own table and NOT in `jdkAbsentTags`, so it stays green under a mutation that
-    // removes only the registry rows. Checked for the vacuity trap first — on the pinned Corretto
-    // 21 `forLanguageTag("sgn-NO")` stays `sgn-NO` and does not collapse the pair the way
-    // `sgn-dyl`/`dyl` and `bh`/`bih` do, which is why those two pairs cannot be fixtures at all.
+    // is a class JDK 21's own table carries too (it is not one of the twelve tags JDK 21 lacks), so
+    // it stays green under a mutation that removes only those. Checked for the vacuity trap first —
+    // on the pinned Corretto 21 `forLanguageTag("sgn-NO")` stays `sgn-NO` and does not collapse the
+    // pair the way `sgn-dyl`/`dyl` and `bh`/`bih` do, which is why those two pairs cannot be
+    // fixtures at all. (This paragraph named the spec's retired `jdkAbsentTags` list until A30.)
     name: "iana-equivalence-partner",
     fallback: "fr",
     instance: "fr",
     tiebreakers: null,
     strings: catalogs(["fr", "mrd-US", "nsl"], ["fr"]),
+  },
+  {
+    // **A LANGUAGE EQUIVALENT COMBINED WITH A REGION OR VARIANT SUBSTITUTION, added at A30.**
+    // `mgp-BU` reaches a loaded `mrd-MM` only through BOTH the `mgp`/`mrd` class and the `-bu`/`-mm`
+    // substitution applied to the derived member (the nested step of
+    // `IanaLanguageEquivalents#expansionsFor`). Until A30 the port's single-locale table was
+    // pre-expanded and carried that combination only where its probe space had included it: MEASURED
+    // against lokalized-java 3.1.0 on the pinned JDK over test/locale.test.js's door grid (22,493
+    // pairs), 88 answered NONE here and CANONICAL in Java (mgp/mrd 28, mrh/shl 28, enm/yol 28,
+    // nsl/sgn-no 4; this set carries three of the four families). This differential could not
+    // see it — no catalog set here held a partner under a substitutable subtag — and neither could
+    // the corpus. `mgp-BU`, `yol-heploc` and `nsl-heploc` are the three probes; bare `mgp` and
+    // `es-BU` are controls whose answer does not depend on the nested step.
+    name: "iana-equivalence-region-variant",
+    fallback: "fr",
+    instance: "fr",
+    tiebreakers: null,
+    strings: catalogs(["fr", "mrd-MM", "enm-alalc97", "sgn-NO-alalc97"], ["fr"]),
   },
 ];
 
@@ -626,6 +645,9 @@ function probes() {
   // the JDK-table control that separates "the equivalence mechanism works" from "the REGISTRY rows
   // are consulted".
   for (const tag of ["mgp", "mgp-US", "mrd", "mrd-US", "nsl", "sgn-NO"]) set.add(tag);
+  // ...and the `iana-equivalence-region-variant` set's: a language equivalent AND a region/variant
+  // substitution in one request, with `es-BU` as the substitution-only control.
+  for (const tag of ["mgp-BU", "yol-heploc", "nsl-heploc", "es-BU", "mrd-MM", "enm-alalc97"]) set.add(tag);
 
   // (5) EXTENSIONS AND PRIVATE USE: the `u`/`t`/`a` singletons including the two the compatibility
   // synthesis produces, keyword ordering (a `-u-` payload is a SET and a MAP, so two spellings are

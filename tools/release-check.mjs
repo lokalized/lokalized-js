@@ -25,7 +25,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { brotliCompressSync, constants } from "node:zlib";
@@ -46,6 +46,24 @@ if (rewriteSizes && !rewriteReason) {
   console.error("--write needs --reason \"what grew and why\"; the reason is kept in the artifact");
   process.exit(2);
 }
+// `--stamp-capture`: the orchestrator has just re-driven the browser rehearsal against THIS tarball
+// and says so. It records the bytes the capture was taken against (below) and nothing else; the
+// capture's own fields are written by the person who drove the browser.
+const stampCapture = process.argv.includes("--stamp-capture");
+if (stampCapture && !rewriteReason) {
+  console.error("--stamp-capture needs --reason \"which re-drive this records\"; the reason is kept in the artifact");
+  process.exit(2);
+}
+/** Printed after the verdict and never a problem: the browser capture's staleness is REPORTED. */
+const reports = [];
+/**
+ * The re-recorded `measurements/release-rehearsal.json`, written only AFTER the verdict and only when
+ * the run passed. It used to be written in the middle of the run, before the parity and anti-vacuity
+ * checks below it, so `--stamp-capture` on a failing rehearsal stamped the capture as describing a
+ * tarball the same run had just refused (found in the A30 follow-up review, measured).
+ * @type {string | null}
+ */
+let pendingRecord = null;
 const site = mkdtempSync(join(tmpdir(), "lokalized-release-"));
 
 try {
@@ -215,14 +233,56 @@ try {
           `the packed artifact is ${squeezed}`]);
   }
 
+  /*
+   * **WHAT THE BROWSER CAPTURE WAS TAKEN AGAINST, AND WHETHER THAT IS STILL WHAT SHIPS — REPORTED,
+   * NEVER GATED.** The size columns above re-record through `--write --reason`; the capture's browser
+   * fields (`loadedInBrowser`, `exports`, `rendered`, `rootRequests`, `totalRequests`) do not, and
+   * nothing said when they stopped describing the bundles: the sizes were re-recorded at 1.0.0-rc.1
+   * and again at A30, which rebuilt every entry (`negotiate` 111,001 -> 89,117 raw bytes), while the
+   * capture still read `loadedInBrowser: true` for bytes no browser had loaded. So the record now
+   * names the digest of every file the capture's entries load, stamped when the browser is re-driven
+   * (`--stamp-capture --reason`), and this compares them with the tarball it just packed. A
+   * difference is REPORTED as STALE, on scenario:0a's reasoning for its own browser half: a green
+   * `verify` must not need a person at a browser. A record with no digests prints NOT RECORDED rather
+   * than reading absence as agreement.
+   */
+  /** @type {Record<string, string>} */
+  const loadedNow = {};
+  for (const file of [...record.browser.entries.map((/** @type {any} */ e) => e.file), record.browser.classicScript?.file]) {
+    if (!file || !files.includes(file)) continue;
+    for (const absolute of graphBytes(installed, file).files)
+      loadedNow[relative(installed, absolute)] = createHash("sha256").update(readFileSync(absolute)).digest("hex");
+  }
+  const sortedLoaded = Object.fromEntries(Object.entries(loadedNow).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+  if (stampCapture) {
+    record.browser.capturedAgainst = { files: sortedLoaded, stampedFor: rewriteReason };
+    console.log(`stamping the browser capture (written only if this run passes) against ${Object.keys(sortedLoaded).length} file(s): ${rewriteReason}`);
+  } else {
+    const against = record.browser.capturedAgainst;
+    if (!against?.files) {
+      reports.push("browser capture NOT RECORDED: measurements/release-rehearsal.json does not record the bytes its " +
+        "browser half was taken against, so nothing can say whether it describes this tarball. " +
+        (record.browser.capturedAgainstNote ?? ""));
+    } else {
+      const changed = [...new Set([...Object.keys(against.files), ...Object.keys(sortedLoaded)])]
+        .filter((file) => against.files[file] !== sortedLoaded[file]).sort();
+      if (changed.length > 0)
+        reports.push(`browser capture STALE: it was taken against bundles that differ from this tarball in ` +
+          `${changed.length} file(s) (${changed.join(", ")}).`);
+    }
+    if (reports.length > 0)
+      reports.push(`Re-drive it (${record.procedure}), then: node tools/release-check.mjs --stamp-capture --reason "..."`);
+  }
+
   if (sizeDrift.length > 0 && rewriteSizes) {
     for (const [entry, field, value] of sizeDrift) entry[field] = value;
     record.browser.sizesRecordedFor = rewriteReason;
-    writeFileSync(join(root, "measurements/release-rehearsal.json"), `${JSON.stringify(record, null, 2)}\n`);
-    console.log(`re-recorded ${sizeDrift.length} size field(s): ${rewriteReason}`);
+    console.log(`re-recording ${sizeDrift.length} size field(s) (written only if this run passes): ${rewriteReason}`);
   } else {
     for (const [, , , message] of sizeDrift) problems.push(message);
   }
+  if ((sizeDrift.length > 0 && rewriteSizes) || stampCapture)
+    pendingRecord = `${JSON.stringify(record, null, 2)}\n`;
 
   /* 7. the parity declaration and the divergence document, as the tarball carries them */
   //
@@ -267,9 +327,14 @@ try {
   rmSync(site, { recursive: true, force: true });
 }
 
+// REPORTED, not gated, and printed whatever the verdict below is.
+for (const line of reports) console.log(`  ${line}`);
 if (problems.length > 0) {
   console.log(`\n${problems.length} problem(s):`);
   for (const line of problems) console.log(`  - ${line}`);
+  if (pendingRecord !== null)
+    console.log("\nmeasurements/release-rehearsal.json was NOT written: a record is re-recorded only by a passing run.");
   process.exit(1);
 }
+if (pendingRecord !== null) writeFileSync(join(root, "measurements/release-rehearsal.json"), pendingRecord);
 console.log("the packed package installs, imports, typechecks and renders as a consumer receives it.");

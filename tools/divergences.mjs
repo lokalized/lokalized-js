@@ -20,6 +20,13 @@
  * `tools/conformance.mjs --dump-divergences` prints its tables and exits before any case runs, so
  * that file stays their single owner and this one cannot hold a second copy that drifts.
  *
+ * **TWO SECTIONS HAVE NO CORPUS CASE BEHIND THEM, AND GATE THEMSELVES HERE INSTEAD.** A Java public
+ * API this port declines (sourced from lokalized-spec's `java-surface-amendments.json`, which
+ * `scripts/java-surface-audit.mjs` holds to Java's real surface) and a JDK-version-dependent answer
+ * (the port models JDK 21) are deliberate differences no recorded case exercises. Each row carries a
+ * probe of THIS package's behaviour, run every time this file runs; a row whose probe no longer holds
+ * is STALE and fails, so neither section can outlive the divergence it states.
+ *
  *   node tools/divergences.mjs            regenerate and CHECK the committed DIVERGENCES.md
  *   node tools/divergences.mjs --write    re-record it
  */
@@ -31,6 +38,10 @@ import { fileURLToPath } from "node:url";
 
 import { CONSTRUCT_REFUSAL_ADAPTATIONS } from "./construct-refusals.mjs";
 import { DEFINE_REFUSAL_ADAPTATIONS } from "./define-refusals.mjs";
+import { specPath } from "./iana-artifact.mjs";
+import * as rootEntry from "../src/index.js";
+import * as coreEntry from "../src/core/index.js";
+import * as negotiateEntry from "../src/negotiate/index.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUTPUT = join(root, "DIVERGENCES.md");
@@ -149,6 +160,108 @@ sections.push({
   after: "If your catalogs render a Java `Double`, format it yourself before interpolating.",
 });
 
+/* ------------------------------------------ 7. Java API this package declines (spec-declared) */
+/**
+ * **A DECLINED JAVA FEATURE IS A DIVERGENCE, AND THIS DOCUMENT OMITTED ONE.** A30 gave lokalized-java
+ * 3.1.0 a public `LanguageRangeEquivalents` setting whose `JDK` value switches its language-range
+ * equivalences back to the running JDK's table, and the maintainer declined it for JavaScript (A30
+ * resolution 5). The README's migration table and the spec's `java-surface-amendments.json` both named
+ * it; this file, which says every deliberate difference is listed, did not, because every section
+ * above is corpus-backed and a declined API has no corpus case.
+ *
+ * The ROWS come from the spec's record: each amendment row dispositioned "No JavaScript counterpart"
+ * is a row here. The mapping below adds only what that record does not carry — the Java entry points
+ * the type reaches, and a probe of THIS package that is true while the counterpart is absent. A row
+ * with no mapping, a mapping with no row, and a probe that stops holding each fail the run.
+ */
+const DECLINED_JAVA_API = {
+  LanguageRangeEquivalents: {
+    java: "`Strings.Builder#languageRangeEquivalents(LanguageRangeEquivalents)`, `LanguageRangeEquivalents.JDK`",
+    /** @returns {string | null} null while the counterpart is still absent; otherwise what changed */
+    stillAbsent: () => {
+      const base = { strings: { en: { K: "a" } }, fallbackLocale: "en", locale: "en" };
+      try { rootEntry.createStrings(base); } catch (error) {
+        return `the control construction itself failed (${/** @type {Error} */ (error).message}); the probe proves nothing`;
+      }
+      try {
+        rootEntry.createStrings({ ...base, languageRangeEquivalents: "JDK" });
+        return "createStrings now ACCEPTS a languageRangeEquivalents option";
+      } catch (error) {
+        if (!String(/** @type {Error} */ (error).message).includes("languageRangeEquivalents"))
+          return `createStrings refused the option for another reason: ${/** @type {Error} */ (error).message}`;
+      }
+      const exported = [rootEntry, coreEntry, negotiateEntry].flatMap((entry) => Object.keys(entry))
+        .filter((name) => /languagerangeequivalents/i.test(name));
+      return exported.length > 0 ? `this package now exports ${exported.join(", ")}` : null;
+    },
+  },
+};
+{
+  const amendmentsPath = specPath("java-surface-amendments.json");
+  /** @type {any[]} */
+  let amendmentRows = [];
+  try { amendmentRows = JSON.parse(readFileSync(amendmentsPath, "utf8")).rows ?? []; } catch (error) {
+    problems.push(`${amendmentsPath} cannot be read (${/** @type {Error} */ (error).message}); the declined-API rows come from it, and absence is not "none declined"`);
+  }
+  const declined = amendmentRows.filter((row) => /^No JavaScript counterpart/.test(String(row?.disposition)));
+  const mapping = /** @type {Record<string, { java: string, stillAbsent: () => string | null }>} */ (DECLINED_JAVA_API);
+  const rows = [];
+  for (const row of declined) {
+    const entry = mapping[row.type];
+    if (!entry) { problems.push(`java-surface-amendments.json declines ${row.type} (${row.amendment}) and DECLINED_JAVA_API has no entry for it`); continue; }
+    const stale = entry.stillAbsent();
+    if (stale !== null) problems.push(`STALE declined-API row ${row.type}: ${stale}. Re-derive the row or the spec's disposition`);
+    rows.push([entry.java, `${row.disposition} (${row.amendment}, ${row.since})`]);
+  }
+  for (const type of Object.keys(mapping))
+    if (!declined.some((row) => row.type === type))
+      problems.push(`DECLINED_JAVA_API names ${type}, which java-surface-amendments.json no longer declines; the mapping outlived its row`);
+  sections.push({
+    heading: "Java API this package declines",
+    intro: "Public Java API with no counterpart here, by decision rather than by construction. Each row " +
+      "comes from lokalized-spec's `java-surface-amendments.json`, and `npm run divergences` fails if " +
+      "this package grows the counterpart while the row still says it has none.",
+    table: { head: ["Java", "why there is no counterpart"], rows },
+  });
+}
+
+/* ------------------------------------------------------- 8. JDK-version-dependent, modelled at 21 */
+/**
+ * **lokalized-java ANSWERS WITH WHATEVER JDK IT RUNS ON; THIS PACKAGE MODELS JDK 21.** Where the answer
+ * depends on the JDK version, a Java deployment on a newer JDK differs from this package even though
+ * both are correct for their pinned JDK. The Java column is MEASURED (Corretto 17, 21, 25, 26 and 27,
+ * 2026-09-23, `java.util.Locale.LanguageRange#parse`, which lokalized-java's own javadoc names as
+ * failing the same way); the "this package" column is re-measured every run and a row whose answer
+ * has moved is STALE.
+ */
+const JDK_VERSION_DEPENDENT = [
+  {
+    input: "a range made only of hyphens, e.g. `parseLanguageRanges(\"-\")`",
+    java: "JDK 17 and 21: `ArrayIndexOutOfBoundsException` `Index 0 out of bounds for length 0`; JDK 25, 26 and 27: `IllegalArgumentException` `range=-`",
+    expected: "RangeError: Index 0 out of bounds for length 0",
+    observe: () => {
+      try { negotiateEntry.parseLanguageRanges("-"); return "no refusal"; } catch (error) {
+        return `${/** @type {Error} */ (error).name}: ${/** @type {Error} */ (error).message}`;
+      }
+    },
+  },
+];
+{
+  const rows = [];
+  for (const row of JDK_VERSION_DEPENDENT) {
+    const observed = row.observe();
+    if (observed !== row.expected)
+      problems.push(`STALE JDK-version row (${row.input}): this package now answers ${JSON.stringify(observed)}, not ${JSON.stringify(row.expected)}`);
+    rows.push([row.input, row.java, `\`${row.expected.split(": ")[0]}\` \`${row.expected.split(": ").slice(1).join(": ")}\` (JDK 21's answer)`]);
+  }
+  sections.push({
+    heading: "Answers that depend on the JDK version",
+    intro: "This package models JDK 21, the JDK every check here pins. lokalized-java answers with the JDK " +
+      "it runs on, so on a different JDK these differ.",
+    table: { head: ["input", "lokalized-java, by JDK", "this package"], rows },
+  });
+}
+
 /* ------------------------------------------------------------------------------- anti-vacuity */
 const totalRows = sections.reduce((sum, s) => sum + s.table.rows.length, 0);
 // **A ROW COUNT VOUCHES FOR A ROW THAT SAYS NOTHING, and the first version of this file proved it:**
@@ -171,8 +284,8 @@ if (sections.some((s) => s.table.rows.length === 0))
     `have no rows — a heading with nothing under it reads as "none of these exist"`);
 // FLOORS AT TODAY'S COUNT, in the house style. A record family that stops being read must fail here
 // rather than quietly shrinking the document a consumer relies on.
-if (sections.length < 6) problems.push(`${sections.length} section(s); this document had 6`);
-if (totalRows < 51) problems.push(`${totalRows} row(s) across all sections; this document had 51`);
+if (sections.length < 8) problems.push(`${sections.length} section(s); this document had 8`);
+if (totalRows < 53) problems.push(`${totalRows} row(s) across all sections; this document had 53`);
 
 const body = [
   "# Divergences from lokalized-java",

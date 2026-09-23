@@ -44,6 +44,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { specPath } from "./iana-artifact.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const recordPath = join(root, "measurements/differentials.json");
@@ -152,9 +153,38 @@ if (!existsSync(recordPath)) {
 }
 const record = JSON.parse(readFileSync(recordPath, "utf8"));
 const problems = [];
+/**
+ * THE JAVA BUILD A DIFFERENTIAL RAN AGAINST, HELD TO THE CORPUS'S. A tool that records
+ * `facts.oracle.librarySourcesSha256` (diff:language-range, since A30) must name the same lokalized-java
+ * sources `generated/behavioral-vectors.json` was recorded against, or the record and the corpus
+ * describe two libraries and a green run proves nothing about the one the corpus specifies. Read with
+ * no JDK, so the binding holds in CI.
+ */
+/**
+ * The differentials whose Java side is the LIBRARY, and so must record which build. For these an ABSENT
+ * `facts.oracle` block is a failure: the comparison below only ran when the field was present, so
+ * deleting the block from the record passed the check it exists to feed (found in the A30 follow-up
+ * review, measured). A tool whose oracle is the JDK alone records no library and is not listed.
+ */
+const LIBRARY_ORACLE_DIFFERENTIALS = ["language-range"];
+for (const name of LIBRARY_ORACLE_DIFFERENTIALS)
+  if (!DIFFERENTIALS.includes(name)) throw new Error(`LIBRARY_ORACLE_DIFFERENTIALS names diff:${name}, which is not a differential`);
+let corpusLibrary = null;
+try {
+  corpusLibrary = JSON.parse(readFileSync(specPath("generated/behavioral-vectors.json"), "utf8")).oracle?.librarySourcesSha256 ?? null;
+} catch (error) {
+  problems.push(`the corpus could not be read for its librarySourcesSha256: ${/** @type {Error} */ (error).message}`);
+}
 for (const name of DIFFERENTIALS) {
   const entry = record.differentials?.[name];
   if (!entry) { problems.push(`diff:${name} has no recorded run`); continue; }
+  const oracleLibrary = entry.facts?.oracle?.librarySourcesSha256;
+  if (LIBRARY_ORACLE_DIFFERENTIALS.includes(name) && typeof oracleLibrary !== "string")
+    problems.push(`diff:${name} records no facts.oracle.librarySourcesSha256, so nothing says which lokalized-java ` +
+      `build it ran against; re-run \`npm run diff:all\` rather than editing the record`);
+  else if (oracleLibrary !== undefined && oracleLibrary !== corpusLibrary)
+    problems.push(`diff:${name} ran against lokalized-java sources ${String(oracleLibrary).slice(0, 8)} and the corpus ` +
+      `was recorded against ${String(corpusLibrary).slice(0, 8)}; re-run \`npm run diff:all\` against the build the corpus names`);
   if (entry.exit !== 0) problems.push(`diff:${name} was recorded RED (exit ${entry.exit})`);
   for (const [fact, value] of Object.entries(entry.facts?.exercised ?? {})) {
     if (typeof value !== "number")

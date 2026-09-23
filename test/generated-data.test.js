@@ -12,13 +12,18 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { IANA_EQUIVALENCES_ARTIFACT, specPath } from "../tools/iana-artifact.mjs";
+
 const root = new URL("../", import.meta.url).pathname;
 const specDir = process.env.LOKALIZED_SPEC_DIR ?? resolve(root, "../lokalized-spec");
 const vendor = resolve(specDir, "vendor/lokalized-java/src/build/resources/cldr/cldr-locale-data.json");
 const skip = existsSync(vendor) ? false : `pinned CLDR artifacts not found at ${vendor}`;
 
-const ianaArtifact = resolve(specDir, "generated/iana-language-range-equivalents.json");
-const skipIana = existsSync(ianaArtifact) ? false : `pinned IANA closure not found at ${ianaArtifact}`;
+// THE PATH COMES FROM ONE PLACE. This line named the retired closure until A30, and a reader whose
+// file had moved did not fail — it SKIPPED, which is silent locally and red only under CI's no-skip
+// rule. `tools/iana-artifact.mjs` is the one spelling every IANA reader here imports.
+const ianaArtifact = specPath(IANA_EQUIVALENCES_ARTIFACT);
+const skipIana = existsSync(ianaArtifact) ? false : `pinned IANA artifact not found at ${ianaArtifact}`;
 
 test("generated data is current, lossless and reproducible", { skip }, () => {
   const run = spawnSync("node", ["tools/gen-data.js", "--check"], { cwd: root, encoding: "utf8" });
@@ -41,22 +46,26 @@ test("generated data is current, lossless and reproducible", { skip }, () => {
 });
 
 /**
- * The IANA closure has its own generator and therefore needs its own gate.
+ * The IANA modules have their own generator and therefore need their own gate.
  *
- * `test/negotiate.test.js` already decodes `src/data/iana-range-equivalents.js` and compares it
- * against the spec artifact entry for entry, so a CONTENT drift is caught inside `npm run verify`.
- * What that comparison cannot see is the half `gen-iana-data.js` actually promises: that the module
- * still REPRODUCES from the artifact byte for byte, banner and formatting included. Until this test
- * existed the generator's two stated guarantees were checked only when a human happened to run it.
+ * `tools/gen-iana-data.js --check` encodes lokalized-spec's registry-generated artifact into the two
+ * modules in memory, refuses a malformed artifact, a class in two places, a one-way region/variant
+ * pair or a projection whose walk could stop early, proves each module decodes back to what it
+ * encodes (order included), and compares bytes with what is on disk. `test/negotiate.test.js` checks
+ * the decoded FULL table against the artifact separately, so a change to the decode rule is caught
+ * as well as a change to the data.
  *
- * Negative-tested: deleting one class from `src/data/iana-range-equivalents.js` makes `--check` exit
- * 1 with `on-disk bytes differ from regeneration`, and this assertion red.
+ * Negative-tested: deleting one class from either module makes `--check` exit 1 with `on-disk bytes
+ * differ from regeneration`, and this assertion red.
  */
-test("the generated IANA closure is current, lossless and reproducible", { skip: skipIana }, () => {
+test("the generated IANA modules are current, lossless and reproducible", { skip: skipIana }, () => {
   const run = spawnSync("node", ["tools/gen-iana-data.js", "--check"], { cwd: root, encoding: "utf8" });
   assert.equal(run.status, 0, `gen-iana-data --check failed:\n${run.stderr || run.stdout}`);
   const report = JSON.parse(run.stdout);
   assert.equal(report.status, "current");
   assert.equal(report.lossless, true);
-  assert.ok(report.entries > 0, "no IANA equivalence classes were checked");
+  // Counts are the artifact's, so none is a literal here; zero in any means the tool checked nothing.
+  assert.equal(report.modules, 2, "gen-iana-data checked a different number of modules than it emits");
+  for (const field of ["languageKeys", "classes", "identityKeys", "identityClasses", "regionVariantPairs"])
+    assert.ok(report[field] > 0, `gen-iana-data reports ${field} ${report[field]}; it checked nothing`);
 });

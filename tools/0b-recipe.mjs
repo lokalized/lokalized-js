@@ -37,6 +37,12 @@ export const RECIPE = Object.freeze({
   cacheState: "a cold browser HTTP cache over a warm CDN edge, which is what a first-time visitor meets. The page runs from a top-level site this browser has not visited (http://<name>.localhost:8713); Chromium keys its HTTP cache by top-level site, so that partition holds nothing for any URL here, the transitively-imported chunks included. A per-run `?0b=<run>` query additionally busts every URL the page controls. The cold-arm check VERIFIES the result per resource; DNS and connection state are not controlled, so latency is reported and never read as cold.",
   preloadState: "fr and fr-CA preloaded WITH crossorigin (CORS mode matches the loader, so reuse is expected); en preloaded WITHOUT it as the mismatch control, which must NOT be reused",
   region: "RECORDED, never pinned: a CDN answers from the edge nearest the runner and this project does not select one",
+  // `tools/browser-0b/manifest.json` CARRIES 1.0.0-rc.1's BUILD IDENTITY ON PURPOSE —
+  // `ianaDataFingerprint` 42a658b3… and `behavioralVectorsVersion` 1.0.0 — and must be EXCLUDED from
+  // any sweep that rewrites fingerprint or version literals to this build's. The page loads the
+  // PUBLISHED rc.1 from `codeOrigin` above, and `src/load/manifest.js` refuses a manifest whose
+  // identity differs from the running build's, so rewriting it to amendment A30's 87b3a43b… would make
+  // the published code refuse it and break the scenario. It moves when the next publish re-records 0b.
   harness: "tools/browser-0b/{serve.mjs,index.html,manifest.json}, driven in a real browser. The summary covers requests STARTED before the render returns; the controls and the streaming-limit arm start after it and are recorded but not summed",
   hostThresholds: null,
   hostThresholdsNote: "A7 declined to freeze any threshold, so plan :2861's seventh freeze item has no value. M8 clauses 84-87 therefore cannot close by running this, and nothing here should be read as meeting a number.",

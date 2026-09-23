@@ -23,323 +23,177 @@ import {
 	likelySubtagFor,
 } from "./locale-cldr.js";
 import { javaSplit, jdkLanguageSubtag, jdkLanguageTag, parseJdkTag, renderJdkTag } from "./locale-jdk-tag.js";
+import { decodeIdentityEquivalents, decodeRegionVariantEquivalents } from "../data/iana-identity-equivalents.js";
 
 /**
- * IANA language-range equivalences — what `java.util.Locale.LanguageRange#parse` materializes as
- * extra ranges, which Java's kernel then treats as interchangeable "identities" of the request.
+ * IANA language-range equivalences — what lokalized-java's parse materializes as extra ranges, which
+ * Java's kernel then treats as interchangeable "identities" of the request.
  *
  * This is NOT CLDR alias data and the two genuinely disagree: it is the reason a `sgn-NO` request
  * selects a loaded `nsl` even though CLDR maps `sgn-NO` to `nsi`. Java consults both tables, so a
  * port that has only the CLDR aliases gets that case wrong.
  *
- * **SINCE lokalized-java 3.1.0 THE PINNED CLOSURE IS THE LIBRARY'S OWN, NOT THE JDK'S**, and the
- * library uses two tables: `java.util.Locale.LanguageRange.parse` for a list the CALLER built, and
- * its registry-sourced `IanaLanguageEquivalents.parse` inside `bestMatchForAcceptLanguage` and
- * `DefaultStrings#addParsedLanguageRangeIdentities`. THIS table is the reduction of the SECOND one,
- * because that is the method the identity channel below ports; `lokalized/negotiate` carries the
- * full closure plus the eight-tag delta that tells its public parse which keys the JDK's table
- * lacks. The eight all survive the reduction, so a `mgp` request finds a loaded `mrd` at the
- * single-locale door exactly as it does at the whole-list one.
+ * **GENERATED FROM THE PINNED IANA REGISTRY, AMENDMENT A30.** lokalized-spec generates
+ * `generated/iana-language-equivalences.json` from the registry snapshot with no JDK, and
+ * `tools/gen-iana-data.js` encodes it into two modules: the FULL table behind `lokalized/negotiate`,
+ * and this DIRECT-MATCH PROJECTION in `src/data/iana-identity-equivalents.js`. lokalized-java 3.1.0
+ * generates its default `LanguageRangeEquivalents.IANA_REGISTRY` table from the same snapshot, and
+ * lokalized-spec's `npm run check:iana` checks the two equal key by key. There is one table now, not
+ * the JDK's plus a registry delta.
  *
- * **THAT SENTENCE WAS TRUE OF THE BARE FORM ONLY WHEN IT WAS WRITTEN, AND IT IS THE SENTENCE THAT
- * WOULD HAVE STOPPED THE NEXT READER LOOKING.** It reasons about which KEYS survive the reduction
- * and says nothing about the LOOKUP SHAPE, which is where a real divergence was: see
- * `REDUCED_RANGE_EQUIVALENTS` below, which was an exact lookup against Java's prefix walk until
- * M-R S13. It now holds for a suffixed request too.
+ * THE PROJECTION keeps only members `normalizeTag` leaves unchanged, and only classes left with two
+ * or more of them, because every range this kernel builds is an already-normalized locale tag and
+ * every identity is compared against a normalized catalog tag: grandfathered forms (`art-lojban`) and
+ * extlang forms (`zh-cmn`) have been collapsed before they get here. Exact AS MEASURED, not by
+ * construction — `test/locale.test.js` compares this door with the whole-list door, which walks the
+ * full table, over every registry subtag crossed with every region/variant subtag, and pins the Java
+ * rows the shared expansion cannot see.
  *
- * Slice: the pinned registry has 814 classes; only two kinds of entry can ever be observed here, so
- * the rest are omitted.
- *   - keys are restricted to tags that survive `normalizeTag` (`jdkLanguageTag(k) === k`), because
- *     every range this kernel builds is an already-normalized locale tag — grandfathered forms
- *     (`art-lojban`) and extlang forms (`zh-cmn`) have been collapsed before they get here;
- *   - values are restricted the same way, because an identity is only ever compared against a
- *     loaded catalog's locale tag, which the loader has likewise normalized.
- *
- * `test/locale.test.js` regenerates this table from the spec's pinned registry and fails on drift.
- * It is generated data and belongs in `src/data/`; it is inlined only because this milestone ships
- * no such module and this module's owner may not add one.
+ * Each key maps to the OTHER members of its class, key excluded, class order kept — the shape of
+ * lokalized-java's `IanaLanguageEquivalents.LANGUAGE_EQUIVALENTS`. The inline table this replaced
+ * (`IANA_RANGE_EQUIVALENTS`, 277 rows) mapped each key to the whole list `parse` returned, key and
+ * region/variant substitutions included, and the rename is there so the change of shape cannot be
+ * read past.
  *
  * @type {Map<string, string[]>}
  */
-export const IANA_RANGE_EQUIVALENTS = new Map([
-	["aam", ["aam", "aas"]],
-	["aas", ["aas", "aam"]],
-	["acn", ["acn", "xia"]],
-	["adp", ["adp", "dz"]],
-	["adx", ["adx", "pcr"]],
-	["aeb", ["aeb", "ajt"]],
-	["ajp", ["ajp", "apc"]],
-	["ajt", ["ajt", "aeb"]],
-	["aog", ["aog", "myd"]],
-	["apc", ["apc", "ajp"]],
-	["ar-de", ["ar-de", "ar-dd"]],
-	["ar-fr", ["ar-fr", "ar-fx"]],
-	["ar-tl", ["ar-tl", "ar-tp"]],
-	["asd", ["asd", "snz"]],
-	["ase", ["ase", "sgn-us"]],
-	["aue", ["aue", "ktz"]],
-	["ayx", ["ayx", "nun"]],
-	["bcg", ["bcg", "bgm"]],
-	["bfi", ["bfi", "sgn-gb"]],
-	["bfy", ["bfy", "ppa"]],
-	["bgm", ["bgm", "bcg"]],
-	["bh", ["bh", "bih"]],
-	["bic", ["bic", "bir"]],
-	["bih", ["bih", "bh"]],
-	["bir", ["bir", "bic"]],
-	["bjd", ["bjd", "drl"]],
-	["blg", ["blg", "snb", "iba"]],
-	["bmf", ["bmf", "krm"]],
-	["bpp", ["bpp", "nxu"]],
-	["bzs", ["bzs", "sgn-br"]],
-	["cax", ["cax", "xba"]],
-	["cbr", ["cbr", "nom"]],
-	["ccq", ["ccq", "ybd", "rki"]],
-	["cir", ["cir", "meg"]],
-	["cjr", ["cjr", "mom"]],
-	["cka", ["cka", "cmr"]],
-	["cmk", ["cmk", "xch"]],
-	["cmn-de", ["cmn-de", "cmn-dd"]],
-	["cmn-fr", ["cmn-fr", "cmn-fx"]],
-	["cmn-tl", ["cmn-tl", "cmn-tp"]],
-	["cmr", ["cmr", "cka"]],
-	["coy", ["coy", "nts", "pij"]],
-	["cqu", ["cqu", "quh"]],
-	["crr", ["crr", "pmk"]],
-	["csn", ["csn", "sgn-co"]],
-	["dek", ["dek", "sqm"]],
-	["dev", ["dev", "gav"]],
-	["dif", ["dif", "dit"]],
-	["dit", ["dit", "dif"]],
-	["dmw", ["dmw", "xrq"]],
-	["drh", ["drh", "khk"]],
-	["drl", ["drl", "bjd"]],
-	["drr", ["drr", "gli", "kzk"]],
-	["drw", ["drw", "tnf", "prs"]],
-	["dse", ["dse", "sgn-nl"]],
-	["dsl", ["dsl", "sgn-dk"]],
-	["dtp", ["dtp", "tdu", "kzt", "kzj", "ktr"]],
-	["duz", ["duz", "guv"]],
-	["dz", ["dz", "adp"]],
-	["eko", ["eko", "nte"]],
-	["ema", ["ema", "uok"]],
-	["enm", ["enm", "yol"]],
-	["fsl", ["fsl", "sgn-fx", "sgn-fr"]],
-	["gal", ["gal", "ilw"]],
-	["gav", ["gav", "dev"]],
-	["gdj", ["gdj", "kvs"]],
-	["gfx", ["gfx", "oun", "mwj", "vaj"]],
-	["ggn", ["ggn", "gvr"]],
-	["gli", ["gli", "drr", "kzk"]],
-	["gsg", ["gsg", "sgn-dd", "sgn-de"]],
-	["gss", ["gss", "sgn-gr"]],
-	["gti", ["gti", "nyc"]],
-	["gu", ["gu", "prp"]],
-	["guv", ["guv", "duz"]],
-	["gvr", ["gvr", "ggn"]],
-	["hle", ["hle", "sca"]],
-	["hrr", ["hrr", "jal"]],
-	["huw", ["huw", "pmc"]],
-	["iba", ["iba", "snb", "blg"]],
-	["ibi", ["ibi", "opa"]],
-	["ilw", ["ilw", "gal"]],
-	["ise", ["ise", "sgn-it"]],
-	["isg", ["isg", "sgn-ie"]],
-	["jal", ["jal", "hrr"]],
-	["jeg", ["jeg", "thx", "skk", "oyb"]],
-	["jsl", ["jsl", "sgn-jp"]],
-	["jv", ["jv", "jw"]],
-	["jw", ["jw", "jv"]],
-	["kak", ["kak", "tne"]],
-	["kdz", ["kdz", "ncp"]],
-	["kgc", ["kgc", "tdf"]],
-	["kgh", ["kgh", "kml"]],
-	["kgm", ["kgm", "plu"]],
-	["khk", ["khk", "drh"]],
-	["kjh", ["kjh", "zkb"]],
-	["kmb", ["kmb", "smd"]],
-	["kml", ["kml", "kgh"]],
-	["koj", ["koj", "kwv"]],
-	["kok-de", ["kok-de", "kok-dd"]],
-	["kok-fr", ["kok-fr", "kok-fx"]],
-	["kok-tl", ["kok-tl", "kok-tp"]],
-	["krm", ["krm", "bmf"]],
-	["kru", ["kru", "kxl"]],
-	["ksp", ["ksp", "lak"]],
-	["ktr", ["ktr", "tdu", "kzt", "kzj", "dtp"]],
-	["ktz", ["ktz", "aue"]],
-	["kvs", ["kvs", "gdj"]],
-	["kwq", ["kwq", "yam"]],
-	["kwv", ["kwv", "koj"]],
-	["kxe", ["kxe", "tvd"]],
-	["kxl", ["kxl", "kru"]],
-	["kxr", ["kxr", "pat"]],
-	["kzj", ["kzj", "tdu", "kzt", "ktr", "dtp"]],
-	["kzk", ["kzk", "gli", "drr"]],
-	["kzt", ["kzt", "tdu", "kzj", "ktr", "dtp"]],
-	["lak", ["lak", "ksp"]],
-	["lcq", ["lcq", "ppr"]],
-	["lii", ["lii", "raq"]],
-	["llo", ["llo", "ngt"]],
-	["lmm", ["lmm", "rmx"]],
-	["lrr", ["lrr", "yma"]],
-	["meg", ["meg", "cir"]],
-	["mfs", ["mfs", "sgn-mx"]],
-	["mgp", ["mgp", "mrd"]],
-	["mo", ["mo", "ro"]],
-	["mom", ["mom", "cjr"]],
-	["mrd", ["mrd", "mgp"]],
-	["mrh", ["mrh", "shl"]],
-	["mry", ["mry", "myt", "mst"]],
-	["ms-de", ["ms-de", "ms-dd"]],
-	["ms-fr", ["ms-fr", "ms-fx"]],
-	["ms-tl", ["ms-tl", "ms-tp"]],
-	["mst", ["mst", "myt", "mry"]],
-	["mtm", ["mtm", "ymt"]],
-	["mwj", ["mwj", "oun", "gfx", "vaj"]],
-	["myd", ["myd", "aog"]],
-	["myt", ["myt", "mst", "mry"]],
-	["nad", ["nad", "xny"]],
-	["nbr", ["nbr", "nns"]],
-	["ncp", ["ncp", "kdz"]],
-	["ncs", ["ncs", "sgn-ni"]],
-	["ngt", ["ngt", "llo"]],
-	["ngv", ["ngv", "nnx"]],
-	["nns", ["nns", "nbr"]],
-	["nnx", ["nnx", "ngv"]],
-	["no-de", ["no-de", "no-dd"]],
-	["no-fr", ["no-fr", "no-fx"]],
-	["no-tl", ["no-tl", "no-tp"]],
-	["nom", ["nom", "cbr"]],
-	["nsl", ["nsl", "sgn-no"]],
-	["nte", ["nte", "eko"]],
-	["nts", ["nts", "coy", "pij"]],
-	["nun", ["nun", "ayx"]],
-	["nxu", ["nxu", "bpp"]],
-	["nyc", ["nyc", "gti"]],
-	["ola", ["ola", "thw"]],
-	["opa", ["opa", "ibi"]],
-	["oun", ["oun", "mwj", "gfx", "vaj"]],
-	["oyb", ["oyb", "thx", "skk", "jeg"]],
-	["pat", ["pat", "kxr"]],
-	["pcr", ["pcr", "adx"]],
-	["phr", ["phr", "pmu"]],
-	["pij", ["pij", "nts", "coy"]],
-	["plu", ["plu", "kgm"]],
-	["pmc", ["pmc", "huw"]],
-	["pmk", ["pmk", "crr"]],
-	["pmu", ["pmu", "phr"]],
-	["ppa", ["ppa", "bfy"]],
-	["ppr", ["ppr", "lcq"]],
-	["prp", ["prp", "gu"]],
-	["prs", ["prs", "tnf", "drw"]],
-	["prt", ["prt", "pry"]],
-	["pry", ["pry", "prt"]],
-	["psr", ["psr", "sgn-pt"]],
-	["pub", ["pub", "puz"]],
-	["puz", ["puz", "pub"]],
-	["quh", ["quh", "cqu"]],
-	["raq", ["raq", "lii"]],
-	["ras", ["ras", "tie"]],
-	["rki", ["rki", "ybd", "ccq"]],
-	["rmx", ["rmx", "lmm"]],
-	["ro", ["ro", "mo"]],
-	["sca", ["sca", "hle"]],
-	["scv", ["scv", "zir"]],
-	["sfs", ["sfs", "sgn-za"]],
-	["sgn-br", ["sgn-br", "bzs"]],
-	["sgn-co", ["sgn-co", "csn"]],
-	["sgn-de", ["sgn-de", "gsg", "sgn-dd"]],
-	["sgn-dk", ["sgn-dk", "dsl"]],
-	["sgn-es", ["sgn-es", "ssp"]],
-	["sgn-fr", ["sgn-fr", "fsl", "sgn-fx"]],
-	["sgn-gb", ["sgn-gb", "bfi"]],
-	["sgn-gr", ["sgn-gr", "gss"]],
-	["sgn-ie", ["sgn-ie", "isg"]],
-	["sgn-it", ["sgn-it", "ise"]],
-	["sgn-jp", ["sgn-jp", "jsl"]],
-	["sgn-mx", ["sgn-mx", "mfs"]],
-	["sgn-ni", ["sgn-ni", "ncs"]],
-	["sgn-nl", ["sgn-nl", "dse"]],
-	["sgn-no", ["sgn-no", "nsl"]],
-	["sgn-pt", ["sgn-pt", "psr"]],
-	["sgn-se", ["sgn-se", "swl"]],
-	["sgn-tl", ["sgn-tl", "sgn-tp"]],
-	["sgn-us", ["sgn-us", "ase"]],
-	["sgn-za", ["sgn-za", "sfs"]],
-	["shl", ["shl", "mrh"]],
-	["skk", ["skk", "thx", "jeg", "oyb"]],
-	["smd", ["smd", "kmb"]],
-	["snb", ["snb", "blg", "iba"]],
-	["snz", ["snz", "asd"]],
-	["sqm", ["sqm", "dek"]],
-	["sr-de", ["sr-de", "sr-dd"]],
-	["sr-fr", ["sr-fr", "sr-fx"]],
-	["sr-tl", ["sr-tl", "sr-tp"]],
-	["ssp", ["ssp", "sgn-es"]],
-	["sw-cd", ["sw-cd", "sw-zr"]],
-	["sw-de", ["sw-de", "sw-dd"]],
-	["sw-fr", ["sw-fr", "sw-fx"]],
-	["sw-tl", ["sw-tl", "sw-tp"]],
-	["swl", ["swl", "sgn-se"]],
-	["szd", ["szd", "umi"]],
-	["taj", ["taj", "tsf"]],
-	["tdf", ["tdf", "kgc"]],
-	["tdg", ["tdg", "tmk"]],
-	["tdu", ["tdu", "kzt", "kzj", "ktr", "dtp"]],
-	["thc", ["thc", "tpo"]],
-	["thw", ["thw", "ola"]],
-	["thx", ["thx", "skk", "jeg", "oyb"]],
-	["tie", ["tie", "ras"]],
-	["tkk", ["tkk", "twm"]],
-	["tlw", ["tlw", "weo"]],
-	["tmk", ["tmk", "tdg"]],
-	["tmp", ["tmp", "tyj"]],
-	["tne", ["tne", "kak"]],
-	["tnf", ["tnf", "drw", "prs"]],
-	["tpn", ["tpn", "tpw"]],
-	["tpo", ["tpo", "thc"]],
-	["tpw", ["tpw", "tpn"]],
-	["tsf", ["tsf", "taj"]],
-	["tvd", ["tvd", "kxe"]],
-	["twm", ["twm", "tkk"]],
-	["tyj", ["tyj", "tmp"]],
-	["umi", ["umi", "szd"]],
-	["und-alalc97", ["und-alalc97", "und-heploc"]],
-	["und-hepburn-heploc", ["und-hepburn-heploc", "und-hepburn-alalc97"]],
-	["uok", ["uok", "ema"]],
-	["uz-de", ["uz-de", "uz-dd"]],
-	["uz-fr", ["uz-fr", "uz-fx"]],
-	["uz-tl", ["uz-tl", "uz-tp"]],
-	["vaj", ["vaj", "oun", "mwj", "gfx"]],
-	["waw", ["waw", "xkh"]],
-	["weo", ["weo", "tlw"]],
-	["xba", ["xba", "cax"]],
-	["xch", ["xch", "cmk"]],
-	["xia", ["xia", "acn"]],
-	["xkh", ["xkh", "waw"]],
-	["xny", ["xny", "nad"]],
-	["xrq", ["xrq", "dmw"]],
-	["xss", ["xss", "zko"]],
-	["yam", ["yam", "kwq"]],
-	["ybd", ["ybd", "ccq", "rki"]],
-	["yma", ["yma", "lrr"]],
-	["ymt", ["ymt", "mtm"]],
-	["yol", ["yol", "enm"]],
-	["yos", ["yos", "zom"]],
-	["yue-de", ["yue-de", "yue-dd"]],
-	["yue-fr", ["yue-fr", "yue-fx"]],
-	["yue-tl", ["yue-tl", "yue-tp"]],
-	["yug", ["yug", "yuu"]],
-	["yuu", ["yuu", "yug"]],
-	["zh-de", ["zh-de", "zh-dd"]],
-	["zh-fr", ["zh-fr", "zh-fx"]],
-	["zh-tl", ["zh-tl", "zh-tp"]],
-	["zir", ["zir", "scv"]],
-	["zkb", ["zkb", "kjh"]],
-	["zko", ["zko", "xss"]],
-	["zom", ["zom", "yos"]],
-]);
+export const IANA_IDENTITY_EQUIVALENTS = /* @__PURE__ */ decodeIdentityEquivalents();
+
+/**
+ * `sun.util.locale.LocaleEquivalentMaps.regionVariantEquivMap`, in the ORDER
+ * `getEquivalentForRegionAndVariant` walks it — generated, from the spec artifact's
+ * `regionVariantEquivalents`.
+ *
+ * FOURTEEN ENTRIES, and the ORDER IS OBSERVABLE: the walk returns on the FIRST subtag that occurs in
+ * the range, so a range carrying two of them (`sgn-de-fr` holds `-de` and `-fr`) answers differently
+ * under a different order. The registry states the seven pairs one way and in no order; the ORDER is
+ * the JDK's `HashMap` iteration order, authored once in lokalized-spec
+ * `tools/iana-oracle/jdk-compatibility.json`, hashed into the lock, and compared against the running
+ * JDK's own map by `npm run check:iana`.
+ *
+ * **THIS REVERSES A DECISION TAKEN AT M7 CLOSE**, which kept the table a source literal in
+ * `src/negotiate/index.js` on two grounds: there was no upstream artifact to pin (its source was a
+ * JDK-internal class reachable only by reflection), and a generated copy would be a third
+ * transcription of something only an executing JDK could state. Amendment A30 removed both: the spec
+ * now publishes the pairs as data under a lock, and the JDK is one of the checks rather than the
+ * source. The pairs also moved from `negotiate` to the kernel, because the single-locale door needs
+ * them too (see `REDUCED_RANGE_EQUIVALENTS`).
+ *
+ * @type {readonly (readonly [string, string])[]}
+ */
+const REGION_VARIANT_EQUIVALENTS = /* @__PURE__ */ decodeRegionVariantEquivalents();
+
+/** `Integer.MIN_VALUE`, the sentinel `getExtentionKeyIndex` returns for "no singleton extension". */
+const NO_EXTENSION_KEY = -2147483648;
+
+/**
+ * `sun.util.locale.LocaleMatcher#getExtentionKeyIndex`, verbatim, misspelling included.
+ *
+ * It reports the index of the hyphen that introduces a SINGLETON subtag (`-x-`, `-u-`, …), found by
+ * looking for two hyphens two characters apart. Java's `i - index` overflows on the first hyphen
+ * because `index` starts at `Integer.MIN_VALUE`; the overflowed value cannot be 2 for any reachable
+ * `i`, so the JS arithmetic — which does not overflow — takes the same branch on every input.
+ *
+ * @param {string} text
+ * @returns {number}
+ */
+function extensionKeyIndex(text) {
+	let index = NO_EXTENSION_KEY;
+
+	for (let position = 1; position < text.length; ++position)
+		if (text[position] === "-") {
+			if (position - index === 2) return index;
+			index = position;
+		}
+
+	return NO_EXTENSION_KEY;
+}
+
+/**
+ * `sun.util.locale.LocaleMatcher#getEquivalentForRegionAndVariant`, verbatim.
+ *
+ * A SUBSTRING SEARCH, not a suffix test: the subtag may sit anywhere in the range as long as it ends
+ * at the range's end or at a hyphen, and as long as it is not inside a singleton extension. So
+ * `de-DE` yields `de-dd`, `sgn-be-fr` yields `sgn-be-fx`, and `de-x-fr` yields nothing.
+ *
+ * @param {string} range lowercased
+ * @returns {string | null}
+ */
+function equivalentForRegionAndVariant(range) {
+	const keyIndex = extensionKeyIndex(range);
+
+	for (const [subtag, equivalent] of REGION_VARIANT_EQUIVALENTS) {
+		const index = range.indexOf(subtag);
+		if (index === -1) continue;
+		if (keyIndex !== NO_EXTENSION_KEY && index > keyIndex) continue;
+
+		const end = index + subtag.length;
+		if (range.length === end || range[end] === "-")
+			return range.slice(0, index) + equivalent + range.slice(end);
+	}
+
+	return null;
+}
+
+/**
+ * lokalized-java's `IanaLanguageEquivalents#expansionsFor` — the ranges one range adds, in the order
+ * they are COMPUTED. A parse inserts each unseen one at the range's index plus one, so as a list they
+ * appear in reverse.
+ *
+ * Two arms, and both are the JDK's `LanguageRange.parse` semantics with the language table swapped
+ * for the registry's:
+ *
+ *  1. the range's own region/variant substitution, if any;
+ *  2. for the LONGEST hyphen-bounded prefix of the range that is a key of `languageEquivalents`, each
+ *     OTHER member of its class, in class order, with the rest of the range carried across — each
+ *     followed immediately by ITS OWN region/variant substitution, if any. The walk drops one trailing
+ *     subtag at a time and stops at the first key it finds, so `sgn-be-fr-x-a` finds `sgn-be-fr` and
+ *     yields `sfb-x-a`, and `no-bok-no` finds `no-bok` and yields `nb-no`; an exact lookup finds
+ *     neither.
+ *
+ * ONE ALGORITHM, TWO TABLES. `lokalized/negotiate`'s `parseLanguageRanges` runs it over the full
+ * registry table; the single-locale door below runs it over the direct-match projection. The nested
+ * step in arm 2 is what makes `mgp-BU` reach a loaded `mrd-MM` (the language equivalent AND the
+ * region substitution in one range), and it is invisible to any comparison of the two doors because
+ * both share it: `test/locale.test.js` pins the Java rows for that, and `test/iana-model-parity.test.js`
+ * holds the whole parse to lokalized-spec's `tools/iana-oracle/model.mjs`.
+ *
+ * @param {string} range lowercased
+ * @param {ReadonlyMap<string, readonly string[]>} languageEquivalents each member to the OTHER
+ *   members of its class, in class order
+ * @returns {string[]}
+ */
+export function languageRangeExpansions(range, languageEquivalents) {
+	/** @type {string[]} */
+	const expansions = [];
+	const own = equivalentForRegionAndVariant(range);
+	if (own !== null) expansions.push(own);
+
+	let prefix = range;
+
+	while (prefix.length > 0) {
+		const others = languageEquivalents.get(prefix);
+
+		if (others !== undefined) {
+			const suffix = range.slice(prefix.length);
+
+			for (const other of others) {
+				const equivalent = other + suffix;
+				expansions.push(equivalent);
+				const nested = equivalentForRegionAndVariant(equivalent);
+				if (nested !== null) expansions.push(nested);
+			}
+
+			break;
+		}
+
+		const index = prefix.lastIndexOf("-");
+		if (index === -1) break;
+		prefix = prefix.slice(0, index);
+	}
+
+	return expansions;
+}
 
 /**
  * `Readonly`, because the runtime freezes every one of these it hands a caller — `matchForRanges`
@@ -672,58 +526,62 @@ function extlangEquivalentLanguageRangeFor(range) {
 }
 
 /**
- * `DefaultStrings#addParsedLanguageRangeIdentities`, whose body is `LanguageRange.parse(range)` — so
- * this is the JDK's IANA equivalence expansion, not a CLDR alias lookup.
+ * `DefaultStrings#addParsedLanguageRangeIdentities`, whose body is lokalized-java's own parse of the
+ * one range (`IanaLanguageEquivalents.parse` on the default `IANA_REGISTRY` setting) — so this is the
+ * IANA equivalence expansion, not a CLDR alias lookup.
  *
- * The DEFAULT resolver is the reduced inline table, which is all the locale ingress can ever need
- * for its KEYS: the ranges `matchFor` builds are normalized locale tags, so the entries dropped from
- * the table are unreachable from it. `lokalized/negotiate` supplies the full pinned closure instead,
- * because a RAW RFC 4647 range is not a normalized tag and reaches entries this table does not
- * carry. Two corpus cases prove that is not hypothetical: `no-bok-no` expands through
- * `no-bok -> nb` and `sgn-be-fr-x-a` through `sgn-be-fr -> sfb`, and neither key survives the
- * reduction.
+ * The DEFAULT resolver parses over the direct-match projection (`IANA_IDENTITY_EQUIVALENTS`), which
+ * is all the locale ingress can ever need: the ranges `matchFor` builds are normalized locale tags,
+ * so the members dropped from the projection are unreachable from it. `lokalized/negotiate` supplies
+ * the full registry parse instead, because a RAW RFC 4647 range is not a normalized tag and reaches
+ * entries the projection does not carry. Two corpus cases prove that is not hypothetical:
+ * `no-bok-no` expands through `no-bok -> nb` and `sgn-be-fr-x-a` through `sgn-be-fr -> sfb`, and
+ * neither key survives the projection.
  *
- * **IT WAS AN EXACT LOOKUP UNTIL M-R S13 AND THAT WAS A LIVE DIVERGENCE FROM JAVA.**
- * `IanaLanguageEquivalents.equivalentsForLanguage` is a longest-known-PREFIX walk: it drops one
- * trailing subtag at a time, stops at the first key it finds, and re-appends the remainder. A bare
- * `Map.get` answers the bare tag and nothing else, so `matchFor("mgp-001")` over a loaded `mrd-001`
- * answered `none` where Java answers `CANONICAL`. **Measured at 48 divergent rows across nine
- * directed pairs and eight language families, of which SIX PRE-DATE the registry change** — `nsl`
- * and `sgn-no` are the pre-existing instance, and they are the proof this is a standing defect the
- * new data widened rather than collateral of it. The reasoning that kept the exact lookup was about
- * which KEYS the reduction drops, and it was silently carried over to the LOOKUP SHAPE, which is a
- * different question.
+ * IT IS A PARSE OF ONE RANGE, and the shape is Java's rather than a table lookup's: the range itself
+ * first, then each unseen expansion `languageRangeExpansions` computes, spliced in at index 1 — so in
+ * reverse of computation order, exactly where `parse` puts them.
  *
- * **WALKING A REDUCED TABLE IS SAFE HERE, AND IT IS CHECKABLE RATHER THAN ARGUABLE.** The hazard
- * would be a walk that stops at a SHORTER prefix than Java's walk over the full closure and
- * substitutes at the wrong boundary. It cannot happen: no key of the 814-class closure has a
- * strictly shorter prefix present in this table, and every key here is a closure key — so this walk
- * either finds Java's prefix or finds nothing. `test/locale.test.js` asserts both halves of that.
- * What remains is a MISS, never a wrong answer: the dropped keys (`no-bok`, `sgn-be-fr`) and the
- * dropped class MEMBERS (`sgn-nsl`) cannot name a loaded catalog anyway, because a catalog tag has
- * been through `normalizeTag`.
+ * **TWO LIVE DIVERGENCES FROM JAVA HAVE LIVED HERE, AND BOTH WERE THE LOOKUP SHAPE, NOT THE KEYS.**
+ *  - Until M-R S13 it was an EXACT lookup where Java walks the longest known PREFIX, so
+ *    `matchFor("mgp-001")` over a loaded `mrd-001` answered `none` where Java answers `CANONICAL`
+ *    (48 divergent rows, six of them predating the registry work: `nsl`/`sgn-no`).
+ *  - Until A30 the table it walked was pre-expanded — each key mapped to the whole list `parse`
+ *    returned for it, region/variant substitutions included — so a language equivalent COMBINED with
+ *    a region or variant substitution existed only for the combinations its probe space happened to
+ *    include. MEASURED against lokalized-java 3.1.0 on the pinned JDK, over `test/locale.test.js`'s
+ *    door grid (every full-table key with no suffix, `-x-a` and each region/variant subtag; each
+ *    normalized member of its parse offered as a catalog beside a fallback: 22,493 pairs): 88
+ *    answered `none` here and `CANONICAL` in Java — mgp/mrd 28, mrh/shl 28, enm/yol 28, nsl/sgn-no 4
+ *    (`mgp-BU` over a loaded `mrd-MM`, `mrh-BU` over `shl-MM`, `yol-heploc` over `enm-alalc97`,
+ *    `nsl-heploc` over `sgn-NO-alalc97`). Computing the substitution per range, as Java does, answers
+ *    all 22,493 as Java does. The corpus and `diff:lookup` could see neither; `test/locale.test.js`
+ *    pins the Java rows.
+ *
+ * **WALKING A PROJECTION IS SAFE HERE, AND IT IS CHECKABLE RATHER THAN ARGUABLE.** The hazard would
+ * be a walk that stops at a SHORTER prefix than Java's walk over the full table and substitutes at
+ * the wrong boundary. `tools/gen-iana-data.js` refuses to emit a projection in which a dropped
+ * full-table key has a kept shorter prefix (measured: none), and every projection key is a full-table
+ * key — so this walk either finds Java's prefix or finds nothing. What remains is a MISS, never a
+ * wrong answer: the dropped keys (`no-bok`, `sgn-be-fr`) and dropped class members (`sgn-nsl`) cannot
+ * name a loaded catalog anyway, because a catalog tag has been through `normalizeTag`.
  *
  * @typedef {(range: string) => readonly string[] | null} RangeEquivalentResolver
  */
 
 /** @type {RangeEquivalentResolver} */
 const REDUCED_RANGE_EQUIVALENTS = (range) => {
-	let prefix = lower(range);
+	const lowered = lower(range);
+	const parsed = [lowered];
+	const seen = new Set(parsed);
 
-	while (prefix.length > 0) {
-		const equivalenceClass = IANA_RANGE_EQUIVALENTS.get(prefix);
-
-		if (equivalenceClass !== undefined) {
-			const suffix = lower(range).slice(prefix.length);
-			return equivalenceClass.map((equivalent) => equivalent + suffix);
+	for (const equivalent of languageRangeExpansions(lowered, IANA_IDENTITY_EQUIVALENTS))
+		if (!seen.has(equivalent)) {
+			seen.add(equivalent);
+			parsed.splice(1, 0, equivalent);
 		}
 
-		const index = prefix.lastIndexOf("-");
-		if (index === -1) break;
-		prefix = prefix.slice(0, index);
-	}
-
-	return null;
+	return parsed;
 };
 
 /**

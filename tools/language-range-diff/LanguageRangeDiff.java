@@ -1,20 +1,30 @@
 package com.lokalized;
 
 import java.io.BufferedWriter;
-import java.io.IOException;
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * The oracle for `tools/language-range-diff/run.mjs`.
  *
- * It calls `java.util.Locale.LanguageRange.parse` — the REAL JDK parser the library itself calls
- * through `DefaultStrings#addParsedLanguageRangeIdentities` — on the pinned Corretto 21, and emits
- * the member list, or the real exception message, for each input. Nothing here re-reads the grammar,
- * so a disagreement is a port defect and not a difference between two readings of the source.
+ * SINCE AMENDMENT A30 it calls lokalized-java 3.1.0's PUBLIC {@link LocaleMatcher#parseLanguageRanges(String)}
+ * on a default {@link Strings} (so {@link LanguageRangeEquivalents#IANA_REGISTRY}), resolved from the jar
+ * `tools/oracle-jar.mjs` names, on the pinned Corretto 21 — the method the port's `parseLanguageRanges`
+ * ports. It ALSO emits, per input, what the JDK's own {@link Locale.LanguageRange#parse(String)} answers,
+ * as `jdk`: the parse this oracle called before A30, kept so the run can say how many probes the registry
+ * and the running JDK disagree on (the anti-vacuity number: zero would mean the re-aim changed nothing).
+ * Nothing here re-reads the grammar, so a disagreement is a port defect and not a difference between two
+ * readings of the source.
+ *
+ * `package com.lokalized` so the `--keys` dump can reflect the library's own package-private table
+ * (`IanaLanguageEquivalents.LANGUAGE_EQUIVALENTS` and `REGION_VARIANT_EQUIVALENTS`). A rename there
+ * breaks this harness LOUDLY, at the dump, which is the intended failure.
  *
  * Weights are emitted as `Double.toString` TEXT rather than as JSON numbers. That is deliberate:
  * `weight=…` messages are compared verbatim by the conformance runner, so the JS side owes an exact
@@ -22,13 +32,16 @@ import java.util.Locale;
  */
 public class LanguageRangeDiff {
 	public static void main(String[] args) throws Exception {
-		if (args.length == 3 && args[0].equals("--keys")) {
-			dumpEquivalenceKeys(Path.of(args[1]));
-			dumpRegionVariantEquivalents(Path.of(args[2]));
+		if (args.length == 5 && args[0].equals("--keys")) {
+			dumpJdkEquivalenceKeys(Path.of(args[1]));
+			dumpJdkRegionVariantEquivalents(Path.of(args[2]));
+			dumpLibraryEquivalenceKeys(Path.of(args[3]));
+			dumpLibraryRegionVariantEquivalents(Path.of(args[4]));
 			return;
 		}
 
 		List<String> inputs = Files.readAllLines(Path.of(args[0]), StandardCharsets.UTF_8);
+		LocaleMatcher library = defaultStrings();
 
 		try (BufferedWriter out = Files.newBufferedWriter(Path.of(args[1]), StandardCharsets.UTF_8)) {
 			for (String line : inputs) {
@@ -36,25 +49,21 @@ public class LanguageRangeDiff {
 					continue;
 
 				String input = unquote(line);
-				StringBuilder row = new StringBuilder("{\"in\":").append(quote(input));
+				StringBuilder row = new StringBuilder("{\"in\":").append(quote(input)).append(',');
 
 				try {
-					List<Locale.LanguageRange> ranges = Locale.LanguageRange.parse(input);
-					row.append(",\"ok\":true,\"ranges\":[");
-
-					for (int index = 0; index < ranges.size(); ++index) {
-						if (index > 0)
-							row.append(',');
-						row.append("{\"range\":").append(quote(ranges.get(index).getRange()))
-								.append(",\"weight\":").append(quote(Double.toString(ranges.get(index).getWeight())))
-								.append('}');
-					}
-
-					row.append(']');
+					appendRanges(row, library.parseLanguageRanges(input));
 				} catch (RuntimeException exception) {
-					row.append(",\"ok\":false,\"error\":").append(quote(exception.getMessage()))
-							.append(",\"errorType\":").append(quote(exception.getClass().getName()));
+					appendRefusal(row, exception);
 				}
+
+				row.append(",\"jdk\":{");
+				try {
+					appendRanges(row, Locale.LanguageRange.parse(input));
+				} catch (RuntimeException exception) {
+					appendRefusal(row, exception);
+				}
+				row.append('}');
 
 				out.write(row.append('}').toString());
 				out.newLine();
@@ -63,21 +72,54 @@ public class LanguageRangeDiff {
 	}
 
 	/**
-	 * Writes every key of the JDK's OWN equivalence tables, one per line.
+	 * A default {@link Strings}: no {@code languageRangeEquivalents} call, so the library's own default
+	 * applies — which is the point, since that default is what the port models. One catalog, because a
+	 * {@code Strings} needs its fallback's; the parse reads none of it.
+	 */
+	private static Strings defaultStrings() {
+		Set<LocalizedString> catalog = LocalizedStringLoader.parse(
+				new ByteArrayInputStream("{\"K\":\"v\"}".getBytes(StandardCharsets.UTF_8)), Locale.ENGLISH, "probe:en");
+
+		return Strings.withFallbackLocale(Locale.ENGLISH)
+				.localizedStringSupplier(() -> Map.of(Locale.ENGLISH, catalog))
+				.localeSupplier((matcher) -> Locale.ENGLISH)
+				.build();
+	}
+
+	private static void appendRanges(StringBuilder row, List<Locale.LanguageRange> ranges) {
+		row.append("\"ok\":true,\"ranges\":[");
+
+		for (int index = 0; index < ranges.size(); ++index) {
+			if (index > 0)
+				row.append(',');
+			row.append("{\"range\":").append(quote(ranges.get(index).getRange()))
+					.append(",\"weight\":").append(quote(Double.toString(ranges.get(index).getWeight())))
+					.append('}');
+		}
+
+		row.append(']');
+	}
+
+	private static void appendRefusal(StringBuilder row, RuntimeException exception) {
+		row.append("\"ok\":false,\"error\":").append(quote(exception.getMessage()))
+				.append(",\"errorType\":").append(quote(exception.getClass().getName()));
+	}
+
+	/**
+	 * Writes every key of the JDK's OWN language equivalence tables, one per line.
 	 *
-	 * This exists because of a defect this differential could not see without it. The probe space used
-	 * to be "the corpus, plus the 802 keys of the PINNED closure artifact, plus suffixes" — that is, the
-	 * probe space was derived from the very table under test, so a range the artifact is MISSING could
-	 * never be probed, and four of them were. Seeding from `sun.util.locale.LocaleEquivalentMaps`
-	 * instead makes the space complete by construction: whatever the JDK keys on, the port is asked.
+	 * It seeds the probe space. The space was once "the corpus, plus the keys of the PINNED closure
+	 * artifact, plus suffixes" — derived from the very table under test, so a range the artifact was
+	 * MISSING could never be probed, and four of them were (`cmn-hans`, `cmn-hant`, `lv-lvs`, `lv-ltg`).
+	 * Since A30 the JDK is a check rather than the source, but its keys still name ranges a JDK-shaped
+	 * caller sends, so they stay in the space beside the library's and the artifact's.
 	 *
 	 * Reflection into a JDK-internal class is the right tool HERE and would not be in the shipped
-	 * library — this is a test oracle pinned to one JDK build, and the alternative (guessing the key
-	 * shapes from CLDR) is exactly the guess that produced the gap. If the fields ever stop being
-	 * reachable this method THROWS rather than returning what it could find: a probe space that
-	 * quietly shrinks is the failure it was written to prevent.
+	 * library — this is a test oracle pinned to one JDK build. If the fields ever stop being reachable
+	 * this method THROWS rather than returning what it could find: a probe space that quietly shrinks is
+	 * the failure it was written to prevent.
 	 */
-	private static void dumpEquivalenceKeys(Path out) throws Exception {
+	private static void dumpJdkEquivalenceKeys(Path out) throws Exception {
 		Class<?> maps = Class.forName("sun.util.locale.LocaleEquivalentMaps");
 		StringBuilder text = new StringBuilder();
 		int total = 0;
@@ -85,7 +127,7 @@ public class LanguageRangeDiff {
 		for (String field : new String[] { "singleEquivMap", "multiEquivsMap" }) {
 			java.lang.reflect.Field handle = maps.getDeclaredField(field);
 			handle.setAccessible(true);
-			java.util.Map<?, ?> map = (java.util.Map<?, ?>) handle.get(null);
+			Map<?, ?> map = (Map<?, ?>) handle.get(null);
 
 			if (map.isEmpty())
 				throw new IllegalStateException(field + " is empty; the probe space would silently shrink");
@@ -105,35 +147,67 @@ public class LanguageRangeDiff {
 	/**
 	 * Writes `regionVariantEquivMap` as `key<TAB>value` lines, in `keySet()` iteration order.
 	 *
-	 * WHY THIS IS A SEPARATE DUMP, and why it was missing. `dumpEquivalenceKeys` above reflects
-	 * `singleEquivMap` and `multiEquivsMap` only — the two LANGUAGE tables. The third table,
-	 * `regionVariantEquivMap`, was reproduced in TWO hand-typed literals instead: `REGION_VARIANT` in
-	 * `run.mjs` and `REGION_VARIANT_EQUIVALENTS` in `src/negotiate/index.js`. Both were verified once,
-	 * by hand, and re-derived by nothing on any run — and that hand transcription was ALREADY WRONG
-	 * ONCE, enumerated as thirteen subtags with `-zr` missing.
-	 *
-	 * That is precisely the failure mode the language half of this file was rewritten to close: a JDK
-	 * that added a fifteenth pair, or reordered the existing fourteen, would leave every gate green.
-	 * The ORDER is load-bearing and not decoration — `getEquivalentForRegionAndVariant` returns on the
-	 * FIRST key it finds in the range, so a range carrying two of these subtags (`sgn-de-fr` carries
-	 * both `-de` and `-fr`) answers differently under a different iteration order.
-	 *
-	 * Values are emitted alongside the keys so the port's table is checked as a MAPPING, not merely as
-	 * a key set: a transcription that paired `-bu` with `-cd` has the right keys and the wrong answer.
-	 * Like its sibling, this THROWS rather than returning what it could find.
+	 * The ORDER is load-bearing — `getEquivalentForRegionAndVariant` returns on the FIRST key it finds in
+	 * the range, so `sgn-de-fr` answers differently under a different order — and since A30 it is the one
+	 * input to the IANA data the registry does not state: lokalized-spec authors it once
+	 * (`tools/iana-oracle/jdk-compatibility.json`) FROM this map. `run.mjs` requires the port's generated
+	 * pairs, the library's and this map's to be the same ordered list. Values are emitted beside the keys
+	 * so the tables are checked as MAPPINGS, not merely as key sets. THROWS rather than returning what it
+	 * could find.
 	 */
-	private static void dumpRegionVariantEquivalents(Path out) throws Exception {
+	private static void dumpJdkRegionVariantEquivalents(Path out) throws Exception {
 		Class<?> maps = Class.forName("sun.util.locale.LocaleEquivalentMaps");
 		java.lang.reflect.Field handle = maps.getDeclaredField("regionVariantEquivMap");
 		handle.setAccessible(true);
-		java.util.Map<?, ?> map = (java.util.Map<?, ?>) handle.get(null);
+		Map<?, ?> map = (Map<?, ?>) handle.get(null);
 
 		if (map.isEmpty())
 			throw new IllegalStateException("regionVariantEquivMap is empty; the port's table would be checked against nothing");
 
 		StringBuilder text = new StringBuilder();
-		for (java.util.Map.Entry<?, ?> entry : map.entrySet())
+		for (Map.Entry<?, ?> entry : map.entrySet())
 			text.append(entry.getKey()).append('\t').append(entry.getValue()).append('\n');
+
+		Files.writeString(out, text.toString(), StandardCharsets.UTF_8);
+	}
+
+	/**
+	 * Writes every key of lokalized-java's OWN registry table (`IanaLanguageEquivalents.LANGUAGE_EQUIVALENTS`),
+	 * one per line. `LANGUAGE_EQUIVALENTS` is a {@code HashMap}, so its ITERATION ORDER MEANS NOTHING:
+	 * `run.mjs` reads these as a SET of probe seeds and never as an order.
+	 */
+	private static void dumpLibraryEquivalenceKeys(Path out) throws Exception {
+		java.lang.reflect.Field handle = IanaLanguageEquivalents.class.getDeclaredField("LANGUAGE_EQUIVALENTS");
+		handle.setAccessible(true);
+		Map<?, ?> map = (Map<?, ?>) handle.get(null);
+
+		if (map.size() < 700)
+			throw new IllegalStateException("only " + map.size() + " library equivalence keys; expected the registry table's 781");
+
+		StringBuilder text = new StringBuilder();
+		for (Object key : map.keySet())
+			text.append(key).append('\n');
+
+		Files.writeString(out, text.toString(), StandardCharsets.UTF_8);
+	}
+
+	/**
+	 * Writes lokalized-java's `IanaLanguageEquivalents.REGION_VARIANT_EQUIVALENTS` as `key<TAB>value`
+	 * lines, in the list's order — which IS the attempt order (a {@code List}, not a map).
+	 */
+	private static void dumpLibraryRegionVariantEquivalents(Path out) throws Exception {
+		java.lang.reflect.Field handle = IanaLanguageEquivalents.class.getDeclaredField("REGION_VARIANT_EQUIVALENTS");
+		handle.setAccessible(true);
+		List<?> pairs = (List<?>) handle.get(null);
+
+		if (pairs.isEmpty())
+			throw new IllegalStateException("REGION_VARIANT_EQUIVALENTS is empty; the port's pairs would be checked against nothing");
+
+		StringBuilder text = new StringBuilder();
+		for (Object pair : pairs) {
+			String[] fromTo = (String[]) pair;
+			text.append(fromTo[0]).append('\t').append(fromTo[1]).append('\n');
+		}
 
 		Files.writeString(out, text.toString(), StandardCharsets.UTF_8);
 	}

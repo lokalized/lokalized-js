@@ -14,8 +14,10 @@ imports are not so confined: `catalog.js` and `parse-file.js` reach `../core/ind
 `tools/graph-walk.mjs` strips comments before it walks, for exactly this reason.
 
 **The corpus is the specification.** `../lokalized-spec/generated/behavioral-vectors.json` records
-what lokalized-java 3.0.0 actually does for 2,379 cases. Where this document and the corpus disagree,
-the corpus wins and the disagreement is a finding worth reporting.
+what lokalized-java actually does for 2,381 cases — executed, never described; the corpus names the
+library build it ran by the digest of its sources (`oracle.librarySourcesSha256`), which since
+amendment A30 is lokalized-java 3.1.0's. Where this document and the corpus disagree, the corpus wins
+and the disagreement is a finding worth reporting.
 
 ---
 
@@ -45,7 +47,7 @@ export function candidateChain(lookupTag, supported, fallbackLocale, tiebreakers
 `matchType` values are the JS spellings: `none`, `exact`, `canonical`, `cldr-fallback`,
 `likely-subtag`, `extended-range`, `primary-language`, `wildcard`.
 
-**Verify against** the corpus's `matchFor` cases (310) and the `resolution.direct.*` seed rows, whose
+**Verify against** the corpus's `matchFor` cases (312) and the `resolution.direct.*` seed rows, whose
 `attemptedLocales` are a PREFIX of what `candidateChain` produces — the walk stops at the first
 catalog holding the key, or when the fallback policy declines to continue. The document said
 "exactly" here until 2026-09-17 while saying "the prefix actually visited" at the end of the same
