@@ -32,6 +32,12 @@
  * THREE ANTI-VACUITY TERMS, because a checker that silently finds nothing is worse than none:
  * no groups, no assertions, or a `// =>` with no expression in front of it each fail the run.
  *
+ * **A SAMPLE MAY NOT LEAVE ANYTHING IN THE TEMP FOLDER.** Each group runs with its own private temp
+ * folder and fails, named, if an entry is left there (`tools/temp-hygiene.mjs` decides what counts).
+ * A reader copies these samples. MEASURED 2026-09-23: `csp-dual` made a `lokalized-second-*` copy of
+ * the package and never removed it — once per run of this check and once per `check:readme:packed`,
+ * 632 of them in this machine's temp folder — and every gate here was green.
+ *
  * **AND THE LIMIT, MEASURED THE DAY AFTER THIS SHIPPED: THIS GATE DOES NOT CHECK PROSE.** The first
  * README went out with two false sentences, both OUTSIDE any code block and therefore invisible
  * here: it said the root exports constants across ELEVEN axes (there are ten — `Object.values` of
@@ -47,11 +53,12 @@
  * to enforce, one level up from where it started.
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { moduleFor, parseReadme } from "./readme-blocks.mjs";
+import { leftoversIn, temporaryEnvironment } from "./temp-hygiene.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const readmePath = join(root, "README.md");
@@ -69,8 +76,11 @@ try {
     // which is the resolution a reader gets and therefore the one worth testing.
     const file = join(root, `.readme-example-${name}.mjs`);
     writeFileSync(file, moduleFor(group));
+    const temporary = join(work, name);
+    mkdirSync(temporary);
     try {
-      const out = execFileSync(process.execPath, [file], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+      const out = execFileSync(process.execPath, [file],
+        { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: temporaryEnvironment(temporary) });
       ran.push(`  ok    ${name.padEnd(14)} ${out.trim()} assertion(s)`);
     } catch (error) {
       const detail = /** @type {{ stderr?: string, stdout?: string }} */ (error);
@@ -78,6 +88,9 @@ try {
     } finally {
       rmSync(file, { force: true });
     }
+    const left = leftoversIn(temporary);
+    if (left.length > 0)
+      problems.push(`example '${name}' left ${left.join(", ")} in the temp folder; a sample a reader copies must remove what it creates`);
   }
 } finally {
   rmSync(work, { recursive: true, force: true });

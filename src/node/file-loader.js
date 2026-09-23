@@ -46,11 +46,18 @@ import { createStringsManifestFromDirectory, directoryPath } from "./manifest-di
  * `Promise<Uint8Array | AsyncIterable<Uint8Array>>` and both are honoured, because a test double has
  * no reason to build a stream and the default reader has every reason to be one.
  *
+ * `partialFailure` is the Fetch doors' `PartialFailurePolicy`, referenced rather than spelled out,
+ * because plan 6.2 derives these options from `LoadStringsOptions`. Until 2026-09-23 this typedef and
+ * `LoadStringsFromDirectoryOptions` below spelled it `"all-or-nothing" | "allow-partial"`, so the
+ * plan's own `"reject"` failed to compile on these doors while `"all-or-nothing"` — a spelling the
+ * plan does not have — compiled. At run time the two were always the same: `run-plan.js` reads
+ * `=== "allow-partial"`.
+ *
  * @typedef {object} LoadStringsFromFilesOptions
  * @property {(url: string, signal?: AbortSignal) => Promise<Uint8Array | AsyncIterable<Uint8Array>>} [readFile]
  * @property {AbortSignal} [signal]
  * @property {import("../internal/catalog.js").ParseLimits} [limits]
- * @property {"all-or-nothing" | "allow-partial"} [partialFailure]
+ * @property {import("../load/index.js").PartialFailurePolicy} [partialFailure]
  */
 
 /** The default reader: a real stream, so a body is bounded as it arrives rather than after. */
@@ -173,7 +180,7 @@ export async function readStringsManifest(path, options = {}) {
   // `readStringsManifest('nope.json', { limits: { maximumInputBytes: -1 } })` reports the RangeError
   // and an `https:` path reports the scheme refusal.
   refuseNetworkOptions(options);
-  refuseUnknownOptions("readStringsManifest", options, READ_MANIFEST_OPTIONS, NODE_NEAR_MISSES);
+  options = refuseUnknownOptions("readStringsManifest", options, READ_MANIFEST_OPTIONS, NODE_NEAR_MISSES);
 
   const url = path instanceof URL ? path : (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(path)
     ? new URL(path) : pathToFileURL(path));
@@ -207,9 +214,11 @@ export async function readStringsManifest(path, options = {}) {
  */
 export async function loadStringsFromFiles(manifest, lookupLocale, options = {}) {
   refuseNetworkOptions(options);
-  refuseUnknownOptions("loadStringsFromFiles", options, NODE_FILE_OPTIONS, NODE_NEAR_MISSES);
+  options = refuseUnknownOptions("loadStringsFromFiles", options, NODE_FILE_OPTIONS, NODE_NEAR_MISSES);
 
-  const plan = fetchSet(manifest, lookupLocale, options);
+  // PROJECTED to `fetchSet`'s own surface, which now refuses a member it does not read: handing it
+  // this door's whole options object would refuse the caller's documented transport options.
+  const plan = fetchSet(manifest, lookupLocale, { limits: options.limits });
   const loaded = await runPlan(manifest, plan, options, FILE_TRANSPORT);
   return Object.freeze({
     ...loaded,
@@ -224,7 +233,7 @@ export async function loadStringsFromFiles(manifest, lookupLocale, options = {})
  */
 export async function loadEntireManifestFromFiles(manifest, options = {}) {
   refuseNetworkOptions(options);
-  refuseUnknownOptions("loadEntireManifestFromFiles", options, NODE_FILE_OPTIONS, NODE_NEAR_MISSES);
+  options = refuseUnknownOptions("loadEntireManifestFromFiles", options, NODE_FILE_OPTIONS, NODE_NEAR_MISSES);
 
   const validated = validateStringsManifest(manifest, { limits: options.limits });
   const loaded = await runPlan(manifest, wholeManifestPlan(validated), options, FILE_TRANSPORT);
@@ -243,7 +252,7 @@ export async function loadEntireManifestFromFiles(manifest, options = {}) {
  * @property {number} [maximumDiscoveryEntries]
  * @property {(url: string, signal?: AbortSignal) => Promise<Uint8Array | AsyncIterable<Uint8Array>>} [readFile]
  * @property {AbortSignal} [signal]
- * @property {"all-or-nothing" | "allow-partial"} [partialFailure]
+ * @property {import("../load/index.js").PartialFailurePolicy} [partialFailure]
  */
 
 /**
@@ -282,7 +291,7 @@ export async function loadStringsFromDirectory(directory, options) {
   // does not. `fetch` and `request` are refused the same way by FILE_TRANSPORT's preflight — but
   // ONLY on the calls that reach it, which is why this door needs its own arm below.
   refuseNetworkOptions(options);
-  refuseUnknownOptions("loadStringsFromDirectory", options, DIRECTORY_DOOR_OPTIONS, NODE_NEAR_MISSES);
+  options = refuseUnknownOptions("loadStringsFromDirectory", options, DIRECTORY_DOOR_OPTIONS, NODE_NEAR_MISSES);
 
   const path = directoryPath(directory);
 

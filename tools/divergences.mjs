@@ -315,7 +315,12 @@ const body = [
 
 const serialized = `${body}\n`;
 const write = process.argv.includes("--write");
-if (write) writeFileSync(OUTPUT, serialized);
+// **WRITTEN ONLY BY A RUN WITH NO PROBLEMS.** This used to write first and report afterwards, so a
+// `--write` that failed — `npm pack` without the sibling spec, for one — still rewrote the tracked
+// DIVERGENCES.md with its declined-API table emptied, then exited 1 (found by the 2026-09-23
+// pre-push review). A deliberate shrink goes through the floors above, which are code.
+if (write && problems.length === 0) writeFileSync(OUTPUT, serialized);
+else if (write) problems.push(`${OUTPUT} was NOT written: a run with problems does not re-record the document`);
 else {
   let recorded = "";
   try { recorded = readFileSync(OUTPUT, "utf8"); } catch { problems.push(`${OUTPUT} does not exist. Run: node tools/divergences.mjs --write`); }

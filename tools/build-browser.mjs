@@ -158,6 +158,9 @@ const outdir = writing
 
 rmSync(outdir, { recursive: true, force: true });
 mkdirSync(outdir, { recursive: true });
+// The check's temporary build goes on `exit`, not after the checks below, where a throw anywhere in
+// between skipped it: two `lokalized-dist-<pid>` directories were found left in the system temp folder.
+if (!writing) process.on("exit", () => rmSync(outdir, { recursive: true, force: true }));
 
 let single, graph, global;
 try {
@@ -426,8 +429,6 @@ if (maps < scripts.length) problems.push(`${scripts.length} script(s) were built
 if (syntheticEntries !== 1)
   problems.push(`the generated-entry source-map exemption applied ${syntheticEntries} time(s); it must apply exactly once`);
 if (mappedSources < 70) problems.push(`the source maps name ${mappedSources} source(s) in total, which is fewer than this package has`);
-
-if (!writing) rmSync(outdir, { recursive: true, force: true });
 
 console.log(`dist/browser — ${manifest.entries.length} entries, ${manifest.files.length + 1} files, ${manifest.builder}`);
 for (const entry of manifest.entries) {

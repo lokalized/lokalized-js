@@ -410,7 +410,12 @@ add(
 );
 
 const work = mkdtempSync(join(tmpdir(), "lokalized-parsediff-"));
-try {
+// REMOVED ON `exit`, NOT IN A `finally`. A red run ends in `process.exit` inside this block, which
+// skips `finally`, and until 2026-09-23 a `finally` after the block held the removal — so every RED
+// run left its work directory in the system temp folder. The block is the old `try` body, kept as a
+// block so its bindings stay scoped.
+process.on("exit", () => rmSync(work, { recursive: true, force: true }));
+{
   const inPath = join(work, "inputs.tsv");
   writeFileSync(
     inPath,
@@ -675,6 +680,4 @@ try {
   }
 
   if (differences.length || unmapped.length || stale.length || degenerate.length) process.exit(1);
-} finally {
-  rmSync(work, { recursive: true, force: true });
 }

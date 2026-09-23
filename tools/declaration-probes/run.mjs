@@ -65,7 +65,16 @@ const ERROR_CLASSES = /** @type {{ name: string, subpath: string, extendsRefused
   { name: "DigestUnavailableError", subpath: "load", extendsRefused: true },
 ]);
 
-/** @type {{ name: string, compiles: boolean, why: string, source: string }[]} */
+/**
+ * `refusedWith` names the diagnostic a must-be-refused probe exists for. **Without it such a probe
+ * passes when `tsc` refuses the WHOLE PROGRAM** — an unresolved import, a typo in the probe — which
+ * is the limit M-D S33 recorded and which the Fetch-door probes below hit on their first run: routed
+ * through the source project by mistake, all three "refused" with TS2307 while their control failed.
+ * Optional, so the older probes keep their meaning; new must-be-refused probes should carry it.
+ *
+ * @type {{ name: string, compiles: boolean, why: string, source: string, throughPackage?: boolean,
+ *   refusedWith?: string }[]}
+ */
 const PROBES = [
   {
     name: "a switch over `matchType` exhausts",
@@ -349,6 +358,115 @@ export const f = (e: FallbackEvent) => e.localeMatch.consideredLocales.length;`,
 export const f = (x: TranslationFailure) => { x.localeMatch.matchType = "exact"; };`,
   },
   {
+    name: "the Fetch doors take every option plan 6.2 declares",
+    compiles: true,
+    throughPackage: true,
+    why: "THE CONTROL for the three below: a declaration refusing every options object would satisfy " +
+      "them, and every member here is one plan 6.2's `LoadStringsOptions` names",
+    source: `import { loadEntireManifest, loadStrings } from "lokalized/load";
+import type { StringsManifestV1 } from "lokalized/load";
+declare const manifest: StringsManifestV1;
+declare const signal: AbortSignal;
+const options = {
+  fetch: globalThis.fetch, signal, partialFailure: "allow-partial",
+  request: { mode: "cors", credentials: "include" }, limits: { maximumInputBytes: 1024 },
+} as const;
+export const subset = loadStrings(manifest, "fr", options);
+export const entire = loadEntireManifest(manifest, { partialFailure: "reject", limits: {} });`,
+  },
+  {
+    name: "a Fetch door takes a custom transport typed as the call the loader makes",
+    compiles: true,
+    throughPackage: true,
+    why: "amendment A31: plan 6.2 typed `fetch` as `typeof globalThis.fetch`, which refused this with " +
+      "TS2322 although the loader only ever calls it with a string URL and an init object. The global " +
+      "`fetch` is still accepted; the control above passes it",
+    source: `import { loadEntireManifest, loadStrings } from "lokalized/load";
+import type { StringsManifestV1 } from "lokalized/load";
+declare const manifest: StringsManifestV1;
+const bare = async (url: string): Promise<Response> => new Response(url);
+const withInit = async (url: string, init?: RequestInit): Promise<Response> => new Response(url, init);
+export const subset = loadStrings(manifest, "fr", { fetch: bare });
+export const entire = loadEntireManifest(manifest, { fetch: withInit });`,
+  },
+  {
+    name: "a Fetch door refuses a transport the loader cannot call",
+    compiles: false,
+    throughPackage: true,
+    refusedWith: "TS2322",
+    why: "THE OTHER HALF of A31: without it the probe above is satisfied by a `fetch` typed `any`. A " +
+      "transport taking a number cannot receive the string URL the loader passes",
+    source: `import { loadStrings } from "lokalized/load";
+import type { StringsManifestV1 } from "lokalized/load";
+declare const manifest: StringsManifestV1;
+const wrong = async (port: number): Promise<Response> => new Response(String(port));
+export const subset = loadStrings(manifest, "fr", { fetch: wrong });`,
+  },
+  {
+    name: "a Fetch door refuses a misspelled option at compile time",
+    compiles: false,
+    throughPackage: true,
+    refusedWith: "TS2353",
+    why: "`transport` is the near miss that sent loads to the real network before M-D S33 refused it at " +
+      "run time. The emitted declaration typed these options `any` until 2026-09-23, so this compiled",
+    source: `import { loadStrings } from "lokalized/load";
+import type { StringsManifestV1 } from "lokalized/load";
+declare const manifest: StringsManifestV1;
+export const subset = loadStrings(manifest, "fr", { transport: globalThis.fetch });`,
+  },
+  {
+    name: "a Fetch door refuses a partial-failure policy it does not have",
+    compiles: false,
+    throughPackage: true,
+    refusedWith: "TS2820",
+    why: "the one guard this value has: `run-plan.js` reads `partialFailure === 'allow-partial'`, so " +
+      "at run time a misspelled policy is silently the default, `reject`. TS2820 is TS2322's " +
+      "\"Did you mean '\"allow-partial\"'?\" form — the compiler names the near miss itself",
+    source: `import { loadEntireManifest } from "lokalized/load";
+import type { StringsManifestV1 } from "lokalized/load";
+declare const manifest: StringsManifestV1;
+export const entire = loadEntireManifest(manifest, { partialFailure: "allow_partial" });`,
+  },
+  {
+    name: "the Fetch doors' options type is read-only, as plan 6.2 declares it",
+    compiles: false,
+    throughPackage: true,
+    refusedWith: "TS2540",
+    why: "plan 6.2 marks every `LoadStringsOptions` member `readonly`; the emitted type was mutable",
+    source: `import type { LoadStringsOptions } from "lokalized/load";
+export const clear = (options: LoadStringsOptions) => { options.signal = undefined; };`,
+  },
+  {
+    name: "the Node file doors take plan 6.2's partial-failure policy",
+    compiles: true,
+    throughPackage: true,
+    why: "plan 6.2 derives `LoadStringsFromFilesOptions` and `LoadStringsFromDirectoryOptions` from " +
+      "`LoadStringsOptions`, so the policy is `\"reject\" | \"allow-partial\"`. Both Node typedefs " +
+      "declared `\"all-or-nothing\" | \"allow-partial\"` until 2026-09-23, which REFUSED the plan's " +
+      "`\"reject\"` with TS2322 — the documented default, spelled as documented",
+    source: `import { loadEntireManifestFromFiles, loadStringsFromDirectory, loadStringsFromFiles } from "lokalized/node";
+import type { StringsManifestV1 } from "lokalized/load";
+declare const manifest: StringsManifestV1;
+export const subset = loadStringsFromFiles(manifest, "fr", { partialFailure: "reject" });
+export const entire = loadEntireManifestFromFiles(manifest, { partialFailure: "allow-partial" });
+export const directory = loadStringsFromDirectory("/srv/catalogs", {
+  catalogVersion: "v1", fallbackLocale: "en", partialFailure: "reject",
+});`,
+  },
+  {
+    name: "the Node file doors refuse a policy the plan does not have",
+    compiles: false,
+    throughPackage: true,
+    refusedWith: "TS2322",
+    why: "the other half: `\"all-or-nothing\"` compiled on the Node doors and was refused on the Fetch " +
+      "doors, one option under two vocabularies. At run time it is the default only because " +
+      "`run-plan.js` reads `=== \"allow-partial\"` and treats every other string alike",
+    source: `import { loadStringsFromFiles } from "lokalized/node";
+import type { StringsManifestV1 } from "lokalized/load";
+declare const manifest: StringsManifestV1;
+export const subset = loadStringsFromFiles(manifest, "fr", { partialFailure: "all-or-nothing" });`,
+  },
+  {
     name: "createStrings refuses a runtimeLimits option",
     compiles: false,
     why: "plan 4.6 — a non-undefined `runtimeLimits` is a construction-time error, and the DECLARATION says so",
@@ -402,13 +520,17 @@ try {
       compiled = false;
       output = `${/** @type {any} */ (error).stdout ?? ""}`;
     }
-    const ok = compiled === probe.compiles;
+    // A refusal for a reason other than the one the probe names is not the refusal it asserts.
+    const refusedForItsReason = probe.refusedWith === undefined || output.includes(`error ${probe.refusedWith}:`);
+    const ok = compiled === probe.compiles && (compiled || refusedForItsReason);
     if (!ok) failures++;
     console.log(`  ${ok ? "ok  " : "FAIL"}  ${probe.compiles ? "compiles" : "REFUSED "}  ${probe.name}`);
     if (!ok) {
       console.log(`          ${probe.why}`);
       const line = output.split("\n").find((l) => l.includes("error TS"));
-      console.log(`          ${compiled ? "it compiled, and the probe says it must not" : `tsc: ${line ?? "(no diagnostic)"}`}`);
+      console.log(`          ${compiled ? "it compiled, and the probe says it must not"
+        : probe.compiles || refusedForItsReason ? `tsc: ${line ?? "(no diagnostic)"}`
+        : `refused, but not with ${probe.refusedWith} — tsc: ${line ?? "(no diagnostic)"}`}`);
     }
   }
 } finally {

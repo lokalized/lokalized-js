@@ -40,7 +40,7 @@ export function readStringsFromDirectory(directory, options = {}) {
   // BEFORE both existing validations, which mask: measured, `{ limits: { maximumInputBytes: -1 },
   // typo: 1 }` reports the resolveLimits RangeError and `{ maximumDiscoveryEntries: 0, typo: 1 }`
   // reports the discovery RangeError.
-  refuseUnknownOptions("readStringsFromDirectory", options,
+  options = refuseUnknownOptions("readStringsFromDirectory", options,
     ["limits", "maximumDiscoveryEntries", "onWarning", "pluralData"], { loadingLimits: "limits" });
 
   // VALIDATED IN THIS ORDER, and the order is observable when BOTH are wrong: the discovery budget

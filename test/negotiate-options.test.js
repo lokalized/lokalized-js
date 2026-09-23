@@ -71,7 +71,7 @@ describe("forLanguageRanges is strict", () => {
   });
 
   test("it builds exactly what core's own `forLocaleMatch` builds", () => {
-    // This module does NOT import core — that would pull a 30-module graph into a 16-module subpath
+    // This module does NOT import core — that would pull core's whole graph into a much smaller subpath
     // — so the two literals are built independently and this is what keeps them equal. The option
     // shape is structural by plan 3.4:713, which is why two constructions are the intended design
     // rather than duplication to tidy away.

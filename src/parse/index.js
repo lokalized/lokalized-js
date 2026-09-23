@@ -171,7 +171,7 @@ const PARSE_STRINGS_OPTIONS = /** @type {const} */ ([
 export function parseStrings(input, options) {
   // BEFORE the session, which is constructed as an ARGUMENT below — so `resolveLimits`' RangeError
   // fires before any body statement and would mask a call carrying both a bad limit and a typo.
-  refuseUnknownOptions("parseStrings", options, PARSE_STRINGS_OPTIONS,
+  options = refuseUnknownOptions("parseStrings", options, PARSE_STRINGS_OPTIONS,
     { loadingLimits: "limits" });
 
   // A FRESH session per call: this door parses exactly one resource, so every aggregate budget is

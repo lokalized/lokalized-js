@@ -313,7 +313,12 @@ let exitCode = 0;
 
 /* Validate the stripper before any stripped byte count is reported. */
 const work = mkdtempSync(join(tmpdir(), "lokalized-graph-size-"));
-try {
+// REMOVED ON `exit`, NOT IN A `finally`: three `process.exit(2)` calls inside this block skip
+// `finally`, and until 2026-09-23 a `finally` after it held the removal, so each of those stops left
+// the directory in the system temp folder. The block is the old `try` body, kept as a block so its
+// bindings stay scoped.
+process.on("exit", () => rmSync(work, { recursive: true, force: true }));
+{
   for (const [file, { text }] of graph.nodes) {
     const rel = relative(root, file);
     const dest = join(work, rel);
@@ -471,8 +476,6 @@ try {
     );
     exitCode = 2;
   }
-} finally {
-  rmSync(work, { recursive: true, force: true });
 }
 
 process.exit(exitCode);

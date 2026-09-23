@@ -279,7 +279,8 @@ test("D4b: an aggregate crossing carries the per-file failures it interrupted, i
   // tolerated. Throwing the budget crossing alone reported "you are over budget" and silently lost
   // every reason a file had been unreadable — so a caller is told to lower a limit when what they
   // actually have is a corrupt catalog.
-  const dir = mkdtempSync(join(tmpdir(), "agg-partial-"));
+  const dir = mkdtempSync(join(tmpdir(), "lokalized-aggregate-partial-"));
+  temporaryDirectories.push(dir);
   for (const tag of ["en", "fr", "de"])
     writeFileSync(join(dir, `${tag}.json`), JSON.stringify({ A: `a-${tag}` }));
   const manifest = await createStringsManifestFromDirectory(dir, {
@@ -307,8 +308,6 @@ test("D4b: an aggregate crossing carries the per-file failures it interrupted, i
   // assembled from two sources, which is exactly where an append-and-hope would have broken it.
   assert.deepEqual(crossing.failures.map((f) => `${f.locale}:${f.stage}`), ["en:parse", "fr:limit"],
     "the crossing must carry the failures it interrupted, merged in fetch-plan order");
-
-  rmSync(dir, { recursive: true, force: true });
 });
 
 // D4 — `allow-partial`, and the two kinds of over-budget it has to tell apart.

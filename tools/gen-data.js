@@ -616,28 +616,31 @@ const emitted = MODULES.map((m) => ({ ...m, text: banner(m.what) + m.encode(m.so
 async function verifyLossless() {
   const work = await mkdtemp(join(tmpdir(), "lokalized-gen-"));
   const failures = [];
-  for (const m of emitted) {
-    const p = join(work, m.file.replace(/\.js$/, ".mjs"));
-    await writeFile(p, m.text);
-    const { decode } = await import(`file://${p}`);
-    if (jcs(decode()) !== jcs(m.source)) failures.push(`${m.file}: decode() does not reproduce the source`);
-  }
+  // Removed in a `finally`: an emitted module that does not import used to leave the directory behind.
+  try {
+    for (const m of emitted) {
+      const p = join(work, m.file.replace(/\.js$/, ".mjs"));
+      await writeFile(p, m.text);
+      const { decode } = await import(`file://${p}`);
+      if (jcs(decode()) !== jcs(m.source)) failures.push(`${m.file}: decode() does not reproduce the source`);
+    }
 
-  // Likely subtags carry extra obligations the generic round-trip does not express.
-  const p = join(work, "ls.mjs");
-  await writeFile(p, emitted.find((m) => m.file === "likely-subtags.js").text);
-  const rows = (await import(`file://${p}`)).decode();
-  const byKey = new Map(rows.map((r) => [r.from, r.to]));
-  if (byKey.size !== locale.likelySubtags.length) failures.push("likely-subtags: key count changed");
-  for (const { from, to } of locale.likelySubtags) {
-    if (byKey.get(from) !== to) failures.push(`likely-subtags: ${from} triple not preserved`);
-    if (to.split("-").length < 3) failures.push(`likely-subtags: ${from} lost a triple component`);
+    // Likely subtags carry extra obligations the generic round-trip does not express.
+    const p = join(work, "ls.mjs");
+    await writeFile(p, emitted.find((m) => m.file === "likely-subtags.js").text);
+    const rows = (await import(`file://${p}`)).decode();
+    const byKey = new Map(rows.map((r) => [r.from, r.to]));
+    if (byKey.size !== locale.likelySubtags.length) failures.push("likely-subtags: key count changed");
+    for (const { from, to } of locale.likelySubtags) {
+      if (byKey.get(from) !== to) failures.push(`likely-subtags: ${from} triple not preserved`);
+      if (to.split("-").length < 3) failures.push(`likely-subtags: ${from} lost a triple component`);
+    }
+    if (byKey.has("zz-not-a-key")) failures.push("likely-subtags: absent key resolves");
+    const latn = locale.likelySubtags.find((r) => r.to.includes("-Latn-"));
+    if (latn && !byKey.has(latn.from)) failures.push("likely-subtags: present Latn row lost its presence bit");
+  } finally {
+    await rm(work, { recursive: true, force: true });
   }
-  if (byKey.has("zz-not-a-key")) failures.push("likely-subtags: absent key resolves");
-  const latn = locale.likelySubtags.find((r) => r.to.includes("-Latn-"));
-  if (latn && !byKey.has(latn.from)) failures.push("likely-subtags: present Latn row lost its presence bit");
-
-  await rm(work, { recursive: true, force: true });
   return failures;
 }
 

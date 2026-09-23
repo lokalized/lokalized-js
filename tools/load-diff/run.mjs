@@ -96,7 +96,7 @@
  * refusals, where availability is not a question anyone can ask.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -192,6 +192,12 @@ const FAILURE_COUNTERPART = {
 };
 
 const workRoot = mkdtempSync(join(tmpdir(), "lokalized-load-diff-"));
+// NOTHING REMOVED THIS DIRECTORY before 2026-09-23, so every run left one in the system temp folder
+// (23 `lokalized-load-diff-*` were counted there). It goes on `exit` because the run ends in
+// `process.exit`, which skips `finally`; `--keep` leaves it for inspection, as `npm run declarations`
+// and `npm run check:readonly` do.
+const KEEP = process.argv.includes("--keep");
+if (!KEEP) process.on("exit", () => rmSync(workRoot, { recursive: true, force: true }));
 
 /**
  * Bodies that live OUTSIDE any probe directory, so two entries can resolve to ONE real path.
@@ -565,7 +571,7 @@ for (const [what, holds] of CONTENT_DISCRIMINATORS)
       ` the parsed-content column agrees for free on that member`);
 
 console.log(`diff:load — ${compared} probe(s) against lokalized-java 3.0.0 on the pinned JDK`);
-console.log(`  probe directories under ${workRoot}`);
+if (KEEP) console.log(`  probe directories kept under ${workRoot}`);
 
 if (unmapped.length) {
   console.log(`\nUNMAPPED JAVA FAILURE TYPES (${unmapped.length}) — declare a counterpart or fix the probe:`);

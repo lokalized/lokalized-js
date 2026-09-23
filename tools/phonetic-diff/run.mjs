@@ -481,8 +481,14 @@ const tsv = SCENARIOS.map((s) => [
   Object.entries(s.catalogs).map(([l, c]) => `${l}::${b64(c)}`).join(";;"),
 ].join("\t")).join("\n");
 
-const work = mkdtempSync(join(tmpdir(), "phonetic-diff-"));
-try {
+const work = mkdtempSync(join(tmpdir(), "lokalized-phonetic-diff-"));
+// REMOVED ON `exit`, NOT IN A `finally`. This run ends in `process.exit`, which skips `finally`,
+// and until 2026-09-23 a `finally` after this block held the removal — so EVERY run left its work
+// directory in the system temp folder (13 `phonetic-diff-*` were counted there; the prefix now
+// matches every other `lokalized-*` scratch directory). The block is the old `try` body, kept as a
+// block so its bindings stay scoped.
+process.on("exit", () => rmSync(work, { recursive: true, force: true }));
+{
   writeFileSync(join(work, "in.tsv"), `${tsv}\n`, "utf8");
   const compile = spawnSync(join(JDK, "bin/javac"),
     ["-cp", join(javaDir, "target/classes"), "-d", work, join(here, "PhoneticDiff.java")],
@@ -592,8 +598,6 @@ try {
     console.log(`DEGENERATE CAUSE-CHAIN SET: ${reason}`);
   process.exit(mismatches === 0 && stale.length === 0 && miscounted.length === 0
     && UNMAPPED_CAUSE_CLASSES.size === 0 && degenerate.length === 0 ? 0 : 1);
-} finally {
-  rmSync(work, { recursive: true, force: true });
 }
 
 /** @param {{name:string,fallback:string,request:string,key:string,resolver:string,values:string,catalogs:Record<string,object>}} s */

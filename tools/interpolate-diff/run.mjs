@@ -279,7 +279,12 @@ function nameColumnProblems(rows) {
 }
 
 const work = mkdtempSync(join(tmpdir(), "lokalized-interpdiff-"));
-try {
+// REMOVED ON `exit`, NOT IN A `finally`. A red run ends in `process.exit` inside this block, which
+// skips `finally`, and until 2026-09-23 a `finally` after the block held the removal — so every RED
+// run left its work directory in the system temp folder. The block is the old `try` body, kept as a
+// block so its bindings stay scoped.
+process.on("exit", () => rmSync(work, { recursive: true, force: true }));
+{
   /** @type {[string, string][]} */
   const rows = [
     ...lenientInputs().map((input) => /** @type {[string, string]} */ (["lenient", input])),
@@ -430,6 +435,4 @@ try {
   const failed = differences.length + channelProblems.length
     + fieldProblems.length + discriminationProblems.length;
   if (failed) process.exit(1);
-} finally {
-  rmSync(work, { recursive: true, force: true });
 }

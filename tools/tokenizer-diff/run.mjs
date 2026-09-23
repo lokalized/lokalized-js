@@ -215,7 +215,12 @@ function inputs() {
 }
 
 const work = mkdtempSync(join(tmpdir(), "lokalized-tokdiff-"));
-try {
+// REMOVED ON `exit`, NOT IN A `finally`. A red run ends in `process.exit` inside this block, which
+// skips `finally`, and until 2026-09-23 a `finally` after the block held the removal — so every RED
+// run left its work directory in the system temp folder. The block is the old `try` body, kept as a
+// block so its bindings stay scoped.
+process.on("exit", () => rmSync(work, { recursive: true, force: true }));
+{
   const expressions = inputs();
   const inPath = join(work, "inputs.txt");
   const outPath = join(work, "java.jsonl");
@@ -343,6 +348,4 @@ try {
     for (const problem of fieldProblems) console.log(`  ${problem}`);
     process.exit(1);
   }
-} finally {
-  rmSync(work, { recursive: true, force: true });
 }

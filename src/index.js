@@ -6,6 +6,7 @@
  * evaluation, no dependencies.
  */
 import { LANGUAGE_FORM_NAMES } from "./internal/catalog.js";
+import { refuseUnknownOptions } from "./internal/configuration-error.js";
 import {
   cardinalCategoryFor,
   cardinalRuleLocaleTags,
@@ -140,6 +141,10 @@ export function pluralOperands(value, options) {
   // `.visible-decimal-places-1025` record exactly that — a `thrown` block with no failure channel at
   // all. Their at-limit twins (`-64`, `-1024`) stay TRANSLATED, which is the control that says this
   // is a boundary and not a blanket refusal.
+  // Two members, and a third spelling is a typo that otherwise selects the WRONG plural form in
+  // silence: `pluralOperands("1", { visibleDecimals: 1 })` built the operands of `1`, not of the
+  // displayed `1.0`, so English answered CARDINALITY_ONE where the display needs CARDINALITY_OTHER.
+  refuseUnknownOptions("pluralOperands", options, ["visibleDecimalPlaces", "compactExponent"]);
   validateOperandOptions(options ?? {});
   return freeze({
     $lokalized: /** @type {const} */ ("plural-operands"),

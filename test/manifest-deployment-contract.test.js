@@ -843,7 +843,7 @@ test("clause 6: the dev door hashes RAW FILE BYTES — a BOM'd catalog generates
 // =================================================================================================
 
 test("clause 6: a resolved url outside a door's scheme refuses the WHOLE load, under both policies", async () => {
-  // **THE `allow-partial` ARM IS THE WHOLE REASON THIS IS EVIDENCE.** Under `all-or-nothing` a check
+  // **THE `allow-partial` ARM IS THE WHOLE REASON THIS IS EVIDENCE.** Under `reject` a check
   // moved into the per-file read still produces an exception, and a test asserting only "it threw"
   // stays green over a genuine degradation. Under `allow-partial` the same moved check returns a
   // `LoadedStrings` with `complete: false` that silently omits a catalog the caller named — the shape
@@ -856,7 +856,7 @@ test("clause 6: a resolved url outside a door's scheme refuses the WHOLE load, u
   const fileDoor = manifestFor(["en", "fr"], {
     baseUrl: "file:///srv/catalogs/", urls: { fr: "https://cdn.example/v1/fr.json" } });
 
-  for (const partialFailure of /** @type {const} */ (["all-or-nothing", "allow-partial"])) {
+  for (const partialFailure of /** @type {const} */ (["reject", "allow-partial"])) {
     const viaFetch = recordingFetch();
     const fetchError = await rejection(
       loadEntireManifest(fetchDoor, { fetch: viaFetch.impl, partialFailure }));

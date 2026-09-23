@@ -33,6 +33,12 @@
  *     cannot be argued with: editing a differential and not re-running it is exactly how an
  *     instrument drifts away from what it claims to compare, and this project has twice found a
  *     green differential that had gone inert on its own axis.
+ *   - a differential that LEFT ANYTHING in its temp folder fails. `--run` gives each one a private
+ *     temp folder (`tools/temp-hygiene.mjs`) and records how many entries it left there; a missing
+ *     count fails too. MEASURED 2026-09-23: seven of the nine removed their work directory in a
+ *     `finally` around a `process.exit`, which never runs — four on every run, three on every red
+ *     one — and `diff:load` had no removal at all. 206 of their directories were counted in the
+ *     system temp folder, and nothing here could see it.
  *   - PORT SOURCE that has moved since the record is REPORTED STALE and does not fail, on
  *     `scenario:0a`'s browser-half reasoning: refreshing means running Java, which a CI box does not
  *     have, and a gate that cannot be satisfied where it runs is a gate that gets disabled.
@@ -41,10 +47,11 @@
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { specPath } from "./iana-artifact.mjs";
+import { leftoversIn, privateTemporaryDirectory, temporaryEnvironment } from "./temp-hygiene.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const recordPath = join(root, "measurements/differentials.json");
@@ -77,12 +84,16 @@ if (process.argv.includes("--run")) {
   for (const name of DIFFERENTIALS) {
     let exit = 0;
     let output = "";
+    const temporary = privateTemporaryDirectory();
     try {
-      output = execFileSync("npm", ["run", `diff:${name}`], { cwd: root, encoding: "utf8", maxBuffer: 256e6 });
+      output = execFileSync("npm", ["run", `diff:${name}`],
+        { cwd: root, encoding: "utf8", maxBuffer: 256e6, env: temporaryEnvironment(temporary) });
     } catch (error) {
       exit = /** @type {any} */ (error).status ?? -1;
       output = `${/** @type {any} */ (error).stdout ?? ""}${/** @type {any} */ (error).stderr ?? ""}`;
     }
+    const temporaryLeft = leftoversIn(temporary);
+    rmSync(temporary, { recursive: true, force: true });
     // THE HEADLINE IS RECORDED VERBATIM, NOT PARSED INTO FIELDS — a parser here would be a second
     // claim about nine tools that each phrase their summary differently, and this project has found
     // ten texts asserting the inverse of what they described.
@@ -135,10 +146,15 @@ if (process.argv.includes("--run")) {
       exit,
       headline: headline.trim().slice(0, 200),
       toolSha256: toolDigest(name),
+      temporaryEntriesLeft: temporaryLeft.length,
       ...(facts ? { facts } : {}),
     };
     if (exit !== 0) failed++;
     console.log(`  ${exit === 0 ? "ok  " : "FAIL"}  diff:${name.padEnd(14)} ${headline.trim().slice(0, 96)}`);
+    if (temporaryLeft.length > 0) {
+      failed++;
+      console.log(`        LEFT ${temporaryLeft.length} temp entr${temporaryLeft.length === 1 ? "y" : "ies"}: ${temporaryLeft.join(", ")}`);
+    }
   }
   writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
   console.log(`\nrecorded ${DIFFERENTIALS.length} differentials to measurements/differentials.json`);
@@ -186,6 +202,12 @@ for (const name of DIFFERENTIALS) {
     problems.push(`diff:${name} ran against lokalized-java sources ${String(oracleLibrary).slice(0, 8)} and the corpus ` +
       `was recorded against ${String(corpusLibrary).slice(0, 8)}; re-run \`npm run diff:all\` against the build the corpus names`);
   if (entry.exit !== 0) problems.push(`diff:${name} was recorded RED (exit ${entry.exit})`);
+  if (typeof entry.temporaryEntriesLeft !== "number")
+    problems.push(`diff:${name} records no temporaryEntriesLeft, so nothing says whether its run cleaned up after ` +
+      `itself; re-run \`npm run diff:all\``);
+  else if (entry.temporaryEntriesLeft !== 0)
+    problems.push(`diff:${name} left ${entry.temporaryEntriesLeft} entr${entry.temporaryEntriesLeft === 1 ? "y" : "ies"} ` +
+      `in its private temp folder when it was last run — every run of it leaks into the real one`);
   for (const [fact, value] of Object.entries(entry.facts?.exercised ?? {})) {
     if (typeof value !== "number")
       problems.push(`diff:${name} recorded a non-numeric '${fact}' among its exercised facts`);

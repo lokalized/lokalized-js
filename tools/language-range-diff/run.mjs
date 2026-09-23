@@ -344,7 +344,12 @@ const defectFamily = (/** @type {string} */ input) =>
   Object.keys(OPEN_PORT_DEFECTS).find((key) => input === key || input.startsWith(`${key}-`)) ?? null;
 
 const work = mkdtempSync(join(tmpdir(), "lokalized-rangediff-"));
-try {
+// REMOVED ON `exit`, NOT IN A `finally`. This run ends in `process.exit`, which skips `finally`,
+// and until 2026-09-23 a `finally` after this block held the removal — so EVERY run left its work
+// directory in the system temp folder (120 `lokalized-rangediff-*` were counted there). The block
+// is the old `try` body, kept as a block so its bindings stay scoped.
+process.on("exit", () => rmSync(work, { recursive: true, force: true }));
+{
   const classesOut = join(work, "classes");
   const compile = spawnSync(join(JDK, "bin/javac"), ["-cp", /** @type {string} */ (JAR), "-d", classesOut, join(here, "LanguageRangeDiff.java")], { encoding: "utf8" });
   if (compile.status !== 0) throw new Error(`oracle compilation failed:\n${compile.stderr}`);
@@ -616,8 +621,6 @@ const JS_CLASS_FOR_JAVA = {
 
   process.exit(differences.length === 0 && defects.length === 0 && stale.length === 0
     && fieldProblems.length === 0 ? 0 : 1);
-} finally {
-  rmSync(work, { recursive: true, force: true });
 }
 
 /**

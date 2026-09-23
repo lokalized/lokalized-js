@@ -708,6 +708,8 @@ if (process.argv.includes("--list")) {
  * maps back to a requirement rather than to a line number.
  */
 const directory = mkdtempSync(join(tmpdir(), "lokalized-readonly-surface-"));
+// Removed on `exit` rather than after the compile below, which a throw in between skipped.
+if (!process.argv.includes("--keep")) process.on("exit", () => rmSync(directory, { recursive: true, force: true }));
 const project = join(directory, "consumer");
 mkdirSync(join(project, "node_modules"), { recursive: true });
 symlinkSync(root, join(project, "node_modules", "lokalized"), "dir");
@@ -766,8 +768,6 @@ for (const [line, { obligation, line: spec }] of byLine) {
     wrongCode.push({ obligation, spec, got });
   }
 }
-
-if (!process.argv.includes("--keep")) rmSync(directory, { recursive: true, force: true });
 
 for (const { obligation, spec, got } of unverifiable) {
   // A DECLARED CONTRADICTION THAT HAS STOPPED CONTRADICTING is a fixed defect with a stale excuse

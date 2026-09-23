@@ -249,6 +249,11 @@ export async function runPlan(manifest, plan, options, transport) {
 
   /** Slots, NOT an arrival log — see the module header. */
   const results = new Array(plan.length).fill(null);
+  /**
+   * Set by `release` below. A worker whose read is still in flight when the load rejects must not
+   * write into a slot the rejection has already cleared.
+   */
+  let released = false;
   let next = 0;
   const worker = async () => {
     for (;;) {
@@ -265,6 +270,16 @@ export async function runPlan(manifest, plan, options, transport) {
       const entry = /** @type {FetchEntry} */ (plan[index]);
       try {
         const { parsed, contribution } = await loadOne(entry, options, limits, transport);
+        // **A READ STILL IN FLIGHT WHEN THE LOAD REJECTED DOES NOT GET TO WRITE ITS CATALOG BACK.**
+        // `Promise.all` rejects on the first worker that throws, and the `catch` below clears the
+        // slots; the other workers keep running. One whose read finishes afterwards used to write its
+        // parsed catalog into a slot that had just been cleared, and the rejection the caller holds
+        // kept it alive. Measured 2026-09-23 with a transport that ignores the signal (which plan
+        // 6.2:2098-2100 permits) and one read delayed across the abort: 1 of 5 catalogs still
+        // reachable from the held rejection on Node 20, 22 and 24. The retention test's abort arm, as
+        // it then was (a fixed 50 ms sleep), failed 2 of 96 runs under 32-way load for the same
+        // reason; its ARM 4b now holds a read across the rejection and fails on every run without this.
+        if (released) return;
         results[index] = { ok: true, entry, parsed, contribution };
       } catch (thrown) {
         // THE ASSERTED SHAPE NAMES `LoadFailure["stage"]`, NOT `string`, so this line and the record
@@ -278,6 +293,7 @@ export async function runPlan(manifest, plan, options, transport) {
           locale: entry.locale, url: entry.url,
           stage: failure?.stage ?? transport.defaultStage, cause: failure?.cause ?? failure,
         });
+        if (released) return;
         results[index] = { ok: false, entry, failure: loadFailure };
       }
     }
@@ -299,15 +315,23 @@ export async function runPlan(manifest, plan, options, transport) {
   // past every line below, so clearing at the outer checks alone leaves that path leaking — measured
   // before this was written, with a signal whose `reason` was undefined.
   // Queued work retains plan order because each worker takes the next unclaimed index.
+  //
+  // `release` also sets `released`, so a worker still running when the load rejects stops without
+  // writing. Only the `catch` below can leave workers running; after `Promise.all` resolves, every
+  // worker has returned, and the later calls set the flag for uniformity only.
+  const release = () => {
+    released = true;
+    results.fill(null);
+  };
   try {
     await Promise.all(Array.from({ length: Math.min(MAXIMUM_ACTIVE_READS, plan.length) }, worker));
   } catch (thrown) {
-    results.fill(null);
+    release();
     throw thrown;
   }
   // Abort is never converted into partial success: it cancels outstanding work and rejects.
   if (options.signal?.aborted) {
-    results.fill(null);
+    release();
     throw options.signal.reason ?? new Error("aborted");
   }
 
@@ -325,7 +349,7 @@ export async function runPlan(manifest, plan, options, transport) {
   const fallbackLoaded = fallbackRow ? fallbackRow.ok : false;
 
   if (failures.length > 0 && (!allowPartial || !fallbackLoaded)) {
-    results.fill(null);
+    release();
     throw loadingError(
       `${failures.length} catalog file(s) failed to load` +
       (allowPartial && !fallbackLoaded ? "; the resolved fallback-locale file is among them, so a partial result is not offered" : ""),
@@ -408,7 +432,7 @@ export async function runPlan(manifest, plan, options, transport) {
       ordered.push({ at: index, failure });
       ordered.sort((left, right) => left.at - right.at);
 
-      results.fill(null);
+      release();
       throw loadingError(
         "the load exceeds an aggregate loading limit; a partial result is not offered, because every " +
         "file that was obtained parsed cleanly and the budget is the whole load's",

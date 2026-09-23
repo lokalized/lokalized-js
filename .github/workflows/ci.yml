@@ -318,10 +318,39 @@ jobs:
 
   packed:
     runs-on: ubuntu-latest
+    # `npm pack` runs `prepack`, and prepack's `divergences --write` reads
+    # `../lokalized-spec/java-surface-amendments.json` for the declined-API section. Without that
+    # file it fails (exit 1) rather than publishing "none declined", and it does not rewrite
+    # DIVERGENCES.md. So this job needs the spec beside the package, exactly as `publish.yml`'s pack
+    # has it. Until 2026-09-23 it checked out this repository alone, and both pushes that day went red
+    # at `npm pack`.
+    #
+    # Both checkouts drop the token afterwards (`persist-credentials: false`), as `publish.yml`'s do:
+    # this job runs `npm ci`, which executes install scripts, and needs no git credentials after the
+    # checkout.
+    defaults:
+      run:
+        working-directory: lokalized-js
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          path: lokalized-js
           fetch-depth: 0
+          persist-credentials: false
+      # The same checkout and guard as the verify job above; the reasoning for each is written there.
+      - name: Check out the behavioral corpus and pinned artifacts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: lokalized/lokalized-spec
+          ref: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
+          path: lokalized-spec
+          fetch-depth: 1
+          token: ${{ secrets.SPEC_REPO_TOKEN || github.token }}
+          persist-credentials: false
+      - name: Verify the corpus checkout carries what the gates read
+        env:
+          SPEC_REPO_REF: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
+        run: node tools/check-spec-checkout.mjs
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           # THE FLOOR, deliberately: a fresh installer on the oldest supported runtime is

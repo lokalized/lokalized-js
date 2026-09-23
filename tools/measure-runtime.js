@@ -82,19 +82,24 @@ async function measureModule(file) {
 async function measureAlternative(label, source, expectEntries) {
   const dir = mkdtempSync(join(tmpdir(), "lokalized-alt-"));
   const path = join(dir, "alt.mjs");
-  writeFileSync(path, source);
   const imports = [];
   const decodes = [];
-  for (let i = 0; i < ITERATIONS; i++) {
-    const { ms, mod } = await timedImport(`file://${path}`);
-    imports.push(ms);
-    const t0 = performance.now();
-    const out = mod.decode();
-    decodes.push(performance.now() - t0);
-    if (out.length !== expectEntries) throw new Error(`${label}: expected ${expectEntries} entries, got ${out.length}`);
+  let retained;
+  // Removed in a `finally`: the entry-count throw below used to leave the directory behind.
+  try {
+    writeFileSync(path, source);
+    for (let i = 0; i < ITERATIONS; i++) {
+      const { ms, mod } = await timedImport(`file://${path}`);
+      imports.push(ms);
+      const t0 = performance.now();
+      const out = mod.decode();
+      decodes.push(performance.now() - t0);
+      if (out.length !== expectEntries) throw new Error(`${label}: expected ${expectEntries} entries, got ${out.length}`);
+    }
+    retained = await retainedBytes(async () => (await timedImport(`file://${path}`)).mod.decode());
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
-  const retained = await retainedBytes(async () => (await timedImport(`file://${path}`)).mod.decode());
-  rmSync(dir, { recursive: true, force: true });
   return { file: label, sourceBytes: Buffer.byteLength(source), importMs: median(imports), decodeMs: median(decodes), retainedBytes: retained?.bytes ?? null, entries: expectEntries };
 }
 

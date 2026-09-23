@@ -201,7 +201,7 @@ function assertRuntimeCompatible(manifest) {
  * @returns {Readonly<StringsManifestV1>}
  */
 export function validateStringsManifest(input, options = {}) {
-  refuseUnknownOptions("validateStringsManifest", options, ["limits"], { loadingLimits: "limits" });
+  options = refuseUnknownOptions("validateStringsManifest", options, ["limits"], { loadingLimits: "limits" });
   const limits = resolveLimits(options.limits);
 
   if (!isPlainRecord(input)) throw configurationError("A strings manifest must be an object");
@@ -369,7 +369,7 @@ export function validateStringsManifest(input, options = {}) {
  * @returns {Readonly<{ fallbackLocale: string, supportedLocales: readonly string[], tiebreakers: Readonly<Record<string, readonly string[]>> }>}
  */
 export function localeConfigurationForManifest(manifest, options = {}) {
-  refuseUnknownOptions("localeConfigurationForManifest", options, ["limits"],
+  options = refuseUnknownOptions("localeConfigurationForManifest", options, ["limits"],
     { loadingLimits: "limits" });
   const validated = validateStringsManifest(manifest, { limits: options.limits });
   return Object.freeze({
@@ -392,7 +392,7 @@ export function parseStringsManifest(input, options = {}) {
   // FIRST, ahead of every read and decode below: this is the one manifest door that does real input
   // work, and `readCharacters`, `readStrictUtf8`, `normalizeCatalogText`, `validateJsonNestingDepth`
   // and `parseJsonDocument` can each throw first and mask a misspelling.
-  refuseUnknownOptions("parseStringsManifest", options, ["limits", "source"],
+  options = refuseUnknownOptions("parseStringsManifest", options, ["limits", "source"],
     { loadingLimits: "limits" });
 
   const source = options.source ?? DEFAULT_SOURCE;

@@ -28,16 +28,22 @@ import { hex, readBoundedStream, runPlan, wholeManifestPlan } from "./run-plan.j
 import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-error.js";
 
 /** @typedef {import("./index.js").StringsManifestV1} StringsManifestV1 */
+/** @typedef {import("./index.js").LoadStringsOptions} LoadStringsOptions */
 
 /**
  * Every member the two Fetch doors read, measured with a recording proxy over the options object.
  *
- * `request` is an opaque `RequestInit` passed through verbatim — including members this library has
- * never heard of, which is the point of it. **It is also a SECOND route to cancellation**, and that
- * is worth knowing rather than discovering: `request.signal` reaches the transport, but `runPlan`'s
- * four abort checks read `options.signal` only, so aborting through `request` cancels the individual
- * request without cancelling the loader's outstanding work. Pass `signal` for the loader-level
- * guarantee. Not refused — a `RequestInit` is the caller's to fill.
+ * `request` is DECLARED as plan 6.2 declares it — `mode` and `credentials`, nothing else — so a
+ * TypeScript caller is held to those two, and has been since the options stopped being typed `any`
+ * (2026-09-23). The RUNTIME still forwards the whole object into the `fetch` call verbatim, so a
+ * JavaScript caller's other `RequestInit` members reach the transport, and so do a TypeScript caller's
+ * when they arrive in a variable rather than a literal, because excess-property checks apply to fresh
+ * literals only. The declaration does not promise the forwarding either way. It is also a
+ * SECOND route to cancellation, worth knowing rather than discovering: `request.signal` reaches the
+ * transport, but `runPlan`'s four abort checks read `options.signal` only, so aborting through
+ * `request` cancels the individual request without cancelling the loader's outstanding work. Pass
+ * `signal` for the loader-level guarantee. Not refused at run time — what else it carries is the
+ * caller's to fill.
  */
 const FETCH_DOOR_OPTIONS = /** @type {const} */ (["fetch", "limits", "partialFailure", "request", "signal"]);
 
@@ -187,7 +193,7 @@ const FETCH_TRANSPORT = {
 };
 
 /**
- * @param {StringsManifestV1} manifest @param {string} lookupLocale @param {any} [options]
+ * @param {StringsManifestV1} manifest @param {string} lookupLocale @param {LoadStringsOptions} [options]
  */
 export async function loadStrings(manifest, lookupLocale, options = {}) {
   // DOOR ENTRY, NOT PREFLIGHT, and that is measured. With the refusal inside
@@ -195,9 +201,11 @@ export async function loadStrings(manifest, lookupLocale, options = {}) {
   // in 4 of 5 probes — `validateStringsManifest` (:214), `resolveLimits` (:215) and `chain()`'s tag
   // normalization all run before `preflight` (:218). `transport` is the near miss that cost real
   // time: it does not fail at the call, it sends the load to THE REAL NETWORK.
-  refuseUnknownOptions("loadStrings", options, FETCH_DOOR_OPTIONS, FETCH_DOOR_NEAR_MISSES);
+  options = refuseUnknownOptions("loadStrings", options, FETCH_DOOR_OPTIONS, FETCH_DOOR_NEAR_MISSES);
 
-  const plan = fetchSet(manifest, lookupLocale, options);
+  // PROJECTED to `fetchSet`'s own surface, which now refuses a member it does not read: handing it
+  // this door's whole options object would refuse the caller's documented transport options.
+  const plan = fetchSet(manifest, lookupLocale, { limits: options.limits });
   const loaded = await runPlan(manifest, plan, options, FETCH_TRANSPORT);
   // NORMALIZED, per plan 6.1's "both functions use and record the normalized serialized value" and
   // plan 2.2's own comment on the field ("Normalized planning input"). It is the tag plan 6.4 then
@@ -209,9 +217,9 @@ export async function loadStrings(manifest, lookupLocale, options = {}) {
   });
 }
 
-/** @param {StringsManifestV1} manifest @param {any} [options] */
+/** @param {StringsManifestV1} manifest @param {LoadStringsOptions} [options] */
 export async function loadEntireManifest(manifest, options = {}) {
-  refuseUnknownOptions("loadEntireManifest", options, FETCH_DOOR_OPTIONS, FETCH_DOOR_NEAR_MISSES);
+  options = refuseUnknownOptions("loadEntireManifest", options, FETCH_DOOR_OPTIONS, FETCH_DOOR_NEAR_MISSES);
 
   // PROJECTED: the validator takes `limits` alone, and this door's own `fetch`/`signal`/`request`/
   // `partialFailure` are not its business.

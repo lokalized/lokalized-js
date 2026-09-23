@@ -30,8 +30,8 @@
         "specifier": "lokalized",
         "file": "dist/browser/lokalized.js",
         "files": 1,
-        "rawBytes": 183771,
-        "brotliBytes": 54701,
+        "rawBytes": 184494,
+        "brotliBytes": 54985,
         "exports": 70,
         "loadedInBrowser": true
       },
@@ -39,8 +39,8 @@
         "specifier": "lokalized/core",
         "file": "dist/browser/core.js",
         "files": 7,
-        "rawBytes": 182951,
-        "brotliBytes": 54683,
+        "rawBytes": 183611,
+        "brotliBytes": 54881,
         "exports": 21,
         "loadedInBrowser": true
       },
@@ -48,8 +48,8 @@
         "specifier": "lokalized/parse",
         "file": "dist/browser/parse.js",
         "files": 5,
-        "rawBytes": 159124,
-        "brotliBytes": 48596,
+        "rawBytes": 159522,
+        "brotliBytes": 48641,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -57,8 +57,8 @@
         "specifier": "lokalized/load",
         "file": "dist/browser/load.js",
         "files": 7,
-        "rawBytes": 177534,
-        "brotliBytes": 53636,
+        "rawBytes": 178080,
+        "brotliBytes": 53829,
         "exports": 10,
         "loadedInBrowser": true
       },
@@ -66,17 +66,17 @@
         "specifier": "lokalized/ssr",
         "file": "dist/browser/ssr.js",
         "files": 2,
-        "rawBytes": 7186,
-        "brotliBytes": 2246,
+        "rawBytes": 7582,
+        "brotliBytes": 2383,
         "exports": 2,
         "loadedInBrowser": true
       },
       {
         "specifier": "lokalized/negotiate",
         "file": "dist/browser/negotiate.js",
-        "files": 3,
-        "rawBytes": 89117,
-        "brotliBytes": 31204,
+        "files": 4,
+        "rawBytes": 90810,
+        "brotliBytes": 31688,
         "exports": 6,
         "loadedInBrowser": true
       },
@@ -84,8 +84,8 @@
         "specifier": "lokalized/data/ordinal",
         "file": "dist/browser/data/ordinal.js",
         "files": 8,
-        "rawBytes": 189659,
-        "brotliBytes": 56140,
+        "rawBytes": 190319,
+        "brotliBytes": 56708,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -93,14 +93,14 @@
         "specifier": "lokalized/data/ranges",
         "file": "dist/browser/data/ranges.js",
         "files": 8,
-        "rawBytes": 192187,
-        "brotliBytes": 56255,
+        "rawBytes": 192847,
+        "brotliBytes": 56542,
         "exports": 2,
         "loadedInBrowser": true
       }
     ],
-    "sizesRecordedFor": "A30 follow-up: a comment-only edit to src/internal/locale.js renamed the content-hashed chunks the split entries import (measured: identical minified bytes, different chunk names), so six entries' brotli sizes moved while every raw size stayed put; the browser capture was NOT re-driven",
+    "sizesRecordedFor": "Promise refusal (maintainer decision, 2026-09-23): src/internal/configuration-error.js refuses a promise or other thenable in the options position, which an unawaited async options factory used to pass as 'no options'. configuration-error.js is reached by every graph, so every graph grows by the check and its comment. No module count moved.",
     "capturedAgainst": null,
-    "capturedAgainstNote": "The browser half was captured before this field existed: the record first carries it at lokalized-js e702166 (2026-09-19), and its size columns have been re-recorded since through --write, which does not re-drive the browser (M-R S13, M-R S14, 1.0.0-rc.1, A30, and the A30 follow-up named in sizesRecordedFor). Nothing records a re-drive, so the capture is not known to describe any bundle this tarball carries."
+    "capturedAgainstNote": "The browser half was captured before this field existed: the record first carries it at lokalized-js e702166 (2026-09-19), and its size columns have been re-recorded since through --write, which does not re-drive the browser (M-R S13, M-R S14, 1.0.0-rc.1, A30, the A30 follow-up, the M-D S33 follow-up, the M-R S26 pre-push follow-up, and the promise refusal; sizesRecordedFor holds only the latest reason, because --write overwrites it). Nothing records a re-drive, so the capture is not known to describe any bundle this tarball carries."
   }
 }

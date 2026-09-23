@@ -41,12 +41,15 @@ const ATTACKER = "pay molly.example";
 async function publish(payee) {
   const directory = mkdtempSync(join(tmpdir(), "lokalized-trust-"));
   const body = JSON.stringify({ "Pay.To": payee });
-  writeFileSync(join(directory, "en.json"), body);
-  const manifest = await createStringsManifestFromDirectory(directory, {
-    catalogVersion: "v1", fallbackLocale: "en", publicationBaseUrl: BASE,
-  });
-  rmSync(directory, { recursive: true, force: true });
-  return { manifest, bytes: new TextEncoder().encode(body) };
+  try {
+    writeFileSync(join(directory, "en.json"), body);
+    const manifest = await createStringsManifestFromDirectory(directory, {
+      catalogVersion: "v1", fallbackLocale: "en", publicationBaseUrl: BASE,
+    });
+    return { manifest, bytes: new TextEncoder().encode(body) };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 const honest = await publish(HONEST);

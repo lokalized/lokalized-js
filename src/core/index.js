@@ -954,6 +954,29 @@ const CREATE_STRINGS_OPTIONS = /** @type {const} */ ([
 ]);
 
 /**
+ * Every member `get`, `t` and `getResult` read from their per-call options — plan 3.3's
+ * `TranslationOptions`, which is the `TranslationCallOptions` typedef above, member for member.
+ *
+ * **THIS WAS THE WIDEST SILENT DOOR LEFT AFTER M-D S33**, because it is the one a caller reaches
+ * every time they render. Measured before the refusal: `get("B", {}, { locale: "fr", onFalback })`
+ * over a French catalog missing `B` served the English fallback and called the misspelled observer
+ * ZERO times, where `onFallback` is called once. The refusal also catches the slot mix-up M-D S26
+ * found readers making — placeholder values handed in the OPTIONS position:
+ * `get("K", undefined, { count: 3 })` returned the KEY `"K"` with no error, and now names `count`.
+ */
+const TRANSLATION_CALL_OPTIONS = /** @type {const} */ ([
+  "locale", "localeMatch", "bidiIsolation", "fallbackPolicy", "onFailure", "onFallback",
+]);
+
+/**
+ * The members a `LocaleConfiguration` has, refused-against by the two choosers below. A SECOND COPY of
+ * `lokalized/negotiate`'s, deliberately: that module must not import core, and
+ * `test/option-surface.test.js` holds both copies to every real `LocaleConfiguration` the library
+ * produces, so neither can drift from what `getLocaleConfiguration()` hands back unnoticed.
+ */
+const LOCALE_CONFIGURATION_MEMBERS = /** @type {const} */ (["fallbackLocale", "supportedLocales", "tiebreakers"]);
+
+/**
  * Build a `Strings` from raw catalogs.
  *
  * Synchronous by contract: parsing, validation, and locale-configuration work all happen here so
@@ -970,7 +993,7 @@ export function createStrings(options) {
   // reported "requires exactly one of 'locale'…" and never mentioned the typo. It must also precede
   // the normalization below, which deletes `loaded` and injects four members — past that line the
   // guard would be inspecting a synthesized object rather than the caller's.
-  refuseUnknownOptions("createStrings", options, CREATE_STRINGS_OPTIONS, { limits: "loadingLimits" });
+  options = refuseUnknownOptions("createStrings", options, CREATE_STRINGS_OPTIONS, { limits: "loadingLimits" });
 
   // The `loaded` branch is NORMALIZED into the direct branch's inputs rather than given a second
   // construction path, so locale validation, duplicate rejection, model validation and expression
@@ -1681,6 +1704,12 @@ export function createStrings(options) {
    * @param {TranslationCallOptions} [callOptions]
    */
   function getResult(key, placeholders, callOptions) {
+    // FIRST, so a misspelled member cannot be masked by a validation of a correctly spelled one, and
+    // named `get` like every other per-call refusal in this function (`t` IS `get`). A pre-walk
+    // refusal like the ingress below: no candidate is attempted and no handler fires. An absent
+    // `callOptions` returns before any work, so the common call pays one `typeof`.
+    refuseUnknownOptions("get", callOptions, TRANSLATION_CALL_OPTIONS);
+
     // REPLACES the instance policy rather than narrowing it, in both directions: per-call `"all"`
     // over an instance `"none"` isolates, and per-call `"none"` over an instance `"all"` does not.
     // `TranslationOptions.getBidiIsolation().orElse(getBidiIsolation())` (DefaultStrings.java:683).
@@ -2351,6 +2380,11 @@ export function chooseLocaleForPreferredLanguages(configuration, languages) {
   if (typeof configuration !== "object" || configuration === null)
     throw new RangeError("A locale configuration is required");
 
+  // The same `LocaleConfiguration` `createLocaleNegotiator` refuses unknown members of, arriving
+  // through the root. Refusing at one of the three doors a single type reaches and not the others
+  // is S28's asymmetry: which door a caller used would decide whether their typo was reported.
+  refuseUnknownOptions("chooseLocaleForPreferredLanguages", configuration, LOCALE_CONFIGURATION_MEMBERS);
+
   if (languages == null || typeof languages === "string" ||
       typeof (/** @type {any} */ (languages)[Symbol.iterator]) !== "function")
     throw new TypeError(
@@ -2429,6 +2463,13 @@ export function chooseLocaleForPreferredLanguages(configuration, languages) {
  * @returns {string} the selected supported locale, or the resolved fallback
  */
 export function chooseBrowserLocale(configuration) {
+  // Its OWN name, before delegating: the refusal must say the door the caller typed, and the pure
+  // helper below would otherwise report `chooseLocaleForPreferredLanguages`, a function they never
+  // called. Only for an OBJECT: anything else is the helper's "A locale configuration is required",
+  // so the two choosers refuse a missing or non-object configuration identically.
+  if (typeof configuration === "object" && configuration !== null)
+    refuseUnknownOptions("chooseBrowserLocale", configuration, LOCALE_CONFIGURATION_MEMBERS);
+
   const languages = /** @type {any} */ (globalThis).navigator?.languages;
 
   return chooseLocaleForPreferredLanguages(

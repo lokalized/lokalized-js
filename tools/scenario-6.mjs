@@ -41,7 +41,7 @@
  * spec-repo gates). This tool is in `npm run verify` and in CI from its first commit, and needs
  * neither a JDK nor a browser.
  *
- *   node --expose-gc tools/scenario-6.mjs [--write --reason "why the baseline moved"]
+ *   npm run scenario:6 [-- --write --reason "why the baseline moved"]   (passes --expose-gc)
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -240,7 +240,7 @@ for (const variant of variants)
     `${String(variant.sourceBytes).padStart(11)}${String(variant.ianaClosureBytes).padStart(9)}` +
     `${String(variant.nodeBuiltinEdges).padStart(7)}${`${variant.importMs} ms`.padStart(11)}`);
 console.log(`\n  negotiate ${record.negotiateMsPerHeader} ms/header over ${RECIPE.headers.length} headers` +
-  `   first render ${record.firstRenderMs} ms   retained ${retainedBytes} B`);
+  `   first render ${record.firstRenderMs} ms   retained ${gc ? `${retainedBytes} B` : "NOT MEASURED (no --expose-gc)"}`);
 console.log(`  requests per render: ${Object.entries(requestsPerRender)
   .map(([header, count]) => `${JSON.stringify(header)}=${count}`).join("  ")}`);
 
@@ -296,6 +296,17 @@ if (baseline) {
 }
 
 if (process.argv.includes("--write")) {
+  // **A RECORD WRITTEN WITHOUT `gc` STORES A ZERO THAT WAS NEVER MEASURED.** `retainedBytes` starts
+  // at 0 and is measured only when `globalThis.gc` exists, so a bare `node tools/scenario-6.mjs
+  // --write` recorded `retainedBytes: 0` — found by a review on 2026-09-23 in the staged record and in
+  // an earlier commit, both written that way, while a measured run is never exactly 0 (how far from
+  // it depends on the Node version). The figure is reported and never gated, so nothing else would
+  // notice.
+  if (!gc) {
+    console.error(`\nrefusing to write without --expose-gc: retainedBytes would be recorded as 0 without` +
+      ` being measured. Re-record with: npm run scenario:6 -- --write --reason "what grew and why"`);
+    process.exit(2);
+  }
   const reasonIndex = process.argv.indexOf("--reason");
   const reason = reasonIndex >= 0 ? process.argv[reasonIndex + 1] : null;
   if ((growth.length || frozen.length) && !reason) {
@@ -327,7 +338,7 @@ if (frozen.length) {
 if (growth.length) {
   console.log(`\nGROWTH (deterministic, gated):`);
   for (const line of growth) console.log(`  ${line}`);
-  console.log(`Re-record deliberately: node tools/scenario-6.mjs --write --reason "what grew and why"`);
+  console.log(`Re-record deliberately: npm run scenario:6 -- --write --reason "what grew and why"`);
   process.exit(1);
 }
 console.log(`\nNO THRESHOLDS EXIST, by decision (A3/A4 precedent). Deterministic figures ratchet;`);

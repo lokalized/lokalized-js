@@ -7,12 +7,12 @@
     "implementationVersion": "1.0.0-rc.1",
     "packageName": "lokalized",
     "packageVersion": "1.0.0-rc.1",
-    "implementationCommit": "2383ded848226463af1e2a6fa43dce38ab9a54f9",
-    "javaReferenceCommit": "a91925827b3000148bddf36de5e738ed55e8408f",
-    "javaReferenceTreeClean": false,
+    "implementationCommit": "7b4f1a7e45b6fd158b0db5594dc802302b570706",
+    "javaReferenceCommit": "47aa87aa76fc8c67c0f4b09388b612290dbb1076",
+    "javaReferenceTreeClean": true,
     "javaReferenceVersion": "3.1.0-SNAPSHOT",
     "javaReferenceTagCommit": "c971f071ded30562acf627c07e5767389d57f84b",
-    "dataCommit": "810cfaa0cf4d29450977365abf7371fd0c9692fe",
+    "dataCommit": "2fa545856bd706e8a796d0ecab9588b432d87b3b",
     "portingContractArchiveDigest": null,
     "requirementsSha256": "649fabc4a99cac5798747ed17af05752d63388813ce4b54e084a74b632952136",
     "selectedReleaseProfileId": "strict-parity-0.x-draft",
@@ -4616,7 +4616,7 @@
       ]
     },
     "xfailMetadata": [],
-    "sourceDateEpoch": 1790129262
+    "sourceDateEpoch": 1790191793
   },
   "undetermined": [
     {

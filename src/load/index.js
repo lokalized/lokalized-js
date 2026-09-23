@@ -38,15 +38,35 @@
  *   `run-plan.js:236` as a bare string against an untyped literal until this named it. An
  *   adversarial pass classified it RENAMED; the plan-surface gate's "a RENAMED disposition names a
  *   spelling the port actually has" test refused, because there was no spelling at all.
+ */
+
+/**
+ * Plan 6.2's option bag for BOTH Fetch doors, `loadStrings` and `loadEntireManifest`.
  *
- * @typedef {object} LoadStringsOptions plan 6.2's subset-loader option bag.
- * @property {typeof globalThis.fetch} [fetch] the transport. An injected reader is explicitly free to
- *   ignore the signal (plan 6.2:2098-2100), which is why the loader owns cancellation rather than
- *   delegating it.
- * @property {AbortSignal} [signal]
- * @property {Readonly<{ mode?: "cors" | "same-origin", credentials?: "omit" | "same-origin" | "include" }>} [request]
- * @property {PartialFailurePolicy} [partialFailure] default `"reject"`.
- * @property {import("../parse/index.js").StringsLoadingLimits} [limits]
+ * `fetch` is the transport; an injected one is explicitly free to ignore the signal (plan
+ * 6.2:2098-2100), which is why the loader owns cancellation rather than delegating it. It is typed as
+ * the call the loader makes, a string URL and an init object, rather than as plan 6.2's
+ * `typeof globalThis.fetch`: the plan's type refused a custom transport typed
+ * `(url: string) => Promise<Response>` (TS2322), and the global `fetch` is still assignable to this
+ * one. The maintainer's decision of 2026-09-23 (amendment A31).
+ * `partialFailure` defaults to `"reject"`, and the declared union is the ONLY guard a misspelled
+ * policy has: `run-plan.js` reads `=== "allow-partial"`, so at run time any other string is the
+ * default. `request` is declared as the plan declares it, two members; the runtime forwards whatever
+ * `RequestInit` members a JavaScript caller adds, and the declaration does not promise that.
+ *
+ * **WRAPPED AND APPLIED ON 2026-09-23.** Until then this type was declared and exported, and neither
+ * door used it: both annotated their options `any`, so a TypeScript caller writing `{ transport }` or
+ * `{ partialFailure: "allow_partial" }` got no error at all. Its members were also mutable where plan
+ * 6.2 declares every one `readonly` — the same wrap, for the same reason, as `ParseStringsOptions`.
+ * `npm run declarations` carries the four probes that hold both.
+ *
+ * @typedef {Readonly<{
+ *   fetch?: (url: string, init: RequestInit) => Promise<Response>,
+ *   signal?: AbortSignal,
+ *   request?: Readonly<{ mode?: "cors" | "same-origin", credentials?: "omit" | "same-origin" | "include" }>,
+ *   partialFailure?: PartialFailurePolicy,
+ *   limits?: import("../parse/index.js").StringsLoadingLimits,
+ * }>} LoadStringsOptions
  */
 
 /**

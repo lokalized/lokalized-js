@@ -383,7 +383,7 @@ export function resolveLimits(limits) {
         "A limits option must be a plain object of the seven named budgets. A Map, an array or a " +
         "class instance is not read and its budgets would be silently dropped");
 
-    // **THE UNKNOWN MEMBER, and this is the nested half of the twelve-door decision.** `resolveLimits`
+    // **THE UNKNOWN MEMBER, and this is the nested half of the every-door decision.** `resolveLimits`
     // read seven named members and ignored every other key — M-D S17 found it as the fourth instance
     // of the silently-ignored-option class, and noted that Java's `LoadDiff.optionsFrom` THROWS on
     // one. Refusing here rather than at each door covers every caller at once and cannot drift:

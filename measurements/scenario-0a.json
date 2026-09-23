@@ -9,20 +9,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 32,
-      "sourceBytes": 770908,
-      "importMs": 0.383,
-      "constructionMs": 0.1417,
-      "firstRenderMs": 0.3248,
-      "retainedBytes": 76912
+      "sourceBytes": 777038,
+      "importMs": 0.351,
+      "constructionMs": 0.1287,
+      "firstRenderMs": 0.3178,
+      "retainedBytes": 86592
     },
     {
       "label": "core + parsed equivalent",
       "modules": 31,
-      "sourceBytes": 760291,
-      "importMs": 0.896,
-      "constructionMs": 0.409,
-      "firstRenderMs": 0.3443,
-      "retainedBytes": 466064
+      "sourceBytes": 765955,
+      "importMs": 0.753,
+      "constructionMs": 0.4256,
+      "firstRenderMs": 0.3514,
+      "retainedBytes": 468904
     }
   ],
   "rebaselines": [
@@ -510,6 +510,27 @@
       "growth": [
         "root + raw-text catalog: source graph grew 770673 -> 770908 bytes",
         "core + parsed equivalent: source graph grew 760056 -> 760291 bytes"
+      ]
+    },
+    {
+      "reason": "M-D S33 follow-up: the doors the S33 sweep missed now refuse an unknown option through the shared refuseUnknownOptions helper — createLocaleNegotiator and the two root choosers (LocaleConfiguration), strings.get/t/getResult per-call options, chain/fetchSet (with the two loader forwards projected), pluralOperands; the root and core graphs grow by the chooser and per-call guards (no new module: both already reach configuration-error.js)",
+      "growth": [
+        "root + raw-text catalog: source graph grew 770908 -> 773958 bytes",
+        "core + parsed equivalent: source graph grew 760291 -> 762875 bytes"
+      ]
+    },
+    {
+      "reason": "M-R S26 pre-push follow-up (2026-09-23): src/internal/configuration-error.js refuses a non-object options argument and returns a normalized frozen {} that required and optional doors both take (maintainer decision), src/negotiate refuses language-range members other than range/weight (maintainer decision), src/load/run-plan.js stops a read still in flight across a rejection from writing its catalog into a cleared slot, src/load/index.js types the Fetch doors' fetch option as the call the loader makes (amendment A31), and comment corrections from three pre-push reviews. configuration-error.js is reached by every graph, so every graph grows; load, node and negotiate grow most. No module count moved.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 773958 -> 776357 bytes",
+        "core + parsed equivalent: source graph grew 762875 -> 765274 bytes"
+      ]
+    },
+    {
+      "reason": "Promise refusal (maintainer decision, 2026-09-23): src/internal/configuration-error.js refuses a promise or other thenable in the options position, which an unawaited async options factory used to pass as 'no options'. configuration-error.js is reached by every graph, so every graph grows by the check and its comment. No module count moved.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 776357 -> 777038 bytes",
+        "core + parsed equivalent: source graph grew 765274 -> 765955 bytes"
       ]
     }
   ],

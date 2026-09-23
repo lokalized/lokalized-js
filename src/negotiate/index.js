@@ -42,6 +42,7 @@
  */
 
 import { decodeLanguageEquivalents } from "../data/iana-range-equivalents.js";
+import { refuseUnknownOptions } from "../internal/configuration-error.js";
 import { languageRangeExpansions, matchFor, matchForRanges, normalizeTag } from "../internal/locale.js";
 import { RUNTIME_METADATA } from "../internal/runtime-metadata.js";
 import {
@@ -504,6 +505,18 @@ function languageRangeFrom(value) {
 	if (typeof value !== "object" || value === null)
 		throw new RangeError("A language range must be an object with a 'range' and a 'weight'");
 
+	// **A RANGE TAKES TWO MEMBERS AND REFUSES A THIRD** — the maintainer's decision of 2026-09-23.
+	// An absent `weight` means the maximum, so a MISSPELLED one did too: `{ range: "fr", wieght: 0 }`
+	// beside `{ range: "en", weight: 0.5 }` selected French, from a list written to exclude it. A
+	// `RangeError` like this function's other shape refusals, so a caller already catching those for a
+	// strict list catches this too. Everything the library hands out — `parseLanguageRanges`' members,
+	// a match's `requestedLanguageRanges` — carries exactly these two, and the fail-soft header door
+	// only ever passes those, so it cannot reach this refusal.
+	const extra = Object.keys(value).filter((name) => name !== "range" && name !== "weight");
+	if (extra.length > 0)
+		throw new RangeError(
+			`A language range takes only 'range' and 'weight', and this one also has [${extra.join(", ")}]`);
+
 	const candidate = /** @type {{ range?: unknown, weight?: unknown }} */ (value);
 
 	if (typeof candidate.range !== "string")
@@ -540,12 +553,28 @@ function languageRangeFrom(value) {
 }
 
 /**
+ * The members a `LocaleConfiguration` has. A SECOND COPY of core's, deliberately: this module must not
+ * import core (see `forLanguageRanges` below), and `test/option-surface.test.js` holds both copies to
+ * every real `LocaleConfiguration` the library produces, so they cannot drift apart unnoticed.
+ */
+const LOCALE_CONFIGURATION_MEMBERS = Object.freeze(["fallbackLocale", "supportedLocales", "tiebreakers"]);
+
+/**
  * @param {LocaleConfiguration} configuration
  * @returns {{ fallbackLocale: string, supportedLocales: string[], tiebreakers: LocaleConfiguration["tiebreakers"] }}
  */
 function applicableConfiguration(configuration) {
 	if (typeof configuration !== "object" || configuration === null)
 		throw new RangeError("A locale configuration is required");
+
+	// A DOOR THE M-D S33 DECISION COVERS AND ITS SWEEP MISSED, because that sweep's door list was
+	// written by hand. `createLocaleNegotiator({ supportedLocales, fallbackLocale, fallbackLocal: "fr" })`
+	// constructed silently and negotiated against `fallbackLocale` — the typo did nothing and said
+	// nothing. Every source of a `LocaleConfiguration` this library has —
+	// `strings.getLocaleConfiguration()` on all three construction paths, and
+	// `localeConfigurationForManifest` — hands back exactly these three members, measured, so the
+	// documented `createLocaleNegotiator(strings.getLocaleConfiguration())` cannot be refused by it.
+	refuseUnknownOptions("createLocaleNegotiator", configuration, LOCALE_CONFIGURATION_MEMBERS);
 
 	// THE NEGOTIATOR'S CONSTRUCTION INGRESS, and it exists because of what a matcher RETURNS rather
 	// than what it accepts. Every `matchFor*` result carries these tags as `consideredLocales` and
@@ -860,8 +889,8 @@ export function createLocaleNegotiator(configuration) {
  * report the growth and not the reason.
  *
  * **NEITHER FUNCTION IMPORTS CORE**, and that is the same point one level down: `forLocaleMatch` in
- * `lokalized/core` builds exactly this object, and importing it would drag core's 30-module graph
- * into a 16-module subpath. The option shape is STRUCTURAL (plan 3.4:713 says so in as many words —
+ * `lokalized/core` builds exactly this object, and importing it would drag core's whole graph into
+ * this much smaller subpath (`measurements/subpath-graphs.json` has both counts). The option shape is STRUCTURAL (plan 3.4:713 says so in as many words —
  * "a `Strings` value created by one installed copy … remains usable by `lokalized/ssr` from
  * another"), so constructing the literal here is the intended shape and not duplication to be
  * tidied away. `test/negotiate-options.test.js` asserts the two literals are `deepEqual`, and

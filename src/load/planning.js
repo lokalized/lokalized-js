@@ -29,6 +29,7 @@
  */
 import { candidateChain } from "../internal/locale.js";
 import { normalizeTag } from "../internal/locale.js";
+import { refuseUnknownOptions } from "../internal/configuration-error.js";
 import { validateStringsManifest } from "./manifest.js";
 
 /** @typedef {import("./index.js").StringsManifestV1} StringsManifestV1 */
@@ -48,6 +49,11 @@ import { validateStringsManifest } from "./manifest.js";
  * @returns {readonly string[]}
  */
 export function chain(manifest, lookupLocale, options = {}) {
+  // A PUBLIC DOOR OF ITS OWN (`lokalized/load`), not only a helper the loaders call. When M-D S33
+  // made the validator refuse, projecting the forward below is what KEPT this door silent:
+  // `chain(manifest, "fr", { loadingLimits })` ran under the default limits and said nothing. The
+  // loaders now project what they hand in, so this door can refuse for itself.
+  options = refuseUnknownOptions("chain", options, ["limits"], { loadingLimits: "limits" });
     // PROJECTED to the validator's own surface. Forwarding a loader's whole options object
     // makes the validator refuse `fetch`/`readFile`/`signal` — a door refusing its own caller
     // for using that caller's documented options. Measured: leaving these wholesale reds 270
@@ -76,6 +82,7 @@ export function chain(manifest, lookupLocale, options = {}) {
  * @returns {readonly FetchEntry[]}
  */
 export function fetchSet(manifest, lookupLocale, options = {}) {
+  options = refuseUnknownOptions("fetchSet", options, ["limits"], { loadingLimits: "limits" });
     // PROJECTED to the validator's own surface. Forwarding a loader's whole options object
     // makes the validator refuse `fetch`/`readFile`/`signal` — a door refusing its own caller
     // for using that caller's documented options. Measured: leaving these wholesale reds 270

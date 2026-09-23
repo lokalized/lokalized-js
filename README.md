@@ -361,15 +361,21 @@ because **it does not fail — it quietly serves the instance's locale instead**
 ```js
 strings.get("Hi", undefined, { locale: "fr" });        // => "Bonjour"
 
-// Both of these are wrong, and neither says so:
+// Wrong, and it does not say so: a locale in the VALUES bag is just a value.
 strings.get("Hi", { locale: "fr" });                   // => "Hello"
-strings.get("Hi", undefined, "fr");                    // => "Hello"
+
+// Wrong, and refused: the options slot takes an options object, not a tag.
+(() => { try { return strings.get("Hi", undefined, "fr"); } catch (error) { return error.name; } })();
+// => "ConfigurationError"
 ```
 
-A misplaced `locale` is not a typo the library can see: it is a value in the wrong bag, and the bag
-is a real parameter. An unrecognised *member* of an options object IS caught — see
-[Every door refuses an option it does not recognise](#every-door-refuses-an-option-it-does-not-recognise)
-— but that cannot help here, because `locale` is a member every one of these doors knows.
+A `locale` in the values bag is not a typo the library can see: it is a value in the wrong bag, and
+the bag is a real parameter. The options slot is stricter — it refuses anything that is not an
+object (apart from `undefined`, `null` and `false`, which mean none), and an unrecognised *member*
+of one (see
+[Every door refuses an option it does not recognise](#every-door-refuses-an-option-it-does-not-recognise))
+— but neither helps with the first mistake, because `locale` is a member every one of these doors
+knows.
 
 ### Ambiguity is refused, not guessed
 
@@ -1253,10 +1259,11 @@ parse({ loadingLimits: { maximumTranslationNodes: 1 } }).replace(/^.*?\. /, "").
 
 ### Every door refuses an option it does not recognise
 
-That is a property of the whole surface, not a quirk of the limits: **all twelve public functions
-that take an options object refuse an unknown member**, with a `ConfigurationError` that names the
-offending key. Where the mistake is one a reader actually makes, the message also names the spelling
-that works:
+That is a property of the whole surface, not a quirk of the limits: **every public function that
+takes an options object refuses an unknown member** — the per-call options of `get`, `t` and
+`getResult` and the locale configuration `createLocaleNegotiator` and the two browser choosers take
+included — with a `ConfigurationError` that names the offending key. Where the mistake is one a
+reader actually makes, the message also names the spelling that works:
 
 | door | you may reach for | it is | what used to happen instead |
 |---|---|---|---|
@@ -1269,13 +1276,71 @@ The last two are why this changed. Neither failed at the call, so neither looked
 produced a network error from a URL you never typed, the other produced a manifest that validated,
 fingerprinted identically to the correct one, and was refused much later somewhere else.
 
+The ones you are likeliest to meet day to day are a misspelled configuration member, which the
+negotiator used to ignore while it ran on the one you spelled right; the values bag handed in the
+options slot, which used to return the key with no error; something that is not an options object at
+all where the options go, which used to be ignored — a transport handed over bare went to the real
+network, and so did an options object from an async function whose `await` was forgotten; and a
+misspelled member of a language range:
+
+<!-- example: unknown-members -->
+
+```js
+import { createStrings } from "lokalized";
+import { createLocaleNegotiator } from "lokalized/negotiate";
+
+const refusal = (run) => {
+  try {
+    run();
+    return "accepted";
+  } catch (error) {
+    return error.message.replace(/\. It takes.*$/, "");
+  }
+};
+
+refusal(() => createLocaleNegotiator({ supportedLocales: ["en", "fr"], fallbackLocale: "en", fallbackLocal: "fr" }));
+// => "createLocaleNegotiator does not take the option(s) [fallbackLocal]"
+
+const strings = createStrings({ strings: { en: { Items: "{{count}} items" } }, fallbackLocale: "en", locale: "en" });
+
+strings.get("Items", { count: 3 });   // => "3 items"
+refusal(() => strings.get("Items", undefined, { count: 3 }));
+// => "get does not take the option(s) [count]"
+
+// `undefined`, `null` and `false` mean "no options", so `cond && { locale }` still works in
+// JavaScript. (TypeScript refuses `false` and `null` there: the declared types take an options
+// object or nothing.)
+// Anything else that is not an object is refused, and so is a promise: an unawaited one has no keys
+// of its own, so it used to read as "no options".
+strings.get("Items", { count: 3 }, false);   // => "3 items"
+refusal(() => strings.get("Items", { count: 3 }, "fr"));
+// => "get takes an options object, and was handed the string \"fr\""
+refusal(() => strings.get("Items", { count: 3 }, Promise.resolve({ locale: "fr" })));
+// => "get takes an options object, and was handed a promise; await it first"
+
+// A language range takes `range` and `weight` and nothing else. The misspelled weight used to be
+// read as absent — as 1.0 — so this list, written to exclude French, selected it.
+const negotiator = createLocaleNegotiator({ supportedLocales: ["en", "fr"], fallbackLocale: "en" });
+refusal(() => negotiator.bestMatchForLanguageRanges([{ range: "fr", wieght: 0 }, { range: "en", weight: 0.5 }]));
+// => "A language range takes only 'range' and 'weight', and this one also has [wieght]"
+```
+
+The rule reaches one kind of value you build that is not an options object: the language ranges you
+hand the range-list doors (`matchForLanguageRanges`, `bestMatchForLanguageRanges`,
+`forLanguageRanges`), as the last line above shows. It does not reach two others. A value the library
+hands you and you hand back — a manifest, a `LocaleMatch`, an SSR stamp or rendering context — is a
+record rather than an options object, and is not held to this rule. And the placeholder values you
+pass to `get` are named by your catalog, so there is no list to refuse a misspelling against. A value
+under the wrong name is ignored; the placeholder it was meant for then fails as missing, which by
+default hands back the key, and a value no translation references is never noticed at all.
+
 The refusal recurses one level into `limits`, which is the other place a name can be dropped — an
 unknown budget is refused, and so is a container the seven budgets cannot be read out of. A
 `ReadonlyMap` is the one to know about: `tiebreakers` accepts one and `limits` does not, so the same
 budget spelled as a Map used to be dropped in silence while the plain object refused.
 
-**A key present with an `undefined` value is still refused.** `{ fetch: maybeUndefined }` is the same
-misspelling as `{ fetch: fn }`, and a value-sensitive rule would let the dangerous case through on
+**A key present with an `undefined` value is still refused.** `{ transport: maybeUndefined }` is the
+same misspelling as `{ transport: fn }`, and a value-sensitive rule would let the dangerous case through on
 exactly the days the value happened to be unset. If you spread a wider config object into a door, spread
 the members it takes.
 
@@ -2579,7 +2644,7 @@ own origin, with request init `{ mode: "cors", credentials: "same-origin" }`.
 
 ### Loading from a browser without a bundler
 
-**The package ships a prebuilt browser distribution.** `package.json`'s `files` is `["src/", "types/", "dist/", "LICENSE", "NOTICE", "THIRD-PARTY-NOTICES.md", "README.md", "measurements/lokalized-parity.json", "DIVERGENCES.md"]`, and `dist/browser/`
+**The package ships a prebuilt browser distribution.** `package.json`'s `files` is `["src/", "types/", "dist/", "LICENSE", "NOTICE", "THIRD-PARTY-NOTICES.md", "README.md", "CHANGELOG.md", "measurements/lokalized-parity.json", "DIVERGENCES.md"]`, and `dist/browser/`
 holds the built form: one classic script, one single-file module root, and a module entry per
 optional subpath. Everything below loads it straight from a CDN with no build step of your own.
 
@@ -2952,7 +3017,7 @@ the copies interoperate structurally and not by class. Match on `name` and `code
 <!-- example: csp-dual -->
 
 ```js
-import { cpSync, mkdtempSync } from "node:fs";
+import { cpSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -2973,6 +3038,8 @@ const failure = (() => {
 [failure instanceof first.ConfigurationError, failure instanceof second.ConfigurationError];   // => [true, false]
 [failure instanceof first.LokalizedError, failure instanceof second.LokalizedError];           // => [true, false]
 [failure.name, failure.code, failure instanceof Error];   // => ["ConfigurationError", "CONFIGURATION", true]
+
+rmSync(copy, { recursive: true });
 ```
 
 ### What it costs a browser
@@ -2986,11 +3053,11 @@ second table. Both columns are re-derived on every run, so they describe this co
 
 | import | minified | brotli |
 |---|---|---|
-| `import { createStrings } from "lokalized"` | 180,770 | 53,949 |
-| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 87,962 | 30,674 |
-| `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,630 | 2,002 |
+| `import { createStrings } from "lokalized"` | 181,266 | 54,179 |
+| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 89,541 | 31,257 |
+| `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,654 | 2,009 |
 | `import { GENDER_FEMININE } from "lokalized"` | 2,350 | 914 |
-| the four above, in one bundle | 221,271 | 64,215 |
+| the four above, in one bundle | 222,213 | 64,406 |
 <!-- bundle-table:end -->
 
 <!-- dist-table:start -->
@@ -3000,15 +3067,15 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 
 | load | files | raw | brotli |
 |---|---|---|---|
-| `lokalized` | 1 | 183,771 | 54,701 |
-| `lokalized/core` | 7 | 182,951 | 54,683 |
-| `lokalized/parse` | 5 | 159,124 | 48,596 |
-| `lokalized/load` | 7 | 177,534 | 53,636 |
-| `lokalized/ssr` | 2 | 7,186 | 2,246 |
-| `lokalized/negotiate` | 3 | 89,117 | 31,204 |
-| `lokalized/data/ordinal` | 8 | 189,659 | 56,140 |
-| `lokalized/data/ranges` | 8 | 192,187 | 56,255 |
-| `lokalized.global.js`, the classic script | 1 | 242,146 | 68,469 |
+| `lokalized` | 1 | 184,494 | 54,985 |
+| `lokalized/core` | 7 | 183,611 | 54,881 |
+| `lokalized/parse` | 5 | 159,522 | 48,641 |
+| `lokalized/load` | 7 | 178,080 | 53,829 |
+| `lokalized/ssr` | 2 | 7,582 | 2,383 |
+| `lokalized/negotiate` | 4 | 90,810 | 31,688 |
+| `lokalized/data/ordinal` | 8 | 190,319 | 56,708 |
+| `lokalized/data/ranges` | 8 | 192,847 | 56,542 |
+| `lokalized.global.js`, the classic script | 1 | 243,314 | 68,811 |
 <!-- dist-table:end -->
 
 **What a no-build page downloads.** The table above is what a bundler produces from the source; this
@@ -3026,9 +3093,9 @@ larger, so a figure quoted in it overstates what a visitor on a modern CDN actua
 not printed here, because a number nothing re-derives is how this section came to be wrong before.
 
 Three things are worth reading off that table. **Half of the root bundle is one pinned CLDR table** —
-replacing `likely-subtags` with an empty one takes the same bundle from 180,770 to 157,841 minified
+replacing `likely-subtags` with an empty one takes the same bundle from 181,266 to 158,337 minified
 bytes, which is the price of resolving `fr-CH` to `fr` without asking the host. **The tables are
-shared, not duplicated**: adding three more subpaths to the root costs 40,501 bytes, not another
+shared, not duplicated**: adding three more subpaths to the root costs 40,947 bytes, not another
 whole copy. And **`lokalized/ssr` carries no pinned data at all**, which is what lets the stamp
 module sit in a page that does no matching.
 
@@ -3052,7 +3119,7 @@ Object.keys(await import("lokalized/ssr"));   // => ["createSsrStamp", "validate
 ```
 
 `sideEffects` is declared `false` and bundlers honour it — removing that field takes the
-single-constant import from 2,350 to 78,537 minified bytes, 33× larger.
+single-constant import from 2,350 to 78,562 minified bytes, 33× larger.
 
 ---
 

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
-import { getHeapSnapshot } from "node:v8";
+import { after, test } from "node:test";
+import { writeHeapSnapshot } from "node:v8";
 
 import { loadEntireManifest, loadStrings } from "../src/load/index.js";
 import { createStringsManifestFromDirectory, loadEntireManifestFromFiles } from "../src/node/index.js";
@@ -37,7 +37,8 @@ import { createStringsManifestFromDirectory, loadEntireManifestFromFiles } from 
  * **THE FIXTURE IS FIVE CATALOGS WIDE AND EVERY ONE IS ASSERTED ABSENT, which is not cosmetic.** A
  * two-file fixture parses exactly one catalog, and an implementation that released only the first
  * slot (`results[0] = null`) would pass every arm while still retaining four of five. Measured: it
- * does pass the narrow form and it reds three arms of this one.
+ * does pass the narrow form, and it fails five arms of this one: digest, refuse, partial, abort and
+ * late (measured 2026-09-23 on Node 20, 22 and 24).
  */
 
 const TAGS = ["en", "fr", "de", "it", "es"];
@@ -45,6 +46,9 @@ const NEEDLE = (arm, tag) => `lokalized-retention-${arm}-${tag}-a41c7`;
 
 /** @type {string[]} */
 const temporaryDirectories = [];
+// In a hook, not at the end of the test: a red assertion skipped the removal, and every failing run
+// (each ablation of this file, for one) left its eight fixture directories in the system temp folder.
+after(() => { for (const directory of temporaryDirectories) rmSync(directory, { recursive: true, force: true }); });
 
 function catalogDirectory(arm, tags) {
   const directory = mkdtempSync(join(tmpdir(), `lokalized-retention-${arm}-`));
@@ -65,15 +69,13 @@ const manifestFor = (arm, tags, baseUrl) =>
  * A transport over a real directory, with named failure modes.
  *
  * @param {string} directory
- * @param {{ tamper?: string[], refuse?: string[], hold?: { release?: () => void } }} [modes]
+ * @param {{ tamper?: string[], refuse?: string[] }} [modes]
  */
 function transportFor(directory, modes = {}) {
   return async (url) => {
     const name = String(url).split("/").pop() ?? "";
     const tag = name.replace(/\.json$/, "");
     if (modes.refuse?.includes(tag)) throw new Error(`refused ${tag}`);
-    if (modes.hold && tag === "es")
-      await new Promise((resolve) => { modes.hold.release = resolve; });
     if (modes.tamper?.includes(tag))
       return new Response(JSON.stringify({ Key: "tampered, so this body fails its digest" }));
     const { readFileSync } = await import("node:fs");
@@ -81,15 +83,71 @@ function transportFor(directory, modes = {}) {
   };
 }
 
-/** Every live string in a heap snapshot. */
-async function heapStrings() {
-  /** @type {Buffer[]} */
-  const chunks = [];
-  for await (const chunk of getHeapSnapshot()) chunks.push(Buffer.from(chunk));
-  return JSON.parse(Buffer.concat(chunks).toString("utf8")).strings;
+/**
+ * A `readFile` for the Node file door that holds each tag named in `holds` until the test calls its
+ * `release`, which exists from the moment the loader asks for that file.
+ *
+ * **WHY THE ABORT ARMS USE THIS DOOR.** Once an injected `readFile` resolves, the rest of that file's
+ * load (the bounded read of one chunk, the synchronous hash, the parse, and the slot write or the
+ * `return`) runs as microtasks, with no timer and no I/O wait. So one `tick()` after a read is
+ * released is enough to know the loader has finished with it, and the abort arms need neither a
+ * sleep nor a retry. The Fetch door hashes with WebCrypto, which completes on its own schedule.
+ *
+ * @param {Record<string, { release?: () => void }>} holds
+ */
+function readerFor(holds) {
+  return async (/** @type {string} */ url) => {
+    const tag = (String(url).split("/").pop() ?? "").replace(/\.json$/, "");
+    const held = holds[tag];
+    if (held) await new Promise((resolve) => { held.release = resolve; });
+    return new Uint8Array(readFileSync(new URL(url)));
+  };
 }
 
-test("a rejected load releases every catalog it had already parsed", async () => {
+/** One turn of the event loop: every microtask queued before it has run. */
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+/**
+ * Resolves once `holder.release` exists. FAILS rather than waiting forever: if `load` settles first
+ * (a loader that rejects or finishes without asking for the held file), and if ten seconds pass (a
+ * loader that stalls without asking for it, e.g. one admitting a single read while another is held).
+ * The deadline can only turn a stall into a named failure; it cannot make anything pass.
+ */
+async function started(/** @type {{ release?: () => void }} */ holder, /** @type {Promise<unknown>} */ load) {
+  let settled = false;
+  load.then(() => { settled = true; }, () => { settled = true; });
+  const deadline = Date.now() + 10_000;
+  while (!holder.release) {
+    assert.ok(!settled, "the load settled before the held read started, so this arm cannot run");
+    assert.ok(Date.now() < deadline, "the held read did not start within 10 s, so this arm cannot run");
+    await tick();
+  }
+}
+
+/**
+ * Every live string in a heap snapshot.
+ *
+ * **WRITTEN TO A FILE, SYNCHRONOUSLY, AND NOT STREAMED — the streamed form stalled.** It used to
+ * async-iterate `getHeapSnapshot()`, and on Node 22.14.0 that iteration never completes: the event
+ * loop empties while the test awaits it and the runner cancels the test with "Promise resolution is
+ * still pending but the event loop has already resolved". Measured 2026-09-23 with this file alone,
+ * eight processes at a time: 40 of 40 runs failed on 22.14.0 and 0 of 40 on 20.20.2 and 24.18.0, and
+ * CI's unit-test step went red on single Node legs in exactly that way on 2026-09-21 and twice on
+ * 2026-09-23. `writeHeapSnapshot` finishes before it returns, so there is nothing to wait for. On
+ * 22.14.0 the old form never reached an assertion at all, so there this file checked nothing.
+ */
+let snapshotDirectory = "";
+function heapStrings() {
+  if (!snapshotDirectory) {
+    snapshotDirectory = mkdtempSync(join(tmpdir(), "lokalized-retention-snapshot-"));
+    temporaryDirectories.push(snapshotDirectory);
+  }
+  const file = writeHeapSnapshot(join(snapshotDirectory, "retention.heapsnapshot"));
+  return JSON.parse(readFileSync(file, "utf8")).strings;
+}
+
+// The timeout is a backstop so a stall anywhere reports as a failure rather than a hung suite.
+test("a rejected load releases every catalog it had already parsed", { timeout: 120_000 }, async () => {
   /**
    * Held exactly as a caller holds one: the rejection is kept for the life of the test.
    *
@@ -137,22 +195,51 @@ test("a rejected load releases every catalog it had already parsed", async () =>
 
   // ARM 4 — an ABORT delivered from inside a worker, with `reason` undefined so the thrown value is
   // the loader's own `new Error("aborted")`, built inside the worker closure. That is the path the
-  // outer clearing cannot reach, and the reason the fix wraps `Promise.all` in a `catch`.
+  // outer clearing cannot reach, and the reason the fix wraps `Promise.all` in a `catch`. At the file
+  // door (see `readerFor`), so the four unheld catalogs have certainly parsed into their slots before
+  // the abort: this arm is about releasing catalogs the load had already parsed.
   const abortDirectory = catalogDirectory("abort", TAGS);
   const abortManifest = await createStringsManifestFromDirectory(abortDirectory, {
-    catalogVersion: "v1", fallbackLocale: "en", publicationBaseUrl: "https://cdn.example/v1/",
+    catalogVersion: "v1", fallbackLocale: "en",
   });
-  /** @type {{ release?: () => void }} */
-  const hold = {};
+  /** @type {Record<string, { release?: () => void }>} */
+  const abortHolds = { es: {} };
   const signal = { aborted: false, reason: undefined, addEventListener() {}, removeEventListener() {} };
-  const aborting = loadEntireManifest(abortManifest, {
-    fetch: transportFor(abortDirectory, { hold }),
+  const aborting = loadEntireManifestFromFiles(abortManifest, {
+    readFile: readerFor(abortHolds),
     signal: /** @type {any} */ (signal),
   });
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await started(abortHolds.es, aborting);
+  await tick(); // en, fr, de and it have parsed into their slots
   signal.aborted = true;
-  hold.release?.();
+  /** @type {() => void} */ (abortHolds.es.release)();
   await reject(aborting);
+
+  // ARM 4b — a read STILL IN FLIGHT when the load rejects, which finishes afterwards. `es` is released
+  // after the abort, so its worker writes its slot, sees the abort and throws, and the load rejects;
+  // `fr` is released only after that, and one tick later its catalog has parsed into a load whose
+  // slots were already cleared. Before `run-plan.js` stopped late writes, that catalog went into a
+  // cleared slot and the held rejection kept it. Measured 2026-09-23: with that version of run-plan.js
+  // this arm fails on every run, on Node 20, 22 and 24.
+  const lateDirectory = catalogDirectory("late", TAGS);
+  const lateManifest = await createStringsManifestFromDirectory(lateDirectory, {
+    catalogVersion: "v1", fallbackLocale: "en",
+  });
+  /** @type {Record<string, { release?: () => void }>} */
+  const lateHolds = { es: {}, fr: {} };
+  const lateSignal = { aborted: false, reason: undefined, addEventListener() {}, removeEventListener() {} };
+  const lateLoad = loadEntireManifestFromFiles(lateManifest, {
+    readFile: readerFor(lateHolds),
+    signal: /** @type {any} */ (lateSignal),
+  });
+  await started(lateHolds.es, lateLoad);
+  await started(lateHolds.fr, lateLoad);
+  await tick(); // en, de and it have parsed into their slots
+  lateSignal.aborted = true;
+  /** @type {() => void} */ (lateHolds.es.release)();
+  await reject(lateLoad);
+  /** @type {() => void} */ (lateHolds.fr.release)();
+  await tick(); // fr has parsed, after the rejection
 
   // ARM 5 — the NODE FILE DOOR, so the property is pinned for the other transport too. Same runner,
   // and nothing here would notice if the two doors ever stopped sharing it.
@@ -170,11 +257,13 @@ test("a rejected load releases every catalog it had already parsed", async () =>
   });
   await reject(loadStrings(subsetManifest, "it", { fetch: transportFor(subsetDirectory, { tamper: ["en"] }) }));
 
-  // ARM 7 — an AGGREGATE BUDGET CROSSING, which is the widest arm in this file and the newest
-  // rejection path. Every one of the five catalogs parses CLEANLY and is sitting in its slot when the
-  // reconciliation walk crosses the node budget at the second file, so this is the only arm where all
-  // five were live at the moment of the throw. An implementation that released slots on the per-file
-  // failure paths and forgot this one retains the lot.
+  // ARM 7 — an AGGREGATE BUDGET CROSSING, the newest rejection path. Every one of the five catalogs
+  // parses cleanly and is in its slot when the reconciliation walk crosses the node budget at the
+  // second file. **This arm does NOT gate the release on that path**, and this comment used to claim it
+  // did: that error is built in `runPlan`'s own frame, not in a worker closure, so the held rejection
+  // never reaches `results`. Measured: removing that one release leaves this file green on Node 20, 22
+  // and 24 (`run-plan.js` says the same beside it). The arm stays because it pins that this rejection,
+  // too, retains nothing, whatever the reason.
   const budgetDirectory = catalogDirectory("budget", TAGS);
   const budgetManifest = await createStringsManifestFromDirectory(budgetDirectory, {
     catalogVersion: "v1", fallbackLocale: "en", publicationBaseUrl: "https://cdn.example/v1/",
@@ -194,18 +283,18 @@ test("a rejected load releases every catalog it had already parsed", async () =>
   });
   const keptRecord = await loadEntireManifest(keptManifest, { fetch: transportFor(keptDirectory) });
 
-  const strings = await heapStrings();
+  const strings = heapStrings();
   const reachable = (arm, tag) =>
     strings.filter((value) => typeof value === "string" && value.includes(NEEDLE(arm, tag))).length;
 
   assert.ok(reachable("kept", "en") > 0,
     "the control is unreachable, so this instrument cannot distinguish release from blindness");
   assert.equal(Object.keys(keptRecord.catalogs).length, 1);
-  assert.equal(held.length, 7, "every arm must have rejected");
+  assert.equal(held.length, 8, "every arm must have rejected");
 
   // EVERY parsed tag, not just one. An implementation that released only the first slot retains four
   // of these five and passes a one-tag assertion.
-  for (const arm of ["digest", "refuse", "partial", "abort", "nodedoor", "budget"])
+  for (const arm of ["digest", "refuse", "partial", "abort", "late", "nodedoor", "budget"])
     assert.deepEqual(
       TAGS.filter((tag) => reachable(arm, tag) > 0), [],
       `the held rejection from the '${arm}' arm still reaches parsed catalogs`,
@@ -215,6 +304,4 @@ test("a rejected load releases every catalog it had already parsed", async () =>
     ["it", "en"].filter((tag) => reachable("subset", tag) > 0), [],
     "the held rejection from the subset door still reaches parsed catalogs",
   );
-
-  for (const directory of temporaryDirectories) rmSync(directory, { recursive: true, force: true });
 });
