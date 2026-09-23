@@ -20,12 +20,18 @@
  * fixture is the same idea: a directory whose two counts disagree.
  */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 
 import { readStringsFromDirectory } from "../src/node/index.js";
+
+// Every fixture lives under ONE directory, removed when this file's tests finish. Until 2026-09-23
+// each fixture was its own directory in the system temp folder and nothing removed it: 1,815
+// `lokalized-budget-*` directories were counted there, three per run.
+const scratch = mkdtempSync(join(tmpdir(), "lokalized-budget-"));
+after(() => rmSync(scratch, { recursive: true, force: true }));
 
 /**
  * Two loadable catalogs among five children, so "entries" and "parsed files" are 5 and 2.
@@ -37,7 +43,7 @@ import { readStringsFromDirectory } from "../src/node/index.js";
  * would silently stop discriminating the moment one filter was reordered.
  */
 function mixedDirectory() {
-  const directory = mkdtempSync(join(tmpdir(), "lokalized-budget-"));
+  const directory = mkdtempSync(join(scratch, "mixed-"));
   writeFileSync(join(directory, "en.json"), '{"A":"a"}');
   writeFileSync(join(directory, "fr.json"), '{"A":"a"}');
   writeFileSync(join(directory, ".hidden.json"), '{"A":"a"}');

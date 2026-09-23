@@ -14,16 +14,22 @@
  * on their own and together do not.
  */
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 
 import { readStringsFromDirectory } from "../src/node/index.js";
 
+// Every fixture lives under ONE directory, removed when this file's tests finish. Until 2026-09-23
+// each fixture was its own directory in the system temp folder and nothing removed it: 2,540
+// `lokalized-session-*` directories were counted there, four per run.
+const scratch = mkdtempSync(join(tmpdir(), "lokalized-session-"));
+after(() => rmSync(scratch, { recursive: true, force: true }));
+
 /** @param {Record<string, string>} files */
 function directoryOf(files) {
-  const directory = mkdtempSync(join(tmpdir(), "lokalized-session-"));
+  const directory = mkdtempSync(join(scratch, "d-"));
   for (const [name, contents] of Object.entries(files)) writeFileSync(join(directory, name), contents);
   return directory;
 }

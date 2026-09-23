@@ -54,7 +54,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { runInNewContext } from "node:vm";
 
 import { createStrings } from "../src/core/index.js";
@@ -136,9 +136,15 @@ const INSTANCE_MEMBERS = Object.freeze([
   "getWarnings", "getDirectLocaleContext",
 ]);
 
+// Every fixture lives under ONE directory, removed when this file's tests finish. Until 2026-09-23
+// each fixture was its own directory in the system temp folder and nothing removed it: 4,188
+// `lokalized-clause73-*` directories were counted there, seven per run.
+const scratch = mkdtempSync(join(tmpdir(), "lokalized-clause73-"));
+after(() => rmSync(scratch, { recursive: true, force: true }));
+
 /** @param {{ omit?: "hy-SU" }} [shape] */
 function fixtureDirectory(shape = {}) {
-  const directory = mkdtempSync(join(tmpdir(), "lokalized-clause73-"));
+  const directory = mkdtempSync(join(scratch, "d-"));
   writeFileSync(join(directory, "hy-AM.json"), catalogText("AM"));
   if (shape.omit !== "hy-SU") writeFileSync(join(directory, "hy-SU.json"), catalogText("SU"));
   return directory;

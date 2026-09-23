@@ -50,10 +50,10 @@
  * different line from the one every other arm exercises.
  */
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 
 import { loadEntireManifest } from "../src/load/fetch-loader.js";
 import { sha256Hex } from "../src/internal/sha256.js";
@@ -78,6 +78,12 @@ const MINIMUM_MESSAGE_LENGTH = 8;
 
 const catalog = (/** @type {string} */ greeting) => JSON.stringify({ Greeting: greeting });
 
+// Every published directory lives under ONE directory, removed when this file's tests finish. Until
+// 2026-09-23 each was its own directory in the system temp folder and nothing removed it: 26,651
+// `lokalized-cause-*` directories were counted there, forty-five per run.
+const scratch = mkdtempSync(join(tmpdir(), "lokalized-cause-"));
+after(() => rmSync(scratch, { recursive: true, force: true }));
+
 /**
  * Write a directory of catalogs and GENERATE the manifest from it.
  *
@@ -96,7 +102,7 @@ const catalog = (/** @type {string} */ greeting) => JSON.stringify({ Greeting: g
  * @param {{ fallbackLocale?: string, publicationBaseUrl?: string }} [options]
  */
 async function publish(files, options = {}) {
-  const directory = mkdtempSync(join(tmpdir(), "lokalized-cause-"));
+  const directory = mkdtempSync(join(scratch, "d-"));
   for (const [name, body] of Object.entries(files))
     writeFileSync(join(directory, name), typeof body === "string" ? body : Buffer.from(body));
   const manifest = await createStringsManifestFromDirectory(directory, {
