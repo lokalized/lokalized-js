@@ -31,7 +31,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { RECIPE, recipeSha256 } from "./0b-recipe.mjs";
+import { RECIPE, harnessDigests, recipeProblems, recipeSha256, tieProblems } from "./0b-recipe.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RECORD = join(root, "measurements/scenario-0b.json");
@@ -49,11 +49,36 @@ if (!existsSync(RECORD)) {
 const record = JSON.parse(readFileSync(RECORD, "utf8"));
 
 // A MOVED RECIPE WITH AN UNMOVED REVISION is two different scenarios wearing one name — scenario 6's
-// rule, and the reason the digest exists at all.
+// rule, and the reason the digest exists at all. The recipe is held to the digest FROZEN for its
+// revision in `tools/0b-recipe.mjs`, so the rule does not depend on the record surviving; the record
+// is then held to the recipe, with a remedy that depends on which of the two is newer.
+problems.push(...recipeProblems());
 if (record.recipeSha256 !== recipeSha256) {
-  problems.push(`the recipe has changed (${String(record.recipeSha256).slice(0, 12)} -> ${recipeSha256.slice(0, 12)}) ` +
-    `while revision stayed ${record.recipe?.revision}. Bump RECIPE.revision and re-record: runs either side of a ` +
-    "recipe change are not comparable.");
+  const was = record.recipe?.revision;
+  const from = `${String(record.recipeSha256).slice(0, 12)} -> ${recipeSha256.slice(0, 12)}`;
+  problems.push(typeof was === "number" && was > RECIPE.revision
+    ? `the record is revision ${was}, newer than this checkout's recipe (revision ${RECIPE.revision}); update the ` +
+      "checkout rather than re-recording, which tools/browser-0b/record.mjs refuses"
+    : was === RECIPE.revision
+      ? `the record's recipe (${from}) differs from this checkout's at the same revision ${was}`
+      : `the record is revision ${was} and the recipe is revision ${RECIPE.revision} (${from}). Re-record 0b.`);
+}
+
+// THE RUN MUST BE OF WHAT THE RECIPE NAMES, and of the page and manifest this checkout holds. The
+// published build ACCEPTED the manifest it was given — the capture's render proves it, since the
+// loader refuses a manifest whose build identity is not its own — so what is left to hold is that the
+// manifest here is still that one. The record carries both files' digests from record time.
+const page = readFileSync(join(root, "tools/browser-0b/index.html"), "utf8");
+const manifestText = readFileSync(join(root, "tools/browser-0b/manifest.json"), "utf8");
+problems.push(...tieProblems({ capture: record.capture, page, manifest: JSON.parse(manifestText) }));
+const now = harnessDigests(page, manifestText);
+for (const file of /** @type {const} */ (["page", "manifest"])) {
+  const recorded = record.harnessSha256?.[file];
+  if (recorded === undefined)
+    problems.push(`the record does not say which ${file} it was taken with (harnessSha256.${file}); re-record`);
+  else if (recorded !== now[file])
+    problems.push(`tools/browser-0b/${file === "page" ? "index.html" : "manifest.json"} has changed since the recorded run ` +
+      `(${recorded.slice(0, 12)} -> ${now[file].slice(0, 12)}); re-run 0b`);
 }
 
 const capture = record.capture ?? {};
@@ -111,8 +136,8 @@ for (const problem of capture.problems ?? []) problems.push(`the capture reporte
 const s = capture.summary ?? {};
 say("scenario 0b — production-host network delivery");
 say(`  recipe revision ${RECIPE.revision}, digest ${recipeSha256.slice(0, 12)}`);
-say(`  code origin     ${RECIPE.codeOrigin}`);
-say(`  catalog origin  ${RECIPE.catalogOrigin}`);
+say(`  code origin     ${capture.origins?.code ?? "— (not recorded)"}`);
+say(`  catalog origin  ${capture.origins?.catalogs ?? "— (not recorded)"}`);
 say("");
 say(`  request count            ${s.requestCount ?? "—"}`);
 say(`  encoded bytes            ${(s.encodedBytes ?? 0).toLocaleString()}`);

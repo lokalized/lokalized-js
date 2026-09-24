@@ -2,12 +2,12 @@
   "formatVersion": 1,
   "note": "Scenario 0b, measured against the real production host. REPORTED, never thresholded — A7 declined to freeze any, so this cannot close M8 clauses 84-87. Re-checked by tools/scenario-0b.mjs, which touches no network.",
   "recipe": {
-    "revision": 2,
-    "packRecipe": "the published npm tarball, unmodified: lokalized@1.0.0-rc.1, sha256 dbe58b36…, verified byte-identical to the locally gated build",
+    "revision": 3,
+    "packRecipe": "the published npm tarball, unmodified: lokalized@1.0.0-rc.2, sha256 702833b0…, published by .github/workflows/publish.yml from d754c98 with a provenance attestation whose subject digest equals the locally verified build's",
     "importRecipe": "ES module import of dist/browser/lokalized.js and dist/browser/load.js, plus their transitive chunks",
     "loaderGraph": "loadStrings(manifest, 'fr') over a four-catalog manifest; requested fr, sibling fr-CA, fallback en",
     "streamingLimitArm": "after the scenario and its controls, loadStrings(manifest, 'fr', { limits: { maximumInputBytes } }) twice, each on its own token: one byte under fr's manifest-declared decoded size (must refuse fr alone at stage `limit`) and at it (must load). The limit counts what the loader streams, which on a compressing host is the decoded body, so a wire-byte count would accept both",
-    "codeOrigin": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/",
+    "codeOrigin": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/",
     "catalogOrigin": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/",
     "requiredHostHeaders": [
       "timing-allow-origin",
@@ -22,7 +22,11 @@
     "hostThresholds": null,
     "hostThresholdsNote": "A7 declined to freeze any threshold, so plan :2861's seventh freeze item has no value. M8 clauses 84-87 therefore cannot close by running this, and nothing here should be read as meeting a number."
   },
-  "recipeSha256": "af65c158595cd9e1caca22dfbb108eb196075be1e1e8cd2d66570de0f2579612",
+  "recipeSha256": "9c06237a3f5acc9eca17ff204e3fd642b0cd6c4b5680fb4e9cd59631f35ffe66",
+  "harnessSha256": {
+    "page": "9f83cedf07796a2cd1bf877630d0e58943a988ef5b68b2eb737977cbbf139ea2",
+    "manifest": "9d3df0d19723a5f130f83e62dad0cf6e578b5d6c20700d6545de936f08ea2de0"
+  },
   "hostPreconditions": {
     "contentEncoding": "br",
     "code": {
@@ -42,19 +46,19 @@
     "catalogsPinnedToCommit": true
   },
   "capture": {
-    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.2553.13 Chrome/152.0.7977.76 Safari/537.36",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.7032.0 Chrome/152.0.7977.130 Safari/537.36",
     "origins": {
-      "page": "http://zb-r2a.localhost:8713",
-      "code": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/",
+      "page": "http://zb-r3a.localhost:8713",
+      "code": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/",
       "catalogs": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/",
       "blindControl": "http://localhost:8714/no-timing-allow-origin.json"
     },
     "resources": [
       {
-        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r2a-cold",
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r3a-1",
         "origin": "production-host",
         "phase": "scenario",
-        "startMs": 7.8,
+        "startMs": 7.9,
         "initiatorType": "link",
         "transferSize": 687,
         "encodedBodySize": 387,
@@ -62,10 +66,10 @@
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 99.6
+        "durationMs": 82.2
       },
       {
-        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r2a-cold",
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r3a-1",
         "origin": "production-host",
         "phase": "scenario",
         "startMs": 7.9,
@@ -76,13 +80,13 @@
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 99.3
+        "durationMs": 85.8
       },
       {
-        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r2a-cold",
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r3a-1",
         "origin": "production-host",
         "phase": "scenario",
-        "startMs": 7.9,
+        "startMs": 8,
         "initiatorType": "link",
         "transferSize": 0,
         "encodedBodySize": 0,
@@ -90,13 +94,13 @@
         "deliveryType": "",
         "responseStatus": 0,
         "readable": false,
-        "durationMs": 120.9
+        "durationMs": 81.9
       },
       {
-        "url": "http://zb-r2a.localhost:8713/manifest.json",
+        "url": "http://zb-r3a.localhost:8713/manifest.json",
         "origin": "local-control",
         "phase": "scenario",
-        "startMs": 11.9,
+        "startMs": 10.7,
         "initiatorType": "fetch",
         "transferSize": 1651,
         "encodedBodySize": 1351,
@@ -104,55 +108,97 @@
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 3.4
+        "durationMs": 3.6
       },
       {
-        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/lokalized.js?0b=r2a-cold",
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/lokalized.js?0b=r3a-1",
         "origin": "production-host",
         "phase": "scenario",
-        "startMs": 16.5,
+        "startMs": 16,
         "initiatorType": "script",
-        "transferSize": 66066,
-        "encodedBodySize": 65766,
-        "decodedBodySize": 188097,
+        "transferSize": 65028,
+        "encodedBodySize": 64728,
+        "decodedBodySize": 184494,
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 117.8
+        "durationMs": 75.6
       },
       {
-        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/load.js?0b=r2a-cold",
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/load.js?0b=r3a-1",
         "origin": "production-host",
         "phase": "scenario",
-        "startMs": 144.7,
+        "startMs": 103.2,
         "initiatorType": "script",
-        "transferSize": 7678,
-        "encodedBodySize": 7378,
-        "decodedBodySize": 20448,
+        "transferSize": 7731,
+        "encodedBodySize": 7431,
+        "decodedBodySize": 20600,
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 28.5
+        "durationMs": 23.3
       },
       {
-        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-KSXV2EIX.js",
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-NZVWUS27.js",
         "origin": "production-host",
         "phase": "scenario",
-        "startMs": 173.9,
+        "startMs": 126.8,
         "initiatorType": "script",
-        "transferSize": 1498,
-        "encodedBodySize": 1198,
+        "transferSize": 1501,
+        "encodedBodySize": 1201,
         "decodedBodySize": 2481,
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 25.8
+        "durationMs": 22.7
       },
       {
-        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-QU3LBEYR.js",
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-LED5CWLB.js",
         "origin": "production-host",
         "phase": "scenario",
-        "startMs": 174,
+        "startMs": 126.9,
+        "initiatorType": "script",
+        "transferSize": 994,
+        "encodedBodySize": 694,
+        "decodedBodySize": 1355,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 22.5
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-ZSYPX2PV.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 126.9,
+        "initiatorType": "script",
+        "transferSize": 552,
+        "encodedBodySize": 252,
+        "decodedBodySize": 347,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 24.4
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-7WU4JE3E.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 126.9,
+        "initiatorType": "script",
+        "transferSize": 23067,
+        "encodedBodySize": 22767,
+        "decodedBodySize": 75744,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 26.5
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-QU3LBEYR.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "startMs": 126.9,
         "initiatorType": "script",
         "transferSize": 779,
         "encodedBodySize": 479,
@@ -160,69 +206,27 @@
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 22.9
+        "durationMs": 27
       },
       {
-        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-AJGDCACK.js",
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-LNGUQ7KN.js",
         "origin": "production-host",
         "phase": "scenario",
-        "startMs": 174,
+        "startMs": 126.9,
         "initiatorType": "script",
-        "transferSize": 581,
-        "encodedBodySize": 281,
-        "decodedBodySize": 397,
+        "transferSize": 33342,
+        "encodedBodySize": 33042,
+        "decodedBodySize": 76894,
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 25.9
+        "durationMs": 29.1
       },
       {
-        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-ZZZNP6PS.js",
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r3a-1",
         "origin": "production-host",
         "phase": "scenario",
-        "startMs": 174,
-        "initiatorType": "script",
-        "transferSize": 787,
-        "encodedBodySize": 487,
-        "decodedBodySize": 959,
-        "deliveryType": "",
-        "responseStatus": 200,
-        "readable": true,
-        "durationMs": 25.9
-      },
-      {
-        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-XKUWI26D.js",
-        "origin": "production-host",
-        "phase": "scenario",
-        "startMs": 174,
-        "initiatorType": "script",
-        "transferSize": 23063,
-        "encodedBodySize": 22763,
-        "decodedBodySize": 75744,
-        "deliveryType": "",
-        "responseStatus": 200,
-        "readable": true,
-        "durationMs": 31.6
-      },
-      {
-        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/chunks/chunk-4KMHTUBO.js",
-        "origin": "production-host",
-        "phase": "scenario",
-        "startMs": 174.1,
-        "initiatorType": "script",
-        "transferSize": 34488,
-        "encodedBodySize": 34188,
-        "decodedBodySize": 81161,
-        "deliveryType": "",
-        "responseStatus": 200,
-        "readable": true,
-        "durationMs": 29.3
-      },
-      {
-        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r2a-cold",
-        "origin": "production-host",
-        "phase": "scenario",
-        "startMs": 217.3,
+        "startMs": 166.8,
         "initiatorType": "fetch",
         "transferSize": 659,
         "encodedBodySize": 359,
@@ -230,13 +234,13 @@
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 20.9
+        "durationMs": 19.2
       },
       {
-        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r2a-cold",
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r3a-1",
         "origin": "production-host",
         "phase": "after-render",
-        "startMs": 244.5,
+        "startMs": 191.5,
         "initiatorType": "fetch",
         "transferSize": 0,
         "encodedBodySize": 387,
@@ -244,13 +248,13 @@
         "deliveryType": "cache",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 0.5
+        "durationMs": 0.6
       },
       {
         "url": "http://localhost:8714/no-timing-allow-origin.json",
         "origin": "local-control",
         "phase": "after-render",
-        "startMs": 245.4,
+        "startMs": 192.3,
         "initiatorType": "fetch",
         "transferSize": 0,
         "encodedBodySize": 0,
@@ -258,13 +262,13 @@
         "deliveryType": "",
         "responseStatus": 200,
         "readable": false,
-        "durationMs": 1.2
+        "durationMs": 1.1
       },
       {
-        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r2a-cold-limit-908",
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r3a-1-limit-908",
         "origin": "production-host",
         "phase": "after-render",
-        "startMs": 248.1,
+        "startMs": 194.7,
         "initiatorType": "fetch",
         "transferSize": 687,
         "encodedBodySize": 387,
@@ -272,13 +276,13 @@
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 18.8
+        "durationMs": 16.2
       },
       {
-        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r2a-cold-limit-908",
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r3a-1-limit-908",
         "origin": "production-host",
         "phase": "after-render",
-        "startMs": 248.2,
+        "startMs": 194.8,
         "initiatorType": "fetch",
         "transferSize": 671,
         "encodedBodySize": 371,
@@ -286,13 +290,13 @@
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 25.1
+        "durationMs": 20.7
       },
       {
-        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r2a-cold-limit-908",
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r3a-1-limit-908",
         "origin": "production-host",
         "phase": "after-render",
-        "startMs": 248.3,
+        "startMs": 194.9,
         "initiatorType": "fetch",
         "transferSize": 659,
         "encodedBodySize": 359,
@@ -300,13 +304,13 @@
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 27.1
+        "durationMs": 18.2
       },
       {
-        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r2a-cold-limit-909",
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r3a-1-limit-909",
         "origin": "production-host",
         "phase": "after-render",
-        "startMs": 276.5,
+        "startMs": 216.4,
         "initiatorType": "fetch",
         "transferSize": 687,
         "encodedBodySize": 387,
@@ -314,27 +318,13 @@
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 18.4
+        "durationMs": 17.8
       },
       {
-        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r2a-cold-limit-909",
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r3a-1-limit-909",
         "origin": "production-host",
         "phase": "after-render",
-        "startMs": 276.5,
-        "initiatorType": "fetch",
-        "transferSize": 671,
-        "encodedBodySize": 371,
-        "decodedBodySize": 876,
-        "deliveryType": "",
-        "responseStatus": 200,
-        "readable": true,
-        "durationMs": 20.9
-      },
-      {
-        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r2a-cold-limit-909",
-        "origin": "production-host",
-        "phase": "after-render",
-        "startMs": 276.6,
+        "startMs": 216.5,
         "initiatorType": "fetch",
         "transferSize": 659,
         "encodedBodySize": 359,
@@ -342,7 +332,21 @@
         "deliveryType": "",
         "responseStatus": 200,
         "readable": true,
-        "durationMs": 20.8
+        "durationMs": 17.7
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r3a-1-limit-909",
+        "origin": "production-host",
+        "phase": "after-render",
+        "startMs": 216.5,
+        "initiatorType": "fetch",
+        "transferSize": 671,
+        "encodedBodySize": 371,
+        "decodedBodySize": 876,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 25.6
       }
     ],
     "controls": {
@@ -372,14 +376,14 @@
       "key": "Cart.Items",
       "rendered": "Votre panier contient 3 livres.",
       "renderedTheKeyBack": false,
-      "coldImportMs": 197.6,
-      "loadMs": 25.8,
-      "firstUsableRenderMs": 228
+      "coldImportMs": 147.2,
+      "loadMs": 23.8,
+      "firstUsableRenderMs": 175.5
     },
     "problems": [],
     "cacheBuster": {
       "parameter": "0b",
-      "value": "r2a-cold",
+      "value": "r3a-1",
       "appliedTo": "every production-host URL"
     },
     "streamingLimits": {
@@ -425,9 +429,9 @@
     "summary": {
       "requestCount": 12,
       "requestsAfterRenderExcluded": 7,
-      "encodedBytes": 133657,
-      "decodedBytes": 372570,
-      "transferBytes": 136957
+      "encodedBytes": 131711,
+      "decodedBytes": 365198,
+      "transferBytes": 135011
     }
   }
 }

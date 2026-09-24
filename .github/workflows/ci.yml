@@ -28,14 +28,14 @@ jobs:
       run:
         working-directory: lokalized-js
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: lokalized-js
           # Plan validators reject shallow repositories: they verify capacity
           # and start-record commit ancestry with `git merge-base --is-ancestor`.
           fetch-depth: 0
       - name: Check out the behavioral corpus and pinned artifacts
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: lokalized/lokalized-spec
           # THE REF IS LOAD-BEARING. `lokalized-spec`'s DEFAULT branch (`main`) holds two files,
@@ -61,7 +61,7 @@ jobs:
           SPEC_REPO_REF: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
         run: node tools/check-spec-checkout.mjs
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node }}
       - run: npm ci || npm install
@@ -332,14 +332,14 @@ jobs:
       run:
         working-directory: lokalized-js
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: lokalized-js
           fetch-depth: 0
           persist-credentials: false
       # The same checkout and guard as the verify job above; the reasoning for each is written there.
       - name: Check out the behavioral corpus and pinned artifacts
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: lokalized/lokalized-spec
           ref: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
@@ -351,7 +351,7 @@ jobs:
         env:
           SPEC_REPO_REF: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
         run: node tools/check-spec-checkout.mjs
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # THE FLOOR, deliberately: a fresh installer on the oldest supported runtime is
           # exactly what a packed-artifact check is for. Tracks engines.node's lower bound.

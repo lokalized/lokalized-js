@@ -5,9 +5,10 @@
 # can publish as the owner. Trusted publishing exchanges a short-lived GitHub OIDC token for a
 # scoped npm credential at the moment of publishing, so there is nothing to leak between releases.
 # It is also plan 9.1's last bullet. That clause closes only when a real publish runs through here and
-# the registry reports an attestation — this file existing is not the same as having been used.
+# the registry reports an attestation — this file existing is not the same as having been used. It
+# closed on 2026-09-24 with 1.0.0-rc.2 (run 36024984063).
 #
-# **TWO JOBS, AND THE SPLIT IS ITSELF THE SECURITY PROPERTY.** `id-token: write` is granted per JOB,
+# **THE BUILD/PUBLISH SPLIT IS ITSELF THE SECURITY PROPERTY.** `id-token: write` is granted per JOB,
 # and GitHub exports ACTIONS_ID_TOKEN_REQUEST_URL / ACTIONS_ID_TOKEN_REQUEST_TOKEN to EVERY step of a
 # job that holds it. npm's exchange needs nothing else (lib/utils/oidc.js:63-142): GET that URL with
 # `?audience=npm:registry.npmjs.org`, POST the result to
@@ -19,7 +20,8 @@
 # one `npm publish`. Publishing a TARBALL executes no lifecycle scripts at all — `npm`'s
 # `lib/commands/publish.js:99` and `:215` gate prepublishOnly/publish/postpublish on
 # `spec.type === 'directory'`, and `libnpmpack/lib/index.js:19` gates prepack the same way — so the
-# credentialed job runs no repository code and no dependency code.
+# credentialed job runs no repository code and no dependency code. A third job, `report`, reads the
+# registry after the publish and holds no credential either, so it can be re-run on its own.
 #
 # **THE DIGEST INPUT IS THE POINT, and it rests on a measurement.** `npm pack` here is REPRODUCIBLE:
 # a full `prepack` (tsc, esbuild, divergences) run at a different path produced a tarball
@@ -92,21 +94,23 @@ jobs:
       run:
         working-directory: lokalized-js
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: lokalized-js
           fetch-depth: 0
-          # actions/checkout otherwise leaves an `http.extraheader` bearing the job's token in
-          # `.git/config`, and this job then runs `npm ci` (which executes an install script) and
-          # every `verify` gate over that tree. Nothing here fetches or pushes afterwards; the deep
-          # clone is for the plan validators, which read history locally.
+          # actions/checkout otherwise leaves the job's token where git will send it — an
+          # `http.extraheader` in a credentials file under $RUNNER_TEMP that `.git/config` includes
+          # (v6 and later; v4 wrote it into `.git/config` itself) — and this job then runs `npm ci`
+          # (which executes an install script) and every `verify` gate over that tree. Nothing here
+          # fetches or pushes afterwards; the deep clone is for the plan validators, which read
+          # history locally.
           persist-credentials: false
 
       # `npm run verify` is the whole point of publishing from here rather than a laptop, and it
       # needs the corpus. Mirrors ci.yml's checkout AND the guard ci.yml wraps around it — the first
       # draft copied the checkout alone, which is how the release path came to have the weaker check.
       - name: Check out the behavioral corpus and pinned artifacts
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: lokalized/lokalized-spec
           ref: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
@@ -124,9 +128,15 @@ jobs:
       # `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` and point NPM_CONFIG_USERCONFIG at it.
       # This workflow has no such token, and a config line naming one is exactly what it claims not
       # to have. The default registry is registry.npmjs.org regardless.
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      # `package-manager-cache: false` because setup-node v5 and later turn npm caching ON by
+      # themselves when `$GITHUB_WORKSPACE/package.json` names npm (`packageManager`; also
+      # `devEngines.packageManager` from v6). Both checkouts here use `path:`, so no such file
+      # exists today; this keeps caching off if one ever appears, because a release build must not
+      # restore a dependency cache another workflow could have written.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
+          package-manager-cache: false
 
       - run: npm ci
       - name: Install the spec repo's own dependencies
@@ -203,7 +213,7 @@ jobs:
           echo "byte-identical to the verified tarball"
 
       - name: Hand the tarball to the publishing job
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tarball
           path: lokalized-js/lokalized-${{ inputs.version }}.tgz
@@ -226,11 +236,11 @@ jobs:
       # back to looking for a credential that this workflow deliberately does not have.
       id-token: write
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: tarball
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
 
@@ -302,24 +312,71 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: npm publish "lokalized-$VERSION.tgz" --tag "$TAG" --provenance --access public
 
-      # `--provenance` already refuses BEFORE the PUT if it cannot generate an attestation, so this
-      # cannot prevent an unattested publish — the version is immutable by the time it runs. What it
-      # can do is turn "nobody noticed the registry dropped it" into a red run. Retried, because
-      # registry reads lag a write by seconds and a spurious red on a publish workflow is its own
-      # kind of noise.
-      - name: Report what the registry now says, and fail if provenance is not there
+  # ---------------------------------------------------------------------------------------------
+  # REPORT. What the registry says once the publish has landed, and a red run if the version
+  # carries no provenance attestation. `--provenance` already refuses BEFORE the PUT if it cannot
+  # generate one, so this cannot prevent an unattested publish — the version is immutable by the
+  # time it runs. What it can do is turn "nobody noticed the registry dropped it" into a red run.
+  #
+  # IT IS ITS OWN JOB, WITH NO CREDENTIAL, BECAUSE IT HAS TO BE RE-RUNNABLE ALONE. GitHub re-runs
+  # jobs, never single steps, and re-running the publish job would run `npm publish` again. As a
+  # job of its own it can be re-run once the registry catches up, and its wait does not happen
+  # beside the OIDC request variables.
+  #
+  # IT WAITS, BECAUSE THE REGISTRY TAKES MINUTES TO SHOW A NEW VERSION, NOT SECONDS. 1.0.0-rc.2
+  # published cleanly on 2026-09-24, and this check, then a single `npm view` run seconds after the
+  # PUT with no retry, answered E404 "No match found for version 1.0.0-rc.2" and turned a good
+  # release red. The registry showed the version about five minutes later. (`npm view` already asks
+  # for a fresh copy rather than its local cache, so the wait is the registry's.) So it reads the
+  # registry every 30 seconds until a read finishes past ten minutes, with npm's own retries off so
+  # that cadence holds when the registry is failing. Each poll is ONE read: a version and its
+  # attestations arrive in the same document, so no second lookup can land on a copy that has not
+  # caught up. `test/publish-workflow.test.js` EXECUTES this step against a stand-in npm.
+  # ---------------------------------------------------------------------------------------------
+  report:
+    needs: [publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Wait for the registry to show the version, and fail if provenance is not there
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          npm view "lokalized@$VERSION" dist-tags version
-          for attempt in 1 2 3; do
-            if npm view "lokalized@$VERSION" --json \
-              | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); if(!d.dist?.attestations){process.exit(1);} console.log(JSON.stringify(d.dist.attestations,null,2));'
-            then
-              exit 0
+          deadline=$((SECONDS + 600))
+          while :; do
+            npm view "lokalized@$VERSION" --json --fetch-retries=0 >"$RUNNER_TEMP/view.json" 2>"$RUNNER_TEMP/view.err" || true
+            # What the registry answered: 0 the version with an attestation, 2 the version without
+            # one, 3 no such version yet (npm's --json E404), anything else no usable answer (a
+            # network error or a 5xx). Only 2 may be reported as a missing attestation.
+            answer=0
+            node -e '
+              let d;
+              try { d = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); } catch { process.exit(4); }
+              if (d.error?.code === "E404") process.exit(3);
+              if (d.error || d.version !== process.env.VERSION) process.exit(4);
+              console.log(`version ${d.version}, dist-tags ${JSON.stringify(d["dist-tags"])}`);
+              if (!d.dist?.attestations) process.exit(2);
+              console.log(JSON.stringify(d.dist.attestations, null, 2));
+            ' "$RUNNER_TEMP/view.json" || answer=$?
+            [ "$answer" -eq 0 ] && exit 0
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              case "$answer" in
+                2) echo "::error::published, but the registry records NO provenance attestation for lokalized@$VERSION. The version is immutable; investigate before the next release." ;;
+                3) echo "::error::the publish job succeeded, but at the ten-minute deadline the registry still did not show lokalized@$VERSION. Do NOT re-run the publish job (versions are immutable); once https://www.npmjs.com/package/lokalized?activeTab=versions lists it, re-run this report job alone." ;;
+                *) cat "$RUNNER_TEMP/view.err"
+                   echo "::error::the last read at the ten-minute deadline got no usable answer about lokalized@$VERSION (its error is above). The publish job succeeded; do NOT re-run it. Re-run this report job alone once the registry answers." ;;
+              esac
+              exit 1
             fi
-            echo "no attestations recorded yet (attempt $attempt of 3)"
-            sleep 10
+            case "$answer" in
+              2) echo "lokalized@$VERSION is visible but carries no attestation yet; checking again in 30 seconds" ;;
+              3) echo "lokalized@$VERSION is not visible on the registry yet; checking again in 30 seconds" ;;
+              *) echo "no usable answer from the registry; checking again in 30 seconds" ;;
+            esac
+            sleep 30
           done
-          echo "::error::published, but the registry records NO provenance attestation for lokalized@$VERSION. The version is immutable; investigate before the next release."
-          exit 1

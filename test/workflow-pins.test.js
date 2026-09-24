@@ -43,7 +43,7 @@ for (const file of files) {
 
 test("the census reads the real workflows", () => {
   assert.ok(files.includes("publish.yml") && files.includes("ci.yml"), `workflows found: ${files.join(", ")}`);
-  assert.ok(refs.length >= 11, `only ${refs.length} action references were found; the two workflows hold eleven today`);
+  assert.ok(refs.length >= 13, `only ${refs.length} action references were found; the two workflows hold thirteen today`);
 });
 
 test("every action is pinned to a full commit SHA", () => {

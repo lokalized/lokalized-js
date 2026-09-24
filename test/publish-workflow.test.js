@@ -28,13 +28,15 @@
  * is on — and `workflow_dispatch` does not register until it is on the default branch. Whether the
  * `npm-publish` environment has any protection rules configured. Those are recorded in the workflow
  * header as external preconditions. And whether a pinned commit is still the release its trailing
- * `# v4.x.y` comment names — the comment is for the reviewer and Dependabot, and checking it needs
+ * `# vX.Y.Z` comment names — the comment is for the reviewer and Dependabot, and checking it needs
  * the network. What IS gated: the credentialed job's action set cannot grow (below), and every action
  * in every workflow is pinned to a full commit, one action to one commit
  * (`test/workflow-pins.test.js`, which reads the whole directory so CI is covered too).
  */
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { spawn } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -108,7 +110,8 @@ test("THE CREDENTIALED JOB RUNS NO REPOSITORY CODE AND NO DEPENDENCY CODE", () =
 
   // npm and node are ALLOWLISTED by subcommand, because a denylist of dangerous ones is the shape
   // this project keeps finding holes in.
-  const NPM_ALLOWED = new Set(["view", "publish", "--version"]);
+  // `view` left this list when the post-publish report moved to a job of its own.
+  const NPM_ALLOWED = new Set(["publish", "--version"]);
   for (const { line, body } of runBodies(tree).filter(({ line }) => steps.some((s) => within(s, line)))) {
     // Prose inside a body is not code. A full-line `#` (shell) or `//` (the inline `node -e`) is a
     // comment in both languages, and this rule fired on the phrase "the npm it most needed to
@@ -132,8 +135,18 @@ test("THE CREDENTIALED JOB RUNS NO REPOSITORY CODE AND NO DEPENDENCY CODE", () =
 function within(step, line) {
   const all = stepsOf(tree, credentialed[0]);
   const i = all.indexOf(step);
-  const end = i + 1 < all.length ? all[i + 1].line : Infinity;
+  // The last step ends where the NEXT JOB begins. It ended at Infinity, which was harmless while this
+  // job was the last in the file, and once `report` followed it made every report step count as
+  // "inside" the credentialed job — policed by rules that are not about it, and only by file order.
+  const next = jobNames[jobNames.indexOf(credentialed[0]) + 1];
+  const end = i + 1 < all.length ? all[i + 1].line : (next ? at(tree, "jobs", next)?.line ?? Infinity : Infinity);
   return line >= step.line && line < end;
+}
+
+/** The shell a step runs, or "" for a step that runs none. */
+function stepBody(step) {
+  const run = child(step, "run");
+  return run?.block ?? run?.value ?? "";
 }
 
 test("the full gate runs in the OTHER job, and publishing DEPENDS on it", () => {
@@ -277,14 +290,151 @@ test("it refuses to publish bytes whose digest the releaser did not supply — i
       `${PATH}:${line} compares the digest but does not EXIT on a mismatch — an ::error:: annotation ` +
       "does not fail a step, only a non-zero status does");
   }
-  const jobsWithACheck = new Set(jobNames.filter((j) =>
-    comparisons.some(({ line }) => {
-      const job = at(tree, "jobs", j);
-      const next = jobNames[jobNames.indexOf(j) + 1];
-      const end = next ? (at(tree, "jobs", next)?.line ?? Infinity) : Infinity;
-      return job && line >= job.line && line < end;
-    })));
-  assert.equal(jobsWithACheck.size, 2, "the digest must be checked in the building job AND in the publishing one");
+  // BY MEMBERSHIP AND ORDER, NOT BY COUNT. This asserted two jobs held a check, which meant
+  // {build, publish} only while there were two jobs: with `report` added, {build, report} satisfied it
+  // and the check before the PUT could move after it with every rule green (second review, 2026-09-24).
+  const digestAt = (/** @type {string} */ job) => stepsOf(tree, job).findIndex((s) =>
+    /\$EXPECTED/.test(stepBody(s)) && /sha256sum/.test(stepBody(s)));
+  const builder = jobNames.find((j) => !credentialed.includes(j) &&
+    stepsOf(tree, j).some((s) => /\bnpm run verify\b/.test(stepBody(s))));
+  assert.ok(builder && digestAt(builder) !== -1, "the building job must compare the digest before it hands the tarball over");
+  const publishAt = stepsOf(tree, credentialed[0]).findIndex((s) => /\bnpm\s+publish\b/.test(stepBody(s)));
+  const checkAt = digestAt(credentialed[0]);
+  assert.ok(checkAt !== -1 && checkAt < publishAt,
+    `the publishing job must compare the digest BEFORE npm publish (digest at step ${checkAt}, publish at ${publishAt})`);
+});
+
+/** A job's `needs:` as a list, whichever YAML spelling it uses, quoted or not. */
+const needsOf = (/** @type {string} */ job) => {
+  const needs = at(tree, "jobs", job, "needs");
+  const raw = needs?.flow ?? (needs?.value ? [needs.value] : items(needs).map((n) => n.value));
+  return raw.map((n) => String(n).replace(/^(["'])(.*)\1$/, "$2"));
+};
+
+/** The jobs that run after this one, directly or through another. */
+function downstreamOf(/** @type {string} */ job) {
+  const found = new Set();
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const j of jobNames)
+      if (!found.has(j) && needsOf(j).some((n) => n === job || found.has(n))) { found.add(j); grew = true; }
+  }
+  return found;
+}
+
+/**
+ * Does this shell read the npm registry? Deliberately GENEROUS — any line naming npm with `view`,
+ * `info`, `show` or `v` later on it, or naming the registry host — because a false positive costs a
+ * reworded line and a false negative is the shape that turned rc.2's run red.
+ */
+const readsRegistry = (/** @type {string} */ body) => body.split("\n").some((l) => !/^\s*#/.test(l) &&
+  (/\bnpm\b.*\b(?:view|info|show|v)\b/.test(l) || /registry\.npmjs\.org/.test(l)));
+
+/** The step that reads the registry after the publish; the rule below requires there to be one. */
+const reportSteps = [...downstreamOf(credentialed[0])].flatMap((job) =>
+  stepsOf(tree, job).filter((s) => readsRegistry(stepBody(s))).map((step) => ({ job, step })));
+
+test("the registry is read after the publish in ONE place, and that place can be re-run alone", () => {
+  // 1.0.0-rc.2 published cleanly and its run still went red: one `npm view`, seconds after the PUT,
+  // answered E404, and the registry showed the version about five minutes later. And GitHub re-runs
+  // JOBS, never single steps, so a check that times out inside the publishing job can only be retried
+  // by publishing again. So the publishing job reads the registry nowhere, and exactly one step, in a
+  // job downstream of it, does: the report the next test EXECUTES.
+  assert.deepEqual(stepsOf(tree, credentialed[0]).filter((s) => readsRegistry(stepBody(s))).map((s) => `${PATH}:${s.line}`), [],
+    "the publishing job reads the registry, so a lagging registry fails the job that holds the credential, and retrying it publishes again");
+  assert.equal(reportSteps.length, 1, `expected exactly one registry-reading step after the publish; found ` +
+    `${reportSteps.length}: ${reportSteps.map(({ step }) => `${PATH}:${step.line}`).join(", ")}`);
+  const [{ job, step }] = reportSteps;
+  assert.match(stepBody(step), /attestations/, "the one registry read after the publish must be the attestation report");
+  assert.equal(effectivePermissions(tree, job)?.permissions["id-token"], undefined, `the \`${job}\` job must hold no credential`);
+  assert.equal(at(tree, "jobs", job, "environment"), undefined,
+    `the \`${job}\` job must not reference the publish environment: re-running it would then wait on a release approval`);
+  for (const [where, node] of [[`job ${job}`, at(tree, "jobs", job)], [`${PATH}:${step.line}`, step]]) {
+    assert.equal(child(node, "continue-on-error"), undefined, `${where}: a report whose failure does not fail the run reports nothing`);
+    assert.equal(child(node, "if"), undefined, `${where}: a condition can skip the report; it runs whenever the publish succeeded`);
+  }
+});
+
+test("the report, EXECUTED against a stand-in npm, waits for the registry and names the answer it got", async () => {
+  // The rule this replaces read the loop's SHAPE and a second review found eight wrong edits it
+  // passed, one of them the rc.2 failure itself: drop `|| true` and the first E404 ends the step.
+  // So the step is RUN, under GitHub's own shell flags, with time scaled down and `npm` replaced by
+  // a stand-in answering from a script. Only the deadline and the sleep are rewritten.
+  assert.equal(reportSteps.length, 1, "no single report step to execute; see the test above");
+  const body = stepBody(reportSteps[0].step);
+  const deadlines = [...body.matchAll(/^[ \t]*deadline=\$\(\(SECONDS \+ (\d+)\)\)[ \t]*$/gm)];
+  assert.equal(deadlines.length, 1, "exactly one deadline, set once before the loop — a second assignment resets or shortens it");
+  assert.ok(Number(deadlines[0][1]) >= 450, `the registry is given ${deadlines[0][1]} seconds; it has been measured ` +
+    "taking about 300 to show a new version, and serves the package document with max-age=300");
+  const sleeps = [...body.matchAll(/^[ \t]*sleep (\d+)[ \t]*$/gm)];
+  assert.equal(sleeps.length, 1, "exactly one sleep, between reads");
+  assert.ok(Number(sleeps[0][1]) >= 10, `sleeping ${sleeps[0][1]}s between reads polls the registry harder than it needs`);
+  const scaled = body.replace(deadlines[0][0], deadlines[0][0].replace(/\+ \d+/, "+ 4"))
+    .replace(sleeps[0][0], sleeps[0][0].replace(/\d+/, "1"));
+
+  const VERSION = "1.2.3-stand-in";
+  const STUB = `const fs = require("fs"), path = require("path");
+const dir = __dirname, log = path.join(dir, "calls");
+const n = fs.existsSync(log) ? fs.readFileSync(log, "utf8").split("\\n").filter(Boolean).length : 0;
+fs.appendFileSync(log, JSON.stringify(process.argv.slice(2)) + "\\n");
+const plan = JSON.parse(fs.readFileSync(path.join(dir, "plan.json"), "utf8"));
+const answer = plan[Math.min(n, plan.length - 1)], v = process.env.VERSION;
+if (answer === "absent") { console.log(JSON.stringify({ error: { code: "E404", summary: "No match found for version " + v } })); process.exit(1); }
+if (answer === "error") { console.error("npm error code E503 (stand-in)"); console.log(JSON.stringify({ error: { code: "E503", summary: "Service Unavailable" } })); process.exit(1); }
+const doc = { name: "lokalized", version: v, "dist-tags": { next: v }, dist: {} };
+if (answer === "attested") doc.dist.attestations = { url: "https://example.invalid/att", provenance: { predicateType: "https://slsa.dev/provenance/v1" } };
+console.log(JSON.stringify(doc, null, 2));
+`;
+  const run = (/** @type {string[]} */ plan) => new Promise((settle) => {
+    const dir = mkdtempSync(join(tmpdir(), "lokalized-report-"));
+    writeFileSync(join(dir, "report.sh"), scaled);
+    writeFileSync(join(dir, "npm-stand-in.cjs"), STUB);
+    writeFileSync(join(dir, "npm"), `#!/bin/sh\nexec node "$(dirname "$0")/npm-stand-in.cjs" "$@"\n`, { mode: 0o755 });
+    // Any other way to reach the registry FAILS here, as it can on a runner: the report must go
+    // through the stand-in, and this test must not depend on the network.
+    for (const tool of ["curl", "wget"])
+      writeFileSync(join(dir, tool), `#!/bin/sh\necho "${tool}: no network in this test" >&2\nexit 7\n`, { mode: 0o755 });
+    writeFileSync(join(dir, "plan.json"), JSON.stringify(plan));
+    const shell = spawn("bash", ["--noprofile", "--norc", "-eo", "pipefail", join(dir, "report.sh")],
+      { env: { ...process.env, PATH: `${dir}${delimiter}${process.env.PATH}`, VERSION, RUNNER_TEMP: dir } });
+    let out = "";
+    shell.stdout.on("data", (chunk) => { out += chunk; });
+    shell.stderr.on("data", (chunk) => { out += chunk; });
+    const killer = setTimeout(() => shell.kill("SIGKILL"), 30_000);
+    shell.on("close", (code, signal) => {
+      clearTimeout(killer);
+      const log = join(dir, "calls");
+      const calls = existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
+      rmSync(dir, { recursive: true, force: true });
+      settle({ code, signal, out, calls });
+    });
+  });
+  const [late, unattested, absent, failing] = /** @type {{ code: number, signal: string | null, out: string, calls: string[][] }[]} */ (
+    await Promise.all([run(["absent", "error", "attested"]), run(["unattested"]), run(["absent"]), run(["error"])]));
+
+  for (const [name, r] of Object.entries({ late, unattested, absent, failing })) {
+    assert.equal(r.signal, null, `${name}: the step never finished; a loop that does not honour its deadline spins until the job's six-hour timeout\n${r.out}`);
+    assert.ok(r.calls.every((a) => a[0] === "view" && a.includes(`lokalized@${VERSION}`) && a.includes("--json") && a.includes("--fetch-retries=0")),
+      `${name}: every read is \`npm view lokalized@<version> --json --fetch-retries=0\`; got ${JSON.stringify(r.calls)}`);
+  }
+  // A version that is missing, then unreadable, then there: each failed read is survived, and the
+  // step passes on the read that finds the attestation — not before, not after.
+  assert.equal(late.code, 0, `a version that appears late must pass once it does\n${late.out}`);
+  assert.equal(late.calls.length, 3, `expected 3 reads (absent, error, attested); got ${late.calls.length}`);
+  assert.match(late.out, new RegExp(`version ${VERSION.replaceAll(".", "\\.")}`));
+  // Each way of never getting there fails, BOUNDED, naming the answer it actually got.
+  for (const [name, r, message] of /** @type {const} */ ([
+    ["unattested", unattested, /::error::published, but the registry records NO provenance attestation/],
+    ["absent", absent, /::error::the publish job succeeded, but at the ten-minute deadline the registry still did not show/],
+    ["failing", failing, /::error::the last read at the ten-minute deadline got no usable answer/],
+  ])) {
+    assert.equal(r.code, 1, `${name}: must fail\n${r.out}`);
+    assert.match(r.out, message, `${name}: the error must name the answer the registry gave`);
+    assert.ok(r.calls.length >= 2 && r.calls.length <= 8,
+      `${name}: ${r.calls.length} reads in a 4-second window with a 1-second sleep; a loop that retries without sleeping, or gives up at once, is wrong`);
+  }
+  assert.match(failing.out, /E503 \(stand-in\)/, "at the deadline with no usable answer, the step shows the last error npm printed");
+  assert.match(absent.out, /Do NOT re-run the publish job/, "a release that published but is not yet visible must not be re-published");
 });
 
 test("no workflow input reaches a shell except through env:", () => {

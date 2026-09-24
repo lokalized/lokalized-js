@@ -4,11 +4,11 @@
   "catalogFingerprint": "6f5595dbb579cbdbb05168471c8e5a2ebb80a83f23561ca47609255a47ca6fa1",
   "cldrVersion": "48.2",
   "dataFingerprint": "9b4f24165b6dd1ee6dbb5f0822abc7bcde49c5b94d35903045826b45e1f30e68",
-  "behavioralVectorsVersion": "1.0.0",
+  "behavioralVectorsVersion": "1.1.0",
   "localeDataMode": "pinned",
   "cardinalityMode": "exact",
   "ianaRegistryDate": "2026-09-17",
-  "ianaDataFingerprint": "42a658b350903ec3697499ecce103a08021cc4588ef60014045cf391786073c0",
+  "ianaDataFingerprint": "87b3a43b03f490206cead05d865357bd7cfc3953a52ec4d8405243f699385815",
   "fallbackLocale": "en",
   "baseUrl": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/",
   "files": {
