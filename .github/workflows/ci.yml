@@ -131,11 +131,26 @@ jobs:
       #
       # The status is read from `$?` on a redirected run, never through a pipe: `npm test | tail`
       # reports `tail`'s status, and this project has already banked a passing status that way.
+      # And it is read with `|| status=$?`, because this step's shell is `bash -e`, which exits at the
+      # first failing command: the previous `npm test > test.log 2>&1; status=$?` stopped the step
+      # right there, so `cat test.log` never ran and EVERY failing run's log ended before a single
+      # line of test output (found 2026-09-24, after two such failures could not be read).
+      #
+      # A FAILURE IS NAMED WHERE IT CAN BE READ WITHOUT SIGNING IN. Downloading a job's log needs a
+      # GitHub login; reading its annotations does not. So a failing run turns each failing test into
+      # an annotation (tools/annotate-test-failures.mjs), which needs one output format on every leg:
+      # Node 20 and 22 print TAP when writing to a file and later versions print the spec reporter's
+      # output, hence `--test-reporter=tap`. `|| true` keeps a broken annotator from replacing the
+      # tests' own status.
       - name: Unit tests
         run: |
-          npm test > test.log 2>&1; status=$?
+          status=0
+          npm test -- --test-reporter=tap > test.log 2>&1 || status=$?
           cat test.log
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          if [ "$status" -ne 0 ]; then
+            node tools/annotate-test-failures.mjs test.log || true
+            exit "$status"
+          fi
           # Format-agnostic on purpose: node --test prints `# skipped N` under TAP and `i skipped N`
           # under the spec reporter, and CI and a local run do not use the same one. An earlier
           # version of this line matched neither and could never have failed.
