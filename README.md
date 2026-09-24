@@ -11,14 +11,13 @@ Every rule below is arbitrated against the Java implementation by an executed te
 by description.
 
 ```bash
-npm install lokalized@1.0.0-rc.1
+npm install lokalized@1.0.0-rc.2
 ```
 
-**Pin the version.** `1.0.0-rc.1` is a release candidate, published under the `next` dist-tag — but
-npm sets `latest` to the first version of a package whatever tag you publish it under, so a bare
-`npm install lokalized` resolves to this release candidate today rather than failing. Measured
-against the registry on 2026-09-21: `{ next: 1.0.0-rc.1, latest: 1.0.0-rc.1 }`. Naming the version
-is how you say which one you meant, and it is what this document's CDN section asks for too.
+**Pin the version.** `1.0.0-rc.2` is a release candidate, published under the `next` dist-tag. npm set
+`latest` to this package's first version, 1.0.0-rc.1, and publishing under `next` does not move it,
+so a bare `npm install lokalized` installs that older candidate. Naming the version is how you say
+which one you meant, and it is what this document's CDN section asks for too.
 
 Requires Node 20+ or any modern browser. **Zero dependencies.** ESM only.
 Node 20 reached end of life on 2026-04-30 and the floor names it because a great many projects
@@ -2665,7 +2664,7 @@ No modules, no import map, no build step — `lokalized.global.js` is a classic 
 one global:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/lokalized.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/lokalized.global.js"></script>
 <script>
   const strings = lokalized.createStrings({
     strings: { en: { Hi: "Hello {{name}}" }, fr: { Hi: "Bonjour {{name}}" } },
@@ -2697,7 +2696,7 @@ write the URL, you need no map at all:
 
 ```html
 <script type="module">
-  import { createStrings } from "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/lokalized.js";
+  import { createStrings } from "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/lokalized.js";
 
   const strings = createStrings({
     strings: { en: { Hi: "Hello {{name}}" }, fr: { Hi: "Bonjour {{name}}" } },
@@ -2743,14 +2742,14 @@ The same eight over the network:
 <script type="importmap">
 {
   "imports": {
-    "lokalized":                "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/lokalized.js",
-    "lokalized/core":           "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/core.js",
-    "lokalized/parse":          "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/parse.js",
-    "lokalized/load":           "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/load.js",
-    "lokalized/ssr":            "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/ssr.js",
-    "lokalized/negotiate":      "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/negotiate.js",
-    "lokalized/data/ordinal":   "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/data/ordinal.js",
-    "lokalized/data/ranges":    "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.1/dist/browser/data/ranges.js"
+    "lokalized":                "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/lokalized.js",
+    "lokalized/core":           "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/core.js",
+    "lokalized/parse":          "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/parse.js",
+    "lokalized/load":           "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/load.js",
+    "lokalized/ssr":            "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/ssr.js",
+    "lokalized/negotiate":      "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/negotiate.js",
+    "lokalized/data/ordinal":   "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/data/ordinal.js",
+    "lokalized/data/ranges":    "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/data/ranges.js"
   }
 }
 </script>
@@ -3053,11 +3052,11 @@ second table. Both columns are re-derived on every run, so they describe this co
 
 | import | minified | brotli |
 |---|---|---|
-| `import { createStrings } from "lokalized"` | 181,266 | 54,179 |
+| `import { createStrings } from "lokalized"` | 181,266 | 54,189 |
 | `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 89,541 | 31,257 |
 | `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,654 | 2,009 |
 | `import { GENDER_FEMININE } from "lokalized"` | 2,350 | 914 |
-| the four above, in one bundle | 222,213 | 64,406 |
+| the four above, in one bundle | 222,213 | 64,411 |
 <!-- bundle-table:end -->
 
 <!-- dist-table:start -->
@@ -3067,15 +3066,15 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 
 | load | files | raw | brotli |
 |---|---|---|---|
-| `lokalized` | 1 | 184,494 | 54,985 |
-| `lokalized/core` | 7 | 183,611 | 54,881 |
+| `lokalized` | 1 | 184,494 | 54,979 |
+| `lokalized/core` | 7 | 183,611 | 54,855 |
 | `lokalized/parse` | 5 | 159,522 | 48,641 |
-| `lokalized/load` | 7 | 178,080 | 53,829 |
+| `lokalized/load` | 7 | 178,080 | 53,817 |
 | `lokalized/ssr` | 2 | 7,582 | 2,383 |
-| `lokalized/negotiate` | 4 | 90,810 | 31,688 |
-| `lokalized/data/ordinal` | 8 | 190,319 | 56,708 |
-| `lokalized/data/ranges` | 8 | 192,847 | 56,542 |
-| `lokalized.global.js`, the classic script | 1 | 243,314 | 68,811 |
+| `lokalized/negotiate` | 4 | 90,810 | 31,666 |
+| `lokalized/data/ordinal` | 8 | 190,319 | 56,368 |
+| `lokalized/data/ranges` | 8 | 192,847 | 56,433 |
+| `lokalized.global.js`, the classic script | 1 | 243,314 | 68,890 |
 <!-- dist-table:end -->
 
 **What a no-build page downloads.** The table above is what a bundler produces from the source; this

@@ -535,31 +535,31 @@
     }
   ],
   "browser": {
-    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.2553.1 Chrome/152.0.7977.76 Safari/537.36",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.7032.0 Chrome/152.0.7977.130 Safari/537.36",
     "transferCompression": "none — the harness server does not compress; section 9.2's gzip/brotli ceilings are a separate measure",
     "memoryKind": "performance.memory (coarse, whole-page)",
     "note": "One variant per page load: measuring both in one document leaves the second with a warm module cache and zero cold-import, resource and transfer figures.",
     "variants": [
       {
         "label": "root + raw-text catalog",
-        "resources": 31,
-        "encodedBytes": 770596,
-        "decodedBytes": 770596,
-        "coldImportMs": 36.7,
-        "importMs": 1.6,
-        "constructionMs": 0.4,
-        "firstRenderMs": 0.9,
+        "resources": 32,
+        "encodedBytes": 777038,
+        "decodedBytes": 777038,
+        "coldImportMs": 25,
+        "importMs": 1.3,
+        "constructionMs": 0.2,
+        "firstRenderMs": 0.5,
         "firstRender": "I read 3 books"
       },
       {
         "label": "core + parsed equivalent",
-        "resources": 30,
-        "encodedBytes": 759983,
-        "decodedBytes": 759983,
-        "coldImportMs": 38.4,
-        "importMs": 3.6,
-        "constructionMs": 1.6,
-        "firstRenderMs": 1.4,
+        "resources": 31,
+        "encodedBytes": 765955,
+        "decodedBytes": 765955,
+        "coldImportMs": 27.4,
+        "importMs": 1.9,
+        "constructionMs": 0.6,
+        "firstRenderMs": 0.6,
         "firstRender": "I read 3 books"
       }
     ]

@@ -11,12 +11,12 @@
   "note": "The browser half is DRIVEN BY HAND in a real browser, on scenario:0a reasoning — a green `verify` must not need a person at one. `npm run check:release` compares what it can without a browser: that every file this capture loaded is in the tarball, that nothing 404ed, and that the render is the French catalog s entry rather than the fallback.",
   "procedure": "npm pack -> npm install the tarball into a clean ESM project -> serve node_modules/lokalized over HTTP -> import map pointing `lokalized` at dist/browser/lokalized.js -> import and render.",
   "browser": {
-    "engine": "Chromium (Claude browser pane)",
-    "capturedFrom": "the packed tarball, served over HTTP",
+    "engine": "Chromium 152 (Claude browser pane)",
+    "capturedFrom": "the packed 1.0.0-rc.2 tarball, installed into a clean ESM project and served over HTTP from localhost with no caching",
     "isSecureContext": true,
     "cryptoSubtle": "object",
     "rendered": "Bonjour, Ada",
-    "plural": "2 item(s)",
+    "plural": "2 items",
     "rootRequests": 1,
     "totalRequests": 17,
     "notFound": 0,
@@ -31,7 +31,7 @@
         "file": "dist/browser/lokalized.js",
         "files": 1,
         "rawBytes": 184494,
-        "brotliBytes": 54985,
+        "brotliBytes": 54979,
         "exports": 70,
         "loadedInBrowser": true
       },
@@ -40,7 +40,7 @@
         "file": "dist/browser/core.js",
         "files": 7,
         "rawBytes": 183611,
-        "brotliBytes": 54881,
+        "brotliBytes": 54855,
         "exports": 21,
         "loadedInBrowser": true
       },
@@ -58,7 +58,7 @@
         "file": "dist/browser/load.js",
         "files": 7,
         "rawBytes": 178080,
-        "brotliBytes": 53829,
+        "brotliBytes": 53817,
         "exports": 10,
         "loadedInBrowser": true
       },
@@ -76,7 +76,7 @@
         "file": "dist/browser/negotiate.js",
         "files": 4,
         "rawBytes": 90810,
-        "brotliBytes": 31688,
+        "brotliBytes": 31666,
         "exports": 6,
         "loadedInBrowser": true
       },
@@ -85,7 +85,7 @@
         "file": "dist/browser/data/ordinal.js",
         "files": 8,
         "rawBytes": 190319,
-        "brotliBytes": 56708,
+        "brotliBytes": 56368,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -94,13 +94,34 @@
         "file": "dist/browser/data/ranges.js",
         "files": 8,
         "rawBytes": 192847,
-        "brotliBytes": 56542,
+        "brotliBytes": 56433,
         "exports": 2,
         "loadedInBrowser": true
       }
     ],
-    "sizesRecordedFor": "Promise refusal (maintainer decision, 2026-09-23): src/internal/configuration-error.js refuses a promise or other thenable in the options position, which an unawaited async options factory used to pass as 'no options'. configuration-error.js is reached by every graph, so every graph grows by the check and its comment. No module count moved.",
-    "capturedAgainst": null,
-    "capturedAgainstNote": "The browser half was captured before this field existed: the record first carries it at lokalized-js e702166 (2026-09-19), and its size columns have been re-recorded since through --write, which does not re-drive the browser (M-R S13, M-R S14, 1.0.0-rc.1, A30, the A30 follow-up, the M-D S33 follow-up, the M-R S26 pre-push follow-up, and the promise refusal; sizesRecordedFor holds only the latest reason, because --write overwrites it). Nothing records a re-drive, so the capture is not known to describe any bundle this tarball carries."
+    "sizesRecordedFor": "version 1.0.0-rc.1 -> 1.0.0-rc.2 for the next release candidate: producerVersion is a source string of the same length, so raw sizes are unchanged and only brotli moves",
+    "capturedAgainst": {
+      "files": {
+        "dist/browser/chunks/chunk-2QVQLAF6.js": "ba3df99cb2e795608585b0d41ef59582750da7a9822e7b0551b39a98089d1a2c",
+        "dist/browser/chunks/chunk-7WU4JE3E.js": "1df412278bd848e2bfb6fd55c4b9c927b2ac16f55718af0b66afbfe1639b2c3b",
+        "dist/browser/chunks/chunk-LED5CWLB.js": "d3a26dc9ffbbf6773fba6f6d19428f835ebcfb849044c65e781e1d3f6f7a2e6b",
+        "dist/browser/chunks/chunk-LNGUQ7KN.js": "e6dbba7c55df62835be0e63db1f65b31042bccdde9abf787ad1e475ad7e087b0",
+        "dist/browser/chunks/chunk-NZVWUS27.js": "20962700f5934800182c9abc8bf7382f1118904d66be48662172ec21c0f6f524",
+        "dist/browser/chunks/chunk-QU3LBEYR.js": "7b795ba5ae65818645e708f3022ebfd44c26a90da7cbe3553430fac72b25b194",
+        "dist/browser/chunks/chunk-TOHMQD3N.js": "168c660e39d979eb8c2fd5deab378604c2206ff73d058b063f52d26fc78a59fb",
+        "dist/browser/chunks/chunk-ZSYPX2PV.js": "eeddd0fd5b25bab43af69ccaa9c514e77ad9501dfd4b1e4e6053aae834b753ba",
+        "dist/browser/core.js": "c6c1647d884fccfd06c3b33dc2774eeee2f161602e1800f827d74c683471a0ca",
+        "dist/browser/data/ordinal.js": "862fa34e4702b05d299f6d45c7d52d17b7dbea4aa69d344d7b70b550f5420587",
+        "dist/browser/data/ranges.js": "9bd539e574055a6fafc1fad91e0e15d909c08bbb9ad4c3e3233e64fd0d868c91",
+        "dist/browser/load.js": "0cc1efb7b1eceb7ee5c63ba8d39ed2fe233c28c843afbd5ce2aae8b86135d4e5",
+        "dist/browser/lokalized.global.js": "fda3911f9801bd9770a0e72850ccbaa39b5f37c02db2dfdb8a325cdeeacc157a",
+        "dist/browser/lokalized.js": "79fb771b9b592b85272bc12c59b4785783abebd50729c19f2b597b65193c1345",
+        "dist/browser/negotiate.js": "50ae46e1c5859cf7f91168084a8682596b75030a0bdec5fdfe297cd9d4aa1d3d",
+        "dist/browser/parse.js": "0758608637d87b65310088b59517cca407b702b36d6210b9d574a4745ebe09eb",
+        "dist/browser/ssr.js": "bdec2b89be542c85da4c7ab167eca309c8cc8190f83809776e491004c68c73c6"
+      },
+      "stampedFor": "re-driven 2026-09-23 against 1.0.0-rc.2 in Chromium 152 (Claude browser pane): the packed tarball installed into a clean project and served over HTTP; root 1 request, all eight entries loaded, the classic script defined window.lokalized, 17 requests, 0 not found. The plural probe is now a real CARDINALITY_ONE/OTHER form (2 items); the earlier capture's probe is not recorded"
+    },
+    "capturedAgainstNote": "The browser half was captured before this field existed: the record first carries it at lokalized-js e702166 (2026-09-19), and its size columns have been re-recorded since through --write, which does not re-drive the browser (M-R S13, M-R S14, 1.0.0-rc.1, A30, the A30 follow-up, the M-D S33 follow-up, the M-R S26 pre-push follow-up, the promise refusal, and 1.0.0-rc.2; sizesRecordedFor holds only the latest reason, because --write overwrites it). Nothing records a re-drive, so the capture is not known to describe any bundle this tarball carries."
   }
 }

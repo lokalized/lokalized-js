@@ -28,8 +28,8 @@
   "iterations": 9,
   "graph": {
     "src/index.js": {
-      "bytes": 764556,
-      "modules": 31,
+      "bytes": 777038,
+      "modules": 32,
       "files": [
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/core/index.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/aliases-language.js",
@@ -37,6 +37,7 @@
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/aliases-script.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/aliases-variant.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/cardinal.js",
+        "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/iana-identity-equivalents.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/likely-subtags.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/parents.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/provenance.js",
@@ -65,8 +66,8 @@
       ]
     },
     "src/core/index.js": {
-      "bytes": 753943,
-      "modules": 30,
+      "bytes": 765955,
+      "modules": 31,
       "files": [
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/core/index.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/aliases-language.js",
@@ -74,6 +75,7 @@
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/aliases-script.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/aliases-variant.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/cardinal.js",
+        "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/iana-identity-equivalents.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/likely-subtags.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/parents.js",
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/data/provenance.js",
@@ -106,83 +108,83 @@
       "label": "root + raw-text catalog",
       "entry": "src/index.js",
       "importMs": {
-        "median": 0.4839589999999987,
-        "min": 0.4246249999999918,
-        "max": 11.077749999999998,
-        "spread": 22.01245353428707,
+        "median": 0.5852920000000097,
+        "min": 0.49662499999999454,
+        "max": 12.647082999999999,
+        "spread": 20.759651592708945,
         "n": 9
       },
       "constructionMs": {
-        "median": 8.640999999999991,
-        "min": 7.491292000000016,
-        "max": 19.009542000000003,
-        "spread": 1.3329765073486863,
+        "median": 10.145459000000002,
+        "min": 8.196042000000006,
+        "max": 20.263959,
+        "spread": 1.1894895046148224,
         "n": 9
       },
       "firstRenderMs": {
-        "median": 0.3631250000000108,
-        "min": 0.2186669999999964,
-        "max": 1.6439579999999978,
-        "spread": 3.9250698795179595,
+        "median": 0.33454100000000153,
+        "min": 0.25891599999999926,
+        "max": 1.806709000000005,
+        "spread": 4.6266167674515195,
         "n": 9
       },
       "steadyLookupNsFallback": {
-        "median": 49341.604000000014,
-        "min": 48676.291999999994,
-        "max": 50232.208500000015,
-        "spread": 0.031533561414015254,
+        "median": 52834.70850000003,
+        "min": 52390.666499999956,
+        "max": 54348.562500000015,
+        "spread": 0.03705700392006625,
         "n": 9
       },
       "steadyLookupNsDirect": {
-        "median": 21950.79199999998,
-        "min": 21692.43749999998,
-        "max": 22308.16649999997,
-        "spread": 0.028050422964236963,
+        "median": 23755.125000000022,
+        "min": 23483.771000000048,
+        "max": 24377.49999999994,
+        "spread": 0.03762257618092488,
         "n": 9
       },
-      "retainedAfterConstructionBytes": 1360456,
-      "retainedAfterSweepBytes": 1486648
+      "retainedAfterConstructionBytes": 1363392,
+      "retainedAfterSweepBytes": 1482224
     },
     {
       "label": "core + parsed equivalent",
       "entry": "src/core/index.js",
       "importMs": {
-        "median": 1.038583000000017,
-        "min": 0.9524999999998727,
-        "max": 1.7677920000000995,
-        "spread": 0.7850041835849553,
+        "median": 1.0219579999998132,
+        "min": 0.8747079999998277,
+        "max": 1.3416659999998046,
+        "spread": 0.45692484426959057,
         "n": 9
       },
       "constructionMs": {
-        "median": 6.675875000000133,
-        "min": 5.807999999999993,
-        "max": 9.120166000000154,
-        "spread": 0.496139607167614,
+        "median": 6.046832999999879,
+        "min": 5.589249999999993,
+        "max": 8.2309580000001,
+        "spread": 0.43687464165128437,
         "n": 9
       },
       "firstRenderMs": {
-        "median": 0.4253329999996822,
-        "min": 0.36787500000036744,
-        "max": 0.9197079999999005,
-        "spread": 1.2974140261864124,
+        "median": 0.3628750000002583,
+        "min": 0.3293340000000171,
+        "max": 0.5653330000000096,
+        "spread": 0.6503589390281076,
         "n": 9
       },
       "steadyLookupNsFallback": {
-        "median": 49793.166499999876,
-        "min": 49119.12499999994,
-        "max": 50415.27100000007,
-        "spread": 0.02603060000211344,
+        "median": 52226.27049999983,
+        "min": 51990.10399999997,
+        "max": 55275.54149999992,
+        "spread": 0.06290775635606528,
         "n": 9
       },
       "steadyLookupNsDirect": {
-        "median": 21689.145999999935,
-        "min": 21581.937500000095,
-        "max": 22044.06250000011,
-        "spread": 0.021306740246942683,
+        "median": 23604.95849999984,
+        "min": 23306.041499999992,
+        "max": 24572.66699999991,
+        "spread": 0.053659297897089155,
         "n": 9
       },
       "retainedAfterConstructionBytes": 1278864,
-      "retainedAfterSweepBytes": 1489864
+      "retainedAfterSweepBytes": 1490504
     }
   ]
 }

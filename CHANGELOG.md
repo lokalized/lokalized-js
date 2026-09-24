@@ -4,7 +4,7 @@ All notable changes to lokalized are recorded here. This package is a JavaScript
 [lokalized-java](https://github.com/lokalized/lokalized-java) 3.1.0; where the two differ on purpose,
 [DIVERGENCES.md](DIVERGENCES.md) lists it.
 
-## Unreleased
+## 1.0.0-rc.2 - 2026-09-23
 
 Changes since 1.0.0-rc.1. This is still a release-candidate line, so the breaking changes below were
 made where the old behaviour failed silently.

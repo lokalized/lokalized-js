@@ -4,10 +4,10 @@
   "planSection": "8.5",
   "status": "incomplete",
   "fields": {
-    "implementationVersion": "1.0.0-rc.1",
+    "implementationVersion": "1.0.0-rc.2",
     "packageName": "lokalized",
-    "packageVersion": "1.0.0-rc.1",
-    "implementationCommit": "7b4f1a7e45b6fd158b0db5594dc802302b570706",
+    "packageVersion": "1.0.0-rc.2",
+    "implementationCommit": "8489e23104b22744fd887ead34f5f0ea630e79b0",
     "javaReferenceCommit": "47aa87aa76fc8c67c0f4b09388b612290dbb1076",
     "javaReferenceTreeClean": true,
     "javaReferenceVersion": "3.1.0-SNAPSHOT",
@@ -4616,7 +4616,7 @@
       ]
     },
     "xfailMetadata": [],
-    "sourceDateEpoch": 1790191793
+    "sourceDateEpoch": 1790204237
   },
   "undetermined": [
     {
