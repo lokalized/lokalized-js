@@ -68,6 +68,7 @@ import { loadEntireManifestFromFiles, loadStringsFromFiles } from "../src/node/f
 import { sha256Hex } from "../src/internal/sha256.js";
 import { validateStringsManifest } from "../src/load/manifest.js";
 import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
+import { untilSettled } from "../tools/test-support/settle.js";
 
 const utf8 = new TextEncoder();
 
@@ -323,23 +324,11 @@ function transportStub(manifest, bytesByTag, { mode = "hold", failing = [], open
     release: (/** @type {string} */ locale) => { gateFor(locale).resolve(); },
     releaseAll: () => { openAll = true; for (const gate of gates.values()) gate.resolve(); },
     /**
-     * Run the event loop until the invocation count has been still for twenty consecutive turns.
-     *
-     * Adaptive rather than a fixed sleep, because a released read runs through an ASYNCHRONOUS
-     * digest before its worker can claim the next index, and a fixed number of turns that happened
-     * to be enough on one machine is the kind of number that fails in CI and nowhere else.
+     * Wait until the loader has finished everything the last release set off. A released read runs
+     * through an ASYNCHRONOUS digest before its worker can claim the next index, and idle turns of
+     * the event loop did not outlast it on a loaded CI runner; see tools/test-support/settle.js.
      */
-    drain: async () => {
-      let last = -1;
-      let stable = 0;
-      for (let turn = 0; turn < 600 && stable < 20; turn += 1) {
-        await new Promise((resolve) => setImmediate(resolve));
-        if (calls.length === last) stable += 1;
-        else { last = calls.length; stable = 0; }
-      }
-      await new Promise((resolve) => setTimeout(resolve, 1));
-      for (let turn = 0; turn < 20; turn += 1) await new Promise((resolve) => setImmediate(resolve));
-    },
+    drain: () => untilSettled(),
   };
 }
 

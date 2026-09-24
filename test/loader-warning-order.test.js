@@ -75,6 +75,7 @@ import { parseStrings } from "../src/parse/index.js";
 import { primaryLanguage } from "../src/internal/locale.js";
 import { sha256Hex } from "../src/internal/sha256.js";
 import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
+import { untilSettled } from "../tools/test-support/settle.js";
 
 const utf8 = new TextEncoder();
 
@@ -239,23 +240,11 @@ function gatedTransport(manifest, bodies, { open = false } = {}) {
       if (gate) { gates.delete(locale); gate(); }
     },
     /**
-     * Run the event loop until the invocation count has been still for twenty consecutive turns.
-     *
-     * Adaptive rather than a fixed sleep: a released read runs through an ASYNCHRONOUS digest before
-     * its worker can claim the next plan index, and a fixed turn count that happened to suffice on
-     * one machine is the kind of number that fails in CI and nowhere else.
+     * Wait until the loader has finished everything the last release set off. A released read runs
+     * through an ASYNCHRONOUS digest before its worker can claim the next plan index, and idle turns of
+     * the event loop did not outlast it on a loaded CI runner; see tools/test-support/settle.js.
      */
-    drain: async () => {
-      let last = -1;
-      let stable = 0;
-      for (let turn = 0; turn < 600 && stable < 20; turn += 1) {
-        await new Promise((resolve) => setImmediate(resolve));
-        if (startLog.length === last) stable += 1;
-        else { last = startLog.length; stable = 0; }
-      }
-      await new Promise((resolve) => setTimeout(resolve, 1));
-      for (let turn = 0; turn < 20; turn += 1) await new Promise((resolve) => setImmediate(resolve));
-    },
+    drain: () => untilSettled(),
   };
 }
 

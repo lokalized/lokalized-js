@@ -61,6 +61,7 @@ import { parseStrings } from "../src/parse/index.js";
 import { sha256Hex } from "../src/internal/sha256.js";
 import { wholeManifestPlan } from "../src/load/run-plan.js";
 import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
+import { untilSettled } from "../tools/test-support/settle.js";
 
 const utf8 = new TextEncoder();
 const bodyFor = (/** @type {string} */ tag) => JSON.stringify({ Greeting: `hello ${tag}` });
@@ -199,10 +200,6 @@ function gatedFetch() {
     },
   };
 }
-
-const settle = async (ticks = 8) => {
-  for (let index = 0; index < ticks; index += 1) await new Promise((resolve) => setTimeout(resolve, 0));
-};
 
 /**
  * Run with `globalThis.fetch` replaced by a thrower.
@@ -359,12 +356,12 @@ test("requests dispatched after the first eight-request window carry the same ov
   // quiescence is an exact quantity with no timing in it. Without this assertion the test would be
   // claiming an observation it never made — "index 8 was in a later window" would be an inference
   // from the fixture's cardinality, and a port that fired all twelve at once would satisfy it.
-  await settle();
+  await untilSettled();
   assert.equal(stub.calls.length, 8,
     "plan 6.2:2087 caps concurrent catalog reads at eight; this test needs a real second window");
 
   assert.equal(stub.releaseAll(), 8);
-  await settle();
+  await untilSettled();
   assert.equal(stub.calls.length, TWELVE.length, "draining the first window must admit the remaining four");
 
   // c3's OWN assertion line, over the slice the first window cannot contain. A suite whose only
