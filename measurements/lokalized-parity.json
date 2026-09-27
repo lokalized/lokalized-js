@@ -7,18 +7,18 @@
     "implementationVersion": "1.0.0-rc.2",
     "packageName": "lokalized",
     "packageVersion": "1.0.0-rc.2",
-    "implementationCommit": "8489e23104b22744fd887ead34f5f0ea630e79b0",
-    "javaReferenceCommit": "47aa87aa76fc8c67c0f4b09388b612290dbb1076",
+    "implementationCommit": "5f6ee87d207038abc1d741deee57c82ff3bb8920",
+    "javaReferenceCommit": "63b63e47c982f7a87873c52ac2289cc0392f3329",
     "javaReferenceTreeClean": true,
-    "javaReferenceVersion": "3.1.0-SNAPSHOT",
-    "javaReferenceTagCommit": "c971f071ded30562acf627c07e5767389d57f84b",
-    "dataCommit": "2fa545856bd706e8a796d0ecab9588b432d87b3b",
+    "javaReferenceVersion": "3.1.0",
+    "javaReferenceTagCommit": "63b63e47c982f7a87873c52ac2289cc0392f3329",
+    "dataCommit": "2d9547700d88ad8b7bc73e4d2c0fe18bdffb68a4",
     "portingContractArchiveDigest": null,
     "requirementsSha256": "649fabc4a99cac5798747ed17af05752d63388813ce4b54e084a74b632952136",
     "selectedReleaseProfileId": "strict-parity-0.x-draft",
     "releaseProfileApproved": false,
-    "profileRegistrySha256": "56a9f8819947bbcf10bd67e02a2e94a50c5ea7f5061dad9f103ab34129a31cad",
-    "selectionRecordSha256": "deaf86804a5358a8ed40791b5c2293baaa0659f1d28e0c678375047c016babc7",
+    "profileRegistrySha256": "f4bfcd55101ed99c642e5625c137d5dddfac2378b1b742eddabb8468bafc0f6d",
+    "selectionRecordSha256": "b60121d566b9ab0b154b16ca1c5637049f9f7c92c711914ee14dab54783a9adc",
     "activeRequirementIds": {
       "byActivationFrontier": 1338,
       "byReviewStatus": 0,
@@ -4616,7 +4616,7 @@
       ]
     },
     "xfailMetadata": [],
-    "sourceDateEpoch": 1790204237
+    "sourceDateEpoch": 1790284505
   },
   "undetermined": [
     {
@@ -4644,7 +4644,7 @@
     "packageVersion": "8.5's first bullet names TWO versions, implementation and package. For a JavaScript package these coincide — the implementation IS the package and there is no second version anywhere in the repository — so both slots are filled from the same key and the coincidence is stated rather than left to look like a duplicated field.",
     "javaReferenceCommit": "lokalized-java's HEAD, and the parity claim is against 3.1.0 rather than the 3.0.0 tag — the maintainer's decision of 2026-09-20: this package is a port of lokalized-java 3.1.0 once that is released. Between the tag and 3.1.0 the Java sources change BEHAVIOUR, not only packaging: the registry-generated IanaLanguageEquivalents table, and at amendment A30 the LanguageRangeEquivalents setting and the public LocaleMatcher#parseLanguageRanges. The answers recorded in the corpus are that build's — the corpus names it by the digest of its sources, oracle.librarySourcesSha256 — not the tag's, and that is the point of the decision rather than a drift to reconcile. This note once said the opposite (\"zero behavioural Java source differs\"), and its correction then stated a literal diff size that went stale the next time the Java sources moved; it states no size now, so a later Java edit cannot falsify it.",
     "javaReferenceTreeClean": "whether lokalized-java's src/main had no uncommitted change (staged, unstaged or untracked) when this was recorded. FALSE means javaReferenceCommit names a commit that does NOT contain the Java the corpus, check:iana and diff:language-range ran against — those name the build by its sources' digest, oracle.librarySourcesSha256, which stays exact either way. A verifier measured exactly that at A30: HEAD a919258 with the twelve A30 files staged and uncommitted. `npm run parity:check` REPORTS a false value and does not fail on it; the remedy is to commit lokalized-java, then re-run `npm run parity -- --write` and `npm run diff:all`.",
-    "javaReferenceVersion": "the reference is 3.1.0-SNAPSHOT today: the parity target is 3.1.0 and it is NOT YET RELEASED, so this names a snapshot on purpose. It must read a release version before a parity-backed publish can claim one.",
+    "javaReferenceVersion": "read from lokalized-java's pom.xml when this was recorded, never restated. A value ending in -SNAPSHOT names an unreleased build; a release version is also the tag javaReferenceTagCommit resolves.",
     "requirementsSha256": "plan 8.6's `requirements.json` is `pre-m0/bootstrap.requirements.candidate.json` here: the successor registry revision 8.6 describes has not been produced, so this is the digest of the candidate the project actually has.",
     "selectedReleaseProfileId": "read from a selection record whose own `status` is `draft-unapproved`; the id is selected, the selection is not approved. See `releaseProfileApproved`.",
     "profileRegistrySha256": "the selection record carries null for this; it is computable from the file that exists and is computed here rather than copied from the null.",

@@ -12,7 +12,7 @@
     "divergenceFromPlan": "plan :2612 pins Eclipse Temurin; this is Amazon Corretto. Blocker B8, the maintainer's to resolve. Recorded here so the lock is not mistaken for compliance."
   },
   "javaReference": {
-    "version": "3.1.0-SNAPSHOT",
-    "commit": "47aa87aa76fc8c67c0f4b09388b612290dbb1076"
+    "version": "3.1.0",
+    "commit": "63b63e47c982f7a87873c52ac2289cc0392f3329"
   }
 }

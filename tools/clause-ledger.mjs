@@ -10,7 +10,8 @@
  * machine-readable artifact and this tool enforces what a verdict has to carry:
  *
  *   PROVEN requires (a) at least one named GATE, (b) a recorded ABLATION stating what went red, and
- *   (c) every named gate that looks like a path to EXIST on disk.
+ *   (c) every named gate that looks like a path to EXIST on disk. Rule (c) binds EVERY verdict,
+ *   DEFERRED included, not PROVEN alone.
  *
  * Anything else is NOT-PROVEN. "Nothing contradicts it" is not a verdict, and neither is confident
  * prose — the ledger was DERIVED from `planning/M8-STATUS.md` by agents told to downgrade whatever
@@ -240,6 +241,33 @@ for (const { milestone, file, expected } of LEDGERS) {
     if (typeof clause.evidenceLine !== "string" || clause.evidenceLine.trim().length === 0)
       problems.push(`${at}: no evidence line; every verdict must say what it rests on`);
 
+    // A NAMED GATE MUST RESOLVE WHATEVER THE VERDICT, and this is checked BEFORE the DEFERRED branch
+    // and the PROVEN filter below, both of which end in a `continue`. MEASURED 2026-09-17: two M-D
+    // clauses named `lokalized-spec/scripts/documentation-topics.mjs`, which resolves from nowhere —
+    // paths here are relative to this repository and the spec is a SIBLING — and the ledger was green,
+    // because gates were validated for PROVEN clauses only. It surfaced the moment one of the two was
+    // upgraded, by which time the wrong path had been sitting in the record for a slice. A gate that
+    // cannot be opened is wrong while the clause is open too; that is when somebody is most likely to
+    // go looking for it.
+    //
+    // **AND "WHATEVER THE VERDICT" WAS FALSE UNTIL 2026-09-25.** The check sat AFTER the DEFERRED
+    // branch, whose `continue` skipped it, so a DEFERRED clause could name a gate that does not exist
+    // and the ledger stayed at exit 0 — measured by planting `tools/does-not-exist.mjs` on M8 clause
+    // 92. It moved here; `test/clause-ledger.test.js` plants the same gate and must see exit 1.
+    //
+    // AND `gates` MUST BE A LIST OF NAMES. A string is iterable, so `gates: "tools/does-not-exist.mjs"`
+    // was read one CHARACTER at a time — no character looks like a path — and a DEFERRED clause
+    // carrying it passed at exit 0 (measured 2026-09-25 by an adversarial review); on a PROVEN clause
+    // the same string crashed the run at `.filter` below.
+    const gates = Array.isArray(clause.gates) ? clause.gates : [];
+    if (clause.gates !== undefined && !Array.isArray(clause.gates))
+      problems.push(`${at}: gates is ${JSON.stringify(clause.gates)}, not a list of gate names`);
+    for (const gate of gates)
+      if (typeof gate !== "string")
+        problems.push(`${at} names gate ${JSON.stringify(gate)}, which is not a name`);
+      else if (PATH_LIKE.test(gate) && !isFile(gate))
+        problems.push(`${at} names gate '${gate}', which does not exist`);
+
     if (clause.verdict === "DEFERRED") {
       const ground = clause.deferral ?? {};
       const until = ground.untilMilestone;
@@ -288,22 +316,10 @@ for (const { milestone, file, expected } of LEDGERS) {
       continue;
     }
 
-    // A NAMED GATE MUST RESOLVE WHATEVER THE VERDICT, and this is checked BEFORE the PROVEN filter
-    // below. MEASURED 2026-09-17: two M-D clauses named
-    // `lokalized-spec/scripts/documentation-topics.mjs`, which resolves from nowhere — paths here are
-    // relative to this repository and the spec is a SIBLING — and the ledger was green, because gates
-    // were validated for PROVEN clauses only. It surfaced the moment one of the two was upgraded, by
-    // which time the wrong path had been sitting in the record for a slice. A gate that cannot be
-    // opened is wrong while the clause is open too; that is when somebody is most likely to go
-    // looking for it.
-    for (const gate of clause.gates ?? [])
-      if (PATH_LIKE.test(gate) && !isFile(gate))
-        problems.push(`${at} names gate '${gate}', which does not exist`);
-
     if (clause.verdict !== "PROVEN") continue;
 
     // THE RULE THIS TOOL EXISTS FOR.
-    if (!Array.isArray(clause.gates) || clause.gates.length === 0)
+    if (gates.length === 0)
       problems.push(`${at} is PROVEN with no named gate`);
     if (typeof clause.ablation !== "string" || clause.ablation.trim().length === 0)
       problems.push(
@@ -318,11 +334,11 @@ for (const { milestone, file, expected } of LEDGERS) {
     // version only validated entries that LOOKED like paths, so `gates: ["the non-invocation test"]`
     // satisfied it completely — a gate that would have accepted prose as evidence, in the tool
     // written to stop prose being evidence. Found by reading its own output rather than by it failing.
-    const resolvable = (clause.gates ?? []).filter(
-      (/** @type {string} */ gate) => isFile(gate) || isScript(gate));
+    const resolvable = gates.filter(
+      (/** @type {string} */ gate) => typeof gate === "string" && (isFile(gate) || isScript(gate)));
     if (resolvable.length === 0)
       problems.push(
-        `${at} is PROVEN but none of its gates [${(clause.gates ?? []).join(", ")}] is a file that ` +
+        `${at} is PROVEN but none of its gates [${gates.join(", ")}] is a file that ` +
         `exists or an npm script; a description of a gate is not a gate`);
   }
 

@@ -1,0 +1,609 @@
+{
+  "formatVersion": 1,
+  "note": "No thresholds, by A3 (M7 clause 19) and A4/A7 (restated as A33, 2026-09-25): recorded, ratcheted where a ratchet exists, reported where none does. A green run shows the figures cannot grow unnoticed; it does not show that any of them meets a number. Frozen late: plan 9.2:2814-2817 says scenarios 1-5 \"freeze at M2 exit\"; this suite was first frozen on 2026-09-25, on scenario 6's precedent (freeze now, and make every later comparison mean something). The deviation is the record.",
+  "suite": {
+    "revision": 1,
+    "sha256": "4894b2608203bb6b17dc91cc26140ab2a002e3c83ff87d8bfabe7563b23914db"
+  },
+  "compressors": {
+    "zlib": "1.3.1-e00f703",
+    "brotli": "1.2.0"
+  },
+  "run": {
+    "tarballSha256": "3e6976f3695edabe81dc49ce88f2bb888cf6ba57d48e64252857c0898c4418d1",
+    "outputGraphSha256": "2c4f8edf8a31ec7ff6d4fbbbdf499ad9116d18c590fef8abd040ef586884277c",
+    "dataFingerprint": "9b4f24165b6dd1ee6dbb5f0822abc7bcde49c5b94d35903045826b45e1f30e68",
+    "ianaDataFingerprint": "87b3a43b03f490206cead05d865357bd7cfc3953a52ec4d8405243f699385815",
+    "identityRebuild": "34 of 34 shipped dist/browser files byte-identical",
+    "resultSha256": "5b4440187a40274655933140f26dd109cb47cf5a4a009d9b38d712e71ec82d73",
+    "environment": {
+      "node": "v24.18.0",
+      "v8": "13.6.233.17-node.50",
+      "esbuild": "0.28.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M5 Pro"
+    }
+  },
+  "scenarios": {
+    "1": {
+      "title": "self-contained no-build browser root",
+      "revision": 1,
+      "recipeSha256": "3f41582f933a4dc821e99eb9782fc5c5c355981cc182efa097a581ab455e4c1f",
+      "fixtureSha256": "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55",
+      "variants": {
+        "root module": {
+          "form": "no-build",
+          "files": [
+            "lokalized.js"
+          ],
+          "columns": {
+            "rawSource": 777038,
+            "rawModules": 32,
+            "preMinify": 360803,
+            "minified": 184494,
+            "gzip9": 66601,
+            "brotliQ11": 54979,
+            "brotliQ5": 61916,
+            "requests": 1
+          },
+          "dataRows": {
+            "rendering locale/cardinal": 48266,
+            "validity/IANA identity": 10298
+          },
+          "includedGraph": [
+            "src/core/index.js",
+            "src/data/aliases-language.js",
+            "src/data/aliases-region.js",
+            "src/data/aliases-script.js",
+            "src/data/aliases-variant.js",
+            "src/data/cardinal.js",
+            "src/data/iana-identity-equivalents.js",
+            "src/data/likely-subtags.js",
+            "src/data/parents.js",
+            "src/data/provenance.js",
+            "src/data/rtl.js",
+            "src/data/valid-languages.js",
+            "src/data/valid-regions.js",
+            "src/data/valid-scripts.js",
+            "src/data/valid-variants.js",
+            "src/index.js",
+            "src/internal/bidi.js",
+            "src/internal/catalog.js",
+            "src/internal/configuration-error.js",
+            "src/internal/expression-tokenizer.js",
+            "src/internal/expression.js",
+            "src/internal/interpolate.js",
+            "src/internal/json-parse.js",
+            "src/internal/loaded-input.js",
+            "src/internal/locale-cldr.js",
+            "src/internal/locale-jdk-tag.js",
+            "src/internal/locale.js",
+            "src/internal/lokalized-error.js",
+            "src/internal/parse-warnings.js",
+            "src/internal/plural.js",
+            "src/internal/resolution-error.js",
+            "src/internal/runtime-metadata.js"
+          ],
+          "runtime": {
+            "samples": 5,
+            "importMs": 8.316,
+            "constructMs": 1.936,
+            "firstRenderMs": 1.893,
+            "retainedBytes": 2610176
+          }
+        }
+      }
+    },
+    "2": {
+      "title": "bundler import of `lokalized`",
+      "revision": 1,
+      "recipeSha256": "7f5af5b3153a0e66820a91d0ecaff0e7d92295b89910053f58fb702d5e8631af",
+      "fixtureSha256": "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55",
+      "variants": {
+        "esbuild": {
+          "form": "bundler",
+          "files": [
+            "(one bundle)"
+          ],
+          "columns": {
+            "rawSource": 777038,
+            "rawModules": 32,
+            "preMinify": 356234,
+            "minified": 181290,
+            "gzip9": 65655,
+            "brotliQ11": 54341,
+            "brotliQ5": 61014,
+            "requests": 1
+          },
+          "dataRows": {
+            "rendering locale/cardinal": 48266,
+            "validity/IANA identity": 10298
+          },
+          "includedGraph": [
+            "src/core/index.js",
+            "src/data/aliases-language.js",
+            "src/data/aliases-region.js",
+            "src/data/aliases-script.js",
+            "src/data/aliases-variant.js",
+            "src/data/cardinal.js",
+            "src/data/iana-identity-equivalents.js",
+            "src/data/likely-subtags.js",
+            "src/data/parents.js",
+            "src/data/provenance.js",
+            "src/data/rtl.js",
+            "src/data/valid-languages.js",
+            "src/data/valid-regions.js",
+            "src/data/valid-scripts.js",
+            "src/data/valid-variants.js",
+            "src/index.js",
+            "src/internal/bidi.js",
+            "src/internal/catalog.js",
+            "src/internal/configuration-error.js",
+            "src/internal/expression-tokenizer.js",
+            "src/internal/expression.js",
+            "src/internal/interpolate.js",
+            "src/internal/json-parse.js",
+            "src/internal/loaded-input.js",
+            "src/internal/locale-cldr.js",
+            "src/internal/locale-jdk-tag.js",
+            "src/internal/locale.js",
+            "src/internal/lokalized-error.js",
+            "src/internal/parse-warnings.js",
+            "src/internal/plural.js",
+            "src/internal/resolution-error.js",
+            "src/internal/runtime-metadata.js"
+          ],
+          "runtime": {
+            "samples": 5,
+            "importMs": 8.34,
+            "constructMs": 1.929,
+            "firstRenderMs": 1.925,
+            "retainedBytes": 2582128
+          }
+        }
+      }
+    },
+    "3": {
+      "title": "`lokalized/core` with an already parsed catalog",
+      "revision": 1,
+      "recipeSha256": "8eafa50ef953b5a72ca5bb0b8fc78a88f041ba3a2b0558850105ce2e98bce90f",
+      "fixtureSha256": "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55",
+      "variants": {
+        "esbuild": {
+          "form": "bundler",
+          "files": [
+            "(one bundle)"
+          ],
+          "columns": {
+            "rawSource": 765955,
+            "rawModules": 31,
+            "preMinify": 354573,
+            "minified": 179937,
+            "gzip9": 65208,
+            "brotliQ11": 53695,
+            "brotliQ5": 60619,
+            "requests": 1
+          },
+          "dataRows": {
+            "rendering locale/cardinal": 48266,
+            "validity/IANA identity": 10298
+          },
+          "includedGraph": [
+            "src/core/index.js",
+            "src/data/aliases-language.js",
+            "src/data/aliases-region.js",
+            "src/data/aliases-script.js",
+            "src/data/aliases-variant.js",
+            "src/data/cardinal.js",
+            "src/data/iana-identity-equivalents.js",
+            "src/data/likely-subtags.js",
+            "src/data/parents.js",
+            "src/data/provenance.js",
+            "src/data/rtl.js",
+            "src/data/valid-languages.js",
+            "src/data/valid-regions.js",
+            "src/data/valid-scripts.js",
+            "src/data/valid-variants.js",
+            "src/internal/bidi.js",
+            "src/internal/catalog.js",
+            "src/internal/configuration-error.js",
+            "src/internal/expression-tokenizer.js",
+            "src/internal/expression.js",
+            "src/internal/interpolate.js",
+            "src/internal/json-parse.js",
+            "src/internal/loaded-input.js",
+            "src/internal/locale-cldr.js",
+            "src/internal/locale-jdk-tag.js",
+            "src/internal/locale.js",
+            "src/internal/lokalized-error.js",
+            "src/internal/parse-warnings.js",
+            "src/internal/plural.js",
+            "src/internal/resolution-error.js",
+            "src/internal/runtime-metadata.js"
+          ],
+          "runtime": {
+            "samples": 5,
+            "importMs": 8.798,
+            "constructMs": 1.802,
+            "firstRenderMs": 2.016,
+            "retainedBytes": 2553880
+          }
+        },
+        "no-build core.js": {
+          "form": "no-build",
+          "files": [
+            "chunks/chunk-7WU4JE3E.js",
+            "chunks/chunk-LED5CWLB.js",
+            "chunks/chunk-LNGUQ7KN.js",
+            "chunks/chunk-QU3LBEYR.js",
+            "chunks/chunk-TOHMQD3N.js",
+            "chunks/chunk-ZSYPX2PV.js",
+            "core.js"
+          ],
+          "columns": {
+            "rawSource": 765955,
+            "rawModules": 31,
+            "preMinify": 361658,
+            "minified": 183611,
+            "gzip9": 68285,
+            "brotliQ11": 57038,
+            "brotliQ5": 63901,
+            "requests": 7
+          },
+          "dataRows": {
+            "rendering locale/cardinal": 48265,
+            "validity/IANA identity": 10298
+          },
+          "includedGraph": [
+            "src/core/index.js",
+            "src/data/aliases-language.js",
+            "src/data/aliases-region.js",
+            "src/data/aliases-script.js",
+            "src/data/aliases-variant.js",
+            "src/data/cardinal.js",
+            "src/data/iana-identity-equivalents.js",
+            "src/data/likely-subtags.js",
+            "src/data/parents.js",
+            "src/data/provenance.js",
+            "src/data/rtl.js",
+            "src/data/valid-languages.js",
+            "src/data/valid-regions.js",
+            "src/data/valid-scripts.js",
+            "src/data/valid-variants.js",
+            "src/internal/bidi.js",
+            "src/internal/catalog.js",
+            "src/internal/configuration-error.js",
+            "src/internal/expression-tokenizer.js",
+            "src/internal/expression.js",
+            "src/internal/interpolate.js",
+            "src/internal/json-parse.js",
+            "src/internal/loaded-input.js",
+            "src/internal/locale-cldr.js",
+            "src/internal/locale-jdk-tag.js",
+            "src/internal/locale.js",
+            "src/internal/lokalized-error.js",
+            "src/internal/parse-warnings.js",
+            "src/internal/plural.js",
+            "src/internal/resolution-error.js",
+            "src/internal/runtime-metadata.js"
+          ],
+          "runtime": {
+            "samples": 5,
+            "importMs": 10.813,
+            "constructMs": 1.866,
+            "firstRenderMs": 2.055,
+            "retainedBytes": 2704984
+          }
+        }
+      }
+    },
+    "4": {
+      "title": "root plus ordinal data",
+      "revision": 1,
+      "recipeSha256": "b6a8322ff7e302268843ec8bd7a11742d0509664892eca7702db859911787df1",
+      "fixtureSha256": "08aaf60d391b58ece02ca4b5d15137ee28974f14e119d0ec82d91eddab9d435c",
+      "variants": {
+        "esbuild": {
+          "form": "bundler",
+          "files": [
+            "(one bundle)"
+          ],
+          "columns": {
+            "rawSource": 796764,
+            "rawModules": 34,
+            "preMinify": 366872,
+            "minified": 186773,
+            "gzip9": 67360,
+            "brotliQ11": 55432,
+            "brotliQ5": 62517,
+            "requests": 1
+          },
+          "dataRows": {
+            "rendering locale/cardinal": 48266,
+            "validity/IANA identity": 10298,
+            "optional ordinal": 2634,
+            "data API code": 2638
+          },
+          "includedGraph": [
+            "src/core/index.js",
+            "src/data/aliases-language.js",
+            "src/data/aliases-region.js",
+            "src/data/aliases-script.js",
+            "src/data/aliases-variant.js",
+            "src/data/cardinal.js",
+            "src/data/iana-identity-equivalents.js",
+            "src/data/likely-subtags.js",
+            "src/data/ordinal-rules.js",
+            "src/data/ordinal.js",
+            "src/data/parents.js",
+            "src/data/provenance.js",
+            "src/data/rtl.js",
+            "src/data/valid-languages.js",
+            "src/data/valid-regions.js",
+            "src/data/valid-scripts.js",
+            "src/data/valid-variants.js",
+            "src/index.js",
+            "src/internal/bidi.js",
+            "src/internal/catalog.js",
+            "src/internal/configuration-error.js",
+            "src/internal/expression-tokenizer.js",
+            "src/internal/expression.js",
+            "src/internal/interpolate.js",
+            "src/internal/json-parse.js",
+            "src/internal/loaded-input.js",
+            "src/internal/locale-cldr.js",
+            "src/internal/locale-jdk-tag.js",
+            "src/internal/locale.js",
+            "src/internal/lokalized-error.js",
+            "src/internal/parse-warnings.js",
+            "src/internal/plural.js",
+            "src/internal/resolution-error.js",
+            "src/internal/runtime-metadata.js"
+          ],
+          "runtime": {
+            "samples": 5,
+            "importMs": 11.042,
+            "constructMs": 1.649,
+            "firstRenderMs": 1.868,
+            "retainedBytes": 2636352
+          }
+        },
+        "no-build core.js + data/ordinal.js": {
+          "form": "no-build",
+          "files": [
+            "chunks/chunk-2QVQLAF6.js",
+            "chunks/chunk-7WU4JE3E.js",
+            "chunks/chunk-LED5CWLB.js",
+            "chunks/chunk-LNGUQ7KN.js",
+            "chunks/chunk-QU3LBEYR.js",
+            "chunks/chunk-TOHMQD3N.js",
+            "chunks/chunk-ZSYPX2PV.js",
+            "core.js",
+            "data/ordinal.js"
+          ],
+          "columns": {
+            "rawSource": 796764,
+            "rawModules": 34,
+            "preMinify": 375106,
+            "minified": 191215,
+            "gzip9": 71378,
+            "brotliQ11": 59800,
+            "brotliQ5": 66880,
+            "requests": 9
+          },
+          "dataRows": {
+            "rendering locale/cardinal": 48265,
+            "validity/IANA identity": 10298,
+            "optional ordinal": 2631,
+            "data API code": 2617
+          },
+          "includedGraph": [
+            "src/core/index.js",
+            "src/data/aliases-language.js",
+            "src/data/aliases-region.js",
+            "src/data/aliases-script.js",
+            "src/data/aliases-variant.js",
+            "src/data/cardinal.js",
+            "src/data/iana-identity-equivalents.js",
+            "src/data/likely-subtags.js",
+            "src/data/ordinal-rules.js",
+            "src/data/ordinal.js",
+            "src/data/parents.js",
+            "src/data/provenance.js",
+            "src/data/rtl.js",
+            "src/data/valid-languages.js",
+            "src/data/valid-regions.js",
+            "src/data/valid-scripts.js",
+            "src/data/valid-variants.js",
+            "src/index.js",
+            "src/internal/bidi.js",
+            "src/internal/catalog.js",
+            "src/internal/configuration-error.js",
+            "src/internal/expression-tokenizer.js",
+            "src/internal/expression.js",
+            "src/internal/interpolate.js",
+            "src/internal/json-parse.js",
+            "src/internal/loaded-input.js",
+            "src/internal/locale-cldr.js",
+            "src/internal/locale-jdk-tag.js",
+            "src/internal/locale.js",
+            "src/internal/lokalized-error.js",
+            "src/internal/parse-warnings.js",
+            "src/internal/plural.js",
+            "src/internal/resolution-error.js",
+            "src/internal/runtime-metadata.js"
+          ],
+          "runtime": {
+            "samples": 5,
+            "importMs": 13.831,
+            "constructMs": 1.917,
+            "firstRenderMs": 1.798,
+            "retainedBytes": 2849480
+          }
+        }
+      }
+    },
+    "5": {
+      "title": "root plus range data",
+      "revision": 1,
+      "recipeSha256": "5b19e25e2408d242b82e04b4a3db5f0ff4e78eb6a8ab4e293105f3a7aa3cf03f",
+      "fixtureSha256": "e58cdbf2da4bfe47eea335c15eec1a5a31936216766c49950f8efe87a5db5ad4",
+      "variants": {
+        "esbuild": {
+          "form": "bundler",
+          "files": [
+            "(one bundle)"
+          ],
+          "columns": {
+            "rawSource": 801637,
+            "rawModules": 34,
+            "preMinify": 368853,
+            "minified": 189478,
+            "gzip9": 67458,
+            "brotliQ11": 55536,
+            "brotliQ5": 62722,
+            "requests": 1
+          },
+          "dataRows": {
+            "rendering locale/cardinal": 48266,
+            "validity/IANA identity": 10298,
+            "optional range": 4684,
+            "data API code": 3292
+          },
+          "includedGraph": [
+            "src/core/index.js",
+            "src/data/aliases-language.js",
+            "src/data/aliases-region.js",
+            "src/data/aliases-script.js",
+            "src/data/aliases-variant.js",
+            "src/data/cardinal-ranges.js",
+            "src/data/cardinal.js",
+            "src/data/iana-identity-equivalents.js",
+            "src/data/likely-subtags.js",
+            "src/data/parents.js",
+            "src/data/provenance.js",
+            "src/data/ranges.js",
+            "src/data/rtl.js",
+            "src/data/valid-languages.js",
+            "src/data/valid-regions.js",
+            "src/data/valid-scripts.js",
+            "src/data/valid-variants.js",
+            "src/index.js",
+            "src/internal/bidi.js",
+            "src/internal/catalog.js",
+            "src/internal/configuration-error.js",
+            "src/internal/expression-tokenizer.js",
+            "src/internal/expression.js",
+            "src/internal/interpolate.js",
+            "src/internal/json-parse.js",
+            "src/internal/loaded-input.js",
+            "src/internal/locale-cldr.js",
+            "src/internal/locale-jdk-tag.js",
+            "src/internal/locale.js",
+            "src/internal/lokalized-error.js",
+            "src/internal/parse-warnings.js",
+            "src/internal/plural.js",
+            "src/internal/resolution-error.js",
+            "src/internal/runtime-metadata.js"
+          ],
+          "runtime": {
+            "samples": 5,
+            "importMs": 10.831,
+            "constructMs": 1.914,
+            "firstRenderMs": 1.91,
+            "retainedBytes": 2646640
+          }
+        },
+        "no-build core.js + data/ranges.js": {
+          "form": "no-build",
+          "files": [
+            "chunks/chunk-2QVQLAF6.js",
+            "chunks/chunk-7WU4JE3E.js",
+            "chunks/chunk-LED5CWLB.js",
+            "chunks/chunk-LNGUQ7KN.js",
+            "chunks/chunk-QU3LBEYR.js",
+            "chunks/chunk-TOHMQD3N.js",
+            "chunks/chunk-ZSYPX2PV.js",
+            "core.js",
+            "data/ranges.js"
+          ],
+          "columns": {
+            "rawSource": 801637,
+            "rawModules": 34,
+            "preMinify": 376754,
+            "minified": 193743,
+            "gzip9": 71476,
+            "brotliQ11": 59870,
+            "brotliQ5": 66997,
+            "requests": 9
+          },
+          "dataRows": {
+            "rendering locale/cardinal": 48265,
+            "validity/IANA identity": 10298,
+            "optional range": 4681,
+            "data API code": 3209
+          },
+          "includedGraph": [
+            "src/core/index.js",
+            "src/data/aliases-language.js",
+            "src/data/aliases-region.js",
+            "src/data/aliases-script.js",
+            "src/data/aliases-variant.js",
+            "src/data/cardinal-ranges.js",
+            "src/data/cardinal.js",
+            "src/data/iana-identity-equivalents.js",
+            "src/data/likely-subtags.js",
+            "src/data/parents.js",
+            "src/data/provenance.js",
+            "src/data/ranges.js",
+            "src/data/rtl.js",
+            "src/data/valid-languages.js",
+            "src/data/valid-regions.js",
+            "src/data/valid-scripts.js",
+            "src/data/valid-variants.js",
+            "src/index.js",
+            "src/internal/bidi.js",
+            "src/internal/catalog.js",
+            "src/internal/configuration-error.js",
+            "src/internal/expression-tokenizer.js",
+            "src/internal/expression.js",
+            "src/internal/interpolate.js",
+            "src/internal/json-parse.js",
+            "src/internal/loaded-input.js",
+            "src/internal/locale-cldr.js",
+            "src/internal/locale-jdk-tag.js",
+            "src/internal/locale.js",
+            "src/internal/lokalized-error.js",
+            "src/internal/parse-warnings.js",
+            "src/internal/plural.js",
+            "src/internal/resolution-error.js",
+            "src/internal/runtime-metadata.js"
+          ],
+          "runtime": {
+            "samples": 5,
+            "importMs": 13.955,
+            "constructMs": 1.939,
+            "firstRenderMs": 2.167,
+            "retainedBytes": 2849072
+          }
+        }
+      }
+    }
+  },
+  "history": [
+    {
+      "reason": "first record of the frozen suite (frozen late: plan 9.2 says at M2 exit)",
+      "date": "2026-09-25",
+      "suite": {
+        "revision": 1,
+        "sha256": "4894b2608203bb6b17dc91cc26140ab2a002e3c83ff87d8bfabe7563b23914db"
+      },
+      "baselineSha256": "5b4440187a40274655933140f26dd109cb47cf5a4a009d9b38d712e71ec82d73",
+      "changes": [
+        "the first record of the frozen suite"
+      ],
+      "previousSha256": null
+    }
+  ]
+}

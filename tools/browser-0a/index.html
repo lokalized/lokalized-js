@@ -11,7 +11,10 @@
 <div id="status">running…</div>
 <div id="out"></div>
 <script type="module">
-  // The same fixed small raw-text catalog the Node half uses, so the two are comparable.
+  // The same catalog CONTENT the Node half uses (tools/0a-recipe.mjs), handed to BOTH variants as
+  // already-parsed objects. The Node root variant is handed raw text instead, so this page's root row
+  // does not pay for parsing at construction; the graph figures (resources, transfer bytes) are
+  // unaffected. The recipe records the difference; changing it here is a new browser capture.
   const CATALOG = {
     en: {
       "Greeting": "Hello, {{name}}",

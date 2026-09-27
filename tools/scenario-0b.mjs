@@ -3,7 +3,7 @@
 /**
  * SCENARIO 0b — M8 network delivery, measured against the real production host.
  *
- * Plan :2811-2812: "production-host root plus `load`, manifest, and realistic requested/fallback
+ * Plan :2811-2813: "production-host root plus `load`, manifest, and realistic requested/fallback
  * catalogs. It records request count, encoded and decoded bytes, preload reuse, streaming limits,
  * first usable render, and the host's actual content encoding."
  *
@@ -15,152 +15,116 @@
  * origin of every row so that claim is checkable rather than asserted.
  *
  * **THIS TOOL TOUCHES NO NETWORK.** It re-checks a RECORD. Everything requiring the host or a
- * browser happens in `tools/browser-0b/`, and the host's own response facts are captured there and
- * carried in the record — the `diff:all`/`diff:check` split, applied a fourth time, so a gate never
- * depends on a third party being up.
+ * browser happens in `tools/browser-0b/`, and the host's own response facts and the published
+ * tarball's digests are measured there and carried in the record — the `diff:all`/`diff:check`
+ * split, applied a fourth time, so a gate never depends on a third party being up. The checks
+ * themselves live in `tools/0b-checks.mjs`, because the recorder applies the same ones before it
+ * writes anything.
  *
- * **NO THRESHOLDS, AND THE ABSENCE IS DELIBERATE.** A7 declined to freeze any, because that would
- * revoke the 2026-09-01 no-thresholds decision. So running this CANNOT close M8 clauses 84-87, which
- * require 0b to MEET a frozen request/transfer/latency/preload threshold. It closes 82 and 83 only,
- * and it says so below rather than letting a green run imply otherwise. Writing a threshold from
- * 0b's own first run is the one outcome the design pass singled out as worse than having none.
+ * **RATCHETED, NOT THRESHOLDED — A4 and A7 (restated as A33, 2026-09-25).** A4 restated 0b's go/no-go
+ * thresholds as "recorded and ratcheted", and A7 extended "recorded, ratcheted where a ratchet exists,
+ * reported where none does" to every M8 threshold rather than freeze a number; recipe revision 4
+ * declares that policy as its `hostThresholds`. So the record keeps every run of a revision in
+ * `history`: the request count and the decoded, encoded and transfer bytes are RE-DERIVED here from the
+ * capture's resources and RATCHET — a run whose figure grew over the run before it, or over its own
+ * version's last run, stands only with its reason — and the three timings are REPORTED: required present,
+ * never compared. Every run's request
+ * count and decoded bytes must also EQUAL its version's published graph, which the recorder reads out
+ * of the verified tarball, and the manifest's planned catalogs: within one version those two cannot
+ * move, and a lost or doubled resource is refused rather than read as a smaller or a larger figure.
+ * That, each control, the cold arm, the streaming-limit boundary, the render, and the host's headers
+ * and pins are exit terms at their ceiling, not ratchets: a run where one slips cannot be read at all.
+ * Writing a threshold from 0b's own first run is still the one outcome the design pass singled out as
+ * worse than having none; a ratchet needs no number, only the previous run.
  *
- *   node tools/scenario-0b.mjs              re-check the record
- *   npm run serve:0b                        then drive the browser half; see tools/browser-0b/
+ *   node tools/scenario-0b.mjs [record.json]    re-check the record (default measurements/scenario-0b.json)
+ *   npm run serve:0b                            then drive the browser half; see tools/browser-0b/record.mjs
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { RECIPE, harnessDigests, recipeProblems, recipeSha256, tieProblems } from "./0b-recipe.mjs";
+import { RECIPE, SUBJECT, recipeSha256 } from "./0b-recipe.mjs";
+import { RATCHETED, RECORD_NAME, REPORTED, checkRecord, deriveCapture, readHarness, unfrozenTail } from "./0b-checks.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const RECORD = join(root, "measurements/scenario-0b.json");
-
-
-
-const problems = [];
+const recordPath = process.argv[2] ? resolve(process.argv[2]) : join(root, RECORD_NAME);
+const files = readHarness(root);
+/** @type {any} */
+let record = null;
+if (existsSync(recordPath)) {
+  try { record = JSON.parse(readFileSync(recordPath, "utf8")); } catch (error) {
+    console.error(`${recordPath} is not readable JSON: ${/** @type {Error} */ (error).message}`);
+    process.exit(1);
+  }
+}
+const problems = checkRecord(record, files);
 const say = (/** @type {string} */ line) => console.log(line);
 
-if (!existsSync(RECORD)) {
-  console.error("measurements/scenario-0b.json is absent. Absence is never agreement: run the browser\n" +
-    "half (npm run serve:0b, load /?run=<token>, then node tools/browser-0b/record.mjs <capture.json>).");
-  process.exit(1);
-}
-const record = JSON.parse(readFileSync(RECORD, "utf8"));
-
-// A MOVED RECIPE WITH AN UNMOVED REVISION is two different scenarios wearing one name — scenario 6's
-// rule, and the reason the digest exists at all. The recipe is held to the digest FROZEN for its
-// revision in `tools/0b-recipe.mjs`, so the rule does not depend on the record surviving; the record
-// is then held to the recipe, with a remedy that depends on which of the two is newer.
-problems.push(...recipeProblems());
-if (record.recipeSha256 !== recipeSha256) {
-  const was = record.recipe?.revision;
-  const from = `${String(record.recipeSha256).slice(0, 12)} -> ${recipeSha256.slice(0, 12)}`;
-  problems.push(typeof was === "number" && was > RECIPE.revision
-    ? `the record is revision ${was}, newer than this checkout's recipe (revision ${RECIPE.revision}); update the ` +
-      "checkout rather than re-recording, which tools/browser-0b/record.mjs refuses"
-    : was === RECIPE.revision
-      ? `the record's recipe (${from}) differs from this checkout's at the same revision ${was}`
-      : `the record is revision ${was} and the recipe is revision ${RECIPE.revision} (${from}). Re-record 0b.`);
-}
-
-// THE RUN MUST BE OF WHAT THE RECIPE NAMES, and of the page and manifest this checkout holds. The
-// published build ACCEPTED the manifest it was given — the capture's render proves it, since the
-// loader refuses a manifest whose build identity is not its own — so what is left to hold is that the
-// manifest here is still that one. The record carries both files' digests from record time.
-const page = readFileSync(join(root, "tools/browser-0b/index.html"), "utf8");
-const manifestText = readFileSync(join(root, "tools/browser-0b/manifest.json"), "utf8");
-problems.push(...tieProblems({ capture: record.capture, page, manifest: JSON.parse(manifestText) }));
-const now = harnessDigests(page, manifestText);
-for (const file of /** @type {const} */ (["page", "manifest"])) {
-  const recorded = record.harnessSha256?.[file];
-  if (recorded === undefined)
-    problems.push(`the record does not say which ${file} it was taken with (harnessSha256.${file}); re-record`);
-  else if (recorded !== now[file])
-    problems.push(`tools/browser-0b/${file === "page" ? "index.html" : "manifest.json"} has changed since the recorded run ` +
-      `(${recorded.slice(0, 12)} -> ${now[file].slice(0, 12)}); re-run 0b`);
-}
-
-const capture = record.capture ?? {};
-const controls = capture.controls ?? {};
-
-// THE CONTROLS ARE EXIT TERMS, not decoration. Each exists because the measurement above it is
-// unfalsifiable without an arm that must come back DIFFERENT.
-if (!(controls.preload?.matched?.["fr.json"] === 1 && controls.preload?.matched?.["fr-CA.json"] === 1))
-  problems.push("the matched preloads did not report one entry each, so preload reuse was not observed");
-if (!(controls.preload?.mismatched?.["en.json"] >= 2))
-  problems.push("the MISMATCHED preload did not report a second entry. Without an arm that is NOT reused, " +
-    "one-entry-per-url is equally satisfied by a loader that never fetched — M-D S22's lesson.");
-if (controls.secondLoad?.servedFromCache !== true)
-  problems.push("the second-load control did not report cache delivery, so the capture is not observing delivery at all");
-if (controls.blind?.isBlind !== true)
-  problems.push("the blind control reported a readable size. A cross-origin resource with no Timing-Allow-Origin " +
-    "must read 0; if it does not, the capture is not reading what it believes it is.");
-
-// THE COLD ARM. Reported, and it fails the run — a warm figure recorded as a cold one is the
-// specific way this scenario would mislead, and jsDelivr's year-long immutable cache makes it the
-// DEFAULT outcome rather than an unlucky one.
-if (capture.coldArm?.contaminated)
-  problems.push(`${capture.coldArm.cachedResources?.length} first-occurrence resource(s) were served from the browser ` +
-    "cache, so the recorded transfer figure is not a cold one. Re-run from a top-level site this browser " +
-    "has not visited — Chromium keys its HTTP cache by top-level site — with a new `serve-0b-*` launch entry.");
-
-// STREAMING LIMITS — plan :2813 names them among what 0b records. Revision 1 had no arm at all,
-// while the ledger line describing it said all six measurements were recorded.
-const limits = capture.streamingLimits;
-const [below, at] = limits?.arms ?? [];
-const frScenario = (capture.resources ?? []).find((r) => r.phase === "scenario" && r.readable &&
-  r.origin === "production-host" && new URL(r.url).pathname.endsWith("/fr.json"));
-if (!limits) problems.push("no streaming-limit arm was recorded, and plan :2813 names streaming limits among what 0b records");
-else {
-  if (!(below?.outcome === "refused" && below.failures?.length === 1 &&
-        below.failures[0].locale === "fr" && below.failures[0].stage === "limit"))
-    problems.push("the streaming-limit arm under the boundary did not refuse fr, and fr alone, at stage limit");
-  if (at?.outcome !== "loaded")
-    problems.push("the streaming-limit arm at the boundary did not load, so the refusal is not located there");
-  // THE ARM DISCRIMINATES ONLY IF THE WIRE SIZE SITS UNDER THE REFUSED LIMIT AND THE BOUNDARY IS THE
-  // DECODED SIZE. Re-derived from the capture's own resource entry, never from the page's verdict:
-  // were the host to stop compressing, or the catalog to shrink under the limit, both arms could
-  // still pass while no longer telling wire bytes from decoded ones.
-  if (!frScenario) problems.push("fr.json has no readable scenario entry, so the limit arm's premise cannot be checked");
-  else if (!(frScenario.encodedBodySize <= below.maximumInputBytes &&
-             at.maximumInputBytes === below.maximumInputBytes + 1 &&
-             at.maximumInputBytes === frScenario.decodedBodySize))
-    problems.push(`the streaming-limit arm does not separate wire bytes from decoded bytes: fr is ` +
-      `${frScenario.encodedBodySize} encoded / ${frScenario.decodedBodySize} decoded against limits ` +
-      `${below?.maximumInputBytes} / ${at?.maximumInputBytes}`);
-}
-
-for (const problem of capture.problems ?? []) problems.push(`the capture reported: ${problem}`);
-
-const s = capture.summary ?? {};
 say("scenario 0b — production-host network delivery");
-say(`  recipe revision ${RECIPE.revision}, digest ${recipeSha256.slice(0, 12)}`);
-say(`  code origin     ${capture.origins?.code ?? "— (not recorded)"}`);
-say(`  catalog origin  ${capture.origins?.catalogs ?? "— (not recorded)"}`);
-say("");
-say(`  request count            ${s.requestCount ?? "—"}`);
-say(`  encoded bytes            ${(s.encodedBytes ?? 0).toLocaleString()}`);
-say(`  decoded bytes            ${(s.decodedBytes ?? 0).toLocaleString()}`);
-say(`  transfer bytes           ${(s.transferBytes ?? 0).toLocaleString()}`);
-say(`  first usable render      ${capture.render?.firstUsableRenderMs ?? "—"} ms   (reported, never gated)`);
-say(`  streaming limit          fr ${frScenario?.encodedBodySize ?? "—"} B on the wire, ${frScenario?.decodedBodySize ?? "—"} decoded: ` +
-    `${below?.maximumInputBytes ?? "—"} ${below?.outcome ?? "—"}, ${at?.maximumInputBytes ?? "—"} ${at?.outcome ?? "—"}`);
-say(`  page origin              ${capture.origins?.page ?? "— (not recorded)"}`);
-say(`  rendered                 ${JSON.stringify(capture.render?.rendered ?? null)}`);
-say(`  host content encoding    ${record.hostPreconditions?.contentEncoding ?? "—"}`);
-say("");
-say("  controls: preload matched " + JSON.stringify(controls.preload?.matched ?? null) +
+say(`  recipe          revision ${RECIPE.revision}, digest ${recipeSha256.slice(0, 12)}; SUBJECT lokalized@${SUBJECT.version}`);
+if (record) {
+  // EVERY LABEL BELOW IS THE RECORD'S OWN REVISION, not the recipe's: a record of another revision is
+  // a run of a different scenario, and printing it under this recipe's number would say otherwise.
+  const revision = record.recipe?.revision;
+  const current = record.recipeSha256 === recipeSha256;
+  const capture = record.capture ?? {};
+  const history = Array.isArray(record.history) ? record.history : [];
+  const latest = history.at(-1);
+  say(`  record          revision ${revision}, digest ${String(record.recipeSha256).slice(0, 12)}, formatVersion ${record.formatVersion}` +
+    (current ? "" : " — NOT this recipe's; re-record"));
+  say(`  code origin     ${capture.origins?.code ?? "— (not recorded)"}`);
+  say(`  catalog origin  ${capture.origins?.catalogs ?? "— (not recorded)"}`);
+  say(`  page origin     ${capture.origins?.page ?? "— (not recorded)"}, run ${capture.cacheBuster?.value ?? "—"}`);
+  say("");
+  const figures = current
+    ? deriveCapture(capture, { page: files.page, version: latest?.subject?.version ?? SUBJECT.version }).figures
+    : capture.summary ?? {};
+  say(current ? `  figures, re-derived from the capture's counted resources (revision ${revision}'s method):`
+    : `  figures as revision ${revision}'s own page summed them (never compared with this recipe's):`);
+  for (const f of RATCHETED) say(`    ${f.padEnd(24)} ${Number(figures[f]).toLocaleString()}`);
+  for (const f of REPORTED) say(`    ${f.padEnd(24)} ${capture.render?.[f] ?? "—"} ms   (reported, never compared)`);
+  const [below, at] = capture.streamingLimits?.arms ?? [];
+  say(`    streaming limit          ${below?.maximumInputBytes ?? "—"} ${below?.outcome ?? "—"}, ${at?.maximumInputBytes ?? "—"} ${at?.outcome ?? "—"}`);
+  say(`    rendered                 ${JSON.stringify(capture.render?.rendered ?? null)}`);
+  say(`    host content encoding    ${record.hostPreconditions?.contentEncoding ?? "—"}`);
+  const controls = capture.controls ?? {};
+  say("    controls                 preload matched " + JSON.stringify(controls.preload?.matched ?? null) +
     ", mismatched " + JSON.stringify(controls.preload?.mismatched ?? null) +
-    ", secondLoad cached " + String(controls.secondLoad?.servedFromCache) +
-    ", blind " + String(controls.blind?.isBlind));
+    ", second load cached " + String(controls.secondLoad?.servedFromCache) + ", blind " + String(controls.blind?.isBlind));
+  say("");
+  if (history.length === 0) say(`  history, revision ${revision}: none (formatVersion ${record.formatVersion} predates the ratchet)`);
+  else {
+    say(`  history, revision ${revision} — ${RATCHETED.join(", ")} ratchet; ${REPORTED.join(", ")} reported`);
+    for (const [i, entry] of history.entries()) {
+      const graph = entry?.subject?.graph && typeof entry.subject.graph === "object" ? Object.keys(entry.subject.graph).length : "—";
+      say(`    ${String(i).padStart(2)}  ${String(entry?.run).padEnd(40)} ${String(entry?.subject?.version).padEnd(12)}` +
+        `${String(graph).padStart(3)} modules` +
+        RATCHETED.map((f) => String(entry?.ratcheted?.[f]?.toLocaleString() ?? "—").padStart(10)).join("") +
+        `  ${String(entry?.reported?.firstUsableRenderMs ?? "—").padStart(7)} ms  ` +
+        (i === 0 ? "(first run)" : entry?.grew?.length ? `grew [${entry.grew}]: ${entry.reason}`
+          : `no growth${entry?.reason ? `; ${entry.reason}` : ""}`));
+    }
+    // HOW FAR THE FROZEN LINES REACH, and the line that would reach the rest; a run they do not reach
+    // also fails the check below (`historyProblems`). Only for a record of this recipe, whose history the
+    // frozen lines describe.
+    if (current) for (const line of unfrozenTail(history, revision)) say(`  ${line}`);
+  }
+  const prior = Array.isArray(record.priorRevisions) ? record.priorRevisions : [];
+  if (prior.length > 0) say("  earlier revisions — a different scenario (plan :2796-2797), kept as context and never compared:");
+  for (const p of prior)
+    say(`    revision ${p?.revision}, ${p?.run}: ` + RATCHETED.map((f) => p?.figures?.[f]).join(" / ") + " under its own method");
+}
 say("");
-say("  NO THRESHOLDS. A7 declined to freeze any, so M8 clauses 84-87 cannot close by running this;");
-say("  82 (the freeze) and 83 (the run and its record) are what 0b can discharge today.");
+say("  RATCHETED, NOT THRESHOLDED — A4 and A7 (restated as A33, 2026-09-25): a ratcheted figure may grow only");
+say("  on a run recorded with its reason; the request count and decoded bytes are always the version's published");
+say("  graph's; the timings are recorded and never compared. Exit terms at their ceiling:");
+say(`  ${Object.keys(RECIPE.hostThresholds.invariants).join(", ")}.`);
 
 if (problems.length > 0) {
   console.error(`\n${problems.length} problem(s):`);
   for (const problem of problems) console.error(`  - ${problem}`);
   process.exit(1);
 }
-say("\nthe recorded 0b run is current, its controls all discriminated, and its cold arm is clean.");
+say("\nthe recorded 0b run is current, its figures re-derive from its resources and are its version's published graph, " +
+  "every control discriminated, its cold arm is clean, and its history ratchets from the run frozen for its revision and is " +
+  "frozen through its newest run.");

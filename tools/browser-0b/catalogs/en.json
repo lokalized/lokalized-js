@@ -1,0 +1,36 @@
+{
+  "App.Title": "The Lokalized Bookshop",
+
+  "Locale.Direct": "This page is served in {{served}}.",
+
+  "Locale.Notice": "You asked for {{requested}}. This page is served in {{served}}.",
+
+  "Cart.Items": {
+    "translation": "Your cart holds {{count}} {{books}}.",
+    "placeholders": {
+      "books": {
+        "value": "count",
+        "translations": {
+          "CARDINALITY_ONE": "book",
+          "CARDINALITY_OTHER": "books"
+        }
+      }
+    }
+  },
+
+  "Greeting": {
+    "translation": "Welcome back, {{name}}. {{youAre}} on your own reading list.",
+    "placeholders": {
+      "youAre": {
+        "value": "readerGender",
+        "translations": {
+          "GENDER_MASCULINE": "He is",
+          "GENDER_FEMININE": "She is",
+          "GENDER_COMMON": "They are"
+        }
+      }
+    }
+  },
+
+  "Checkout.Cta": "Check out"
+}

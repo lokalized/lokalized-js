@@ -96,16 +96,20 @@ try {
     coldImportMs: +(tImported - t0).toFixed(1),
     loadMs: +(tLoaded - tImported).toFixed(1),
     firstUsableRenderMs: +(tRendered - t0).toFixed(1),
+    // WHEN THE RENDER RETURNED, on the resource entries' own clock and UNROUNDED, as each entry's
+    // `startMs` is: which requests are the scenario's is decided by comparing the two below, and
+    // `tools/0b-checks.mjs` re-derives that comparison rather than taking the page's `phase` as
+    // written. Revisions 1-3 recorded neither value exactly, so the label could not be checked.
+    renderedAtMs: tRendered,
   };
   if (results.render.renderedTheKeyBack) results.problems.push("the render returned the raw key");
 
-  // CONTROL 1 — PRELOAD REUSE, read as a CONTRAST rather than a count. Entries per URL: the two
-  // matched preloads should be 1, the mismatched one 2.
-  const perUrl = (file) => entries().filter((e) => new URL(e.name).pathname.endsWith("/" + file)).length;
-  results.controls.preload = {
-    matched: { "fr.json": perUrl("fr.json"), "fr-CA.json": perUrl("fr-CA.json") },
-    mismatched: { "en.json": perUrl("en.json") },
-  };
+  // CONTROL 1 — PRELOAD REUSE, read as a CONTRAST rather than a count: entries per URL, the two
+  // matched preloads 1, the mismatched one 2. COUNTED AT CAPTURE TIME, below, over the entries that
+  // STARTED before the render returned — not here, the instant the render returns, where the
+  // revisions up to 3 counted it: an entry is buffered asynchronously (see `settle`), so a count taken
+  // here can miss a fetch the loader has already finished, and the checker, which re-derives the
+  // control from the captured entries, would then refuse the run for disagreeing with itself.
 
   // CONTROL 2 — a second load of an already-loaded URL. INVERTED from the first attempt, which
   // looked for a new entry carrying transferSize 0 and found `null`: a memory-cache hit often
@@ -117,12 +121,16 @@ try {
   // produces an entry, without it produces none, which is why the first blind control read `null`.
   // THE SAME URL THE LOADER USED, cache-buster and all — re-fetching the unbusted spelling would be
   // a different cache key and the control would measure a fresh request rather than a cached one.
-  await (await fetch(manifest.files.fr.url, { mode: "cors", credentials: "same-origin" })).arrayBuffer();
+  const again = await (await fetch(manifest.files.fr.url, { mode: "cors", credentials: "same-origin" })).arrayBuffer();
   const added = entries().slice(beforeSecond).filter((e) => new URL(e.name).pathname.endsWith("/fr.json"));
   results.controls.secondLoad = {
     newEntries: added.length,
     transferSize: added.length > 0 ? added[0].transferSize : null,
     servedFromCache: added.length === 0 || added[0].transferSize === 0,
+    // WHAT THE SECOND LOAD RETURNED. Absence of an entry is read as a cache hit, so without this a
+    // control that never fetched at all would read exactly like one served from cache; the checker
+    // requires fr's decoded size here.
+    bytesRead: again.byteLength,
   };
 
   // CONTROL 3 — the BLIND arm, on a DIFFERENT ORIGIN (port 8714) with no Timing-Allow-Origin. It
@@ -145,10 +153,11 @@ try {
   // bytes on the wire and 909 decoded. So the BOUNDARY is the measurement — one byte under the
   // decoded size must refuse `fr` at stage `limit`, the decoded size itself must load — and a
   // loader counting wire bytes would accept both. Both limits are DERIVED from the manifest rather
-  // than typed, and `scenario-0b.mjs` re-checks that the wire size really sits below the refused
+  // than typed, and `tools/0b-checks.mjs` re-checks that the wire size really sits below the refused
   // limit, so the arm cannot quietly stop discriminating. Each arm carries its own token, so the
   // bytes it streams came off the network in that arm rather than out of the cache the scenario
-  // just filled. Runs AFTER the three controls: it re-fetches the same pathnames they count.
+  // just filled. Runs AFTER the render and the second-load control: it re-fetches the same pathnames
+  // they count, and every one of its fetches therefore starts after the render.
   const limitArm = async (maximumInputBytes) => {
     const m = structuredClone(pristine);
     const token = RUN + "-limit-" + maximumInputBytes;
@@ -178,19 +187,46 @@ try {
   // Let the buffer settle before the capture, for the reason `settle` documents.
   await new Promise((resolve) => setTimeout(resolve, 250));
 
+  // CONTROL 1, counted now (see above). Every later fetch of these paths — the second load and the
+  // streaming-limit arm — started after the render, so the start time keeps them out.
+  const perUrl = (file) => entries()
+    .filter((e) => e.startTime < tRendered && new URL(e.name).pathname.endsWith("/" + file)).length;
+  results.controls.preload = {
+    matched: { "fr.json": perUrl("fr.json"), "fr-CA.json": perUrl("fr-CA.json") },
+    mismatched: { "en.json": perUrl("en.json") },
+  };
+
+  // THE MISMATCH CONTROL IS NAMED BY THIS PAGE'S OWN MARKUP, not by a URL typed here: the `link`
+  // entry of every preload declared WITHOUT `crossorigin`. It is a harness arm a real visitor never
+  // sends, it is opaque (a no-CORS request, `responseStatus` 0, every size withheld), and revision 3
+  // counted it as the scenario's twelfth request while summing it as zero bytes. From revision 4 it
+  // is labelled a control and summed nowhere — the second-load control's treatment in revision 2 —
+  // and `tools/0b-checks.mjs` derives the same exclusion from this file's markup and refuses a
+  // capture whose labels or summary disagree with it.
+  const mismatchedPreloads = new Set([...document.querySelectorAll('link[rel="preload"]:not([crossorigin])')]
+    .map((link) => link.href));
+
   // THE CAPTURE. No `|| 0` anywhere: an unreadable entry must be visible AS unreadable rather than
   // summed as a zero, which is the defect this slice found in 0a's own capture loop.
   for (const e of entries()) {
+    const production = e.name.startsWith("https://cdn.jsdelivr.net/");
+    // WHICH REQUESTS ARE THE SCENARIO'S. Revision 1 summed every production-host entry, so the
+    // second-load control's own re-fetch of `fr.json` was counted as the scenario's thirteenth
+    // request. Everything the scenario asks for has STARTED before the render returns — the
+    // render needs it — and every control starts after, so the start time separates them without
+    // a hand-kept list of which URL belongs to whom. The one control that starts BEFORE the render
+    // is the mismatched preload, parsed with the page, and it is named above.
+    const phase = e.startTime < tRendered ? "scenario" : "after-render";
+    const control = e.initiatorType === "link" && mismatchedPreloads.has(e.name) ? "mismatched-preload" : null;
     results.resources.push({
       url: e.name,
-      origin: e.name.startsWith("https://cdn.jsdelivr.net/") ? "production-host" : "local-control",
-      // WHICH REQUESTS ARE THE SCENARIO'S. Revision 1 summed every production-host entry, so the
-      // second-load control's own re-fetch of `fr.json` was counted as the scenario's thirteenth
-      // request. Everything the scenario asks for has STARTED before the render returns — the
-      // render needs it — and every control starts after, so the start time separates them without
-      // a hand-kept list of which URL belongs to whom.
-      phase: e.startTime < tRendered ? "scenario" : "after-render",
-      startMs: +e.startTime.toFixed(1),
+      origin: production ? "production-host" : "local-control",
+      phase,
+      control,
+      counted: production && phase === "scenario" && control === null,
+      // UNROUNDED, like `render.renderedAtMs`: the two decide `phase`, and a checker comparing
+      // rounded values could not say which side of the render an entry started within 0.1 ms of it.
+      startMs: e.startTime,
       initiatorType: e.initiatorType,
       transferSize: e.transferSize,
       encodedBodySize: e.encodedBodySize,
@@ -202,40 +238,38 @@ try {
     });
   }
 
-  const host = results.resources.filter((r) => r.origin === "production-host" && r.phase === "scenario");
-  // THE MISMATCH CONTROL'S OWN `link` ENTRY LEGITIMATELY READS ZERO — it is preloaded without
-  // `crossorigin`, so it is a no-CORS request and its sizes are withheld by design. Counting it as
-  // an unreadable resource is a false positive, and it fired on the first run that had the control.
-  // Excluded BY URL AND INITIATOR, not by "any zero", so a genuinely unreadable fetch still reports.
-  const unreadable = host.filter((r) => !r.readable
-    && !(r.initiatorType === "link" && new URL(r.url).pathname.endsWith("/en.json")));
+  const counted = results.resources.filter((r) => r.counted);
+  // EVERY COUNTED RESOURCE MUST BE READABLE. The mismatch control's own `link` entry legitimately
+  // reads zero, and it is no longer counted, so no exclusion is needed here: an unreadable counted
+  // entry means Timing-Allow-Origin went, and summing its zeros would make a blind measurement read
+  // as a smaller one.
+  const unreadable = counted.filter((r) => !r.readable);
   if (unreadable.length > 0)
-    results.problems.push(unreadable.length + " production-host resource(s) reported no size; Timing-Allow-Origin may have gone");
+    results.problems.push(unreadable.length + " counted production-host resource(s) reported no size; Timing-Allow-Origin may have gone");
 
   // COLD-ARM CONTAMINATION. jsDelivr sends `immutable, max-age=31536000` and cannot be told
   // no-store, so a browser that has seen these URLs before serves them from its own cache and the
   // transfer figure silently collapses. Measured on the first run: `lokalized.js` came back
   // deliveryType "cache", transferSize 0 — 65,766 bytes that never crossed the wire. A run in that
   // state is VOID rather than optimistic, so it is named here and the tool refuses to record it.
-  // FIRST READABLE OCCURRENCE PER URL, scenario phase only. The controls re-fetch an
-  // already-loaded resource BY DESIGN, and are excluded by phase above.
-  // **READABLE, BECAUSE AN OPAQUE ENTRY'S ZERO SAYS NOTHING ABOUT THE CACHE.** The mismatch arm's
-  // `link` entry is a no-CORS request: `responseStatus` 0 and every size withheld, so its
-  // `transferSize` of 0 is not a cache hit. Revision 1 counted it anyway — replayed over that
-  // capture, 7 flagged, 6 of them real chunk hits and this one — so a run in a perfectly cold
-  // profile would STILL have been refused. Skipping it makes `en.json`'s first READABLE entry the
-  // loader's own fetch, which is the one that says whether those bytes crossed the wire.
-  const seen = new Set();
-  const firstOccurrence = host.filter((r) => {
-    if (!r.readable) return false;
-    const key = new URL(r.url).pathname;
-    if (seen.has(key)) return false;
-    seen.add(key); return true;
-  });
-  const cached = firstOccurrence.filter((r) => r.deliveryType === "cache" || r.transferSize === 0);
+  // EVERY READABLE COUNTED ENTRY IS EXAMINED, AND EACH MUST HAVE CROSSED THE NETWORK: its transfer
+  // size EXCEEDS its encoded body, by the response's headers. Revisions 1-3 read only a zero
+  // `transferSize` (or `deliveryType` "cache") as a hit, and a review's synthetic captures passed as
+  // cold under that rule with every transfer set to 1 byte, and in a revalidation's shape —
+  // `lokalized.js` transferring 300 bytes of headers against its 64,728 encoded, the body coming
+  // from the cache. A transfer that cannot hold the body did not bring it. (A body SMALLER than its
+  // headers revalidated would still read as crossed; the host's year-long `immutable` cache serves
+  // without revalidating, and a served hit reads 0.) Revisions 1-3 also examined only the FIRST
+  // entry per path, because the mismatch control's opaque `link` entry shared `en.json`'s path; it is
+  // not counted now, so nothing counted legitimately repeats a path, and a second counted entry
+  // served from cache no longer hides behind a first.
+  // **READABLE, BECAUSE AN OPAQUE ENTRY'S ZERO SAYS NOTHING ABOUT THE CACHE**: an unreadable counted
+  // entry is refused above on its own account, not read here as a hit.
+  const examined = counted.filter((r) => r.readable);
+  const cached = examined.filter((r) => r.deliveryType === "cache" || !(r.transferSize > r.encodedBodySize));
   results.coldArm = {
     contaminated: cached.length > 0,
-    examined: firstOccurrence.length,
+    examined: examined.length,
     cachedResources: cached.map((r) => ({ url: r.url, encodedBodySize: r.encodedBodySize })),
     // A cache-buster reaches the ENTRY POINTS and the catalogs, whose URLs this page controls. It
     // cannot reach the chunks: those are relative specifiers inside the published bundles, so they
@@ -246,12 +280,16 @@ try {
   if (cached.length > 0)
     results.problems.push(cached.length + " production-host resource(s) were served from the browser cache, so this is not a cold measurement; re-run from a top-level site this browser has not visited");
 
+  // THE PAGE'S OWN SUMMARY, over the counted resources. It is a claim, not the figure: the checker
+  // and the recorder re-derive every field of it from `resources` and refuse a capture whose summary
+  // differs in any.
   results.summary = {
-    requestCount: host.length,
+    requestCount: counted.length,
     requestsAfterRenderExcluded: results.resources.filter((r) => r.origin === "production-host" && r.phase !== "scenario").length,
-    encodedBytes: host.reduce((n, r) => n + r.encodedBodySize, 0),
-    decodedBytes: host.reduce((n, r) => n + r.decodedBodySize, 0),
-    transferBytes: host.reduce((n, r) => n + r.transferSize, 0),
+    controlsExcluded: results.resources.filter((r) => r.control !== null).length,
+    encodedBytes: counted.reduce((n, r) => n + r.encodedBodySize, 0),
+    decodedBytes: counted.reduce((n, r) => n + r.decodedBodySize, 0),
+    transferBytes: counted.reduce((n, r) => n + r.transferSize, 0),
   };
 } catch (error) {
   results.problems.push(String((error && error.stack) || error));

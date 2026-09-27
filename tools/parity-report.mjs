@@ -114,6 +114,13 @@ const core = await import("../src/core/index.js");
  * report that files "the plan says null here" beside "nobody has approved this yet" tells its
  * reader nothing about what is left to do.
  */
+/** lokalized-java's own version, read once from its pom; null where the checkout is absent (CI). */
+const javaPomVersion = (() => {
+  try {
+    const pom = readFileSync(join(java, "pom.xml"), "utf8");
+    return /<artifactId>lokalized<\/artifactId>\s*<version>([^<]+)<\/version>/.exec(pom)?.[1]?.trim() ?? null;
+  } catch { return null; }
+})();
 const FIELDS = [
   { name: "implementationVersion", obligation: 0, value: pkg.version },
   { name: "packageName", obligation: 0, value: pkg.name },
@@ -156,19 +163,22 @@ const FIELDS = [
     // Read from the oracle's own pom rather than restated. Null where lokalized-java is absent —
     // CI does not check it out — and carried from the record by `--check`, like every other
     // oracle-derived field.
-    value: (() => {
-      try {
-        const pom = readFileSync(join(java, "pom.xml"), "utf8");
-        return /<artifactId>lokalized<\/artifactId>\s*<version>([^<]+)<\/version>/.exec(pom)?.[1]?.trim() ?? null;
-      } catch { return null; }
-    })(),
+    value: javaPomVersion,
     reason: "absent only where the lokalized-java checkout is not beside this one",
-    note: "the reference is 3.1.0-SNAPSHOT today: the parity target is 3.1.0 and it is NOT YET " +
-      "RELEASED, so this names a snapshot on purpose. It must read a release version before a " +
-      "parity-backed publish can claim one." },
+    note: "read from lokalized-java's pom.xml when this was recorded, never restated. A value ending " +
+      "in -SNAPSHOT names an unreleased build; a release version is also the tag " +
+      "javaReferenceTagCommit resolves." },
   { name: "javaReferenceTagCommit", obligation: 1,
-    value: (() => { try { return execFileSync("git", ["-C", java, "rev-parse", "3.0.0^{commit}"], GIT).trim(); } catch { return null; } })(),
-    reason: "absent only if the 3.0.0 tag is not present in this checkout" },
+    // THE TAG IS DERIVED FROM THE VERSION, NOT SPELLED. It was the literal "3.0.0", which would have
+    // named the previous release's commit beside a 3.1.0 version the moment the pom moved.
+    value: (() => {
+      if (javaPomVersion === null || javaPomVersion.endsWith("-SNAPSHOT")) return null;
+      try { return execFileSync("git", ["-C", java, "rev-parse", `${javaPomVersion}^{commit}`], GIT).trim(); }
+      catch { return null; }
+    })(),
+    reason: "absent where lokalized-java is not checked out, where its version is a -SNAPSHOT (no " +
+      "release tag names it), or where the tag its version names does not exist yet: the tag is " +
+      "created after the release commit, so re-record with `npm run parity -- --write` once it does" },
   { name: "dataCommit", obligation: 1, value: headOf(spec) },
   { name: "portingContractArchiveDigest", obligation: 1, value: null,
     reason: "plan :2395 has each pinned Java reference tag publish an immutable " +

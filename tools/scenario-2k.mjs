@@ -13,13 +13,36 @@
  * WHAT IS AND IS NOT CLAIMED HERE.
  * This is a MEASUREMENT, not a gate. No threshold is asserted and nothing about a TIMING ratchets.
  *
- * EXACTLY ONE THING CAN FAIL THIS RUN, and it is not a number anyone chose: if the catalog this
- * tool builds no longer digests to what `measurements/scenario-2k.json` recorded, the medians in
+ * WHAT CAN FAIL THIS RUN IS THE CATALOG'S IDENTITY (and, since 2026-09-26, a record missing what it
+ * reports — see below), never a number anyone chose: if the catalog this tool builds no longer
+ * digests to what `measurements/scenario-2k.json` recorded, the medians in
  * that artifact were measured on a DIFFERENT catalog and quoting them is simply false. The header
  * below already staked the tool's claims on that digest — "a number that is quoted with a different
  * digest beside it was not measured on this catalog" — so enforcing it asserts the tool's own stated
  * rule rather than importing a threshold. It is deterministic and machine-independent, which is
  * precisely what a timing is not.
+ *
+ * **AND THAT GATE DID NOT SURVIVE ITS RECORD** (2026-09-26, the proof obligation A33 restates).
+ * Measured on the tool before the change: with `measurements/scenario-2k.json` deleted a run printed
+ * "(run with --write to record …)" and exited 0, so the digest check disappeared with the file; and
+ * with the catalog changed, a scaling write (`--write --keys 8`) recorded an 8-key catalog, after which
+ * the default run compared nothing — the digest check ran only when `--keys` equalled the record's —
+ * and exited 0 over the changed catalog. Now the scenario's catalog is FROZEN here (`SCENARIO_KEYS`
+ * and the digest of the catalog that size builds, `FROZEN_CATALOG_DIGEST`), and every run checks it,
+ * whatever `--keys` says: a missing or unreadable record FAILS, and `--write` will not start one or
+ * write over one; a tool whose catalog no longer digests to the frozen value fails and refuses to
+ * write until the digest is re-frozen in source — a deliberate edit; a record describing any other
+ * catalog fails until `--write` re-records it; and `--write` records only the scenario's own catalog.
+ * These are decided before anything is measured. There is no history here to chain: nothing but the
+ * digest is gated, and the digest is frozen in source rather than carried by the record.
+ *
+ * **AND WHAT IS REPORTED IS REQUIRED PRESENT** (A33: "timings are reported and required present").
+ * Measured the same day, after the rules above: `variants` and `graph` deleted from the record, exit 0
+ * — the source graph printed "NOT RECORDED" and nothing failed. Every timing, both heap figures and
+ * both source graphs must be in the record, each a finite number, or the run fails before measuring;
+ * `--write` is the remedy, because the record is re-derived from a run in full. A write without
+ * `--expose-gc` is refused, because it would record both heap figures as null and the next run would
+ * refuse the record it wrote. `test/scenario-2k-record.test.js` runs each rule on a copy.
  *
  * Source-graph movement is REPORTED STALE and deliberately NOT gated, on scenario 0a's reasoning for
  * its browser half: the recorded timings describe the code as it stood, staleness is detectable by
@@ -65,7 +88,7 @@
  * Run with --expose-gc, or the memory rows report n/a:
  *   node --expose-gc tools/scenario-2k.mjs [--write] [--keys 2000] [--iterations 9]
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { graphBytes } from "./graph-walk.mjs";
@@ -76,7 +99,19 @@ const gc = /** @type {undefined | (() => void)} */ (globalThis.gc);
 const argOf = (flag, fallback) =>
   process.argv.includes(flag) ? Number(process.argv[process.argv.indexOf(flag) + 1]) : fallback;
 
-const KEYS = argOf("--keys", 2000);
+/** The scenario's catalog size: the "2k". `--keys` measures other sizes; only this one is recorded. */
+const SCENARIO_KEYS = 2000;
+
+/**
+ * THE DIGEST OF THE CATALOG `SCENARIO_KEYS` BUILDS, frozen so that neither a deleted record nor a
+ * re-written one can carry a different catalog past the check. Changing the catalog on purpose means
+ * re-freezing this — a deliberate edit, which the diff shows — and then re-recording. `undefined`
+ * only for a brand-new tool: see `--init`.
+ * @type {string | undefined}
+ */
+const FROZEN_CATALOG_DIGEST = "84280c24";
+
+const KEYS = argOf("--keys", SCENARIO_KEYS);
 const ITERATIONS = argOf("--iterations", 9);
 if (!Number.isInteger(KEYS) || KEYS < 4) throw new Error("--keys must be an integer >= 4");
 if (!Number.isInteger(ITERATIONS) || ITERATIONS < 3) throw new Error("--iterations must be >= 3");
@@ -131,7 +166,8 @@ function definitionFor(i) {
 /** The argument set every key can be rendered with; one object reused so arg construction is not timed. */
 const ARGS = { name: "Ada", count: 3 };
 
-const KEY_NAMES = Array.from({ length: KEYS }, (_, i) => `key.${pad(i)}`);
+const keyName = (/** @type {number} */ i) => `key.${pad(i)}`;
+const KEY_NAMES = Array.from({ length: KEYS }, (_, i) => keyName(i));
 
 /**
  * Three locales, so the measurement runs a REAL fallback walk rather than a direct hit.
@@ -142,11 +178,12 @@ const KEY_NAMES = Array.from({ length: KEYS }, (_, i) => `key.${pad(i)}`);
  * and the failure policy on the majority of lookups. The `en` request measured alongside it is the
  * direct-hit control: the difference between the two rows IS the cost of the walk.
  */
-function buildCatalog() {
+/** @param {number} keys */
+function buildCatalog(keys) {
   /** @type {Record<string, Record<string, unknown>>} */
   const catalog = { en: {}, "en-001": {}, fr: {} };
-  for (let i = 0; i < KEYS; i++) {
-    const key = KEY_NAMES[i];
+  for (let i = 0; i < keys; i++) {
+    const key = keyName(i);
     catalog.en[key] = definitionFor(i);
     if (i % 10 === 0) {
       catalog["en-001"][key] = `Value ${pad(i)} (en-001)`;
@@ -156,10 +193,12 @@ function buildCatalog() {
   return catalog;
 }
 
-const CATALOG = buildCatalog();
+const CATALOG = buildCatalog(KEYS);
 const TIEBREAKERS = { en: ["en", "en-001"] };
+/** @param {Record<string, Record<string, unknown>>} catalog */
+const rawOf = (catalog) => Object.fromEntries(Object.entries(catalog).map(([tag, doc]) => [tag, JSON.stringify(doc)]));
 /** The root entry point takes raw text and pays for parsing at construction; core takes it parsed. */
-const RAW = Object.fromEntries(Object.entries(CATALOG).map(([tag, doc]) => [tag, JSON.stringify(doc)]));
+const RAW = rawOf(CATALOG);
 const RAW_BYTES = Object.values(RAW).reduce((n, s) => n + Buffer.byteLength(s), 0);
 
 /** FNV-1a over the canonical serialization, so a quoted number can be tied to the input it came from. */
@@ -172,6 +211,144 @@ function digest(text) {
   return h.toString(16).padStart(8, "0");
 }
 const CATALOG_DIGEST = digest(JSON.stringify(RAW));
+/** The digest of the SCENARIO's catalog, whatever size this run measures: what the checks below hold. */
+const SCENARIO_DIGEST = KEYS === SCENARIO_KEYS ? CATALOG_DIGEST : digest(JSON.stringify(rawOf(buildCatalog(SCENARIO_KEYS))));
+
+/** The two variants, named here so the record can be checked for them before anything is measured. */
+const VARIANTS = Object.freeze([
+  Object.freeze({ label: "root + raw-text catalog", entry: "src/index.js", strings: RAW }),
+  Object.freeze({ label: "core + parsed equivalent", entry: "src/core/index.js", strings: CATALOG }),
+]);
+/** What a record holds per variant: timings as median/min/max/spread over n, heap as bytes. */
+const TIMINGS = ["importMs", "constructionMs", "firstRenderMs", "steadyLookupNsFallback", "steadyLookupNsDirect"];
+const HEAP = ["retainedAfterConstructionBytes", "retainedAfterSweepBytes"];
+const isNumber = (/** @type {unknown} */ n) => typeof n === "number" && Number.isFinite(n);
+const isCount = (/** @type {unknown} */ n) => Number.isSafeInteger(n) && /** @type {number} */ (n) >= 0;
+const isTiming = (/** @type {any} */ s) => Boolean(s) && typeof s === "object" &&
+  ["median", "min", "max", "spread"].every((field) => isNumber(s[field])) && Number.isSafeInteger(s.n) && s.n >= 3;
+
+/**
+ * Everything the record reports and nothing compares: each variant's timings and heap figures, and each
+ * entry's source graph. Required present, never compared — a record missing one fails, and `--write`
+ * re-records it.
+ * @param {any} from
+ * @returns {string[]}
+ */
+function unrecordedProblems(from) {
+  /** @type {string[]} */
+  const problems = [];
+  const rows = Array.isArray(from.variants) ? from.variants : [];
+  for (const variant of VARIANTS) {
+    const matching = rows.filter((/** @type {any} */ row) => row?.label === variant.label);
+    if (matching.length !== 1) {
+      problems.push(`NOT RECORDED: ${RECORD} holds ${matching.length} rows for "${variant.label}", not one, so its ` +
+        "timings and heap figures are missing or ambiguous. Timings are reported and required present (A33); " +
+        "re-record with --write");
+    } else {
+      for (const field of TIMINGS)
+        if (!isTiming(matching[0][field]))
+          problems.push(`NOT RECORDED: ${RECORD} holds no measured ${field} for "${variant.label}" ` +
+            `(${JSON.stringify(matching[0][field]) ?? "nothing"}); timings are reported and required present (A33). ` +
+            "Re-record with --write");
+      for (const field of HEAP)
+        if (!isNumber(matching[0][field]))
+          problems.push(`NOT RECORDED: ${RECORD} holds no measured ${field} for "${variant.label}" ` +
+            `(${JSON.stringify(matching[0][field]) ?? "nothing"}); heap figures are reported and required present. ` +
+            "Re-record with --write under --expose-gc");
+    }
+    const graph = from.graph && typeof from.graph === "object" ? from.graph[variant.entry] : undefined;
+    if (!graph || !isCount(graph.bytes) || !isCount(graph.modules))
+      problems.push(`NOT RECORDED: ${RECORD} holds no source graph for ${variant.entry}, so whether its timings ` +
+        "describe this source cannot be said. Re-record with --write");
+  }
+  return problems;
+}
+
+/* ----------------------------------------------------------------- the record, before any measuring
+ *
+ * Decided before a single timing is taken, because none of it depends on one, and a run that fails
+ * here has nothing its timings could be compared with. Two kinds of finding:
+ *
+ *   BROKEN — no write may proceed: a record that cannot be read (restore it from git), and a tool whose
+ *            catalog no longer digests to the frozen value (re-freeze it in source first, deliberately).
+ *   STALE  — the record describes another catalog than the scenario's, or lacks a timing, a heap
+ *            figure or a source graph: fails the run, and `--write` is the remedy, because the record is
+ *            re-derived from this run in full.
+ */
+const RECORD = "measurements/scenario-2k.json";
+const recordedPath = resolve(root, RECORD);
+const writing = process.argv.includes("--write");
+const init = process.argv.includes("--init");
+/** @type {string[]} */
+const broken = [];
+/** @type {string[]} */
+const stale = [];
+const missing = !existsSync(recordedPath);
+/** @type {any} */
+let recorded = null;
+if (!missing) {
+  // An unreadable record is BROKEN, never "missing", and never agreement: it used to read as absent.
+  /** @type {unknown} */
+  let parsed;
+  try { parsed = JSON.parse(readFileSync(recordedPath, "utf8")); } catch (error) {
+    broken.push(`${RECORD} is not valid JSON (${/** @type {Error} */ (error).message}); restore it from git`);
+  }
+  if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) recorded = parsed;
+  else if (parsed !== undefined) broken.push(`${RECORD} holds ${JSON.stringify(parsed)}, not a record; restore it from git`);
+}
+if (FROZEN_CATALOG_DIGEST !== undefined && SCENARIO_DIGEST !== FROZEN_CATALOG_DIGEST)
+  broken.push(`this tool builds a different ${SCENARIO_KEYS}-key catalog (digest ${SCENARIO_DIGEST}) from the one ` +
+    `frozen in it (${FROZEN_CATALOG_DIGEST}): a changed catalog is a changed scenario, and every recorded median ` +
+    `describes the old one. If the change is deliberate, freeze "${SCENARIO_DIGEST}" as FROZEN_CATALOG_DIGEST, ` +
+    `then re-record with --write`);
+if (recorded && (recorded.catalog?.keys !== SCENARIO_KEYS || recorded.catalog?.digest !== SCENARIO_DIGEST))
+  stale.push(`the recorded measurement describes a different catalog (${JSON.stringify(recorded.catalog?.keys)} ` +
+    `keys, digest ${JSON.stringify(recorded.catalog?.digest)}; the scenario's is ${SCENARIO_KEYS} keys, digest ` +
+    `${SCENARIO_DIGEST}). Every median in ${RECORD} was produced against it, so quoting them alongside today's ` +
+    `catalog states something false. Re-record deliberately — node --expose-gc tools/scenario-2k.mjs --write — ` +
+    "and say in the commit what changed the catalog, because every historical comparison breaks");
+if (recorded) stale.push(...unrecordedProblems(recorded));
+
+if (writing) {
+  /** @type {string[]} */
+  const refusals = [...broken];
+  if (!gc)
+    refusals.push("--write needs --expose-gc: without it both heap figures would be recorded as null, and the next " +
+      "run would refuse the record this write produced");
+  if (KEYS !== SCENARIO_KEYS)
+    refusals.push(`--write records the scenario's ${SCENARIO_KEYS}-key catalog, and --keys ${KEYS} measures another ` +
+      "one: its record would describe a catalog this scenario is not, and the next run would refuse it");
+  if (!missing && init) refusals.push(`--init starts a first record, and ${RECORD} exists; drop --init`);
+  if (missing) {
+    // A FIRST RECORD IS A LOUD, EXPLICIT ACT, and it is refused once the tool freezes a digest.
+    if (!init)
+      refusals.push(`${RECORD} does not exist, and --write will not start a new one: it would record ` +
+        `whatever catalog this tree builds today. Restore it from git (git checkout -- ${RECORD}).`);
+    else if (FROZEN_CATALOG_DIGEST !== undefined)
+      refusals.push(`--init refused: this tool freezes the catalog digest ${FROZEN_CATALOG_DIGEST}, so a record ` +
+        "has existed. Restore it from git");
+  }
+  if (refusals.length) {
+    console.error(`refusing to write ${RECORD} (nothing was measured):`);
+    for (const line of refusals) console.error(`  ${line}`);
+    process.exit(2);
+  }
+} else {
+  // ABSENCE IS NEVER AGREEMENT. This used to print "(run with --write to record …)" and exit 0.
+  /** @type {string[]} */
+  const problems = [...broken, ...stale];
+  if (missing)
+    problems.unshift(`NOT RECORDED: ${RECORD} does not exist, so the catalog digest is checked against nothing. ` +
+      `Restore it from git (git checkout -- ${RECORD}); --write will not start a new one.`);
+  if (FROZEN_CATALOG_DIGEST === undefined)
+    problems.push(`this tool freezes no catalog digest, so a record written again could carry any catalog; freeze ` +
+      `"${SCENARIO_DIGEST}" as FROZEN_CATALOG_DIGEST`);
+  if (problems.length) {
+    console.error(`scenario 2k — FAILED before measuring (nothing was measured):`);
+    for (const line of problems) console.error(`  ${line}`);
+    process.exit(1);
+  }
+}
 
 /* ------------------------------------------------------------------------------------ statistics */
 
@@ -292,12 +469,11 @@ async function measure(label, entry, construct) {
   };
 }
 
-const rows = [
-  await measure("root + raw-text catalog", "src/index.js", (mod, locale) =>
-    mod.createStrings({ fallbackLocale: "en", locale, strings: RAW, tiebreakers: TIEBREAKERS })),
-  await measure("core + parsed equivalent", "src/core/index.js", (mod, locale) =>
-    mod.createStrings({ fallbackLocale: "en", locale, strings: CATALOG, tiebreakers: TIEBREAKERS })),
-];
+/** @type {Awaited<ReturnType<typeof measure>>[]} */
+const rows = [];
+for (const variant of VARIANTS)
+  rows.push(await measure(variant.label, variant.entry, (mod, locale) =>
+    mod.createStrings({ fallbackLocale: "en", locale, strings: variant.strings, tiebreakers: TIEBREAKERS })));
 
 /* ------------------------------------------------------------------------------------- reporting */
 
@@ -340,61 +516,49 @@ if (rows[0].sample !== rows[1].sample)
  * Split deliberately into a gate and a report, because the two questions have different answers.
  * The catalog is derived with no RNG and no seed, so its digest is a fact about the code alone and a
  * mismatch is never noise: it means the recorded medians belong to a catalog that no longer exists.
- * The source graph is equally deterministic, but what goes stale WITH it is a set of timings that
- * only a re-run on some particular machine can refresh — so that half is printed, never enforced.
+ * That half is decided above, before anything was measured, and a run that reaches this point has
+ * passed it. The source graph is equally deterministic, but what goes stale WITH it is a set of
+ * timings that only a re-run on some particular machine can refresh — so that half is printed, never
+ * enforced.
  */
 const GRAPH = Object.fromEntries(rows.map((r) => [r.entry, graphBytes(root, r.entry)]));
-const recordedPath = resolve(root, "measurements/scenario-2k.json");
-let recorded = null;
-try {
-  recorded = JSON.parse(readFileSync(recordedPath, "utf8"));
-} catch {
-  recorded = null;
-}
 
-let digestMismatch = null;
-if (recorded && !process.argv.includes("--write") && KEYS === recorded.catalog?.keys) {
-  console.log(`\nagainst measurements/scenario-2k.json:`);
-  if (recorded.catalog?.digest !== CATALOG_DIGEST) {
-    digestMismatch = `catalog digest ${recorded.catalog?.digest} -> ${CATALOG_DIGEST}`;
-  } else {
-    console.log(`  catalog        digest ${CATALOG_DIGEST} unchanged — the recorded medians describe THIS catalog`);
-  }
+if (recorded && !writing && KEYS !== SCENARIO_KEYS) {
+  console.log(`\nagainst ${RECORD}: the record describes the scenario's ${SCENARIO_KEYS}-key catalog (checked above);`);
+  console.log(`  this run measured --keys ${KEYS}, so none of its timings compare with it, and --write is refused`);
+} else if (recorded && !writing) {
+  console.log(`\nagainst ${RECORD}:`);
+  console.log(`  catalog        digest ${CATALOG_DIGEST} unchanged — the recorded medians describe THIS catalog`);
 
-  // A recorded artifact predating this check has no `graph` block. Say so rather than reading the
-  // absence as agreement: a freshness check that treats "no data" as "fresh" has stopped checking.
-  if (!recorded.graph) {
-    console.log(`  source graph   NOT RECORDED — this artifact predates the freshness check;`);
-    console.log(`                 re-run with --write to give the next run something to compare against`);
+  // Both entries' recorded graphs were required present before anything was measured, so a missing
+  // one has already failed the run rather than being read here as "fresh". It used to print
+  // "NOT RECORDED" at this point and exit 0.
+  const moved = rows
+    .map((r) => ({ entry: r.entry, was: recorded.graph[r.entry], now: GRAPH[r.entry] }))
+    .filter((g) => g.was.bytes !== g.now.bytes || g.was.modules !== g.now.modules);
+  if (moved.length === 0) {
+    console.log(`  source graph   unchanged in both variants — the recorded timings describe THIS source`);
   } else {
-    const moved = rows
-      .map((r) => ({ entry: r.entry, was: recorded.graph[r.entry], now: GRAPH[r.entry] }))
-      .filter((g) => !g.was || g.was.bytes !== g.now.bytes || g.was.modules !== g.now.modules);
-    if (moved.length === 0) {
-      console.log(`  source graph   unchanged in both variants — the recorded timings describe THIS source`);
-    } else {
-      console.log(`  source graph   STALE in ${moved.length} variant(s); the timings above were measured on different code:`);
-      for (const g of moved)
-        console.log(
-          `                 ${g.entry}  ${g.was ? `${g.was.bytes} B / ${g.was.modules} modules` : "not recorded"}` +
-            ` -> ${g.now.bytes} B / ${g.now.modules} modules`,
-        );
-      console.log(`                 REPORTED, NOT GATED (see the header): refresh with`);
-      console.log(`                 node --expose-gc tools/scenario-2k.mjs --write`);
-    }
+    console.log(`  source graph   STALE in ${moved.length} variant(s); the timings above were measured on different code:`);
+    for (const g of moved)
+      console.log(`                 ${g.entry}  ${g.was.bytes} B / ${g.was.modules} modules -> ${g.now.bytes} B / ${g.now.modules} modules`);
+    console.log(`                 REPORTED, NOT GATED (see the header): refresh with`);
+    console.log(`                 node --expose-gc tools/scenario-2k.mjs --write`);
   }
 }
 
 console.log(`
 NO THRESHOLDS EXIST HERE, by the same decision that governs scenario 0a: M2/M7 sizing is tracked by
 engineering measurement and no go/no-go line was ever frozen. Nothing above ratchets and this run
-cannot fail on a TIMING — the one thing that fails it is a catalog digest that no longer matches the
-recorded one, which is a staleness fact, not a budget. Timings are machine- and load-dependent; the parenthesised range and ±
-spread are how far this machine moved during THIS run, and are not a confidence interval.
-Node-only: it says nothing about a browser, where module fetch, parse and GC all differ.`);
+cannot fail on a TIMING — what fails it is the catalog's identity: a record that is missing or
+unreadable, or a catalog, the tool's or the record's, that is not the one frozen in this tool, which is
+a staleness fact, not a budget — and a record that lacks a timing, a heap figure or a source graph,
+which are reported and required present, never compared. Timings are machine- and load-dependent; the
+parenthesised range and ± spread are how far this machine moved during THIS run, and are not a
+confidence interval. Node-only: it says nothing about a browser, where module fetch, parse and GC all
+differ.`);
 
-if (process.argv.includes("--write")) {
-  const path = resolve(root, "measurements/scenario-2k.json");
+if (writing) {
   const record = {
     scenario: "2k",
     note: "Measurement, not a threshold. Nothing here ratchets; see the tool header.",
@@ -425,20 +589,13 @@ if (process.argv.includes("--write")) {
       retainedAfterSweepBytes: r.retainedAfterSweepBytes,
     })),
   };
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`, "utf8");
-  console.log(`\nwritten to measurements/scenario-2k.json`);
-} else {
-  console.log(`\n(run with --write to record measurements/scenario-2k.json)`);
-}
-
-if (digestMismatch) {
-  console.error(
-    `\nFAILED: the recorded measurement describes a different catalog (${digestMismatch}).\n` +
-      `Every median in measurements/scenario-2k.json was produced against the old one, so quoting\n` +
-      `them alongside today's catalog states something false. Re-record deliberately:\n` +
-      `  node --expose-gc tools/scenario-2k.mjs --write\n` +
-      `and say in the commit what changed the catalog, because every historical comparison breaks.`,
-  );
-  process.exit(1);
+  mkdirSync(dirname(recordedPath), { recursive: true });
+  writeFileSync(recordedPath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  console.log(`\nwritten to ${RECORD}`);
+  if (FROZEN_CATALOG_DIGEST === undefined) {
+    console.error(`\nA FIRST RECORD WAS WRITTEN. Freeze its catalog in this tool before anything else:\n` +
+      `  const FROZEN_CATALOG_DIGEST = "${CATALOG_DIGEST}";\n` +
+      `Until then every run fails, because a record written again could carry any catalog.`);
+    process.exit(1);
+  }
 }

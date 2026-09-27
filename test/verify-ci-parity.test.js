@@ -25,7 +25,7 @@
  * `npm run verify`. It is still `npm test`, so it compares equal here.
  */
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
@@ -126,6 +126,238 @@ describe("`npm run verify` and the CI job that mirrors it", () => {
       } else {
         assert.ok(inCi && !inVerify, `${entry.step} is declared CI-only and is not`);
       }
+    }
+  });
+});
+
+/**
+ * **A STEP REMOVED FROM BOTH LISTS AT ONCE REDDENED NOTHING.** The comparison above gates drift
+ * BETWEEN `verify` and CI, never whether a step is there at all. Measured 2026-09-26: with
+ * `npm run scenario:1-5` removed from package.json#verify and from ci.yml together, this file,
+ * `test/scenarios-1-5.test.js` and `test/clause-ledger.test.js` passed at exit 0, and so did
+ * `npm run clause:ledger`. M-R clause 8 rests on plan 9.2:2829 — M-R "reruns/evaluates every scenario
+ * applicable to the selected release profile" — and a scenario that no longer runs is re-checked by
+ * nothing, however carefully its record is kept.
+ *
+ * **THE REQUIRED SET IS DERIVED, NOT LISTED:** every package.json script whose name starts with
+ * `scenario:`, so a scenario added later is required the day its script exists, plus the three size
+ * and graph ratchets that are not scenarios by name. Those three are required BY NAME, so a renamed
+ * one fails the rule as missing rather than leaving it. A renamed scenario would instead drop out of
+ * the prefix without a word, so `CITED_SCENARIOS` is the derivation's anti-vacuity floor — and it is
+ * itself held to the M-R ledger: every script that runs a tool clause 8 cites as a gate must be in the
+ * floor or among the size ratchets. That check exists because the floor's first version omitted the
+ * scripts of two of the six tools the ledger cited, `scenario:concurrency` and `scenario:peak-memory`,
+ * while this comment said it named them; renaming either out of the prefix then left the whole suite
+ * green. Both lists are checked, and no DECLARED_EXCEPTIONS entry excuses either: an exception that
+ * let a scenario run in one list only is the escape this rule is for.
+ *
+ * **BEING LISTED IS NOT BEING ABLE TO FAIL, so three more rules, each measured escaping first** by a
+ * review of the rule above: the scenario 6 CI step given `continue-on-error: true`, or `if: false`, or
+ * a run line ending `|| true` — all green here, the first with the whole of `npm test` green too; and
+ * `"scenario:1-5": "node -e 0"`, a script body that runs nothing, green. So each required step's CI
+ * step must be a `name:` and a bare `run: npm run <name>` and nothing else, the job itself may carry
+ * no `continue-on-error:` or `if:`, and each required script's body must run a tool that exists
+ * under `tools/`, through `tools/temp-hygiene.mjs` or directly, joined by `&&` alone. What that cannot
+ * see is a tool that runs and checks nothing, or arguments that ask it not to; the tools' own tests
+ * are what hold those.
+ *
+ * **THE RULES ARE ONE PURE FUNCTION, TESTED BY BREAKING ITS INPUT.** The rest of this file is checked
+ * only against the tree as it stands, so deleting one of its rules leaves it green. Here each escape
+ * above is replayed on a mutated copy of the real inputs and must be named.
+ */
+const SIZE_RATCHETS = ["subpath:graphs", "check:bundle", "size:graph"];
+const CITED_SCENARIOS = [
+  "scenario:0a", "scenario:0b", "scenario:1-5", "scenario:2k", "scenario:6", "scenario:concurrency", "scenario:peak-memory",
+];
+
+/**
+ * The tools a script body runs, or `null` when a part of it does not have the shape of running one.
+ * `size:graph` runs its tool twice, joined by `&&`.
+ * @param {string} body
+ * @returns {string[] | null}
+ */
+function toolsRunBy(body) {
+  const tools = [];
+  for (const part of body.split("&&").map((text) => text.trim())) {
+    const match = /^node(?: tools\/temp-hygiene\.mjs node)?(?: --[\w-]+)* (tools\/[\w./-]+\.mjs)(?: [\w./:=-]+)*$/.exec(part);
+    if (!match || match[1] === "tools/temp-hygiene.mjs") return null;
+    tools.push(match[1]);
+  }
+  return tools;
+}
+
+/**
+ * The CI verify job as text: its own keys, and each step with comment lines dropped and the sibling
+ * repo's steps excluded, exactly as `ciSteps` above reads them.
+ * @param {string} text the workflow
+ * @returns {{ header: string, steps: string[] }}
+ */
+function ciVerifyJob(text) {
+  const start = text.indexOf("\n  verify:");
+  assert.notEqual(start, -1, "ci.yml has no `verify` job");
+  const end = text.indexOf("\n  packed:", start);
+  const executable = (/** @type {string} */ part) => part.split("\n").filter((line) => !/^\s*#/.test(line)).join("\n").trim();
+  const [header, ...steps] = text.slice(start, end === -1 ? undefined : end).split(/\n {6}- /);
+  return {
+    header: executable(header),
+    steps: steps.filter((step) => !/^\s*working-directory:/m.test(step)).map(executable),
+  };
+}
+
+const escape = (/** @type {string} */ text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Everything wrong with how the scenarios and size ratchets run, as sentences.
+ * @param {{ scripts: Record<string, string>, verifySteps: string[], job: { header: string, steps: string[] },
+ *   toolExists: (path: string) => boolean }} input
+ * @returns {string[]}
+ */
+function requiredStepProblems({ scripts, verifySteps, job, toolExists }) {
+  /** @type {string[]} */
+  const problems = [];
+  const scenarios = Object.keys(scripts).filter((name) => name.startsWith("scenario:"));
+  for (const name of CITED_SCENARIOS)
+    if (!scenarios.includes(name))
+      problems.push(`the derivation does not see ${name}: it is not a package.json script named scenario:*, so a ` +
+        "renamed or deleted scenario would leave this rule without saying so");
+  if (/^\s*(?:continue-on-error|if):/m.test(job.header))
+    problems.push("the CI verify job itself carries `continue-on-error:` or `if:`, so no step in it can be relied on " +
+      "to fail the workflow");
+  for (const name of [...scenarios, ...SIZE_RATCHETS]) {
+    const body = scripts[name];
+    if (typeof body !== "string") {
+      problems.push(`${name} is required by name and package.json has no such script; a renamed size ratchet is ` +
+        "renamed in SIZE_RATCHETS too");
+    } else {
+      const tools = toolsRunBy(body);
+      if (tools === null)
+        problems.push(`${name}'s script ${JSON.stringify(body)} does not have the shape of running a tool: ` +
+          "`node [tools/temp-hygiene.mjs node] [--flag…] tools/<file>.mjs [args]`, joined by `&&` alone");
+      else
+        for (const tool of tools.filter((path) => !toolExists(path)))
+          problems.push(`${name}'s script runs ${tool}, which does not exist`);
+    }
+    if (!verifySteps.includes(name))
+      problems.push(`not a step of \`npm run verify\`: ${name}. A scenario or size ratchet that verify does not run ` +
+        "is re-checked by nothing; add it back, in its place in the list");
+    const running = job.steps.filter((step) => new RegExp(`\\bnpm run ${escape(name)}(?![\\w:-])`).test(step));
+    if (running.length === 0)
+      problems.push(`not a step of the CI verify job: ${name}. Every scenario and size ratchet runs in CI as well, ` +
+        "whatever DECLARED_EXCEPTIONS says");
+    for (const step of running)
+      if (!new RegExp(`^(?:name: [^\\n]*\\n\\s*)?run: npm run ${escape(name)}$`).test(step))
+        problems.push(`${name}: its CI step is not a \`name:\` and a bare \`run: npm run ${name}\` alone. Any other key or a ` +
+          "longer run line is refused rather than judged, because `continue-on-error`, `if` and `|| true` were each " +
+          `measured letting a failing step pass: ${JSON.stringify(step)}`);
+  }
+  return problems;
+}
+
+describe("every scenario and size ratchet runs in `npm run verify` and in CI, and can fail it", () => {
+  const job = ciVerifyJob(workflow);
+  /** The real inputs. Each test below hands the rule a copy of them with one thing changed. */
+  const real = () => ({
+    scripts: /** @type {Record<string, string>} */ ({ ...manifest.scripts }),
+    verifySteps: [...verifySteps],
+    job: { header: job.header, steps: [...job.steps] },
+    toolExists: (/** @type {string} */ path) => existsSync(join(root, path)),
+  });
+  /** @param {ReturnType<typeof real>} input @param {RegExp} expected @param {string} what */
+  const fires = (input, expected, what) => {
+    const problems = requiredStepProblems(input);
+    assert.ok(problems.some((line) => expected.test(line)),
+      `${what}: expected a problem matching ${expected}, got ${JSON.stringify(problems, null, 2)}`);
+  };
+  /** Drop a required step from both lists, as the measured escape did. */
+  const dropped = (/** @type {string} */ name, input = real()) => ({
+    ...input,
+    verifySteps: input.verifySteps.filter((step) => step !== name),
+    job: { ...input.job, steps: input.job.steps.filter((step) => !step.endsWith(`run: npm run ${name}`)) },
+  });
+
+  it("reads the same CI job the comparison above reads", () => {
+    const names = job.steps.flatMap((step) => [...step.matchAll(/npm (?:run ([\w:-]+)|(test))\b/g)].map((match) => match[1] ?? "npm test"));
+    assert.deepEqual(names, ciSteps, "two readings of one CI job disagree, so one of them is reading something else");
+  });
+
+  it("holds for this tree", () => {
+    assert.deepEqual(requiredStepProblems(real()), []);
+  });
+
+  it("names in its floor every scenario M-R clause 8 cites", () => {
+    const ledger = JSON.parse(readFileSync(join(root, "measurements/mr-clauses.json"), "utf8"));
+    const clause = ledger.clauses.find((/** @type {any} */ entry) => entry.id === 8);
+    assert.ok(clause && Array.isArray(clause.gates), "measurements/mr-clauses.json has no clause 8 with gates");
+    const cited = Object.entries(/** @type {Record<string, string>} */ (manifest.scripts))
+      .filter(([, body]) => (toolsRunBy(body) ?? []).some((tool) => clause.gates.includes(tool)))
+      .map(([name]) => name);
+    // Anti-vacuity: the ledger row cites at least 0a, 2k and the subpath graphs today.
+    for (const name of ["scenario:0a", "scenario:2k", "subpath:graphs"])
+      assert.ok(cited.includes(name), `no script found running the tool clause 8 cites for ${name}; the derivation broke`);
+    const unnamed = cited.filter((name) => !CITED_SCENARIOS.includes(name) && !SIZE_RATCHETS.includes(name));
+    assert.deepEqual(unnamed, [],
+      "M-R clause 8 cites a tool these scripts run, and neither CITED_SCENARIOS nor SIZE_RATCHETS names them");
+  });
+
+  it("fails on a required step removed from both lists: each scenario and each size ratchet", () => {
+    for (const name of [...CITED_SCENARIOS, ...SIZE_RATCHETS]) {
+      fires(dropped(name), new RegExp(`not a step of \`npm run verify\`: ${escape(name)}\\.`), name);
+      fires(dropped(name), new RegExp(`not a step of the CI verify job: ${escape(name)}\\.`), name);
+    }
+    // One list at a time, too: each is required on its own.
+    const ciOnly = real();
+    ciOnly.verifySteps = ciOnly.verifySteps.filter((step) => step !== "scenario:6");
+    fires(ciOnly, /not a step of `npm run verify`: scenario:6\./, "verify only");
+  });
+
+  it("fails on a scenario renamed or deleted out of the prefix, which would otherwise shrink the derived set", () => {
+    for (const name of CITED_SCENARIOS) {
+      const renamed = dropped(name);
+      renamed.scripts[`perf:${name.slice("scenario:".length)}`] = renamed.scripts[name];
+      delete renamed.scripts[name];
+      fires(renamed, new RegExp(`the derivation does not see ${escape(name)}:`), name);
+      assert.ok(requiredStepProblems(renamed).every((line) => !line.startsWith(`not a step`)),
+        `${name}: once renamed it is no longer required, which is exactly why the floor must name it`);
+    }
+    const sizeRenamed = dropped("size:graph");
+    sizeRenamed.scripts["size:graphs-root"] = sizeRenamed.scripts["size:graph"];
+    delete sizeRenamed.scripts["size:graph"];
+    fires(sizeRenamed, /size:graph is required by name and package\.json has no such script/, "size ratchet renamed");
+  });
+
+  it("fails on a CI step, or the job, that cannot fail", () => {
+    const step = job.steps.findIndex((text) => text.endsWith("run: npm run scenario:6"));
+    assert.notEqual(step, -1, "the scenario 6 step is not where the arms below expect it");
+    for (const [what, change] of /** @type {Array<[string, (text: string) => string]>} */ ([
+      ["continue-on-error", (text) => text.replace("run: npm run scenario:6", "continue-on-error: true\n        run: npm run scenario:6")],
+      ["if: false", (text) => text.replace("run: npm run scenario:6", "if: false\n        run: npm run scenario:6")],
+      ["|| true", (text) => `${text} || true`],
+      ["a shell that runs nothing", (text) => text.replace("run: npm run scenario:6", "shell: bash -c \"exit 0\" {0}\n        run: npm run scenario:6")],
+    ])) {
+      const input = real();
+      input.job.steps[step] = change(input.job.steps[step]);
+      assert.notEqual(input.job.steps[step], job.steps[step], `${what}: the mutation did not land`);
+      fires(input, /scenario:6: its CI step is not a `name:` and a bare `run: npm run scenario:6` alone/, what);
+    }
+    for (const key of ["continue-on-error: true", "if: false"]) {
+      const input = real();
+      input.job.header = `${input.job.header}\n    ${key}`;
+      fires(input, /the CI verify job itself carries `continue-on-error:` or `if:`/, `job ${key}`);
+    }
+  });
+
+  it("fails on a script body that does not run its tool", () => {
+    for (const [what, body, expected] of /** @type {Array<[string, string, RegExp]>} */ ([
+      ["neutered", "node -e 0", /scenario:1-5's script "node -e 0" does not have the shape of running a tool/],
+      ["the wrapper around no tool", "node tools/temp-hygiene.mjs node -e 0", /does not have the shape of running a tool/],
+      ["the wrapper as its own tool", "node tools/temp-hygiene.mjs", /does not have the shape of running a tool/],
+      ["unable to fail", "node tools/temp-hygiene.mjs node tools/scenarios-1-5.mjs || true", /does not have the shape of running a tool/],
+      ["two commands, one that cannot fail", "node tools/scenarios-1-5.mjs; true", /does not have the shape of running a tool/],
+      ["a tool that is not there", "node tools/temp-hygiene.mjs node tools/scenarios-1-6.mjs", /scenario:1-5's script runs tools\/scenarios-1-6\.mjs, which does not exist/],
+    ])) {
+      const input = real();
+      input.scripts["scenario:1-5"] = body;
+      fires(input, expected, what);
     }
   });
 });
