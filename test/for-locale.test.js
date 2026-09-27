@@ -19,7 +19,7 @@ import { createStrings, forLocale } from "../src/core/index.js";
 
 const strings = createStrings({
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
   strings: {
     en: { GREETING: "Hello" },
     fr: { GREETING: "Bonjour" },

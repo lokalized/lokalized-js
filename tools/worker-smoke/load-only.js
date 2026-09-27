@@ -45,7 +45,7 @@ export default {
         signal: controller.signal,
         ...(limit === null ? {} : { limits: { maximumInputBytes: Number(limit) } }),
       });
-      const strings = createStrings({ loaded, locale });
+      const strings = createStrings({ loaded, localeResolver: () => locale });
       Object.assign(body, {
         outcome: "rendered",
         requested: loaded.requestedFiles.map((file) => file.locale),

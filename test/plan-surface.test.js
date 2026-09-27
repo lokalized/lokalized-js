@@ -42,7 +42,7 @@ const STRUCTURAL = /** @type {Record<string, string>} */ ({
   // the two ARMS the union actually needs and inlines the rest. The arms are delivered (S29).
   CommonCreateStringsOptions: "folded into both arms of the delivered CreateStringsOptions union",
   CreateStringsBehaviorOptions: "folded into both arms; every member appears on each",
-  LocaleSourceOptions: "the locale/localeResolver/localeMatchResolver trio, inlined on both arms",
+  LocaleSourceOptions: "the localeResolver/localeMatchResolver pair, an exactly-one union inlined on both arms",
   TranslationBehaviorOptions: "folded into the delivered TranslationCallOptions",
   // Plan 3.2/3.7 type aliases over primitives and records. A parameter typed `string` honours
   // `type LocaleTag = string` exactly; a named alias would add no constraint a consumer can rely on.

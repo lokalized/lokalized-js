@@ -797,15 +797,9 @@ export function requireJdkWellFormedLocale(normalizedTag, description) {
  * name for that callback is `localeResolver`; it becomes `localeResolver result`, which is exactly
  * the `returned null` precedent one word over.
  *
- * `Instance locale` IS A FOURTH, AND IT IS NAMED HERE RATHER THAN BORROWED. `createStrings({ locale
- * })` is a port affordance with no Java counterpart: `Strings.Builder` has no constant-locale
- * setter, and `VectorOracle.java:300` realizes a fixture's `instanceLocale` as
- * `localeSupplier(matcher -> instanceLocale)` — so in JAVA that source IS a supplier and its
- * refusal says `localeSupplier result`. The port cannot say that: no resolver was installed, and
- * naming a callback the caller never wrote is a worse divergence than a new phrase. The phrase
- * follows Java's own house style for a caller-supplied locale (`Fallback locale`, `Lookup locale`,
- * `Requested locale`), and it is refused at the SAME point in the lookup as the resolver arm — the
- * pre-walk ingress — so the observable timing matches Java's constant supplier exactly.
+ * `Instance locale` WAS A FOURTH, for `createStrings({ locale })`, a port affordance with no Java
+ * counterpart. The option was removed before 1.0.0 (a `Strings` has no language of its own), so the
+ * phrase went with it rather than staying as a key nothing reaches.
  *
  * EIGHT MORE WERE ADDED AFTER THE LOOKUP INGRESS SHIPPED, AND ALL EIGHT ARE VERBATIM JAVA. Three sit
  * at CONSTRUCTION (`Fallback locale` at `Strings.java:211` and `DefaultStrings.java:248`, `Localized
@@ -826,14 +820,13 @@ export function requireJdkWellFormedLocale(normalizedTag, description) {
  * (`LocalizedStringLoader.java:1119/1165/1211`, which are M8's). A named key makes the JS site
  * commit to WHICH Java sentence it is reproducing.
  *
- * @type {Readonly<Record<"perCallLocale" | "instanceLocale" | "localeResolverResult" |
+ * @type {Readonly<Record<"perCallLocale" | "localeResolverResult" |
  *   "requestedLocale" | "fallbackLocale" | "localizedStringsLocale" | "tiebreakerLocale" |
  *   "inspectionLocale" | "sourceLocale" | "targetLocale" | "selectedLocale" |
  *   "consideredLocale", string>>}
  */
 export const LOCALE_INGRESS_DESCRIPTION = Object.freeze({
 	perCallLocale: "Locale override",
-	instanceLocale: "Instance locale",
 	localeResolverResult: "localeResolver result",
 	requestedLocale: "Requested locale",
 	fallbackLocale: "Fallback locale",

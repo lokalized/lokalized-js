@@ -193,7 +193,7 @@ describe("the same three checks through the consuming surfaces", () => {
   const build = () =>
     createStrings({
       fallbackLocale: "fr",
-      locale: "fr",
+      localeResolver: () => "fr",
       strings: { fr: { Hello: "bonjour" }, en: { Hello: "hello" } },
     });
 

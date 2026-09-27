@@ -229,7 +229,7 @@ describe("cache bounds survive adversarial tags", () => {
     // different requests, four different answers, in both spellings.
     const fixed = createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       strings: { en: { Greeting: "en" }, fr: { Greeting: "fr" }, de: { Greeting: "de" } },
     });
 

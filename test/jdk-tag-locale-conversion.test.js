@@ -171,7 +171,7 @@ describe("the no-NO-NY rewrite, which changes the language", () => {
     // and fallback: Java answers NYNORSK / BOKMAAL / NYNORSK for these three requests.
     const strings = createStrings({
       fallbackLocale: "fr",
-      locale: "fr",
+      localeResolver: () => "fr",
       strings: { nn: { greeting: "NYNORSK" }, nb: { greeting: "BOKMAAL" }, fr: { greeting: "FRENCH" } },
     });
 
@@ -218,7 +218,7 @@ describe("the no-NO-NY rewrite, which changes the language", () => {
       () =>
         createStrings({
           fallbackLocale: "en",
-          locale: "en",
+          localeResolver: () => "en",
           strings: {
             en: { k: "EN" },
             "en-US-x-lvariant-POSIX": { k: "A" },
@@ -235,7 +235,7 @@ describe("the no-NO-NY rewrite, which changes the language", () => {
       () =>
         createStrings({
           fallbackLocale: "en",
-          locale: "en",
+          localeResolver: () => "en",
           strings: { en: { k: "EN" }, "en-US-POSIX": { k: "A" }, "en-US-posix": { k: "B" } },
         }),
       (/** @type {unknown} */ error) =>
@@ -256,7 +256,7 @@ describe("the no-NO-NY rewrite, which changes the language", () => {
     assert.doesNotThrow(() =>
       createStrings({
         fallbackLocale: "en",
-        locale: "en",
+        localeResolver: () => "en",
         strings: {
           en: { k: "EN" },
           "fr-FR-x-lvariant-POSIX": { k: "A" },
@@ -327,7 +327,7 @@ describe("the Unicode extension payload is a set and a map, not a subtag list", 
       () =>
         createStrings({
           fallbackLocale: "en",
-          locale: "en",
+          localeResolver: () => "en",
           strings: {
             en: { k: "EN" },
             "en-US-u-nu-latn-ca-gregory": { k: "A" },
@@ -345,7 +345,7 @@ describe("the Unicode extension payload is a set and a map, not a subtag list", 
       () =>
         createStrings({
           fallbackLocale: "en",
-          locale: "en",
+          localeResolver: () => "en",
           strings: {
             en: { k: "EN" },
             "en-US-u-nu-latn-ca-gregory": { k: "A" },
@@ -360,7 +360,7 @@ describe("the Unicode extension payload is a set and a map, not a subtag list", 
     assert.doesNotThrow(() =>
       createStrings({
         fallbackLocale: "en",
-        locale: "en",
+        localeResolver: () => "en",
         strings: {
           en: { k: "EN" },
           "fr-FR-u-nu-latn-ca-gregory": { k: "A" },

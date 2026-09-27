@@ -276,7 +276,8 @@ this call's, and the figure a reader sees must be the whole interpolation's. Exc
 
 ## What the assembler (`src/core/index.js`) does with these
 
-`createStrings` parses each catalog, resolves the ambient locale, and returns a frozen `Strings`.
+`createStrings` parses each catalog, validates its one locale resolver, and returns a frozen `Strings`;
+the resolver is asked for a lookup's language on each call that does not name its own.
 `getResult` walks `candidateChain`, renders the first catalog holding the key, and reports
 `attemptedLocales` as the prefix actually visited. `matchFor` supplies the separate diagnostic
 channel. That assembly is written by the integrator, not by module authors.

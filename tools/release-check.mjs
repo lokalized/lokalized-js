@@ -136,7 +136,7 @@ try {
     `${specifiers.map((s, i) => `import * as m${i} from ${JSON.stringify(s)};`).join("\n")}\n` +
     `import { createStrings } from "lokalized";\n` +
     `const s = createStrings({ strings: { en: { K: "Hello, {{n}}" }, fr: { K: "Bonjour, {{n}}" } },\n` +
-    `  fallbackLocale: "en", locale: "fr" });\n` +
+    `  fallbackLocale: "en", localeResolver: () => "fr" });\n` +
     `const counts = [${specifiers.map((_, i) => `Object.keys(m${i}).length`).join(", ")}];\n` +
     `console.log(JSON.stringify({ rendered: s.get("K", { n: "Ada" }), counts }));\n`, "utf8");
   const esm = JSON.parse(execFileSync(process.execPath, ["esm.mjs"], { cwd: app, encoding: "utf8" }));
@@ -163,7 +163,7 @@ try {
     `import { createStrings, forLocaleMatch } from "lokalized/core";\n` +
     `import type { Strings, LocaleMatch, TranslationFailure } from "lokalized/core";\n` +
     `import { createLocaleNegotiator } from "lokalized/negotiate";\n` +
-    `const s: Strings = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", locale: "en",\n` +
+    `const s: Strings = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en",\n` +
     `  onFailure: (f: TranslationFailure) => { void f.localeMatch.matchType; return { action: "return-key" as const }; } });\n` +
     `const m: LocaleMatch = createLocaleNegotiator({ fallbackLocale: "en", supportedLocales: ["en", "fr"] }).matchFor("fr-CA");\n` +
     `export const out = s.get("K", {}, forLocaleMatch(m));\n`, "utf8");

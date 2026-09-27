@@ -28,7 +28,7 @@ import * as root from "../src/index.js";
 /** A catalog with exactly one entry, so every interesting key is a MISSING one. */
 const strings = createStrings({
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
   strings: { en: { "Locale.Marker": "en", Slot: "{{slot}}" } },
 });
 

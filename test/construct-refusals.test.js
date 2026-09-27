@@ -24,18 +24,18 @@ import { CONSTRUCT_REFUSAL_ADAPTATIONS } from "../tools/construct-refusals.mjs";
  * rather than sitting unexercised — the same staleness rule the runner applies from the other side.
  */
 const CATALOG = { Greeting: { translation: "Hello" } };
-const BASE = { fallbackLocale: "en", locale: "en", strings: { en: CATALOG } };
+const BASE = { fallbackLocale: "en", localeResolver: () => "en", strings: { en: CATALOG } };
 /** Two catalogs under one language code: the state every tiebreaker rule below is about. */
 const AMBIGUOUS = {
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
   strings: { en: CATALOG, "en-US": { Greeting: { translation: "Howdy" } } },
 };
 
 /** @type {Record<string, () => unknown>} keyed by the `DefaultStrings.java` site the table names */
 const SUBJECTS = {
   // :250 -- no catalog source at all.
-  "DefaultStrings.java:250": () => createStrings({ fallbackLocale: "en", locale: "en" }),
+  "DefaultStrings.java:250": () => createStrings({ fallbackLocale: "en", localeResolver: () => "en" }),
   // :254 -- the both-ABSENT arm of "exactly one of".
   "DefaultStrings.java:254": () => createStrings({ fallbackLocale: "en", strings: { en: CATALOG } }),
   // :262 -- the catalog source present and null.
@@ -58,13 +58,13 @@ const SUBJECTS = {
   // an accepting instance in exactly one field.
   // :309 -- the fallback locale names no loaded catalog.
   "DefaultStrings.java:309": () =>
-    createStrings({ fallbackLocale: "de", locale: "en", strings: { en: CATALOG } }),
+    createStrings({ fallbackLocale: "de", localeResolver: () => "en", strings: { en: CATALOG } }),
   // :329 -- two tiebreaker language codes that canonicalize alike. `mo`/`ro` is a CLDR alias pair,
   // not a JDK legacy one, so a port that only did the JDK's own he->iw mapping still accepts it.
   "DefaultStrings.java:329": () =>
     createStrings({
       fallbackLocale: "ro",
-      locale: "ro",
+      localeResolver: () => "ro",
       strings: { ro: CATALOG },
       tiebreakers: { mo: ["mo"], ro: ["ro"] },
     }),
@@ -105,7 +105,7 @@ const SUBJECTS = {
   "DefaultStrings.java:465": () =>
     createStrings({
       fallbackLocale: "und",
-      locale: "und-bokmal",
+      localeResolver: () => "und-bokmal",
       strings: { "und-bokmal": CATALOG, "und-nynorsk": CATALOG },
     }),
 
@@ -296,7 +296,7 @@ test("the locale-source rule is ONE rule: none and both are refused by the same 
     {
       name: "RangeError",
       message:
-        "createStrings requires exactly one of 'locale', 'localeResolver' or 'localeMatchResolver'; " +
+        "createStrings requires exactly one of 'localeResolver' or 'localeMatchResolver'; " +
         "received none",
     },
   );
@@ -311,7 +311,7 @@ test("the locale-source rule is ONE rule: none and both are refused by the same 
     {
       name: "RangeError",
       message:
-        "createStrings requires exactly one of 'locale', 'localeResolver' or 'localeMatchResolver'; " +
+        "createStrings requires exactly one of 'localeResolver' or 'localeMatchResolver'; " +
         "received [localeResolver, localeMatchResolver]",
     },
   );
@@ -361,7 +361,7 @@ test("a well-formed variant catalog still loads — the collision rule is not a 
   // renaming every variant catalog. This one is expected to construct.
   const strings = createStrings({
     fallbackLocale: "en-US-POSIX",
-    locale: "en-US-POSIX",
+    localeResolver: () => "en-US-POSIX",
     strings: { "en-US-POSIX": CATALOG },
   });
 

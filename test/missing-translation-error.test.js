@@ -32,7 +32,7 @@ import { pluralOperands } from "../src/index.js";
 const throwing = (extra = {}) =>
   createStrings({
     fallbackLocale: "en",
-    locale: "en",
+    localeResolver: () => "en",
     strings: { en: { Present: "here" } },
     onFailure: () => THROW_EXCEPTION,
     ...extra,
@@ -61,7 +61,7 @@ describe("MissingTranslationError — the cause-less throw", () => {
     // port that isolated eagerly would put directional controls inside an exception message.
     const strings = createStrings({
       fallbackLocale: "he",
-      locale: "he",
+      localeResolver: () => "he",
       strings: { he: { Present: "כאן" } },
       bidiIsolation: "all",
       onFailure: () => THROW_EXCEPTION,
@@ -119,7 +119,7 @@ describe("the retained cause is rethrown by identity", () => {
   const throwingResolverStrings = (/** @type {any} */ onFailure) =>
     createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       strings: { en: ARTICLE },
       phoneticResolver: () => { throw resolverThrew; },
       onFailure,
@@ -218,7 +218,7 @@ describe("pluralOperands refuses out-of-range options at VALUE CONSTRUCTION", ()
   it("refuses before a lookup can turn the refusal into a translation failure", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       strings: {
         en: {
           Counted: {

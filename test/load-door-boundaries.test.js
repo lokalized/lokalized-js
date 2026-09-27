@@ -169,13 +169,13 @@ test("clause 33: the loaded branch reuses THOSE limits — a relaxed load is not
   });
 
   assert.equal(loaded.loadingLimits.maximumTranslationNodes, 4);
-  assert.doesNotThrow(() => createStrings({ loaded, locale: "en" }),
+  assert.doesNotThrow(() => createStrings({ loaded, localeResolver: () => "en" }),
     "construction revalidates under the loader's own record, so the load is not re-judged");
 
   // THE OTHER DIRECTION: a FABRICATED record cannot widen the limits construction applies. The record
   // claims a translation-node budget of 1, which its own catalogs exceed, so construction must refuse
   // — a branch that ignored the record's limits in favour of the defaults would accept it.
   const understated = { ...loaded, loadingLimits: Object.freeze({ ...loaded.loadingLimits, maximumTranslationNodes: 1 }) };
-  assert.throws(() => createStrings({ loaded: understated, locale: "en" }),
+  assert.throws(() => createStrings({ loaded: understated, localeResolver: () => "en" }),
     /translation node/i, "the record's limits are the ones construction obeys");
 });

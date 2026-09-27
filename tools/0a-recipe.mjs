@@ -101,7 +101,12 @@ export const RECIPE = Object.freeze({
   // uncommitted, when a review's findings changed a comment in that file and the `gated`, `browserHalf`
   // and `notFrozen` texts below. The same method, so the same revision: each time its digest was frozen
   // again, the record's `recipe` and `recipeSha256` were updated in place, and no figure was re-measured.
-  revision: 1,
+  // 2 (2026-09-27): `createStrings` lost its constant `locale` option before 1.0.0 (the maintainer: a
+  // language fixed at construction is not acceptable; an instance needs a resolver, as Java's needs a
+  // supplier). The SAME lookup locale is now answered by a resolver, so construction is handed a
+  // function where it was handed a string — a changed method, hence a revision, with the fixture, the
+  // render and every window unchanged.
+  revision: 2,
   description: "M2 static integration: the root with a fixed small embedded raw-text catalog, and " +
     "lokalized/core with its fixed already-parsed equivalent",
   freeze: "LATE, and stated rather than smoothed over. Plan 9.2:2806 has 0a owned by M2 and frozen at M0. M0 " +
@@ -126,7 +131,10 @@ export const RECIPE = Object.freeze({
       fixtureSha256: "f0f95c3ef8f2ac2e4d261d3d80258b8c4a49141c7678d54f70e0a02d5456c279",
     }),
   ]),
-  construction: Object.freeze({ fallbackLocale: "en", locale: "en-AU" }),
+  // `localeResolverAnswers` is the tag the harness's `localeResolver` returns: a recipe is a declared
+  // OBJECT and a function has no digestible value, so the recipe names the answer and the harness
+  // builds the function (`handedProblems` calls it back to compare).
+  construction: Object.freeze({ fallbackLocale: "en", localeResolverAnswers: "en-AU" }),
   // THE RENDER IS CHECKED, not only printed: a measurement whose first render came back as anything
   // else — the key, say — timed a failure path, and is refused rather than recorded.
   render: Object.freeze({ key: "I read {{bookCount}} books", values: Object.freeze({ bookCount: 3 }), expected: "I read 3 books" }),
@@ -178,6 +186,7 @@ export const recipeSha256 = sha256(JSON.stringify(RECIPE));
  */
 export const RECIPE_DIGESTS = Object.freeze({
   1: "5dd067021ed31781ed17eb165e34f7246e80a393fb1f0efccc7e6e679c332d0d",
+  2: "c986ed5096eba80ad937d426016e3afa0e763a6807d986d03d5ebe39a77d4841",
 });
 
 /** The recipe's own consistency, which holds or fails whatever the record says. */
@@ -222,7 +231,11 @@ const sortedJson = (/** @type {object} */ value) =>
 export function handedProblems(variant, options) {
   if (!options || typeof options !== "object")
     return [`${variant.label}: the harness never handed createStrings its options, so nothing was measured`];
-  const { strings, tiebreakers, ...rest } = /** @type {Record<string, unknown>} */ (options);
+  const { strings, tiebreakers, localeResolver, ...others } = /** @type {Record<string, unknown>} */ (options);
+  const rest = {
+    ...others,
+    localeResolverAnswers: typeof localeResolver === "function" ? localeResolver() : localeResolver,
+  };
   /** @type {string[]} */
   const problems = [];
   const handed = handedFixtureSha256({ strings, tiebreakers });

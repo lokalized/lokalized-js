@@ -4,6 +4,20 @@ All notable changes to lokalized are recorded here. This package is a JavaScript
 [lokalized-java](https://github.com/lokalized/lokalized-java) 3.1.0; where the two differ on purpose,
 [DIVERGENCES.md](DIVERGENCES.md) lists it.
 
+## Unreleased
+
+### Breaking changes
+
+- **`createStrings` no longer takes `locale`.** A language fixed when the instance is built read as
+  a second default beside `fallbackLocale`. Every instance now takes exactly one resolver, a function
+  asked for the language on each lookup, as a lokalized-java instance takes exactly one supplier.
+  Replace `createStrings({ …, locale: "fr" })` with `createStrings({ …, localeResolver: () => "fr" })`,
+  or with a resolver that reads the current request. A single call can still name its language with
+  `strings.get(key, values, { locale: "fr" })`. Passing `locale` throws a `ConfigurationError` that
+  says this, and TypeScript refuses it at compile time.
+- **TypeScript refuses a construction with no resolver, or with both.** The runtime already refused
+  both; the declarations now say so too.
+
 ## 1.0.0-rc.2 - 2026-09-23
 
 Changes since 1.0.0-rc.1. This is still a release-candidate line, so the breaking changes below were

@@ -374,7 +374,7 @@ test("loadStringsFromDirectory composes all the way to a rendered string and a s
   assert.equal(loaded.complete, true);
   assert.deepEqual(loaded.requestedFiles.map((/** @type {any} */ e) => e.locale), ["de", "en", "fr"]);
 
-  const strings = createStrings({ loaded, locale: "fr" });
+  const strings = createStrings({ loaded, localeResolver: () => "fr" });
   assert.equal(strings.get("Hi"), "hello fr");
 
   // The generated manifest's identity survives all the way into the SSR stamp, and the manifest a
@@ -392,7 +392,7 @@ test("the generated manifest carries the RENDERER's pinned data, not a placehold
   const manifest = await createStringsManifestFromDirectory(path, OPTIONS);
   assert.equal(manifest.cldrVersion, pinnedProvenance().cldrVersion);
   assert.equal(manifest.dataFingerprint, pinnedProvenance().dataFingerprint);
-  assert.ok(createStrings({ loaded: await loadStringsFromDirectory(path, OPTIONS), locale: "en" }));
+  assert.ok(createStrings({ loaded: await loadStringsFromDirectory(path, OPTIONS), localeResolver: () => "en" }));
 });
 
 test("EVERY FILE IS READ TWICE, and the second read is what makes the digest real", async () => {
@@ -533,7 +533,7 @@ test("END TO END: an ordinary directory of sibling catalogs generates, loads AND
 
   assert.equal(loaded.complete, true);
   assert.deepEqual(Object.keys(manifest.files).sort(), ["en", "en-GB", "fr"]);
-  const strings = createStrings({ loaded, locale: "en-GB" });
+  const strings = createStrings({ loaded, localeResolver: () => "en-GB" });
   assert.equal(strings.get("Hi"), "hello en-GB");
 
   // A LOOKUP SUBSET over the same directory, which is where the filter is load-bearing: `fr` pulls
@@ -549,5 +549,5 @@ test("END TO END: an ordinary directory of sibling catalogs generates, loads AND
   assert.equal(subset.coverage.kind, "lookup", "guard against the conditional that made this vacuous");
   assert.deepEqual(Object.keys(subset.catalogs).sort(), ["en", "fr"], "en-GB is NOT fetched");
   assert.deepEqual({ ...subset.tiebreakers }, { en: ["en"] });
-  assert.doesNotThrow(() => createStrings({ loaded: subset, locale: "fr" }));
+  assert.doesNotThrow(() => createStrings({ loaded: subset, localeResolver: () => "fr" }));
 });

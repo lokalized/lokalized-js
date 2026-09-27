@@ -171,7 +171,7 @@ voices = createStrings({
   // A SEVENTH distinct value. The instance constant is deliberately a locale no handler requests, so
   // "the per-call locale was ignored and the instance constant used" is a self-identifying red
   // rather than an answer that happens to look like one of the siblings'.
-  locale: "es",
+  localeResolver: () => "es",
   // SET EXPLICITLY, never inherited from the default. An isolate expectation resting on an unstated
   // default goes quietly vacuous the day the default moves, instead of going red.
   bidiIsolation: "rtl-locales",
@@ -636,7 +636,7 @@ const instanceEvents = [];
 /** A second instance, identical except that it installs an INSTANCE-level observer. */
 const observed = createStrings({
   fallbackLocale: "en",
-  locale: "es",
+  localeResolver: () => "es",
   bidiIsolation: "rtl-locales",
   onFallback: (/** @type {any} */ event) => { instanceEvents.push(event); },
   strings: {
@@ -825,10 +825,10 @@ const TENANT_EXPECTED = {
 };
 
 const tenantA = createStrings({
-  fallbackLocale: "en", locale: "en", strings: TENANT_A, tiebreakers: TIEBREAKERS_A,
+  fallbackLocale: "en", localeResolver: () => "en", strings: TENANT_A, tiebreakers: TIEBREAKERS_A,
 });
 const tenantB = createStrings({
-  fallbackLocale: "en", locale: "en", strings: TENANT_B, tiebreakers: TIEBREAKERS_B,
+  fallbackLocale: "en", localeResolver: () => "en", strings: TENANT_B, tiebreakers: TIEBREAKERS_B,
 });
 
 function tenantRows(/** @type {any} */ instance) {
@@ -906,7 +906,7 @@ describe("K6 — two Strings instances with different loaded sets share no state
     ])) {
       const source = `
         import { createStrings } from ${JSON.stringify(coreUrl)};
-        const instance = createStrings({ fallbackLocale: "en", locale: "en",
+        const instance = createStrings({ fallbackLocale: "en", localeResolver: () => "en",
           strings: ${JSON.stringify(catalogs)}, tiebreakers: ${JSON.stringify(tiebreakers)} });
         const rows = ${JSON.stringify(TENANT_REQUESTS)}.map((locale) => {
           const r = instance.getResult(${JSON.stringify(TENANT_KEY)}, undefined, { locale });
@@ -1701,7 +1701,7 @@ describe("S1 — two rendering contexts from one manifest-backed instance", () =
     // refuses `complete: false`, so a fixture that quietly failed verification would make every
     // assertion below unreachable rather than red.
     assert.equal(loaded.complete, true);
-    const strings = /** @type {any} */ (createStrings({ loaded, locale: "en" }));
+    const strings = /** @type {any} */ (createStrings({ loaded, localeResolver: () => "en" }));
     assert.deepEqual(strings.getSupportedLocales(), ["de", "en", "fr-FR"]);
     assert.deepEqual({ ...strings.getLoadVerification().coverage }, { kind: "entire-manifest" });
 
@@ -1768,7 +1768,7 @@ describe("S1 — two rendering contexts from one manifest-backed instance", () =
     // alone would accept the wrong page.
     const loaded = /** @type {any} */ ((await settledWithin(
       loadEntireManifestFromFiles(SSR_MANIFEST), "the SSR fixture load")).value);
-    const strings = /** @type {any} */ (createStrings({ loaded, locale: "en" }));
+    const strings = /** @type {any} */ (createStrings({ loaded, localeResolver: () => "en" }));
 
     const direct = { kind: /** @type {const} */ ("locale"), locale: "de" };
     const supplied = {
@@ -1837,8 +1837,8 @@ describe("S2 — two manifest-backed instances keep their own applicable configu
       assert.notEqual(subsetLoaded.catalogIdentity.catalogFingerprint,
         wholeLoaded.catalogIdentity.catalogFingerprint);
 
-      const subset = /** @type {any} */ (createStrings({ loaded: subsetLoaded, locale: "fr-BE" }));
-      const whole = /** @type {any} */ (createStrings({ loaded: wholeLoaded, locale: "en" }));
+      const subset = /** @type {any} */ (createStrings({ loaded: subsetLoaded, localeResolver: () => "fr-BE" }));
+      const whole = /** @type {any} */ (createStrings({ loaded: wholeLoaded, localeResolver: () => "en" }));
 
       /** @type {string[]} */ const log = [];
       const gates = barrier();

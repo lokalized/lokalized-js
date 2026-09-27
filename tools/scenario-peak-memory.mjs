@@ -64,7 +64,7 @@ if (childIndex >= 0) {
   if (keys < 0) { process.stdout.write("OK"); process.exit(0); }
   const { createStrings } = await import("../src/core/index.js");
   if (keys > 0) {
-    const strings = createStrings({ strings: { en: catalogFor(keys) }, fallbackLocale: "en", locale: "en" });
+    const strings = createStrings({ strings: { en: catalogFor(keys) }, fallbackLocale: "en", localeResolver: () => "en" });
     if (strings.get("K0") !== "en:0") throw new Error("the child did not construct what it claims to");
   }
   process.stdout.write("OK");

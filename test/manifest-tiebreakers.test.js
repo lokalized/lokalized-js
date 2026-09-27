@@ -82,7 +82,7 @@ test("a lookup-subset load produces a record its OWN core accepts", async () => 
 
   assert.equal(loaded.complete, true, "nothing failed; this is a complete SUBSET load");
   assert.deepEqual({ ...loaded.tiebreakers }, { en: ["en"] });
-  assert.doesNotThrow(() => createStrings({ loaded, locale: "fr" }));
+  assert.doesNotThrow(() => createStrings({ loaded, localeResolver: () => "fr" }));
 });
 
 test("the DECLARED ORDER survives filtering rather than being re-derived", async () => {
@@ -109,7 +109,7 @@ test("a language with ZERO surviving catalogs is OMITTED, not kept as an empty o
   assert.deepEqual(Object.keys(loaded.catalogs), ["en"]);
   assert.equal(Object.prototype.hasOwnProperty.call(loaded.tiebreakers, "fr"), false,
     "an omitted language must be ABSENT, not present with an empty list");
-  assert.doesNotThrow(() => createStrings({ loaded, locale: "en" }));
+  assert.doesNotThrow(() => createStrings({ loaded, localeResolver: () => "en" }));
 });
 
 test("SELECTION keeps the full manifest while RESOLUTION keeps what loaded", async () => {
@@ -127,7 +127,7 @@ test("SELECTION keeps the full manifest while RESOLUTION keeps what loaded", asy
   assert.deepEqual({ ...loaded.manifestLocaleConfiguration.tiebreakers }, { en: ["en-GB", "en-US", "en"] },
     "selection: the full manifest, unfiltered");
 
-  const strings = createStrings({ loaded, locale: "en" });
+  const strings = createStrings({ loaded, localeResolver: () => "en" });
   assert.deepEqual({ ...strings.getLocaleConfiguration().tiebreakers }, { en: ["en-GB", "en-US", "en"] });
 });
 

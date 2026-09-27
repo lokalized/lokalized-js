@@ -81,23 +81,33 @@ describe("createStrings — exactly one locale source", () => {
     // the analogue of the CONSTRUCTOR, and last-key-wins would make behaviour depend on spread order.
     assert.throws(
       () => createStrings({ ...EN_FR, localeResolver: () => "en", localeMatchResolver: frMatch }),
-      /exactly one of 'locale', 'localeResolver' or 'localeMatchResolver'/,
+      /exactly one of 'localeResolver' or 'localeMatchResolver'; received \[localeResolver, localeMatchResolver\]/,
     );
   });
 
-  it("refuses a constant locale beside a resolver", () => {
+  it("refuses neither — Java's own at-least-one half, and what makes an instance say how it finds a language", () => {
     assert.throws(
-      () => createStrings({ ...EN_FR, locale: "en", localeResolver: () => "fr" }),
-      /exactly one of/,
+      () => createStrings({ ...EN_FR }),
+      { name: "RangeError", message: "createStrings requires exactly one of 'localeResolver' or 'localeMatchResolver'; received none" },
     );
-    assert.throws(
-      () => createStrings({ ...EN_FR, locale: "en", localeMatchResolver: frMatch }),
-      /exactly one of/,
-    );
+  });
+
+  it("refuses the removed constant `locale` BY NAME, alone or beside a resolver, naming what replaced it", () => {
+    // `locale` was an option through 1.0.0-rc.2 (a language fixed at construction), removed by the
+    // maintainer's decision of 2026-09-27. The generic unknown-option message would leave a caller of
+    // either release candidate guessing, so the refusal names the resolver and the per-call option.
+    for (const options of [{ locale: "fr" }, { locale: "fr", localeResolver: () => "fr" }]) {
+      assert.throws(
+        () => createStrings(/** @type {any} */ ({ ...EN_FR, ...options })),
+        (/** @type {any} */ error) =>
+          error.name === "ConfigurationError" && error.code === "CONFIGURATION" &&
+          /does not take 'locale'/.test(error.message) && /localeResolver/.test(error.message) &&
+          /\{ locale: "fr" \}/.test(error.message),
+      );
+    }
   });
 
   it("accepts each source on its own — the control", () => {
-    assert.equal(createStrings({ ...EN_FR, locale: "fr" }).get("Greeting.Hello"), "Bonjour");
     assert.equal(createStrings({ ...EN_FR, localeResolver: () => "fr" }).get("Greeting.Hello"), "Bonjour");
     assert.equal(createStrings({ ...EN_FR, localeMatchResolver: frMatch }).get("Greeting.Hello"), "Bonjour");
   });
@@ -115,8 +125,8 @@ describe("createStrings — exactly one locale source", () => {
 
   it("treats an explicitly null resolver as an omitted one", () => {
     // The `== null` rule every other option follows. Two sources are refused; a null one is not a
-    // source at all, so `locale` still applies.
-    const strings = createStrings({ ...EN_FR, locale: "fr", localeResolver: /** @type {any} */ (null) });
+    // source at all, so the match resolver beside it still applies.
+    const strings = createStrings({ ...EN_FR, localeMatchResolver: frMatch, localeResolver: /** @type {any} */ (null) });
     assert.equal(strings.get("Greeting.Hello"), "Bonjour");
   });
 });
@@ -138,15 +148,20 @@ describe("the ingress arms, and the asymmetry between them", () => {
     probe.getDirectLocaleContext("zh-TW").localeMatch;
 
   it("a locale source keeps the REQUESTED tag as the lookup locale", () => {
-    for (const options of [{ locale: "zh-TW" }, { localeResolver: () => "zh-TW" }]) {
-      const result = createStrings({ ...ZH, ...options }).getResult("Checkout.Title");
+    // The resolver, and the per-call `locale` over a resolver answering something else: the two arms
+    // that name a TAG. (The constant `createStrings({ locale })` arm was removed before 1.0.0.)
+    const perCall = createStrings({ ...ZH, localeResolver: () => "en" });
+    for (const result of [
+      createStrings({ ...ZH, localeResolver: () => "zh-TW" }).getResult("Checkout.Title"),
+      perCall.getResult("Checkout.Title", undefined, { locale: "zh-TW" }),
+    ]) {
       assert.equal(result.lookupLocale, "zh-TW");
       assert.deepEqual([...result.attemptedLocales], ["zh-TW", "zh-Hant", "en"]);
     }
   });
 
   it("a match source replaces it with the SELECTION", () => {
-    const probe = createStrings({ ...ZH, locale: "en" });
+    const probe = createStrings({ ...ZH, localeResolver: () => "en" });
     const match = zhHantMatch(probe);
     assert.equal(match.locale, "zh-Hant");
 
@@ -214,7 +229,7 @@ describe("the ingress arms, and the asymmetry between them", () => {
   });
 
   it("refuses a per-call object naming both a locale and a localeMatch", () => {
-    const strings = createStrings({ ...EN_FR, locale: "en" });
+    const strings = createStrings({ ...EN_FR, localeResolver: () => "en" });
     assert.throws(
       () => strings.getResult("Greeting.Hello", undefined, { locale: "fr", localeMatch: frMatch() }),
       /names two locale sources/,
@@ -293,7 +308,7 @@ describe("layer one — LocaleMatchResult's own rules, and their order", () => {
     // not be tried: `supplied-match.range.identity-includes-weight` is a recorded row whose
     // effective weight is 0.5 against a range weight of 1.0, and Java REFUSES it. The range carries
     // its own weight or the two are conflated.
-    const strings = createStrings({ ...EN_FR, locale: "en" });
+    const strings = createStrings({ ...EN_FR, localeResolver: () => "en" });
     const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
 
     for (const weight of [0.5, 0.7, 1]) {
@@ -367,7 +382,7 @@ describe("layer one — LocaleMatchResult's own rules, and their order", () => {
   });
 
   it("validates a hand-written per-call localeMatch the same way", () => {
-    const strings = createStrings({ ...EN_FR, locale: "en" });
+    const strings = createStrings({ ...EN_FR, localeResolver: () => "en" });
     assert.throws(
       () => strings.getResult("Greeting.Hello", undefined,
         { localeMatch: /** @type {any} */ ({ ...frMatch(), effectiveWeight: 0 }) }),
@@ -481,7 +496,7 @@ describe("forLocaleMatch", () => {
     const options = forLocaleMatch(frMatch());
     assert.equal(Object.isFrozen(options), true);
     assert.equal(options.localeMatch.locale, "fr");
-    assert.equal(createStrings({ ...EN_FR, locale: "en" }).get("Greeting.Hello", undefined, options), "Bonjour");
+    assert.equal(createStrings({ ...EN_FR, localeResolver: () => "en" }).get("Greeting.Hello", undefined, options), "Bonjour");
   });
 
   it("validates at the site that spelled it, not at consumption", () => {
@@ -500,7 +515,7 @@ describe("forLocaleMatch", () => {
     });
     assert.equal(options.localeMatch.locale, "de");
     assert.throws(
-      () => createStrings({ ...EN_FR, locale: "en" }).get("Greeting.Hello", undefined, options),
+      () => createStrings({ ...EN_FR, localeResolver: () => "en" }).get("Greeting.Hello", undefined, options),
       /different fallback locale/,
     );
   });

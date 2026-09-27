@@ -91,7 +91,14 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  *   `Map` wherever a keyed record is taken because the keys come from a generated or untrusted
  *     source.
  *
- * - `locale` — the ambient locale; required until localeResolver lands
+ * - THERE IS NO CONSTANT INSTANCE LOCALE. An instance is given exactly one RESOLVER, asked on
+ *   every lookup that does not name its own language (`get(key, values, { locale })`) — Java's
+ *   `localeSupplier`/`localeMatchSupplier` rule. `locale` was a constant-tag option through
+ *   1.0.0-rc.2 and is refused with its replacement named: the maintainer's decision of 2026-09-27,
+ *   because a language fixed at construction beside `fallbackLocale` read as a second default (36 of
+ *   the README's 64 constructions wrote the same tag into both). The pair is an EXACTLY-ONE union in
+ *   the declaration too, so a TypeScript caller who names neither, or both, is refused at compile time
+ *   rather than by the runtime check below.
  *
  * - `tiebreakers` — plan section 3.2's `TiebreakerMap`. Snapshotted and frozen at construction —
  *   see `safeTiebreakers`.
@@ -160,7 +167,6 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * @typedef {Readonly<{
  *   fallbackLocale: string,
  *   strings: Readonly<Record<string, unknown>> | ReadonlyMap<string, unknown>,
- *   locale?: string,
  *   tiebreakers?: Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]> | null,
  *   loadingLimits?: import("../internal/catalog.js").ParseLimits,
  *   runtimeLimits?: undefined,
@@ -173,9 +179,8 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  *   fallbackPolicy?: BuiltinFallbackPolicy | FallbackPolicy,
  *   onFailure?: FailureHandler,
  *   onFallback?: FallbackObserver,
- *   localeResolver?: () => string,
- *   localeMatchResolver?: () => LocaleMatch,
- * }>} DirectCreateStringsOptions
+ * }> & (Readonly<{ localeResolver: () => string, localeMatchResolver?: null }>
+ *   | Readonly<{ localeMatchResolver: () => LocaleMatch, localeResolver?: null }>)} DirectCreateStringsOptions
  */
 
 /**
@@ -188,16 +193,14 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * one; see that type for the measurement behind the wrap.
  *
  * - `loaded` — the record a loader returned. Plan 6.2's own examples call `createStrings({
- *   loaded, locale })` directly, which is the call that did not typecheck.
+ *   loaded, locale })` directly, which is the call that did not typecheck. Since 2026-09-27 the
+ *   call is `createStrings({ loaded })`, the language named per lookup; see the direct arm.
  *
  * - `localeMatchResolver` — plan 3.2 calls this a `LocaleMatchResult`; the port name for the
  *   same shape is `LocaleMatch`.
  *
  * @typedef {Readonly<{
  *   loaded: import("../load/index.js").LoadedStrings,
- *   locale?: string,
- *   localeResolver?: () => string,
- *   localeMatchResolver?: () => import("../internal/locale.js").LocaleMatch,
  *   fallbackLocale?: never,
  *   strings?: never,
  *   tiebreakers?: never,
@@ -210,7 +213,8 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  *   fallbackPolicy?: BuiltinFallbackPolicy | FallbackPolicy,
  *   onFallback?: (event: FallbackEvent) => void,
  *   onFailure?: FailureHandler,
- * }>} LoadedCreateStringsOptions
+ * }> & (Readonly<{ localeResolver: () => string, localeMatchResolver?: null }>
+ *   | Readonly<{ localeMatchResolver: () => import("../internal/locale.js").LocaleMatch, localeResolver?: null }>)} LoadedCreateStringsOptions
  */
 
 /**
@@ -948,7 +952,7 @@ const MISSING_TRANSLATION_TOKEN = Symbol("lokalized.missing-translation-error");
  * is strictly less useful to the caller.
  */
 const CREATE_STRINGS_OPTIONS = /** @type {const} */ ([
-  "strings", "fallbackLocale", "locale", "tiebreakers", "loadingLimits", "runtimeLimits",
+  "strings", "fallbackLocale", "tiebreakers", "loadingLimits", "runtimeLimits",
   "loaded", "catalogIdentity", "onWarning", "pluralData", "phoneticResolver", "bidiIsolation",
   "fallbackPolicy", "onFailure", "onFallback", "localeResolver", "localeMatchResolver",
 ]);
@@ -993,6 +997,18 @@ export function createStrings(options) {
   // reported "requires exactly one of 'locale'…" and never mentioned the typo. It must also precede
   // the normalization below, which deletes `loaded` and injects four members — past that line the
   // guard would be inspecting a synthesized object rather than the caller's.
+  //
+  // `locale` IS REFUSED BY NAME, AHEAD OF THE GENERAL GUARD, because it is not a typo: it was an
+  // option through 1.0.0-rc.2, and the general message ("does not take the option(s) [locale]")
+  // would leave a caller of either release candidate with no idea what replaced it. There is no
+  // near-miss spelling to offer — the replacement moves the language to the CALL.
+  if (options !== null && typeof options === "object" && Object.hasOwn(options, "locale"))
+    throw configurationError(
+      "createStrings does not take 'locale': a Strings instance has no fixed language. Give it a " +
+        "localeResolver, a function asked for the language on every lookup (for example, reading the " +
+        "current request), and name a language on any single call with " +
+        "strings.get(key, values, { locale: \"fr\" }).",
+    );
   options = refuseUnknownOptions("createStrings", options, CREATE_STRINGS_OPTIONS, { limits: "loadingLimits" });
 
   // The `loaded` branch is NORMALIZED into the direct branch's inputs rather than given a second
@@ -1101,18 +1117,17 @@ export function createStrings(options) {
   // the analogue of the CONSTRUCTOR, not of the fluent builder, so last-key-wins would make
   // behaviour depend on spread order.
   //
-  // `locale` joins the same exclusion, on plan 3.2's `LocaleSourceOptions` union ("Exactly one of
-  // `locale`, `localeResolver`, and `localeMatchResolver` is required"). B3 landed the AT-MOST-ONE
-  // half; B4 lands the AT-LEAST-ONE half, which is what `owed-construct.refusal.locale-source-absent`
-  // records Java refusing. `options.locale ?? options.fallbackLocale` is still what computes the
-  // ambient tag below — the defaulting is unchanged and is simply no longer reachable with no source
-  // named, so the fallback locale can never silently become the ambient locale by omission.
-  const localeSources = ["locale", "localeResolver", "localeMatchResolver"]
+  // `locale` USED TO JOIN THIS EXCLUSION, on plan 3.2's `LocaleSourceOptions` union ("Exactly one of
+  // `locale`, `localeResolver`, and `localeMatchResolver` is required"). The constant tag was removed
+  // before 1.0.0 (the maintainer, 2026-09-27: a language fixed at construction is not acceptable), so
+  // the rule is now Java's own, member for member — and `owed-construct.refusal.locale-source-absent`
+  // is still what records Java refusing the AT-LEAST-ONE half.
+  const localeSources = ["localeResolver", "localeMatchResolver"]
     .filter((name) => /** @type {Record<string, unknown>} */ (options)[name] != null);
 
   if (localeSources.length !== 1)
     throw new RangeError(
-      `createStrings requires exactly one of 'locale', 'localeResolver' or 'localeMatchResolver'; ` +
+      `createStrings requires exactly one of 'localeResolver' or 'localeMatchResolver'; ` +
         `received ${localeSources.length === 0 ? "none" : javaList(localeSources)}`,
     );
 
@@ -1125,27 +1140,6 @@ export function createStrings(options) {
       ? null
       : validateResolver(options.localeMatchResolver, "createStrings({ localeMatchResolver })");
 
-  // Deliberately the CONFIGURED spelling, not the resolved one. The corpus pins this:
-  // `locale-identity.deprecated-fallback.instance-locale-uses-loaded-spelling` configures `hy-810`,
-  // resolves the fallback to the loaded `hy-AM`, and still records `lookupLocale: "hy-810"`.
-  //
-  // Computed even when a resolver is installed — it is simply never READ then, exactly as
-  // `VectorOracle` ignores a fixture's `instanceLocale` whenever it installs a supplier
-  // (`VectorOracle.java:268-276`). The exclusion above is what makes that unobservable rather than
-  // merely unlikely.
-  //
-  // THE RAW SPELLING IS WHAT TRAVELS, and its normalized twin is deliberately NOT kept. Two
-  // consumers want two different things: `lookupLocale` wants the NORMALIZED tag (the corpus row
-  // named above), and it computes it at the ingress; the SELECTION channel wants the raw one,
-  // because Java's `matchFor(Locale)` normalizes exactly once and this port's matcher kernel
-  // normalizes whatever it is handed. See `localeLookupFor`'s per-call arm for the measurement that
-  // separates them.
-  //
-  // `normalizeTag`'s RESULT is discarded here and its THROW is not: a malformed configured locale is
-  // still refused at construction rather than at the first lookup, which is unchanged behaviour and
-  // is what `owed-construct.*` records.
-  const ambientLocaleSource = options.locale ?? direct.fallbackLocale;
-  normalizeTag(ambientLocaleSource);
 
   // A callback of the wrong SHAPE is a configuration mistake and is refused here; a callback that
   // misbehaves at runtime is not, and becomes the current candidate's resolution failure instead.
@@ -1582,7 +1576,7 @@ export function createStrings(options) {
    *   per-call `locale`      → the REQUESTED tag stays the lookup locale; the match is computed
    *   per-call `localeMatch` → the SELECTION replaces it (Java's per-call `languageRanges` arm)
    *   `localeMatchResolver`  → the SELECTION replaces it
-   *   `localeResolver` / the constant instance locale → the REQUESTED tag stays
+   *   `localeResolver`       → the REQUESTED tag stays
    *
    * `ingress-matrix-java.zh-tw.*` is the acceptance test and it is one fixture across six ingresses:
    * instance-locale, per-call locale and `localeSupplier` all attempt `[zh-TW, zh-Hant, en]`, while
@@ -1667,22 +1661,17 @@ export function createStrings(options) {
     // `normalizeTag` raises for the same class of input. The REQUESTED tag survives: a resolver that
     // answers `zh-TW` against catalogs holding only `zh`, `zh-Hant` and `en` still attempts `zh-TW`
     // first, which is exactly what separates this arm from the two match arms above.
-    const requested = localeResolver === null ? ambientLocaleSource : localeResolver();
+    // Exactly one resolver is installed and the match arm has returned, so this one is not null.
+    const requested = /** @type {() => string} */ (localeResolver)();
 
     if (requested == null) throw new TypeError("localeResolver returned null");
 
     // The refusal `:2457` names, at the point `:2457` runs: after the resolver has answered and
     // before `matchFor` or any candidate sees the tag.
     //
-    // THE DESCRIPTION DEPENDS ON THE SOURCE because Java's does. A resolver answered it, so the
-    // resolver is named; a constant `createStrings({ locale })` is a port affordance Java has no
-    // setter for, and it gets its own phrase rather than borrowing a callback name nobody
-    // installed. See `LOCALE_INGRESS_DESCRIPTION`, which is where that reasoning lives.
     const lookupLocale = requireJdkWellFormedLocale(
       normalizeTag(requested),
-      localeResolver === null
-        ? LOCALE_INGRESS_DESCRIPTION.instanceLocale
-        : LOCALE_INGRESS_DESCRIPTION.localeResolverResult,
+      LOCALE_INGRESS_DESCRIPTION.localeResolverResult,
     );
     // `matchFor(suppliedLocale)` on the RAW value (`:2458`), for the reason recorded on the per-call
     // arm above: the kernel normalizes what it is given, and Java normalizes exactly once.

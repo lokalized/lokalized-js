@@ -3,7 +3,7 @@
   "formatVersion": 1,
   "i18nextVersion": "26.4.2",
   "node": "v24.18.0",
-  "toolSha256": "73d1b02e96f9918d336986cd65617d4d4b5ad53077e85c1197ebb15a1644a77d",
+  "toolSha256": "5f25f84c9a9536dd6d127ec984d72a916905a64d13ec2f73830c1c1512d6598e",
   "census": {
     "SAME": 1,
     "DIFFERENT-NO-WINNER": 1,
@@ -109,10 +109,10 @@
       "axis": "cold start: import, construct, render one string",
       "verdict": "I18NEXT-BETTER",
       "i18next": {
-        "millisecondsToFirstString": 2.6
+        "millisecondsToFirstString": 3.3
       },
       "lokalized": {
-        "millisecondsToFirstString": 14.7
+        "millisecondsToFirstString": 20.4
       },
       "reading": "lokalized decodes pinned CLDR tables at import; i18next asks the host for plural rules and has nothing to decode. Reported, never gated — this is one machine and one run shape, and the figure moves with the host. The direction is the durable part."
     },
@@ -126,7 +126,7 @@
       "lokalized": {
         "source": "CLDR tables pinned in the package",
         "filesUsingIntlInCodeUnderSrc": 0,
-        "sourceFilesScanned": 54
+        "sourceFilesScanned": 55
       },
       "reading": "i18next selects through the host's `Intl.PluralRules`, so two machines on different ICU builds can disagree — and equally, i18next picks up CLDR corrections for free when the host updates. lokalized pins the data and fails the build on a bare `Intl` reference anywhere under `src/`, so it renders identically everywhere and goes stale until the package is updated. Which of those you want is a real choice, not a ranking."
     }

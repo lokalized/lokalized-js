@@ -46,6 +46,9 @@ import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import * as RECIPE_MODULE from "../tools/0a-recipe.mjs";
+
+/** The recipe revision the working tree is at; every bump below is relative to it. */
+const CURRENT = RECIPE_MODULE.RECIPE.revision;
 import { chained, entryDigest } from "../tools/ratchet-chain.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -120,20 +123,20 @@ const grow = (/** @type {string} */ dir, /** @type {string} */ file) =>
  * on a digest it computed some other way.
  * @param {string} dir @param {() => void} change @param {number} [to]
  */
-function bumpRevision(dir, change, to = 2) {
+function bumpRevision(dir, change, to = CURRENT + 1) {
   change();
-  edit(join(dir, RECIPE), "  revision: 1,", `  revision: ${to},`);
+  edit(join(dir, RECIPE), `  revision: ${CURRENT},`, `  revision: ${to},`);
   const unfrozen = run(dir);
   const digest = unfrozen.out.match(new RegExp(`recipe revision ${to} has no frozen digest in RECIPE_DIGESTS; freeze "([0-9a-f]{64})"`))?.[1];
   assert.ok(digest, `expected the tool to name revision ${to}'s digest\n${unfrozen.out}`);
   edit(join(dir, RECIPE), "export const RECIPE_DIGESTS = Object.freeze({\n", `export const RECIPE_DIGESTS = Object.freeze({\n  ${to}: "${digest}",\n`);
 }
 
-test("the control: an unmodified copy passes, at recipe revision 1", () => {
+test("the control: an unmodified copy passes, at the current recipe revision", () => {
   const dir = copy();
   const result = run(dir);
   assert.equal(result.status, 0, result.out);
-  assert.match(result.out, /recipe [0-9a-f]{16} {2}revision 1\b/);
+  assert.match(result.out, new RegExp(`recipe [0-9a-f]{16} {2}revision ${CURRENT}\\b`));
 });
 
 test("a changed recipe under an unmoved revision fails, and no --write records over it", () => {
@@ -142,7 +145,7 @@ test("a changed recipe under an unmoved revision fails, and no --write records o
   edit(join(dir, RECIPE), `description: "M2 static integration: `, `description: "M2 static integration (edited): `);
   const result = run(dir);
   assert.equal(result.status, 1, result.out);
-  assert.match(result.out, /the recipe has changed \([0-9a-f]{12} -> [0-9a-f]{12}\) while revision stayed 1/);
+  assert.match(result.out, new RegExp(`the recipe has changed \\([0-9a-f]{12} -> [0-9a-f]{12}\\) while revision stayed ${CURRENT}`));
   const write = run(dir, "--write", "--reason", "try to record over it");
   assert.equal(write.status, 2, write.out);
   assert.ok(readFileSync(join(dir, RECORD)).equals(before), "a refused --write still rewrote the record");
@@ -165,7 +168,7 @@ test("a changed fixture fails, and declaring its new digest without a revision s
   const declaredOnly = run(dir);
   assert.equal(declaredOnly.status, 1, declaredOnly.out);
   assert.doesNotMatch(declaredOnly.out, /the fixture changed/);
-  assert.match(declaredOnly.out, /the recipe has changed .* while revision stayed 1/);
+  assert.match(declaredOnly.out, new RegExp(`the recipe has changed .* while revision stayed ${CURRENT}`));
 });
 
 test("a deleted record fails, and neither --write nor --write --init starts a new one", () => {
@@ -368,8 +371,13 @@ test("the harness is held to the recipe: the options it hands createStrings and 
   assert.equal(run(parsed, "--write", "--reason", "record it").status, 2);
 
   const options = copy();
-  bumpRevision(options, () => edit(join(options, MEASURE), "{ ...RECIPE.construction, strings:", `{ ...RECIPE.construction, fallbackLocale: "fr", strings:`));
-  assert.match(run(options).out, /the harness handed construction options \{"fallbackLocale":"fr","locale":"en-AU"\}, not the recipe's/);
+  bumpRevision(options, () => edit(join(options, MEASURE), "fallbackLocale: RECIPE.construction.fallbackLocale,", `fallbackLocale: "fr",`));
+  assert.match(run(options).out, /the harness handed construction options \{"fallbackLocale":"fr","localeResolverAnswers":"en-AU"\}, not the recipe's/);
+
+  // The resolver is CALLED BACK, not trusted: one answering another tag is the same defect.
+  const answers = copy();
+  bumpRevision(answers, () => edit(join(answers, MEASURE), "localeResolver: () => RECIPE.construction.localeResolverAnswers,", `localeResolver: () => "en-GB",`));
+  assert.match(run(answers).out, /the harness handed construction options \{"fallbackLocale":"en","localeResolverAnswers":"en-GB"\}, not the recipe's/);
 
   const exported = copy();
   const pkg = JSON.parse(readFileSync(join(exported, "package.json"), "utf8"));
@@ -388,21 +396,21 @@ test("a record claiming a revision with no frozen digest fails, and is not writt
   writeRecord(dir, record);
   const result = run(dir);
   assert.equal(result.status, 1, result.out);
-  assert.match(result.out, /is at recipe revision 0, which this tool \(revision 1\) did not produce/);
+  assert.match(result.out, new RegExp(`is at recipe revision 0, which this tool \\(revision ${CURRENT}\\) did not produce`));
   assert.equal(run(dir, "--write", "--reason", "record it").status, 2);
 
-  // An EARLIER revision the tool never froze — reachable once a recipe skips one, as here from 1 to
-  // 3. With no `recipeSha256` in the record and no digest for revision 2, the comparison was
+  // An EARLIER revision the tool never froze — reachable once a recipe skips one, as here from
+  // CURRENT to CURRENT + 2. With no `recipeSha256` in the record and no digest for the one skipped, the comparison was
   // `undefined === undefined`, and passing it made the move look like an ordinary revision bump.
   const skipped = copy();
-  bumpRevision(skipped, () => edit(join(skipped, RECIPE), `description: "M2 static integration: `, `description: "M2 static integration, revised: `), 3);
+  bumpRevision(skipped, () => edit(join(skipped, RECIPE), `description: "M2 static integration: `, `description: "M2 static integration, revised: `), CURRENT + 2);
   const claim = readRecord(skipped);
-  claim.revision = 2;
+  claim.revision = CURRENT + 1;
   delete claim.recipeSha256;
   writeRecord(skipped, claim);
   const skippedRun = run(skipped);
   assert.equal(skippedRun.status, 1, skippedRun.out);
-  assert.match(skippedRun.out, /claims revision 2 under recipe undefined, which is not the digest frozen for that revision \(undefined\)/);
+  assert.match(skippedRun.out, new RegExp(`claims revision ${CURRENT + 1} under recipe undefined, which is not the digest frozen for that revision \\(undefined\\)`));
   assert.equal(run(skipped, "--write", "--reason", "record it").status, 2);
 });
 
@@ -492,11 +500,11 @@ test("a revision bump is recorded only with a reason, and then passes", () => {
   bumpRevision(dir, () => edit(join(dir, RECIPE), `description: "M2 static integration: `, `description: "M2 static integration, revised: `));
   const moved = run(dir);
   assert.equal(moved.status, 1, moved.out);
-  assert.match(moved.out, /the recipe moved from revision 1 to 2/);
+  assert.match(moved.out, new RegExp(`the recipe moved from revision ${CURRENT} to ${CURRENT + 1}`));
   assert.equal(run(dir, "--write").status, 2, "a revision move must need a reason");
-  const recorded = run(dir, "--write", "--reason", "revision 2");
+  const recorded = run(dir, "--write", "--reason", `revision ${CURRENT + 1}`);
   assert.equal(recorded.status, 0, recorded.out);
-  assert.equal(readRecord(dir).revision, 2);
+  assert.equal(readRecord(dir).revision, CURRENT + 1);
   assert.equal(run(dir).status, 0);
 });
 
@@ -542,7 +550,7 @@ test("the measuring code is inside the recipe: a comment in it, or another graph
   edit(join(comment, MEASURE), "let bust = 0;", "// a comment, and nothing else\nlet bust = 0;");
   const commented = run(comment);
   assert.equal(commented.status, 1, commented.out);
-  assert.match(commented.out, /the recipe has changed \([0-9a-f]{12} -> [0-9a-f]{12}\) while revision stayed 1 — its declared object, or the bytes of tools\/0a-measure\.mjs/);
+  assert.match(commented.out, new RegExp(`the recipe has changed \\([0-9a-f]{12} -> [0-9a-f]{12}\\) while revision stayed ${CURRENT} — its declared object, or the bytes of tools/0a-measure\\.mjs`));
   assert.equal(run(comment, "--write", "--reason", "record over it").status, 2);
   assert.ok(readFileSync(join(comment, RECORD)).equals(before), "a refused --write still rewrote the record");
 
@@ -551,7 +559,7 @@ test("the measuring code is inside the recipe: a comment in it, or another graph
   edit(join(other, MEASURE), "graphBytes(root, variant.entry)", `graphBytes(root, "src/core/index.js")`);
   const moved = run(other);
   assert.equal(moved.status, 1, moved.out);
-  assert.match(moved.out, /the recipe has changed .* while revision stayed 1/);
+  assert.match(moved.out, new RegExp(`the recipe has changed .* while revision stayed ${CURRENT}`));
   assert.match(moved.out, /root \+ raw-text catalog: the harness returned \d+ modules \/ \d+ bytes, and the recipe's entry src\/index\.js walks to \d+ \/ \d+: some other graph/);
   assert.equal(run(other, "--write").status, 2, "a bare --write");
   assert.equal(run(other, "--write", "--reason", "record it").status, 2, "a --write with a reason");
@@ -793,8 +801,9 @@ test("the browser half is bound to the newest entry by its digest: a hand edit f
   // import changed from 25 to 2.5 ms, the run printed "fresh" at exit 0.
   const dir = copy();
   const intact = readRecord(dir);
-  assert.equal(intact.rebaselines.at(-1).browserSha256, undefined, "the checkpoint entry predates the binding");
-  // So at the checkpoint the digest the tool freezes for that entry stands in for it.
+  // The newest entry binds the half itself (every write since 2026-09-26 records `browserSha256`); for an
+  // older checkpoint entry that predates the binding, the digest the tool freezes stands in. Either way
+  // a hand edit is refused.
   const retimed = structuredClone(intact);
   retimed.browser.variants[0].coldImportMs = 2.5;
   writeRecord(dir, retimed);
@@ -816,9 +825,13 @@ test("the browser half is bound to the newest entry by its digest: a hand edit f
   assert.match(stale.out, /STALE — the browser capture no longer describes these source files/);
   const record = readRecord(dir);
   assert.equal(record.rebaselines.at(-1).browserSha256, entryDigest(record.browser));
+  // EVERY row is faked, not only the grown one: whether the other rows are already fresh depends on how
+  // recently someone re-drove the browser, and a test must not.
   const faked = structuredClone(record);
-  Object.assign(faked.browser.variants[0],
-    { decodedBytes: record.node[0].sourceBytes, encodedBytes: record.node[0].sourceBytes, coldImportMs: 2.5 });
+  faked.browser.variants.forEach((variant, i) => Object.assign(variant, {
+    decodedBytes: record.node[i].sourceBytes, encodedBytes: record.node[i].sourceBytes,
+    resources: record.node[i].modules, coldImportMs: 2.5,
+  }));
   writeRecord(dir, faked);
   const freshened = run(dir);
   assert.equal(freshened.status, 1, freshened.out);

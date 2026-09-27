@@ -53,7 +53,7 @@ function loadedStrings(overrides = {}) {
 }
 
 const loadedInstance = (overrides = {}) =>
-  createStrings({ loaded: loadedStrings(overrides), locale: "fr" });
+  createStrings({ loaded: loadedStrings(overrides), localeResolver: () => "fr" });
 
 /**
  * A `Strings`-shaped object whose inspection answers have been rewritten.
@@ -69,7 +69,7 @@ const DIRECT_FR = /** @type {const} */ ({ kind: "locale", locale: "fr" });
 // --------------------------------------------------------------- clause 38: eligibility
 
 test("clause 38: a DIRECTLY constructed instance cannot be stamped, identity or not", () => {
-  const plain = createStrings({ strings: { en, fr }, fallbackLocale: "en", locale: "fr" });
+  const plain = createStrings({ strings: { en, fr }, fallbackLocale: "en", localeResolver: () => "fr" });
   assert.equal(plain.getCatalogIdentity(), null);
   assert.throws(() => createSsrStamp(plain, DIRECT_FR), /constructed directly/);
 
@@ -78,7 +78,7 @@ test("clause 38: a DIRECTLY constructed instance cannot be stamped, identity or 
   // truth"). The instance now reports an identity indistinguishable from a loaded one's, and is
   // still ineligible — which is the whole reason plan 6.4 keys on the verification record instead.
   const withIdentity = createStrings({
-    strings: { en, fr }, fallbackLocale: "en", locale: "fr", catalogIdentity: IDENTITY,
+    strings: { en, fr }, fallbackLocale: "en", localeResolver: () => "fr", catalogIdentity: IDENTITY,
   });
   assert.deepEqual(withIdentity.getCatalogIdentity(), IDENTITY);
   assert.equal(withIdentity.getLoadVerification(), null);
@@ -91,7 +91,7 @@ test("clause 38: a DIRECTLY constructed instance cannot be stamped, identity or 
 test("clause 38: a shape-invalid direct identity is refused at construction", () => {
   assert.throws(
     () => createStrings({
-      strings: { en }, fallbackLocale: "en", locale: "en",
+      strings: { en }, fallbackLocale: "en", localeResolver: () => "en",
       catalogIdentity: /** @type {any} */ ({ catalogVersion: 1 }),
     }),
     /must carry a string catalogVersion and catalogFingerprint/);
@@ -115,7 +115,7 @@ test("clause 39: an INCOMPLETE load is refused, and the partial load itself is l
   // tag must match the coverage record on every use" — and nothing enforced it until that rule
   // landed. `de` falls through to the `en` catalog, so the assertion is unchanged in substance: the
   // partial load builds and renders, and still cannot be stamped.
-  const instance = createStrings({ loaded: partial, locale: "de" });
+  const instance = createStrings({ loaded: partial, localeResolver: () => "de" });
   assert.equal(instance.get("Hi"), "hello");
   assert.throws(() => createSsrStamp(instance, { kind: "locale", locale: "de" }), /incomplete/);
 });
@@ -165,7 +165,7 @@ test("clause 40: a PERFECT stamp against an INVALID local instance is refused", 
   const stamp = createSsrStamp(real, DIRECT_FR);
   assert.doesNotThrow(() => validateSsrStamp(stamp, real, DIRECT_FR));
 
-  const direct = createStrings({ strings: { en, fr }, fallbackLocale: "en", locale: "fr" });
+  const direct = createStrings({ strings: { en, fr }, fallbackLocale: "en", localeResolver: () => "fr" });
   assert.throws(() => validateSsrStamp(stamp, direct, DIRECT_FR), /constructed directly/);
   assert.throws(
     () => validateSsrStamp(stamp, doctored(real, { isCatalogComplete: () => false }), DIRECT_FR),
@@ -191,7 +191,7 @@ test("clause 41: entire-manifest coverage covers any valid rendering context", (
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr" }],
     }),
-    locale: "fr",
+    localeResolver: () => "fr",
   });
   for (const locale of ["fr", "en", "de"])
     assert.doesNotThrow(() => createSsrStamp(whole, { kind: "locale", locale }),
@@ -328,7 +328,7 @@ test("clause 45: a selected locale MAY differ from the lookup locale", () => {
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr" }],
     }),
-    locale: "fr",
+    localeResolver: () => "fr",
   });
   const stamp = createSsrStamp(whole, { kind: "locale", locale: "fr-CA" });
   assert.equal(stamp.lookupLocale, "fr-CA");
@@ -352,7 +352,7 @@ test("clause 45: an unmatched supplied match takes the instance fallback as its 
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr" }],
     }),
-    locale: "fr",
+    localeResolver: () => "fr",
   });
   const stamp = createSsrStamp(whole, { kind: "locale-match", localeMatch: { locale: null, matchType: "none" } });
   assert.equal(stamp.lookupLocale, "en");
@@ -369,7 +369,7 @@ test("clause 45: a selected locale outside the instance's configuration is refus
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr" }],
     }),
-    locale: "fr",
+    localeResolver: () => "fr",
   });
   assert.throws(
     () => createSsrStamp(whole, { kind: "locale-match", localeMatch: { locale: "de", matchType: "exact" } }),
@@ -387,7 +387,7 @@ test("clause 46: a TranslationResult is accepted by ORIGIN, and one satisfying n
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr" }],
     }),
-    locale: "fr",
+    localeResolver: () => "fr",
   });
 
   // Origin 1, the automatic direct result: `fr-CA` selects `fr`, which is NOT the supplied-match
@@ -440,7 +440,7 @@ test("clause 48: whole server and fr-BE-planned client share identity and hydrat
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr-FR" }],
     }),
-    locale: "en",
+    localeResolver: () => "en",
   });
   const client = createStrings({
     loaded: loadedStrings({
@@ -448,7 +448,7 @@ test("clause 48: whole server and fr-BE-planned client share identity and hydrat
       coverage: { kind: "lookup", lookupLocale: "fr-BE" },
       requestedFiles: [{ locale: "fr-FR" }, { locale: "en" }],
     }),
-    locale: "en",
+    localeResolver: () => "en",
   });
 
   const context = /** @type {const} */ ({ kind: "locale", locale: "fr-BE" });
@@ -471,7 +471,7 @@ test("clause 48 REJECTION half: a client planned only for its diagnostic selecti
       coverage: { kind: "lookup", lookupLocale: "fr-FR" },
       requestedFiles: [{ locale: "fr-FR" }, { locale: "en" }],
     }),
-    locale: "en",
+    localeResolver: () => "en",
   });
   const context = /** @type {const} */ ({ kind: "locale", locale: "fr-BE" });
   assert.throws(() => createSsrStamp(diagnostic, context),
@@ -485,7 +485,7 @@ test("clause 48 REJECTION half: a client planned only for its diagnostic selecti
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr-FR" }],
     }),
-    locale: "en",
+    localeResolver: () => "en",
   });
   assert.throws(() => validateSsrStamp(createSsrStamp(server, context), diagnostic, context),
     /covers lookup 'fr-FR' only/);

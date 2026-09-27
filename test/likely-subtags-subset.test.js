@@ -56,7 +56,7 @@ import { createLocaleNegotiator } from "NEGOTIATE_PATH";
 const catalogs = Object.fromEntries(${JSON.stringify(SERVED)}.map((tag) => [tag, { K: tag + ": {{v}}" }]));
 // The tiebreaker is the library's own requirement, not the subset's: {fr, fr-CA} is an ambiguous
 // language code and construction refuses it without one. Both probes hit it identically.
-const strings = createStrings({ strings: catalogs, fallbackLocale: "en", locale: "en",
+const strings = createStrings({ strings: catalogs, fallbackLocale: "en", localeResolver: () => "en",
   tiebreakers: { fr: ["fr", "fr-CA"] } });
 const negotiator = createLocaleNegotiator({ fallbackLocale: "en", supportedLocales: ${JSON.stringify(SERVED)} });
 const out = [];

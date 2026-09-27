@@ -84,7 +84,7 @@ try {
   const tImported = performance.now();
   const loaded = await loadStrings(manifest, "fr");
   const tLoaded = performance.now();
-  const strings = createStrings({ loaded, locale: "fr" });
+  const strings = createStrings({ loaded, localeResolver: () => "fr" });
   const rendered = strings.get("Cart.Items", { count: 3 });
   const tRendered = performance.now();
 

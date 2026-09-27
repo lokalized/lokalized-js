@@ -67,7 +67,12 @@ export const RECIPE = Object.freeze({
   //     hashes" — measured by the recorder: the registry's integrity for the version, the tarball's
   //     sha256, and the published module graph read out of that tarball, which the run's request
   //     count and decoded bytes must equal.
-  revision: 4,
+  // 5 (2026-09-27): `createStrings` lost its constant `locale` option before 1.0.0 (the maintainer: an
+  //   instance needs a resolver, as a Java instance needs a supplier). The page's construction becomes
+  //   `createStrings({ loaded, localeResolver: () => "fr" })`, which every published version from
+  //   1.0.0-rc.1 accepts. A changed page is a changed harness, so a revision — with the fixture, the
+  //   render, the network recipe and every rule unchanged.
+  revision: 5,
   packRecipe: "the published npm tarball of SUBJECT's version, unmodified, as the code origin serves it. Each run records the npm registry's integrity for that version, the sha256 of the registry's tarball verified against that integrity, and the module graph the tarball's dist/browser/ holds from the two entry points, each module at its size in the tarball",
   importRecipe: "ES module import of dist/browser/lokalized.js and dist/browser/load.js, plus their transitive chunks",
   loaderGraph: "loadStrings(manifest, 'fr') over a four-catalog manifest; requested fr, sibling fr-CA, fallback en",
@@ -105,7 +110,7 @@ export const RECIPE = Object.freeze({
   // therefore the part of the manifest `harnessMethodSha256` leaves out.
   harness: "tools/browser-0b/{serve.mjs,index.html,manifest.json}, driven in a real browser. The summary covers requests STARTED before the render returns, less the mismatched preload's own entry; the other controls and the streaming-limit arm start after it and are recorded but not summed. harnessMethodSha256 freezes all three files: the page with its CODE constant normalized and the manifest without its seven build-identity fields, because those two follow SUBJECT, and serve.mjs whole",
   harnessMethodSha256: Object.freeze({
-    page: "c0c536dbcc7e6760583df8c4a911d4e0a5b5830c615f4dbb9dd3f0afb284e213",
+    page: "fec029b28855c05a3b2c59d1b3046fbc27d49ad5c46e521befe55c6c7bcfb718",
     manifestFixture: "f8073e9df923ff45c974abdd003e888310838385b808d15559de8773e1aaa65f",
     server: "a682139403318050e2a609abb37292e58c0a938b26939cdeb6c9eff088edc195",
   }),
@@ -196,6 +201,7 @@ export const RECIPE_DIGESTS = Object.freeze({
   2: "af65c158595cd9e1caca22dfbb108eb196075be1e1e8cd2d66570de0f2579612",
   3: "9c06237a3f5acc9eca17ff204e3fd642b0cd6c4b5680fb4e9cd59631f35ffe66",
   4: "41bf3f32a25caffaaab811637a4d6cbfd74ce01f584d2f9428ae34b5a2ac8ae5",
+  5: "ff00ea3dcf8efdf4028680936f5852595fd8aab97365e5f9c76dfc3844e86141",
 });
 
 /**
@@ -217,6 +223,7 @@ export const RECIPE_DIGESTS = Object.freeze({
 export const HISTORY_ORIGINS = Object.freeze(/** @type {Record<number, string>} */ ({
   // One line per revision, exactly as tools/browser-0b/record.mjs prints it for the revision's first run.
   4: "c459d02c8ea97768ec5afb6825fd6e276ba31dd5e7009c67ef7d7f29dad17403",
+  5: "6ac5ad695e46c7dfeefd12613adbff53da9ff60b78b2386e264797516a71aa8e",
 }));
 
 /**
@@ -235,6 +242,7 @@ export const HISTORY_ORIGINS = Object.freeze(/** @type {Record<number, string>} 
 export const HISTORY_CHECKPOINTS = Object.freeze(/** @type {Record<number, { index: number, sha256: string }>} */ ({
   // One line per revision, exactly as tools/scenario-0b.mjs and tools/browser-0b/record.mjs print it.
   4: { index: 0, sha256: "c459d02c8ea97768ec5afb6825fd6e276ba31dd5e7009c67ef7d7f29dad17403" },
+  5: { index: 0, sha256: "6ac5ad695e46c7dfeefd12613adbff53da9ff60b78b2386e264797516a71aa8e" },
 }));
 
 /**

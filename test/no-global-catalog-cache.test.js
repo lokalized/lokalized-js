@@ -307,7 +307,7 @@ test("a second Fetch load of the same manifest acquires every planned file again
   assert.deepEqual(first.failures, []);
   assert.deepEqual(afterFirst, [`${base}fr.json`, `${base}en.json`],
     "the first load must acquire both planned files, or nothing below is measuring a cache");
-  assert.equal(createStrings({ loaded: first, locale: "fr-CA" }).get("Greeting"), "FR-ALPHA");
+  assert.equal(createStrings({ loaded: first, localeResolver: () => "fr-CA" }).get("Greeting"), "FR-ALPHA");
 
   const second = await loadStrings(m, "fr-CA", { fetch: stub.impl });
 
@@ -317,7 +317,7 @@ test("a second Fetch load of the same manifest acquires every planned file again
   assert.equal(stub.calls.length, 4,
     `expected 4 acquisitions across two loads, saw ${stub.calls.length}: ${stub.calls.join(", ")}`);
   assert.deepEqual(stub.calls.slice(2), afterFirst, "the second load repeats the first load's plan exactly");
-  assert.equal(createStrings({ loaded: second, locale: "fr-CA" }).get("Greeting"), "FR-ALPHA");
+  assert.equal(createStrings({ loaded: second, localeResolver: () => "fr-CA" }).get("Greeting"), "FR-ALPHA");
 
   // THE SAME MANIFEST OBJECT WAS REUSED, deliberately: it is the worst case for detection, because a
   // cache keyed on manifest identity (a WeakMap) only ever hits when the object is reused. And since
@@ -366,7 +366,7 @@ test("a second Node file load acquires every planned file again", async () => {
   assert.equal(first.complete, true);
   assert.deepEqual(first.failures, []);
   assert.equal(reader.reads.length, 2, "the first file load must read both planned files");
-  assert.equal(createStrings({ loaded: first, locale: "fr-CA" }).get("Greeting"), "FR-FILES");
+  assert.equal(createStrings({ loaded: first, localeResolver: () => "fr-CA" }).get("Greeting"), "FR-FILES");
 
   await loadStringsFromFiles(m, "fr-CA", { readFile: reader.impl });
   assert.equal(reader.reads.length, 4,
@@ -385,7 +385,7 @@ test("a second directory load acquires every planned file again", async () => {
   const first = await loadStringsFromDirectory(directory, options);
   assert.equal(first.complete, true);
   assert.equal(reader.reads.length, 2, "the first directory load must read both catalogs");
-  assert.equal(createStrings({ loaded: first, locale: "fr" }).get("Greeting"), "FR-DIR");
+  assert.equal(createStrings({ loaded: first, localeResolver: () => "fr" }).get("Greeting"), "FR-DIR");
 
   await loadStringsFromDirectory(directory, options);
   assert.equal(reader.reads.length, 4,
@@ -410,12 +410,12 @@ test("two lookup locales over one manifest do not serve each other's catalogs", 
   const french = await loadStrings(m, "fr-CA", { fetch: stub.impl });
   assert.deepEqual(Object.keys(french.catalogs).sort(), ["en", "fr"]);
   assert.deepEqual(stub.calls, [`${base}fr.json`, `${base}en.json`]);
-  assert.equal(createStrings({ loaded: french, locale: "fr-CA" }).get("Greeting"), "FR-CROSS");
+  assert.equal(createStrings({ loaded: french, localeResolver: () => "fr-CA" }).get("Greeting"), "FR-CROSS");
 
   const german = await loadStrings(m, "de-AT", { fetch: stub.impl });
   assert.deepEqual(Object.keys(german.catalogs).sort(), ["de", "en"],
     "the second lookup was handed the first lookup's catalog set");
-  assert.equal(createStrings({ loaded: german, locale: "de-AT" }).get("Greeting"), "DE-CROSS");
+  assert.equal(createStrings({ loaded: german, localeResolver: () => "de-AT" }).get("Greeting"), "DE-CROSS");
   // The fallback file is in BOTH plans, so this is also the one assertion in the file that would
   // catch a cache serving one locale's load from another's rather than from an earlier identical one.
   assert.deepEqual(stub.calls.slice(2), [`${base}de.json`, `${base}en.json`],
@@ -514,12 +514,12 @@ test("changed bytes at one URL are observed by the next Fetch load, not served s
   const controlStub = countingFetch(() => bravo);
   const controlLoad = await loadStrings(bControl, "en", { fetch: controlStub.impl });
   assert.equal(controlLoad.complete, true, "manifest B is malformed; the staleness arm below cannot be read");
-  assert.equal(createStrings({ loaded: controlLoad, locale: "en" }).get("Greeting"), "BRAVO-BRAVO");
+  assert.equal(createStrings({ loaded: controlLoad, localeResolver: () => "en" }).get("Greeting"), "BRAVO-BRAVO");
 
   // Scripted by CALL INDEX rather than by URL, so the stub itself cannot be what deduplicates.
   const stub = countingFetch((_href, index) => (index === 0 ? alpha : bravo));
   const first = await loadStrings(a, "en", { fetch: stub.impl });
-  assert.equal(createStrings({ loaded: first, locale: "en" }).get("Greeting"), "ALPHA");
+  assert.equal(createStrings({ loaded: first, localeResolver: () => "en" }).get("Greeting"), "ALPHA");
 
   const second = await loadStrings(b, "en", { fetch: stub.impl }).then((value) => value, (error) => error);
   assert.ok(!(second instanceof Error),
@@ -528,7 +528,7 @@ test("changed bytes at one URL are observed by the next Fetch load, not served s
     `${JSON.stringify(/** @type {any} */ (second)?.failures?.map((/** @type {any} */ f) => [f.stage, f.url]))}`);
   assert.deepEqual(second.failures, []);
   assert.equal(second.complete, true);
-  assert.equal(createStrings({ loaded: second, locale: "en" }).get("Greeting"), "BRAVO-BRAVO",
+  assert.equal(createStrings({ loaded: second, localeResolver: () => "en" }).get("Greeting"), "BRAVO-BRAVO",
     "the second load served the FIRST load's catalog: a stale answer with no failure to show for it");
 });
 
@@ -541,14 +541,14 @@ test("the directory door observes a catalog rewritten between two loads", async 
 
   const first = await loadStringsFromDirectory(directory, options);
   assert.equal(first.complete, true);
-  assert.equal(createStrings({ loaded: first, locale: "en" }).get("Greeting"), "ALPHA");
+  assert.equal(createStrings({ loaded: first, localeResolver: () => "en" }).get("Greeting"), "ALPHA");
 
   writeFileSync(join(directory, "en.json"), bodyFor("BRAVO-BRAVO"));
   const second = await loadStringsFromDirectory(directory, options).then((value) => value, (error) => error);
   assert.ok(!(second instanceof Error),
     `the second directory load rejected: ${second instanceof Error ? second.message : ""}`);
   assert.equal(second.complete, true);
-  assert.equal(createStrings({ loaded: second, locale: "en" }).get("Greeting"), "BRAVO-BRAVO",
+  assert.equal(createStrings({ loaded: second, localeResolver: () => "en" }).get("Greeting"), "BRAVO-BRAVO",
     "the second directory load served the first load's catalog");
 });
 
@@ -600,12 +600,12 @@ test("loading installs no property on globalThis or on any ambient host it uses"
   // that proves the opposite of what this test claims. Both doors must complete and render.
   const fetched = await loadStrings(m, "fr-CA", { fetch: stub.impl });
   assert.equal(fetched.complete, true);
-  assert.equal(createStrings({ loaded: fetched, locale: "fr-CA" }).get("Greeting"), "FR-GLOBAL");
+  assert.equal(createStrings({ loaded: fetched, localeResolver: () => "fr-CA" }).get("Greeting"), "FR-GLOBAL");
 
   const directory = directoryOf({ "fr.json": bodyFor("FR-GLOBAL"), "en.json": bodyFor("EN-GLOBAL") });
   const read = await loadStringsFromDirectory(directory, { catalogVersion: "c32.globals-dir", fallbackLocale: "en" });
   assert.equal(read.complete, true);
-  assert.equal(createStrings({ loaded: read, locale: "fr" }).get("Greeting"), "FR-GLOBAL");
+  assert.equal(createStrings({ loaded: read, localeResolver: () => "fr" }).get("Greeting"), "FR-GLOBAL");
 
   const after = globalSnapshot();
   const allowed = new Set(EXPECTED_GLOBAL_DELTA.map((entry) => entry.key));
@@ -665,13 +665,13 @@ test("two module realms do not serve each other's catalogs", async () => {
 
   const loadedA = await doorA.loadStrings(a, "en", { fetch: stub.impl });
   assert.equal(loadedA.complete, true, "the copied tree does not load; a red below would be about the copy");
-  assert.equal(coreA.createStrings({ loaded: loadedA, locale: "en" }).get("Greeting"), "ALPHA");
+  assert.equal(coreA.createStrings({ loaded: loadedA, localeResolver: () => "en" }).get("Greeting"), "ALPHA");
   assert.equal(stub.calls.length, 1);
 
   const loadedB = await doorB.loadStrings(b, "en", { fetch: stub.impl }).then((v) => v, (error) => error);
   assert.ok(!(loadedB instanceof Error),
     `realm B rejected — it was served realm A's bytes: ${loadedB instanceof Error ? loadedB.message : ""}`);
-  assert.equal(coreB.createStrings({ loaded: loadedB, locale: "en" }).get("Greeting"), "BRAVO-BRAVO",
+  assert.equal(coreB.createStrings({ loaded: loadedB, localeResolver: () => "en" }).get("Greeting"), "BRAVO-BRAVO",
     "realm B rendered realm A's catalog: the two installed copies share hidden state");
 });
 
@@ -754,8 +754,8 @@ test("concurrent identical loads: measured and reported, not gated", async (t) =
   // What IS asserted: both concurrent loads answer correctly whichever reading applies.
   assert.equal(left.complete, true);
   assert.equal(right.complete, true);
-  assert.equal(createStrings({ loaded: left, locale: "en" }).get("Greeting"), "EN-ONE");
-  assert.equal(createStrings({ loaded: right, locale: "en" }).get("Greeting"), "EN-ONE");
+  assert.equal(createStrings({ loaded: left, localeResolver: () => "en" }).get("Greeting"), "EN-ONE");
+  assert.equal(createStrings({ loaded: right, localeResolver: () => "en" }).get("Greeting"), "EN-ONE");
 });
 
 /* ------------------------------------------------------------------------------------------------
@@ -881,9 +881,9 @@ test("two records that share a catalogVersion each compile their own Strings", a
     "the two records must COLLIDE on catalogVersion, or this test probes nothing");
   assert.notEqual(loadedA.catalogIdentity.catalogFingerprint, loadedB.catalogIdentity.catalogFingerprint);
 
-  const stringsA = createStrings({ loaded: loadedA, locale: "en" });
+  const stringsA = createStrings({ loaded: loadedA, localeResolver: () => "en" });
   assert.equal(stringsA.get("Greeting"), "ALPHA");
-  const stringsB = createStrings({ loaded: loadedB, locale: "en" });
+  const stringsB = createStrings({ loaded: loadedB, localeResolver: () => "en" });
 
   assert.notEqual(stringsA, stringsB, "one compiled instance was served for both records");
   assert.equal(stringsB.get("Greeting"), "BRAVO-BRAVO",
@@ -915,9 +915,9 @@ test("two records with the SAME fingerprint compile two distinct Strings", async
   assert.equal(first.catalogIdentity.catalogFingerprint, second.catalogIdentity.catalogFingerprint,
     "the two records must share a fingerprint, or a fingerprint-keyed cache is never consulted");
 
-  const stringsFirst = createStrings({ loaded: first, locale: "en" });
+  const stringsFirst = createStrings({ loaded: first, localeResolver: () => "en" });
   assert.equal(stringsFirst.get("Greeting"), "ALPHA");
-  const stringsSecond = createStrings({ loaded: second, locale: "en" });
+  const stringsSecond = createStrings({ loaded: second, localeResolver: () => "en" });
   assert.equal(stringsSecond.get("Greeting"), "ALPHA");
   assert.notEqual(stringsFirst, stringsSecond,
     "one compiled instance was served to both callers from a fingerprint-keyed cache");

@@ -95,7 +95,7 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
     const resolver = recordingResolver();
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       phoneticResolver: resolver.resolve,
       strings: {
         en: {
@@ -128,7 +128,7 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
     const resolver = recordingResolver();
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       phoneticResolver: resolver.resolve,
       strings: {
         en: {
@@ -165,7 +165,7 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
     const resolver = recordingResolver();
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       phoneticResolver: resolver.resolve,
       strings: {
         en: {
@@ -196,7 +196,7 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
     // than classifying the expanded template text.
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       strings: {
         en: {
           Sibling: {

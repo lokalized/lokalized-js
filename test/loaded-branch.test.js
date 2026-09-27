@@ -44,7 +44,7 @@ function loadedStrings(overrides = {}) {
 }
 
 test("a valid loader result builds and renders", () => {
-  const strings = createStrings({ loaded: loadedStrings(), locale: "fr" });
+  const strings = createStrings({ loaded: loadedStrings(), localeResolver: () => "fr" });
   assert.deepEqual(strings.getSupportedLocales(), ["en", "fr"]);
   assert.equal(strings.get("Hi"), "bonjour");
   // The control for every rejection below: without it they would all pass on a branch that refused
@@ -54,10 +54,10 @@ test("a valid loader result builds and renders", () => {
 test("REJECTS a result produced against different pinned CLDR data", () => {
   // Plan 3.4: it fails "EVEN WHEN its immediate file plan happens to match" — the plan here is
   // byte-identical to the accepted case, and only the provenance differs.
-  assert.throws(() => createStrings({ loaded: loadedStrings({ cldrVersion: "1.0" }), locale: "fr" }),
+  assert.throws(() => createStrings({ loaded: loadedStrings({ cldrVersion: "1.0" }), localeResolver: () => "fr" }),
     /produced against CLDR 1\.0/);
   assert.throws(
-    () => createStrings({ loaded: loadedStrings({ dataFingerprint: "e".repeat(64) }), locale: "fr" }),
+    () => createStrings({ loaded: loadedStrings({ dataFingerprint: "e".repeat(64) }), localeResolver: () => "fr" }),
     /this core carries CLDR/);
 });
 
@@ -66,7 +66,7 @@ test("REJECTS a fetch plan whose ORDER differs from what this core would compute
   assert.throws(
     () => createStrings({
       loaded: loadedStrings({ requestedFiles: [{ locale: "en" }, { locale: "fr" }] }),
-      locale: "fr",
+      localeResolver: () => "fr",
     }),
     /is not the plan this core computes/);
 });
@@ -74,7 +74,7 @@ test("REJECTS a fetch plan whose ORDER differs from what this core would compute
 test("REJECTS a covered set carrying a tag the plan never requested", () => {
   // Mode 3. The catalog for `en` is real and loadable; what is wrong is that nothing planned it.
   assert.throws(
-    () => createStrings({ loaded: loadedStrings({ requestedFiles: [{ locale: "fr" }] }), locale: "fr" }),
+    () => createStrings({ loaded: loadedStrings({ requestedFiles: [{ locale: "fr" }] }), localeResolver: () => "fr" }),
     /contains 'en', which the recorded fetch plan never requested/);
 });
 
@@ -92,13 +92,13 @@ test("REJECTS a complete:true plan whose file never arrived", () => {
     requestedFiles: [{ locale: "de" }, { locale: "en" }],
   };
   assert.throws(
-    () => createStrings({ loaded: loadedStrings(partial), locale: "en" }),
+    () => createStrings({ loaded: loadedStrings(partial), localeResolver: () => "en" }),
     /claims complete: true, but no catalog for it arrived/);
 
   // The control: the SAME shortfall with `complete: false` is a legitimate partial load and must be
   // accepted, which is what makes the assertion above about the CLAIM rather than about the gap.
   assert.doesNotThrow(
-    () => createStrings({ loaded: loadedStrings({ ...partial, complete: false }), locale: "en" }));
+    () => createStrings({ loaded: loadedStrings({ ...partial, complete: false }), localeResolver: () => "en" }));
 });
 
 test("REJECTS completeness claimed over recorded failures", () => {
@@ -108,7 +108,7 @@ test("REJECTS completeness claimed over recorded failures", () => {
   assert.throws(
     () => createStrings({
       loaded: loadedStrings({ failures: [{ locale: "de", url: "x", stage: "fetch", cause: null }] }),
-      locale: "fr",
+      localeResolver: () => "fr",
     }),
     /claims complete: true while recording 1 load failure/);
   assert.doesNotThrow(() => createStrings({
@@ -116,13 +116,13 @@ test("REJECTS completeness claimed over recorded failures", () => {
       failures: [{ locale: "de", url: "x", stage: "fetch", cause: null }],
       complete: false,
     }),
-    locale: "fr",
+    localeResolver: () => "fr",
   }));
 });
 
 test("REJECTS a result with no manifest configuration to recompute the plan against", () => {
   assert.throws(
-    () => createStrings({ loaded: loadedStrings({ manifestLocaleConfiguration: undefined }), locale: "fr" }),
+    () => createStrings({ loaded: loadedStrings({ manifestLocaleConfiguration: undefined }), localeResolver: () => "fr" }),
     /cannot be recomputed, only believed/);
 });
 
@@ -132,14 +132,14 @@ test("REJECTS a result whose two fallback records disagree", () => {
       loaded: loadedStrings({
         manifestLocaleConfiguration: { fallbackLocale: "fr", supportedLocales: ["en", "fr"], tiebreakers: {} },
       }),
-      locale: "fr",
+      localeResolver: () => "fr",
     }),
     /resolves fallback 'en' while its manifest configuration resolves 'fr'/);
 });
 
 test("REJECTS a catalog filed under a name it does not claim", () => {
   assert.throws(
-    () => createStrings({ loaded: loadedStrings({ catalogs: { de: fr, en } }), locale: "en" }),
+    () => createStrings({ loaded: loadedStrings({ catalogs: { de: fr, en } }), localeResolver: () => "en" }),
     /declares locale "fr"/);
 });
 
@@ -151,7 +151,7 @@ test("REJECTS `loaded` alongside any direct input it would duplicate", () => {
   // from any caller — so the guard covered a spelling nothing could pass and left the real one open.
   for (const conflicting of ["strings", "fallbackLocale", "tiebreakers", "loadingLimits", "catalogIdentity"])
     assert.throws(
-      () => createStrings({ loaded: loadedStrings(), locale: "fr", [conflicting]: {} }),
+      () => createStrings({ loaded: loadedStrings(), localeResolver: () => "fr", [conflicting]: {} }),
       /already carries/, `${conflicting} must not be accepted alongside loaded`);
 });
 
@@ -176,7 +176,7 @@ test("the loader's own limits are reused, not the defaults", () => {
       coverage: { kind: "lookup", lookupLocale: "en" },
       loadingLimits: { maximumTranslationNodes },
     }),
-    locale: "en",
+    localeResolver: () => "en",
   });
 
   assert.doesNotThrow(withLimit(8), "a budget the catalog fits must build");
@@ -199,7 +199,7 @@ test("entire-manifest coverage IS order-checked, in normalized-tag order", () =>
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr" }],
     }),
-    locale: "fr",
+    localeResolver: () => "fr",
   }));
   assert.throws(
     () => createStrings({
@@ -207,7 +207,7 @@ test("entire-manifest coverage IS order-checked, in normalized-tag order", () =>
         coverage: { kind: "entire-manifest" },
         requestedFiles: [{ locale: "fr" }, { locale: "en" }],
       }),
-      locale: "fr",
+      localeResolver: () => "fr",
     }),
     /is not the plan this core computes for the whole manifest/);
 });
@@ -216,6 +216,6 @@ test("an unknown coverage kind is REFUSED rather than treated as unchecked", () 
   // A third `kind` must not fall through the two recomputations into acceptance — which is exactly
   // what a two-arm `if` would do, and what the S9 shape did for `entire-manifest`.
   assert.throws(
-    () => createStrings({ loaded: loadedStrings({ coverage: { kind: "everything" } }), locale: "fr" }),
+    () => createStrings({ loaded: loadedStrings({ coverage: { kind: "everything" } }), localeResolver: () => "fr" }),
     /must be 'lookup' or 'entire-manifest'/);
 });

@@ -86,7 +86,7 @@ test("the fixture makes every rendered key of `fr-BE` resolve to `fr` — withou
   // collision below stops being reachable through that key and this file quietly narrows — which is
   // exactly how the first design of this gate came to discharge the clause for one witness only.
   const loaded = await loadStrings(manifest, "fr-BE", { fetch: transport });
-  const strings = createStrings({ loaded, locale: "fr-BE" });
+  const strings = createStrings({ loaded, localeResolver: () => "fr-BE" });
   const placeholders = { served: "fr", requested: "fr-BE", count: 2 };
 
   const resolved = RENDERED_KEYS.map(

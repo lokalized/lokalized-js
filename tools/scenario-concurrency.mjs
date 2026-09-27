@@ -96,7 +96,7 @@ async function request(/** @type {number} */ i, /** @type {(index: number) => Pr
   return seen;
 }
 
-const shared = build({ locale: "en" });
+const shared = build({ localeResolver: () => "en" });
 const negotiator = createLocaleNegotiator(shared.getLocaleConfiguration());
 const matchFor = (/** @type {number} */ i) => forAcceptLanguage(negotiator, localeFor(i)).localeMatch;
 const matches = RECIPE.locales.map((_, i) => matchFor(i));
@@ -104,7 +104,7 @@ const matches = RECIPE.locales.map((_, i) => matchFor(i));
 /** The shapes, each a function from a request index to the string it renders. */
 const SHAPES = {
   "rebuild-per-request": async (/** @type {number} */ i) => {
-    const instance = build({ locale: localeFor(i) });
+    const instance = build({ localeResolver: () => localeFor(i) });
     await yieldTurns(1);
     return instance.get("K0");
   },

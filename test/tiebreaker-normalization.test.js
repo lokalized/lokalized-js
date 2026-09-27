@@ -20,7 +20,7 @@ import { createStrings } from "../src/core/index.js";
 const CATALOGS = { "en-US": { "K": "from-US" }, "en-GB": { "K": "from-GB" } };
 
 const served = (tiebreakers) =>
-  createStrings({ fallbackLocale: "en-US", locale: "en", strings: CATALOGS, tiebreakers })
+  createStrings({ fallbackLocale: "en-US", localeResolver: () => "en", strings: CATALOGS, tiebreakers })
     .get("K", undefined, { locale: "en" });
 
 test("the tiebreaker decides which catalog serves an ambiguous request", () => {
@@ -52,7 +52,7 @@ test("a malformed tiebreaker tag is rejected at CONSTRUCTION, not at lookup", ()
   assert.throws(
     () => createStrings({
       fallbackLocale: "en-US",
-      locale: "en",
+      localeResolver: () => "en",
       strings: CATALOGS,
       tiebreakers: { en: ["en-GB", "en-US", "!!not-a-tag!!"] },
     }),

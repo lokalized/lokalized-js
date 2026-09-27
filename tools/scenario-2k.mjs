@@ -473,7 +473,7 @@ async function measure(label, entry, construct) {
 const rows = [];
 for (const variant of VARIANTS)
   rows.push(await measure(variant.label, variant.entry, (mod, locale) =>
-    mod.createStrings({ fallbackLocale: "en", locale, strings: variant.strings, tiebreakers: TIEBREAKERS })));
+    mod.createStrings({ fallbackLocale: "en", localeResolver: () => locale, strings: variant.strings, tiebreakers: TIEBREAKERS })));
 
 /* ------------------------------------------------------------------------------------- reporting */
 

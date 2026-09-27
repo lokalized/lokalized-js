@@ -108,7 +108,7 @@ async function publicReturns() {
 	add("readStringsFromDirectory().warnings", warnings);
 
 	const strings = createStrings(
-		{ strings: catalogs, locale: "en", fallbackLocale: "en", tiebreakers: TIEBREAKERS });
+		{ strings: catalogs, localeResolver: () => "en", fallbackLocale: "en", tiebreakers: TIEBREAKERS });
 
 	// Each `getResult` arm reaches a DIFFERENT `localeMatch` shape: the automatic direct match, a
 	// per-call locale's, a failure's, and a supplied whole-list match's. Before the repair all four
@@ -174,7 +174,7 @@ async function publicReturns() {
 	add("loadStringsFromFiles()", await loadStringsFromFiles(manifest, "fr-CA"));
 	add("loadEntireManifestFromFiles()", await loadEntireManifestFromFiles(manifest));
 
-	const loaded = createStrings({ loaded: whole, locale: "en" });
+	const loaded = createStrings({ loaded: whole, localeResolver: () => "en" });
 	add("loaded: getLoadVerification()", loaded.getLoadVerification());
 	add("loaded: getCatalogIdentity()", loaded.getCatalogIdentity());
 	add("loaded: getLocaleConfiguration()", loaded.getLocaleConfiguration());
@@ -250,7 +250,7 @@ test("a supplied match cannot be poisoned in place", async () => {
 	// already-returned `second` changed underneath its holder, and the third render threw.
 	const { catalogs } = readStringsFromDirectory(directory);
 	const strings = createStrings(
-		{ strings: catalogs, locale: "en", fallbackLocale: "en", tiebreakers: TIEBREAKERS });
+		{ strings: catalogs, localeResolver: () => "en", fallbackLocale: "en", tiebreakers: TIEBREAKERS });
 	const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
 
 	const match = negotiator.matchFor("fr-CH");

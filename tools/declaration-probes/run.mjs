@@ -133,7 +133,7 @@ export function describe(type: LocaleMatchType): string {
     source: `import { createStrings } from ${core};
 import type { LoadedStrings } from ${load};
 declare const record: LoadedStrings;
-export const s = createStrings({ loaded: record, locale: "fr-BE" });`,
+export const s = createStrings({ loaded: record, localeResolver: () => "fr-BE" });`,
   },
   {
     name: "a record FROM THE LOADER flows into construction",
@@ -145,7 +145,7 @@ export const s = createStrings({ loaded: record, locale: "fr-BE" });`,
     source: `import { createStrings } from ${core};
 import { loadStrings } from ${load};
 declare const loaded: Awaited<ReturnType<typeof loadStrings>>;
-export const s = createStrings({ loaded, locale: "fr" });`,
+export const s = createStrings({ loaded, localeResolver: () => "fr" });`,
   },
   {
     name: "a record from the NODE whole-manifest loader flows into construction",
@@ -154,12 +154,34 @@ export const s = createStrings({ loaded, locale: "fr" });`,
     source: `import { createStrings } from ${core};
 import { loadEntireManifestFromFiles } from ${nodeDoor};
 declare const loaded: Awaited<ReturnType<typeof loadEntireManifestFromFiles>>;
-export const s = createStrings({ loaded, locale: "fr" });`,
+export const s = createStrings({ loaded, localeResolver: () => "fr" });`,
   },
   {
     name: "the direct door is callable",
     compiles: true,
     why: "THE CONTROL. Without it a declaration that rejected everything would satisfy the probe above",
+    source: `import { createStrings } from ${core};
+export const s = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en" });`,
+  },
+  {
+    name: "an instance must say how it finds a language: no resolver is refused",
+    compiles: false,
+    why: "Java's `exactly one of 'localeSupplier' or 'localeMatchSupplier'`; the runtime refuses it too, and the declaration now says so before the code runs",
+    source: `import { createStrings } from ${core};
+export const s = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en" });`,
+  },
+  {
+    name: "both resolvers at once are refused",
+    compiles: false,
+    why: "the exactly-one union's other half — last-key-wins would make behaviour depend on spread order",
+    source: `import { createStrings } from ${core};
+export const s = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en",
+  localeResolver: () => "en", localeMatchResolver: () => { throw new Error(); } });`,
+  },
+  {
+    name: "the removed constant `locale` option is refused",
+    compiles: false,
+    why: "removed before 1.0.0 (a language fixed at construction); a 1.0.0-rc caller must be told at compile time, not by a runtime refusal",
     source: `import { createStrings } from ${core};
 export const s = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", locale: "en" });`,
   },
@@ -170,7 +192,7 @@ export const s = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "e
     source: `import { createStrings } from ${core};
 import type { LoadedStrings } from ${load};
 declare const record: LoadedStrings;
-export const s = createStrings({ loaded: record, strings: { en: {} }, fallbackLocale: "en", locale: "en" });`,
+export const s = createStrings({ loaded: record, strings: { en: {} }, fallbackLocale: "en", localeResolver: () => "en" });`,
   },
   {
     name: "a library error is catchable",
@@ -325,7 +347,7 @@ export function poison() { r[0]!.weight = 0; }`,
 const mine = { matchType: "exact" as const, locale: "fr", isMatch: true, fallbackLocale: "en",
   consideredLocales: ["en", "fr"], effectiveWeight: 1,
   languageRange: { range: "fr", weight: 1 }, requestedLanguageRanges: [{ range: "fr", weight: 1 }] };
-const s = createStrings({ strings: { en: { K: "v" }, fr: { K: "v" } }, fallbackLocale: "en", locale: "en" });
+const s = createStrings({ strings: { en: { K: "v" }, fr: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en" });
 export const out = s.get("K", {}, forLocaleMatch(mine));`,
   },
   {
@@ -472,7 +494,7 @@ export const subset = loadStringsFromFiles(manifest, "fr", { partialFailure: "al
     why: "plan 4.6 — a non-undefined `runtimeLimits` is a construction-time error, and the DECLARATION says so",
     source: `import { createStrings } from ${core};
 export const s = createStrings({
-  strings: { en: { K: "v" } }, fallbackLocale: "en", locale: "en",
+  strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en",
   runtimeLimits: { maximumExpressionTokens: 8 },
 });`,
   },

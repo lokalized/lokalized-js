@@ -75,7 +75,7 @@ const SERVES_EARLY = {
 };
 
 /** @param {Record<string, Record<string, string>>} strings */
-const stringsFor = (strings) => createStrings({ strings, fallbackLocale: "fr", locale: "fr" });
+const stringsFor = (strings) => createStrings({ strings, fallbackLocale: "fr", localeResolver: () => "fr" });
 
 /**
  * What one lookup did: the translation, or the error's name and message.
@@ -191,7 +191,7 @@ describe("attempted-locale refusals: where the refusal is disposed of", () => {
     const strings = createStrings({
       strings: EXHAUSTS,
       fallbackLocale: "fr",
-      locale: "fr",
+      localeResolver: () => "fr",
       onFailure: (failure) => {
         failures.push(failure);
         return { action: /** @type {const} */ ("return-key") };
@@ -224,7 +224,7 @@ describe("attempted-locale refusals: where the refusal is disposed of", () => {
     const strings = createStrings({
       strings: EXHAUSTS,
       fallbackLocale: "fr",
-      locale: "fr",
+      localeResolver: () => "fr",
       onFailure: () => ({ action: /** @type {const} */ ("return-string"), translation: "x" }),
     });
     assert.equal(lookup(strings, "en-US-x-lvariant-POSIX").name, "TypeError");
@@ -236,7 +236,7 @@ describe("attempted-locale refusals: where the refusal is disposed of", () => {
     const strings = createStrings({
       strings: EXHAUSTS,
       fallbackLocale: "fr",
-      locale: "fr",
+      localeResolver: () => "fr",
       onFailure: (failure) => {
         failures.push(/** @type {{ cause: Error }} */ (failure));
         return { action: /** @type {const} */ ("throw") };

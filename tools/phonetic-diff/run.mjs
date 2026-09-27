@@ -609,7 +609,7 @@ function runJs(s) {
   try {
     const strings = createStrings({
       fallbackLocale: s.fallback,
-      locale: s.instance ?? s.fallback,
+      localeResolver: () => s.instance ?? s.fallback,
       strings: s.catalogs,
       ...(resolver ? { phoneticResolver: resolver } : {}),
     });

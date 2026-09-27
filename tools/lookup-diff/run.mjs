@@ -1694,7 +1694,7 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
           return { action: /** @type {const} */ (set.throwOnFailure === true ? "throw" : "return-key") };
         },
       };
-      perCall = createStrings({ ...shared, locale: set.instance });
+      perCall = createStrings({ ...shared, localeResolver: () => set.instance });
       viaAmbient = createStrings({ ...shared, localeResolver: () => armed });
     } catch (error) {
       const raised = /** @type {Error} */ (error);

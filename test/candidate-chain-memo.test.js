@@ -47,7 +47,7 @@ const TIEBREAKERS = { fr: ["fr", "fr-CA"] };
 /** @param {boolean} [disabled] */
 function instance(disabled) {
   return createStrings(/** @type {any} */ ({
-    strings: CATALOGS, fallbackLocale: "en", tiebreakers: TIEBREAKERS, locale: "en",
+    strings: CATALOGS, fallbackLocale: "en", tiebreakers: TIEBREAKERS, localeResolver: () => "en",
     ...(disabled ? { [CANDIDATE_CHAIN_MEMO_DISABLED]: true } : {}),
   }));
 }
@@ -134,10 +134,10 @@ describe("the memo is per INSTANCE, which is the only thing that makes the key s
     // across instances. A module-scope map would answer the second instance from the first.
     const withCanadian = createStrings({
       strings: { en: { K: "en" }, fr: { K: "fr" }, "fr-CA": { K: "fr-CA" } },
-      fallbackLocale: "en", tiebreakers: { fr: ["fr", "fr-CA"] }, locale: "en",
+      fallbackLocale: "en", tiebreakers: { fr: ["fr", "fr-CA"] }, localeResolver: () => "en",
     });
     const withoutCanadian = createStrings({
-      strings: { en: { K: "en" }, fr: { K: "fr" } }, fallbackLocale: "en", locale: "en",
+      strings: { en: { K: "en" }, fr: { K: "fr" } }, fallbackLocale: "en", localeResolver: () => "en",
     });
 
     assert.equal(withCanadian.get("K", undefined, forLocale("fr-CA")), "fr-CA");
@@ -193,7 +193,7 @@ describe("neither branch grows retained memory from 4,096 to 40,960 tags", () =>
       import { CANDIDATE_CHAIN_MEMO_DISABLED } from ${JSON.stringify(new URL("src/internal/locale.js", root).href)};
       const gc = globalThis.gc;
       const make = (off) => createStrings({ strings: ${JSON.stringify(CATALOGS)},
-        fallbackLocale: "en", tiebreakers: ${JSON.stringify(TIEBREAKERS)}, locale: "en",
+        fallbackLocale: "en", tiebreakers: ${JSON.stringify(TIEBREAKERS)}, localeResolver: () => "en",
         ...(off ? { [CANDIDATE_CHAIN_MEMO_DISABLED]: true } : {}) });
       const measure = (fn) => { gc(); gc(); const before = process.memoryUsage().heapUsed; fn();
         gc(); gc(); return process.memoryUsage().heapUsed - before; };

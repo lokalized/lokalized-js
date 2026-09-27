@@ -179,7 +179,7 @@ const DECLINED_JAVA_API = {
     java: "`Strings.Builder#languageRangeEquivalents(LanguageRangeEquivalents)`, `LanguageRangeEquivalents.JDK`",
     /** @returns {string | null} null while the counterpart is still absent; otherwise what changed */
     stillAbsent: () => {
-      const base = { strings: { en: { K: "a" } }, fallbackLocale: "en", locale: "en" };
+      const base = { strings: { en: { K: "a" } }, fallbackLocale: "en", localeResolver: () => "en" };
       try { rootEntry.createStrings(base); } catch (error) {
         return `the control construction itself failed (${/** @type {Error} */ (error).message}); the probe proves nothing`;
       }

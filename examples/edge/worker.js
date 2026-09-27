@@ -188,7 +188,7 @@ function localeFromPath(url, supportedLocales) {
  */
 async function directLocaleResponse(manifest, locale, transport, signal) {
   const loaded = await loadStrings(manifest, locale, { fetch: transport, signal });
-  const strings = createStrings({ loaded, locale });
+  const strings = createStrings({ loaded, localeResolver: () => locale });
   const body = renderPage(strings, {
     callOptions: forLocale(locale),
     // DIRECT MODE HAS NO REQUESTED RANGES TO SHOW, and saying so in the view is the honest rendering
@@ -228,7 +228,7 @@ async function matchPreservingResponse(manifest, callOptions, transport, signal)
   const match = callOptions.localeMatch;
   const lookupLocale = match.isMatch && match.locale !== null ? match.locale : match.fallbackLocale;
   const loaded = await loadStrings(manifest, lookupLocale, { fetch: transport, signal });
-  const strings = createStrings({ loaded, locale: lookupLocale });
+  const strings = createStrings({ loaded, localeResolver: () => lookupLocale });
   const body = renderPage(strings, {
     callOptions,
     requestedRanges: match.requestedLanguageRanges.map((range) => range.range),

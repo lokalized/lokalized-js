@@ -150,7 +150,7 @@ test("clause 8 C1: the EXACT arm beats a tiebreaker list that names the equivale
   // predicts `deu` — different tags AND different translations, in one fixture.
   const direct = createStrings({
     strings: catalogsFor(["de", "deu"]), tiebreakers: { de: ["deu", "de"] },
-    fallbackLocale: "de", locale: "pt-BR",
+    fallbackLocale: "de", localeResolver: () => "pt-BR",
   });
   assert.equal(direct.getLocaleConfiguration().fallbackLocale, "de");
   assert.equal(direct.get("Greeting"), "DE!", "and the SERVED catalog moves with the resolved tag");
@@ -161,7 +161,7 @@ test("clause 8 C1: the EXACT arm beats a tiebreaker list that names the equivale
   // both files are loadable and either is electable.
   const control = createStrings({
     strings: catalogsFor(["de", "deu"]), tiebreakers: { de: ["deu", "de"] },
-    fallbackLocale: "deu", locale: "pt-BR",
+    fallbackLocale: "deu", localeResolver: () => "pt-BR",
   });
   assert.equal(control.getLocaleConfiguration().fallbackLocale, "deu");
   assert.equal(control.get("Greeting"), "DEU!");
@@ -184,7 +184,7 @@ test("clause 8 C1: 'exact' means exact AFTER normalization, not byte-identical",
   // elects `deu`, which is why the assertion is on the elected tag rather than on a throw.
   const direct = createStrings({
     strings: catalogsFor(["de", "deu"]), tiebreakers: { de: ["deu", "de"] },
-    fallbackLocale: "DE", locale: "pt-BR",
+    fallbackLocale: "DE", localeResolver: () => "pt-BR",
   });
   assert.equal(direct.getLocaleConfiguration().fallbackLocale, "de");
   assert.equal(direct.get("Greeting"), "DE!");
@@ -200,7 +200,7 @@ test("clause 8 C1: 'exact' means exact AFTER normalization, not byte-identical",
 
 test("clause 8 C2: the sole CLDR-equivalent file resolves the fallback, at both doors", () => {
   const languageAlias = createStrings({
-    strings: catalogsFor(["deu", "fr"]), fallbackLocale: "de", locale: "pt-BR",
+    strings: catalogsFor(["deu", "fr"]), fallbackLocale: "de", localeResolver: () => "pt-BR",
   });
   assert.equal(languageAlias.getLocaleConfiguration().fallbackLocale, "deu");
   assert.equal(languageAlias.getResult("Greeting").resolvedLocale, "deu");
@@ -208,7 +208,7 @@ test("clause 8 C2: the sole CLDR-equivalent file resolves the fallback, at both 
 
   // A REGION alias, not a language one, so the row does not rest on a single CLDR table entry.
   const regionAlias = createStrings({
-    strings: catalogsFor(["en-GB", "fr"]), fallbackLocale: "en-UK", locale: "pt-BR",
+    strings: catalogsFor(["en-GB", "fr"]), fallbackLocale: "en-UK", localeResolver: () => "pt-BR",
   });
   assert.equal(regionAlias.getLocaleConfiguration().fallbackLocale, "en-GB");
 
@@ -232,7 +232,7 @@ test("clause 8 C2: equivalence is CLDR canonical equality, not shared primary la
   // all-positive fixture set stays green under that mistake; the clause is falsified only by a pair,
   // and the second half must be a same-primary-language NON-equivalent tag.
   const refusal = thrown(() => createStrings({
-    strings: catalogsFor(["de-AT", "fr"]), fallbackLocale: "de", locale: "pt-BR",
+    strings: catalogsFor(["de-AT", "fr"]), fallbackLocale: "de", localeResolver: () => "pt-BR",
   }));
   assert.equal(refusal?.name, "RangeError");
   assert.equal(refusal?.message,
@@ -242,7 +242,7 @@ test("clause 8 C2: equivalence is CLDR canonical equality, not shared primary la
   // THE ANTI-zh-123 CONTROL: `de-AT` is a loadable, valid, ELECTABLE tag, so the refusal above is
   // the equivalence verdict and not an earlier guard rejecting the catalog.
   const control = createStrings({
-    strings: catalogsFor(["de-AT", "fr"]), fallbackLocale: "de-AT", locale: "pt-BR",
+    strings: catalogsFor(["de-AT", "fr"]), fallbackLocale: "de-AT", localeResolver: () => "pt-BR",
   });
   assert.equal(control.getLocaleConfiguration().fallbackLocale, "de-AT");
   assert.equal(control.get("Greeting"), "DE-AT!");
@@ -303,7 +303,7 @@ test("clause 8 C3: the direct door pins the same two orders (regression duplicat
   ])) {
     const strings = createStrings({
       strings: catalogsFor(SR_FILES), tiebreakers: { sr: [...order] },
-      fallbackLocale: "sr-Latn", locale: "de",
+      fallbackLocale: "sr-Latn", localeResolver: () => "de",
     });
     assert.equal(strings.getLocaleConfiguration().fallbackLocale, expected);
     assert.equal(strings.get("Greeting"), `${expected.toUpperCase()}!`);
@@ -323,7 +323,7 @@ test("clause 8 C4: zero equivalents refuses with the tag AND the known-locale li
   // when it correctly refuses. (Duplicate of `owed-init.refusal.fallback-locale-names-no-catalog`;
   // this is the JS-door pin.)
   const refusal = thrown(() => createStrings({
-    strings: catalogsFor(["fr", "es"]), fallbackLocale: "de", locale: "pt-BR",
+    strings: catalogsFor(["fr", "es"]), fallbackLocale: "de", localeResolver: () => "pt-BR",
   }));
   assert.equal(refusal?.name, "RangeError");
   assert.equal(refusal?.message,
@@ -331,7 +331,7 @@ test("clause 8 C4: zero equivalents refuses with the tag AND the known-locale li
     "Known locales: [es, fr]");
 
   const control = createStrings({
-    strings: catalogsFor(["fr", "es"]), fallbackLocale: "fr", locale: "pt-BR",
+    strings: catalogsFor(["fr", "es"]), fallbackLocale: "fr", localeResolver: () => "pt-BR",
   });
   assert.equal(control.getLocaleConfiguration().fallbackLocale, "fr");
 });
@@ -342,7 +342,7 @@ test("clause 8 C5: an ambiguous undetermined fallback refuses, naming both equiv
   // entry with the JS half pinned exactly; do not add a second declaration for it.
   const refusal = thrown(() => createStrings({
     strings: { "und-bokmal": catalogFor("und-bokmal"), "und-nynorsk": catalogFor("und-nynorsk") },
-    fallbackLocale: "und", locale: "und",
+    fallbackLocale: "und", localeResolver: () => "und",
   }));
   assert.equal(refusal?.name, "RangeError");
   assert.equal(refusal?.message,
@@ -353,7 +353,7 @@ test("clause 8 C5: an ambiguous undetermined fallback refuses, naming both equiv
   // one equivalent resolves through arm 2 — so the refusal above is ambiguity, not undeterminedness.
   const control = createStrings({
     strings: { "und-bokmal": catalogFor("und-bokmal"), fr: catalogFor("fr") },
-    fallbackLocale: "und", locale: "und",
+    fallbackLocale: "und", localeResolver: () => "und",
   });
   assert.equal(control.getLocaleConfiguration().fallbackLocale, "und-bokmal");
 });
@@ -364,7 +364,7 @@ test("clause 8 C5: the OBVIOUS ambiguity fixture proves the neighbouring guard, 
   // different branch. A designer who picks it reports a passing ambiguity test that never executed
   // the ambiguity arm. Pinning the other sentence here is what keeps the two apart.
   const refusal = thrown(() => createStrings({
-    strings: catalogsFor(["deu", "ger"]), fallbackLocale: "de", locale: "de",
+    strings: catalogsFor(["deu", "ger"]), fallbackLocale: "de", localeResolver: () => "de",
   }));
   assert.equal(refusal?.name, "RangeError");
   assert.equal(refusal?.message,
@@ -416,7 +416,7 @@ test("clause 8 C6: a zero-candidate fallback is REFUSED at the manifest door, be
   assert.equal(localeConfigurationForManifest(control).fallbackLocale, "fr");
   assert.deepEqual(localesOf(fetchSet(control, "pt-BR")), ["fr"]);
   assert.doesNotThrow(() =>
-    createStrings({ strings: catalogsFor(["fr", "es"]), fallbackLocale: "fr", locale: "pt-BR" }));
+    createStrings({ strings: catalogsFor(["fr", "es"]), fallbackLocale: "fr", localeResolver: () => "pt-BR" }));
 });
 
 test("clause 8 C7: an ambiguous fallback is REFUSED at the manifest door, not silently elected", async () => {
@@ -487,7 +487,7 @@ test("clause 8 C8: DIVERGENCE — the loader's own record disagrees with the ins
   // THE SAME INSTANCE REPORTS TWO DIFFERENT FALLBACKS, which is the caller-visible form of the
   // defect and the row the adversarial review predicted would be green. It is not: core resolves,
   // the loader does not, and both answers are handed to the same caller.
-  const instance = createStrings({ loaded, locale: "pt-BR" });
+  const instance = createStrings({ loaded, localeResolver: () => "pt-BR" });
   assert.equal(instance.getLocaleConfiguration().fallbackLocale, "deu");
   assert.equal(
     /** @type {any} */ (instance.getLoadVerification()).manifestLocaleConfiguration.fallbackLocale, "de");
@@ -509,7 +509,7 @@ test("clause 8 C8: DIVERGENCE — the loader's own record disagrees with the ins
   // above is the spelling and not the fixture.
   const exact = validates(manifest(["deu", "fr"], "deu"));
   const exactLoaded = await loadEntireManifest(exact, { fetch: recordingFetch().impl });
-  const exactInstance = createStrings({ loaded: exactLoaded, locale: "pt-BR" });
+  const exactInstance = createStrings({ loaded: exactLoaded, localeResolver: () => "pt-BR" });
   assert.equal(exactInstance.getLocaleConfiguration().fallbackLocale, "deu");
   assert.equal(
     /** @type {any} */ (exactInstance.getLoadVerification()).manifestLocaleConfiguration.fallbackLocale,
@@ -529,7 +529,7 @@ test("clause 8 C8: the record fed back to its own instance is REJECTED; the reso
   // consulted at LOOKUP time, so each row must perform one.
   const m = validates(manifest(["deu", "fr"], "de"));
   const loaded = await loadEntireManifest(m, { fetch: recordingFetch().impl });
-  const probe = createStrings({ loaded, locale: "pt-BR" });
+  const probe = createStrings({ loaded, localeResolver: () => "pt-BR" });
   const ownMatch = probe.getDirectLocaleContext("pt-BR").localeMatch;
   const configuration = loaded.manifestLocaleConfiguration;
 
@@ -559,7 +559,7 @@ test("clause 8 C8: the DIRECT door's supplied match requires the RESOLVED fallba
   // fallback"). Cheap, green today, and it pins "match results use the resolved tag" where the
   // manifest-backed round trip cannot, because that one is red for a different reason.
   const strings = { strings: catalogsFor(["deu", "fr"]), fallbackLocale: "de" };
-  const probe = createStrings({ ...strings, locale: "pt-BR" });
+  const probe = createStrings({ ...strings, localeResolver: () => "pt-BR" });
   const ownMatch = probe.getDirectLocaleContext("pt-BR").localeMatch;
   assert.equal(ownMatch.fallbackLocale, "deu", "the instance's own match already carries the resolved tag");
 
@@ -624,7 +624,7 @@ test("clause 8 C10: a direct request's lookupLocale is never rewritten to the fa
   //     for free" shortcut breaks.
   const inverted = createStrings({
     strings: catalogsFor(["de", "deu"]), tiebreakers: { de: ["deu", "de"] },
-    fallbackLocale: "de", locale: "deu",
+    fallbackLocale: "de", localeResolver: () => "deu",
   });
   const invertedResult = inverted.getResult("Greeting");
   assert.equal(invertedResult.lookupLocale, "deu");
@@ -634,14 +634,14 @@ test("clause 8 C10: a direct request's lookupLocale is never rewritten to the fa
 
   // (ii) the natural direction, where the request and the resolved tag differ the other way. Close to
   //      the gated corpus case `dedup-and-candidates.fallbackalias.mo-request-resolves-ro`.
-  const natural = createStrings({ strings: catalogsFor(["deu", "fr"]), fallbackLocale: "de", locale: "de" });
+  const natural = createStrings({ strings: catalogsFor(["deu", "fr"]), fallbackLocale: "de", localeResolver: () => "de" });
   const naturalResult = natural.getResult("Greeting");
   assert.equal(naturalResult.lookupLocale, "de");
   assert.equal(naturalResult.resolvedLocale, "deu");
 
   // THE CONTROL: an unrelated request on the same instance must actually REACH the fallback, or the
   // non-rewrite assertion can pass vacuously on an instance where resolution never ran.
-  const reaching = createStrings({ strings: catalogsFor(["deu", "fr"]), fallbackLocale: "de", locale: "ja-JP" });
+  const reaching = createStrings({ strings: catalogsFor(["deu", "fr"]), fallbackLocale: "de", localeResolver: () => "ja-JP" });
   const reachingResult = reaching.getResult("Greeting");
   assert.equal(reachingResult.lookupLocale, "ja-JP");
   assert.equal(reachingResult.resolvedLocale, "deu");
@@ -662,7 +662,7 @@ test("clause 8 C10: the SSR stamp and lookup coverage carry the REQUEST, not the
   // Plan 3.4:850-856 validates coverage against the locale that ACTUALLY STARTS per-key fallback, so
   // a rewritten lookup would make this construction refuse — the machine-checkable half of the
   // clause's last sentence.
-  const instance = createStrings({ loaded, locale: "deu" });
+  const instance = createStrings({ loaded, localeResolver: () => "deu" });
   assert.equal(instance.getResult("Greeting").lookupLocale, "deu");
   assert.equal(instance.getLocaleConfiguration().fallbackLocale, "de");
   assert.equal(instance.get("Greeting"), "DEU!");

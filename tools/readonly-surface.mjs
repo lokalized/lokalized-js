@@ -392,9 +392,20 @@ const OBLIGATIONS = {
     [IMPORTS.core],
     `((t: import("lokalized/core").DirectCreateStringsOptions["tiebreakers"]) => t)(null! as ReadonlyMap<string, readonly string[]>)`,
     `((t: import("lokalized/core").DirectCreateStringsOptions["tiebreakers"]) => t)(null! as ReadonlyMap<string, number>)`),
-  "BOOT-M0-0326": readonlyMemberOf(
-    "the ambient-locale variant of plan 3.2's `LocaleSourceOptions`, flattened onto the option type",
-    [IMPORTS.core], `null! as import("lokalized/core").DirectCreateStringsOptions`, "locale"),
+  // HELD THE OTHER WAY, by decision. The statement asks for a `readonly locale` on the constant-locale
+  // variant of plan 3.2's `LocaleSourceOptions`; that variant was REMOVED before 1.0.0 (the maintainer,
+  // 2026-09-27: an instance needs a resolver, as a Java instance needs a supplier), so there is no
+  // member to be readonly. What is asserted is the absence, on BOTH arms, with the resolver read as the
+  // control — and the day `locale` comes back this goes red and the readonly probe has to return.
+  "BOOT-M0-0326": {
+    why: "the constant-locale variant of `LocaleSourceOptions` was removed before 1.0.0; the member must be ABSENT from both option arms",
+    imports: [IMPORTS.core],
+    lines: [
+      { text: `export const resolver = (null! as import("lokalized/core").DirectCreateStringsOptions).localeResolver;`, expect: "compiles" },
+      { text: `export const direct = (null! as import("lokalized/core").DirectCreateStringsOptions).locale;`, expect: "refused", codes: [2339] },
+      { text: `export const loaded = (null! as import("lokalized/core").LoadedCreateStringsOptions).locale;`, expect: "refused", codes: [2339] },
+    ],
+  },
   "BOOT-M0-0330": readonlyMemberOf(
     "the resolver variant of the same union",
     [IMPORTS.core], `null! as import("lokalized/core").DirectCreateStringsOptions`, "localeResolver"),

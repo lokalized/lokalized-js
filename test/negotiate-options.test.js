@@ -34,7 +34,7 @@ const strings = createStrings({
     en: { Hi: "hello en" }, fr: { Hi: "bonjour fr" },
     "fr-CA": { Hi: "bonjour fr-CA" }, es: { Hi: "hola es" }, ja: { Hi: "konnichiwa ja" },
   },
-  fallbackLocale: "en", tiebreakers: { fr: ["fr", "fr-CA"] }, locale: "en",
+  fallbackLocale: "en", tiebreakers: { fr: ["fr", "fr-CA"] }, localeResolver: () => "en",
 });
 const configuration = strings.getLocaleConfiguration();
 const negotiator = createLocaleNegotiator(configuration);
@@ -263,7 +263,7 @@ describe("matchFor delegates to the same strict kernel core's direct diagnostic 
     (() => {
       const elected = createStrings({
         strings: { en: { Hi: "hello en" }, "fr-CA": { Hi: "bonjour fr-CA" }, "fr-FR": { Hi: "bonjour fr-FR" } },
-        fallbackLocale: "en", tiebreakers: { fr: ["fr-FR", "fr-CA"] }, locale: "en",
+        fallbackLocale: "en", tiebreakers: { fr: ["fr-FR", "fr-CA"] }, localeResolver: () => "en",
       });
       return {
         label: "where the tiebreaker must elect",
@@ -289,7 +289,7 @@ describe("matchFor delegates to the same strict kernel core's direct diagnostic 
     assert.equal(elected?.negotiator.matchFor("fr").locale, "fr-FR");
     const reversed = createStrings({
       strings: { en: { Hi: "hello en" }, "fr-CA": { Hi: "bonjour fr-CA" }, "fr-FR": { Hi: "bonjour fr-FR" } },
-      fallbackLocale: "en", tiebreakers: { fr: ["fr-CA", "fr-FR"] }, locale: "en",
+      fallbackLocale: "en", tiebreakers: { fr: ["fr-CA", "fr-FR"] }, localeResolver: () => "en",
     });
     assert.equal(createLocaleNegotiator(reversed.getLocaleConfiguration()).matchFor("fr").locale, "fr-CA",
       "reversing the declared order must move the answer, or the list is not being read");

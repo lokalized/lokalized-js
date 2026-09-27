@@ -49,7 +49,7 @@ Java raises `java.lang.IllegalArgumentException` from all of these; JavaScript n
 | this package raises | Java site | Java says | this package says |
 |---|---|---|---|
 | `TypeError` | DefaultStrings.java:250 | You must specify a 'localizedStringSupplier' when creating a DefaultStrings instance | createStrings({ strings }) is required: supply a record or a Map of locale tag to catalog |
-| `RangeError` | DefaultStrings.java:254 | You must specify exactly one of 'localeSupplier' or 'localeMatchSupplier' when creating a DefaultStrings instance | createStrings requires exactly one of 'locale', 'localeResolver' or 'localeMatchResolver'; received none |
+| `RangeError` | DefaultStrings.java:254 | You must specify exactly one of 'localeSupplier' or 'localeMatchSupplier' when creating a DefaultStrings instance | createStrings requires exactly one of 'localeResolver' or 'localeMatchResolver'; received none |
 | `TypeError` | DefaultStrings.java:262 | The 'localizedStringSupplier' returned null | createStrings({ strings }) was null: supply a record or a Map of locale tag to catalog |
 | `TypeError` | DefaultStrings.java:273 | Null locale encountered in supplied localized strings | Null locale encountered in supplied localized strings |
 | `RangeError` | DefaultStrings.java:280 | Localized strings locales 'en_US_POSIX' and 'en_US_posix' both use IETF BCP 47 language tag 'en-US-posix' | Localized strings locales 'en-US-POSIX' and 'en-US-posix' both use IETF BCP 47 language tag 'en-US-posix' |

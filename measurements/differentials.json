@@ -1,6 +1,6 @@
 {
-  "recordedAt": "2026-09-23T23:14:03.020Z",
-  "sourceSha256": "46a00a3dcb1841611c3ada649202f6ccb434f06d2bb5f407e3d6f5073e005c36",
+  "recordedAt": "2026-09-27T17:45:38.407Z",
+  "sourceSha256": "0f40aca38ffb2413719b62e13b6d52484a189a4b9c2b94fdb9f7951e5aefca3e",
   "differentials": {
     "load": {
       "exit": 0,
@@ -27,8 +27,8 @@
     },
     "lookup": {
       "exit": 0,
-      "headline": "end-to-end lookup differential against lokalized-3.1.0-SNAPSHOT on the pinned JDK: 414161/673200 well-formed lookups identical over 6828 tag(s) x 12 catalog set(s) x 11 shape(s) (3 keys x 2 lookup ing",
-      "toolSha256": "9ff7a9f0d23b8f40487cdbf133f35db505cc548ec355f720844966ec69b0f5d9",
+      "headline": "end-to-end lookup differential against lokalized-3.1.0 on the pinned JDK: 414161/673200 well-formed lookups identical over 6828 tag(s) x 12 catalog set(s) x 11 shape(s) (3 keys x 2 lookup ingresses, p",
+      "toolSha256": "6be8767fa630585c5facfd5f454916de105ea015d304c4619647ea079ac17eb2",
       "temporaryEntriesLeft": 0
     },
     "direct-tag": {
@@ -39,7 +39,7 @@
     },
     "language-range": {
       "exit": 0,
-      "headline": "LocaleMatcher#parseLanguageRanges differential against lokalized-3.1.0-SNAPSHOT on the pinned JDK: 16782/16782 identical, 0 known divergence(s), 0 open port defect(s) over 0 probe(s), 0 unexplained; 2",
+      "headline": "LocaleMatcher#parseLanguageRanges differential against lokalized-3.1.0 on the pinned JDK: 16782/16782 identical, 0 known divergence(s), 0 open port defect(s) over 0 probe(s), 0 unexplained; 241 probe(",
       "toolSha256": "ee3630166ca39bd57aa1e6a124ac7519967fc29e35fb677fc1000c9465292790",
       "temporaryEntriesLeft": 0,
       "facts": {
@@ -52,7 +52,7 @@
           "unexplained": 0
         },
         "oracle": {
-          "library": "lokalized-3.1.0-SNAPSHOT",
+          "library": "lokalized-3.1.0",
           "librarySourcesSha256": "db1f440a5641e419cf1f1a2d8fd89b2f6d7b63d65b9ee0316a0a7f83a76fa1e0"
         }
       }
@@ -78,7 +78,7 @@
     "phonetic": {
       "exit": 0,
       "headline": "69/77 identical, 8 known divergence(s), 0 unexplained",
-      "toolSha256": "5c1da4b12585ac804f7e453edbb45a1b57c54dd6a30c56d3ee985e97625dc24e",
+      "toolSha256": "211ede3abd4c5aa88fa8e18318e3822434bdd9b36af235d50b2bee3e7450b5a5",
       "temporaryEntriesLeft": 0
     }
   }

@@ -250,7 +250,7 @@ for (const door of DOORS) {
     // row. Computed over the WHOLE-MANIFEST instance, never over `direct`: whole coverage permits any
     // direct locale (plan 3.4:621), so this reading is invariant under every mutation of the subset
     // loader, which a reading through `direct` would not be.
-    const whole = createStrings({ loaded: await door.whole(), locale: "fr-BE" });
+    const whole = createStrings({ loaded: await door.whole(), localeResolver: () => "fr-BE" });
     const diagnostic = /** @type {any} */ (whole.getDirectLocaleContext("fr-BE")).localeMatch;
     assert.equal(diagnostic.locale, "fr-FR");
     assert.equal(diagnostic.matchType, "likely-subtag");
@@ -277,7 +277,7 @@ for (const door of DOORS) {
     assert.ok(Object.keys(selected.catalogs).length > 0);
     assert.equal(selected.complete, true);
 
-    const strings = createStrings({ loaded: selected, locale: "fr-FR" });
+    const strings = createStrings({ loaded: selected, localeResolver: () => "fr-FR" });
     assert.equal(strings.get("Shared"), "shared fr-FR");
   });
 }
@@ -391,7 +391,7 @@ test("12.b: RECORDED DID-NOT-FIRE — plan(selection) equals plan(argument), mea
 for (const door of DOORS) {
   test(`12.c [${door.name}]: the direct flow reports AND WALKS FROM the preserved input`, async () => {
     const subset = await door.load("fr-be");
-    const client = createStrings({ loaded: subset, locale: "fr-BE" });
+    const client = createStrings({ loaded: subset, localeResolver: () => "fr-BE" });
 
     const result = /** @type {any} */ (client.getResult("Shared"));
     assert.equal(result.lookupLocale, "fr-BE");
@@ -416,7 +416,7 @@ for (const door of DOORS) {
     // THE CONTROL — the coinciding instance, where lookup, selection and resolution are one string.
     // It stays green under every mutation the rows above catch, which is precisely why it cannot
     // substitute for them.
-    const coinciding = createStrings({ loaded: await door.load("fr-FR"), locale: "fr-FR" });
+    const coinciding = createStrings({ loaded: await door.load("fr-FR"), localeResolver: () => "fr-FR" });
     const control = /** @type {any} */ (coinciding.getResult("Shared"));
     assert.equal(control.lookupLocale, "fr-FR");
     assert.equal(control.localeMatch.locale, "fr-FR");
@@ -429,7 +429,7 @@ for (const door of DOORS) {
     // nothing: on an instance already built with `fr-BE`, a `forLocale("fr-BE")` call is satisfied
     // byte-for-byte by an implementation that drops the per-call options on the floor. `de-CH` is the
     // instance tag here and whole-manifest coverage permits it (plan 3.4:621).
-    const whole = createStrings({ loaded: await door.whole(), locale: "de-CH" });
+    const whole = createStrings({ loaded: await door.whole(), localeResolver: () => "de-CH" });
     const ambient = /** @type {any} */ (whole.getResult("Shared"));
     assert.equal(ambient.lookupLocale, "de-CH");
     assert.equal(ambient.translation, "shared en", "de-CH resolves through the fallback");
@@ -444,7 +444,7 @@ for (const door of DOORS) {
     // per-call door, on a lookup subset, refuses a tag the subset was not planned from — even though
     // this subset holds every catalog `fr-FR` would need. Neither half is satisfiable by an
     // implementation that ignores the per-call option.
-    const client = createStrings({ loaded: await door.load("fr-be"), locale: "fr-BE" });
+    const client = createStrings({ loaded: await door.load("fr-be"), localeResolver: () => "fr-BE" });
     const refused = attempt(() => ({
       get: (/** @type {string} */ key) => client.get(key, undefined, forLocale("fr-FR")),
     }));
@@ -514,7 +514,7 @@ for (const door of DOORS) {
 
     // (3) The PER-CALL match door, on an instance whose own locale disagrees with it — the same
     // vacuity trap the per-call row in 12.c had to avoid.
-    const perCallHost = createStrings({ loaded: whole, locale: "de-CH" });
+    const perCallHost = createStrings({ loaded: whole, localeResolver: () => "de-CH" });
     const perCall = /** @type {any} */ (perCallHost.getResult("Shared", undefined, forLocaleMatch(match)));
     assert.equal(perCall.lookupLocale, match.locale);
     assert.equal(perCall.attemptedLocales[0], match.locale);
@@ -553,7 +553,7 @@ for (const door of DOORS) {
     // CONTROLS: the matched arm of 12.d over the same negotiator (so "unmatched" is not the only
     // thing this negotiator can produce), and this subset's own DIRECT door, proving the `en` subset
     // is loadable and complete on its own terms.
-    assert.equal(createStrings({ loaded: forFallback, locale: "en" }).get("Shared"), "shared en");
+    assert.equal(createStrings({ loaded: forFallback, localeResolver: () => "en" }).get("Shared"), "shared en");
     assert.equal(forFallback.complete, true);
   });
 }
@@ -588,7 +588,7 @@ for (const door of DOORS) {
     // anyway: `configurationError` returns a plain Error with a name and a code and no structured
     // expected/actual, so nothing in the VALUE distinguishes a coverage refusal from a
     // match-configuration one.
-    const direct = (/** @type {any} */ loaded) => () => createStrings({ loaded, locale: "fr-BE" });
+    const direct = (/** @type {any} */ loaded) => () => createStrings({ loaded, localeResolver: () => "fr-BE" });
     const supplied = (/** @type {any} */ loaded) => () =>
       createStrings({ loaded, localeMatchResolver: () => match });
 
@@ -616,7 +616,7 @@ for (const door of DOORS) {
     // ties the refusal to subsetting rather than to a label.
     const forJa = await door.load("ja");
     assert.ok(Object.keys(forJa.catalogs).length < MANIFEST_TAGS.length);
-    const jaAccepted = attempt(() => createStrings({ loaded: forJa, locale: "ja" }));
+    const jaAccepted = attempt(() => createStrings({ loaded: forJa, localeResolver: () => "ja" }));
     assert.equal(jaAccepted.site, null);
     assert.equal(jaAccepted.value, "shared en");
     assertRefused(attempt(direct(forJa)), `${door.name}: fr-BE against a subset planned from ja`);
@@ -639,7 +639,7 @@ for (const door of DOORS) {
     for (const [tag, expected] of /** @type {[string, string][]} */ ([
       ["fr-BE", "shared fr-FR"], ["fr-FR", "shared fr-FR"], ["ja", "shared en"], ["de-CH", "shared en"],
     ])) {
-      const cell = attempt(() => createStrings({ loaded: whole, locale: tag }));
+      const cell = attempt(() => createStrings({ loaded: whole, localeResolver: () => tag }));
       assert.equal(cell.site, null, `${tag} must be accepted under whole coverage`);
       assert.equal(cell.value, expected, tag);
     }
@@ -663,7 +663,7 @@ test("the third door: loadStringsFromDirectory records ENTIRE-MANIFEST coverage;
   assert.equal(composed.coverage.kind, "entire-manifest");
   assert.equal(/** @type {any} */ (composed.coverage).lookupLocale, undefined);
   assert.deepEqual(Object.keys(composed.catalogs).sort(), MANIFEST_TAGS);
-  assert.equal(createStrings({ loaded: composed, locale: "de-CH" }).get("Shared"), "shared en");
+  assert.equal(createStrings({ loaded: composed, localeResolver: () => "de-CH" }).get("Shared"), "shared en");
 
   // …and the RAW door — the port of Java's `loadFromFilesystem` — carries no coverage record at all,
   // because it has no manifest, no digest and no plan to have been planned from. It returns
@@ -673,7 +673,7 @@ test("the third door: loadStringsFromDirectory records ENTIRE-MANIFEST coverage;
   assert.deepEqual(Object.keys(raw.catalogs).sort(), MANIFEST_TAGS);
   assert.equal(raw.coverage, undefined);
   assert.equal(raw.requestedFiles, undefined);
-  assert.throws(() => createStrings({ loaded: raw, locale: "en" }), (error) => {
+  assert.throws(() => createStrings({ loaded: raw, localeResolver: () => "en" }), (error) => {
     assert.equal(/** @type {any} */ (error).name, "ConfigurationError");
     return true;
   }, "a catalog map is not a LoadedStrings and must not be treated as one");

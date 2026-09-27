@@ -38,7 +38,7 @@ import { RETURN_KEY, THROW_EXCEPTION, createStrings, returnString } from "../src
  */
 const FOUR_CANDIDATE = {
   fallbackLocale: "fr",
-  locale: "fr",
+  localeResolver: () => "fr",
   tiebreakers: { en: ["en-GB", "en-001", "en"] },
   strings: {
     "en-GB": { InEvery: "en-GB: everywhere" },
@@ -49,7 +49,7 @@ const FOUR_CANDIDATE = {
 };
 
 /** A single-element chain: only `en` is loaded, `en` is the fallback, `en` is requested. */
-const SINGLE_CANDIDATE = { fallbackLocale: "en", locale: "en", strings: { en: { Present: "here" } } };
+const SINGLE_CANDIDATE = { fallbackLocale: "en", localeResolver: () => "en", strings: { en: { Present: "here" } } };
 
 /** Records every consultation and answers from a delegate. */
 function recordingPolicy(delegate) {
@@ -72,7 +72,7 @@ describe("createStrings({ fallbackPolicy }) — the three built-in names", () =>
   // at all when it should have refused — is caught here and nowhere else.
   const CATALOGS = {
     fallbackLocale: "en",
-    locale: "de",
+    localeResolver: () => "de",
     strings: {
       // `de` holds the key but cannot render it: `absentCount` is never supplied.
       de: {
@@ -134,7 +134,7 @@ describe("the library defaults, which the conformance runner always replaces", (
   it("an omitted fallbackPolicy halts on a resolution failure and forfeits a reachable donor", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "de",
+      localeResolver: () => "de",
       strings: {
         de: {
           Key: {
@@ -155,7 +155,7 @@ describe("the library defaults, which the conformance runner always replaces", (
   it("an omitted fallbackPolicy walks past a missing translation", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "de",
+      localeResolver: () => "de",
       strings: { de: { Other: "de: something else" }, en: { Key: "en: reached" } },
     });
 
@@ -163,7 +163,7 @@ describe("the library defaults, which the conformance runner always replaces", (
   });
 
   it("an omitted onFailure returns the INTERPOLATED key", () => {
-    const strings = createStrings({ fallbackLocale: "en", locale: "en", strings: { en: { Other: "x" } } });
+    const strings = createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: { Other: "x" } } });
     const result = strings.getResult("Farewell {{name}}", { name: "Sarah" });
 
     assert.equal(result.status, "returned-key");
@@ -171,7 +171,7 @@ describe("the library defaults, which the conformance runner always replaces", (
   });
 
   it("an explicit null is the same state as an omitted option, on both", () => {
-    const options = { fallbackLocale: "en", locale: "en", strings: { en: { Other: "x" } } };
+    const options = { fallbackLocale: "en", localeResolver: () => "en", strings: { en: { Other: "x" } } };
     const omitted = createStrings(options).getResult("Key");
     const nulled = createStrings({
       ...options,
@@ -201,7 +201,7 @@ describe("the policy is never consulted for the final candidate", () => {
     const consulted = recordingPolicy(() => true);
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "de",
+      localeResolver: () => "de",
       strings: { en: { Present: "here" } },
       fallbackPolicy: consulted.policy,
     });
@@ -239,7 +239,7 @@ describe("what the policy is handed", () => {
     const consulted = recordingPolicy(() => true);
     const strings = createStrings({
       fallbackLocale: "fr",
-      locale: "en-GB",
+      localeResolver: () => "en-GB",
       tiebreakers: { en: ["en-GB", "en-001", "en"] },
       strings: {
         "en-GB": {
@@ -277,7 +277,7 @@ describe("what the policy is handed", () => {
     });
     const strings = createStrings({
       fallbackLocale: "fr",
-      locale: "de",
+      localeResolver: () => "de",
       strings: { de: failing("de"), fr: failing("fr") },
       fallbackPolicy: consulted.policy,
     });
@@ -291,7 +291,7 @@ describe("what the policy is handed", () => {
   it("refuses a policy that returns something other than a boolean", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "de",
+      localeResolver: () => "de",
       strings: { en: { Present: "here" } },
       fallbackPolicy: /** @type {any} */ (() => null),
     });
@@ -305,7 +305,7 @@ describe("what the policy is handed", () => {
   it("refuses a non-null, non-boolean policy return with its own wording", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "de",
+      localeResolver: () => "de",
       strings: { en: { Present: "here" } },
       fallbackPolicy: /** @type {any} */ (() => "yes"),
     });
@@ -315,7 +315,7 @@ describe("what the policy is handed", () => {
 });
 
 describe("createStrings({ onFailure })", () => {
-  const MISSING = { fallbackLocale: "en", locale: "en", strings: { en: { Other: "x" } } };
+  const MISSING = { fallbackLocale: "en", localeResolver: () => "en", strings: { en: { Other: "x" } } };
 
   it("fires exactly once, after the walk, however many candidates failed", () => {
     /** @type {any[]} */
@@ -366,7 +366,7 @@ describe("createStrings({ onFailure })", () => {
     const boom = new Error("the resolver said no");
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       strings: { en: { Key: { translation: "{{form}}", placeholders: { form: { value: "noun", translations: { PHONETIC_VOWEL: "an", PHONETIC_CONSONANT: "a" } } } } } },
       phoneticResolver: () => { throw boom; },
       onFailure: () => THROW_EXCEPTION,
@@ -417,7 +417,7 @@ describe("the TranslationFailure the handler is handed", () => {
     let seen = null;
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       strings: { en: { Other: "x" } },
       onFailure: (failure) => { seen = failure; return RETURN_KEY; },
     });
@@ -438,7 +438,7 @@ describe("the TranslationFailure the handler is handed", () => {
     let seen = null;
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       strings: { en: { Other: "x" } },
       onFailure: (failure) => { seen = failure; return RETURN_KEY; },
     });
@@ -452,7 +452,7 @@ describe("the TranslationFailure the handler is handed", () => {
     let seen = null;
     const strings = createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       strings: { en: { Other: "x" } },
       onFailure: (failure) => { seen = failure; return RETURN_KEY; },
     });
@@ -486,7 +486,7 @@ describe("the TranslationFailure the handler is handed", () => {
 describe("per-call fallbackPolicy and onFailure REPLACE the instance ones", () => {
   const CATALOGS = {
     fallbackLocale: "en",
-    locale: "de",
+    localeResolver: () => "de",
     strings: {
       de: {
         Key: {

@@ -45,7 +45,7 @@
       imports.push(performance.now() - t0);
 
       const c0 = performance.now();
-      const strings = mod.createStrings({ fallbackLocale: "en", locale: "en-AU", strings: CATALOG, tiebreakers: TIEBREAKERS });
+      const strings = mod.createStrings({ fallbackLocale: "en", localeResolver: () => "en-AU", strings: CATALOG, tiebreakers: TIEBREAKERS });
       constructions.push(performance.now() - c0);
 
       const r0 = performance.now();

@@ -119,7 +119,7 @@ test("clause 5: the record's IANA identity comes from the RENDERER, not from the
   const claiming = /** @type {any} */ ({
     ...loaded, ianaRegistryDate: "1999-12-31", ianaDataFingerprint: "f".repeat(64),
   });
-  const record = createStrings({ loaded: claiming, locale: "en" }).getLoadVerification();
+  const record = createStrings({ loaded: claiming, localeResolver: () => "en" }).getLoadVerification();
 
   assert.equal(record?.ianaRegistryDate, RUNTIME_METADATA.ianaRegistryDate);
   assert.equal(record?.ianaDataFingerprint, RUNTIME_METADATA.ianaDataFingerprint);
@@ -150,7 +150,7 @@ test("clause 13: a lookup subset carries the FULL manifest's identity", async ()
     "a subset identifies the same catalog set as the whole manifest");
   assert.equal(subset.catalogIdentity.catalogFingerprint, m.catalogFingerprint,
     "and that identity is the manifest's own declared fingerprint");
-  assert.equal(createStrings({ loaded: subset, locale: "fr" }).getCatalogIdentity()?.catalogFingerprint,
+  assert.equal(createStrings({ loaded: subset, localeResolver: () => "fr" }).getCatalogIdentity()?.catalogFingerprint,
     m.catalogFingerprint, "the instance reports it too");
 });
 
@@ -174,17 +174,17 @@ test("clause 36: isCatalogComplete() reports the RECORD's completeness, not a co
 
   // Arm 1 — the one that discriminates a constant `true`. A partial load's instance must say false.
   const partial = await loadEntireManifest(m, { fetch: serve(["de"]), partialFailure: "allow-partial" });
-  const partialStrings = createStrings({ loaded: partial, locale: "en" });
+  const partialStrings = createStrings({ loaded: partial, localeResolver: () => "en" });
   assert.equal(partialStrings.isCatalogComplete(), false,
     "a partial load's instance must report incomplete; a constant `true` passes everything else");
 
   // Arm 2 — the one that discriminates a constant `false`, and the reason both arms are needed.
   const whole = await loadEntireManifest(m, { fetch: serve() });
-  assert.equal(createStrings({ loaded: whole, locale: "en" }).isCatalogComplete(), true);
+  assert.equal(createStrings({ loaded: whole, localeResolver: () => "en" }).isCatalogComplete(), true);
 
   // Arm 3 — direct construction has no record at all and reports complete, which is the documented
   // asymmetry (`types/core/index.d.ts:83`) rather than an accident of the other two arms.
   assert.equal(
-    createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", locale: "en" }).isCatalogComplete(),
+    createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en" }).isCatalogComplete(),
     true, "a directly constructed instance is complete by definition");
 });

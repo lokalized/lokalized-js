@@ -74,7 +74,7 @@ test("a WHOLE-MANIFEST load built from unsorted keys constructs and stamps", asy
   assert.deepEqual(loaded.manifestLocaleConfiguration,
     { fallbackLocale: "en", supportedLocales: ["de", "en", "fr"], tiebreakers: {} });
 
-  const strings = createStrings({ loaded, locale: "fr" });
+  const strings = createStrings({ loaded, localeResolver: () => "fr" });
   assert.equal(strings.get("Hi"), "hello fr");
   assert.deepEqual(strings.getSupportedLocales(), ["de", "en", "fr"]);
   assert.deepEqual(strings.getCatalogIdentity(), {
@@ -96,7 +96,7 @@ test("a LOOKUP-SUBSET load constructs, and its coverage tag is the normalized re
   assert.deepEqual(loaded.coverage, { kind: "lookup", lookupLocale: "fr" });
   assert.deepEqual(loaded.requestedFiles.map((/** @type {any} */ e) => e.locale), ["fr", "en"]);
 
-  const strings = createStrings({ loaded, locale: "fr" });
+  const strings = createStrings({ loaded, localeResolver: () => "fr" });
   const stamp = createSsrStamp(strings, { kind: "locale", locale: "fr" });
   assert.equal(stamp.localeMatch.locale, "fr");
 

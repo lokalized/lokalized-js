@@ -1,10 +1,10 @@
 {
   "scenario": "0a",
-  "revision": 1,
+  "revision": 2,
   "note": "Baseline, not a threshold. M2 is tracked by engineering measurement; no go/no-go line exists.",
   "recipe": {
     "scenario": "0a",
-    "revision": 1,
+    "revision": 2,
     "description": "M2 static integration: the root with a fixed small embedded raw-text catalog, and lokalized/core with its fixed already-parsed equivalent",
     "freeze": "LATE, and stated rather than smoothed over. Plan 9.2:2806 has 0a owned by M2 and frozen at M0. M0 certification was skipped and nothing here was frozen until 2026-09-25, during M-R, after 71 recorded rebaselines. Revision 1 declares the method the tool has used since M5a rather than choosing a new one; it does not make the M0 deadline met.",
     "artifact": "the working tree's src/, which package.json#exports ships unbundled for '.' and './core'. Not a packed tarball, which plan 9.2's 'same packed artifact' asks for",
@@ -26,7 +26,7 @@
     ],
     "construction": {
       "fallbackLocale": "en",
-      "locale": "en-AU"
+      "localeResolverAnswers": "en-AU"
     },
     "render": {
       "key": "I read {{bookCount}} books",
@@ -39,14 +39,14 @@
     "method": "Node. Per variant, 9 iterations of: import the entry under a fresh ?m= query (which re-evaluates the entry module alone; its dependencies load once per process, so the median import is a warm figure), construct, first render — each timed with performance.now(), median reported. The raw-text variant's JSON.stringify of its three documents runs inside its construction window (about 2 microseconds against a recorded construction median of about 130, measured 2026-09-25). Retained heap is heapUsed across two forced collections around one more import and construction, which needs --expose-gc: a run without it fails. Modules and source bytes are tools/graph-walk.mjs over the entry's relative import graph. All of it is the code in harness.file, whose bytes are harness.sha256",
     "harness": {
       "file": "tools/0a-measure.mjs",
-      "sha256": "eefa011de0b31bfe80940c39928c77b059279f956dfd4639813b8e24af05b5ac",
+      "sha256": "e07a84eda92a1e129bc0b067ae972e3e465228562041900d5a38fdde54d6445d",
       "command": "node --expose-gc tools/scenario-0a.mjs, which imports harness.file"
     },
     "gated": "modules and sourceBytes per variant ratchet: growth fails until re-recorded with --reason, and every --write needs a reason and appends a chained history entry. Each row's modules and sourceBytes, as the harness returned them and as the run records them, must equal tools/graph-walk.mjs over the variant's declared entry, walked again apart from the harness. The render must equal render.expected. Timings and heap are reported and never compared, and each must be present and finite, in the run and in the record (A33 (4))",
     "browserHalf": "tools/browser-0a/index.html served by tools/browser-0a/serve.mjs, one variant per page load, merged by tools/browser-0a/record.mjs with a reason and a chained history entry. Never re-measured here; its staleness against the Node graph is reported, never gated; it is required present: a row per variant with its counts and finite timings; and it is bound by its digest to the newest history entry, so an edit by hand fails. The page hands the ALREADY-PARSED catalogs to BOTH variants, so its root row's construction does not include parsing, unlike the Node root variant above. Recorded rather than fixed: fixing it is a new browser capture",
     "notFrozen": "thresholds and regression tolerances — none exist, by A3/A4/A7 (restated as A33, 2026-09-25); runtime version and hardware, which move only the reported timings; tools/graph-walk.mjs, which takes the ratcheted figures and is shared with other tools and tests (subpath-graphs, scenario 2k and scenario 6 among them), so a digest of it here would make every edit to it a 0a revision: a change to it moves the harness's rows and their re-derivation alike, the ratchet sees any growth, and writing a shrink needs a reason; and tools/scenario-0a.mjs, which orchestrates, judges and copies the harness's rows into the record: the modules and sourceBytes it copies are walked again from each declared entry, the timings it rounds are held only to being present and finite, as every timing is, and each of its rules is run by test/scenario-0a-recipe.test.js"
   },
-  "recipeSha256": "5dd067021ed31781ed17eb165e34f7246e80a393fb1f0efccc7e6e679c332d0d",
+  "recipeSha256": "c986ed5096eba80ad937d426016e3afa0e763a6807d986d03d5ebe39a77d4841",
   "environments": [
     "node",
     "browser"
@@ -55,22 +55,52 @@
     {
       "label": "root + raw-text catalog",
       "modules": 32,
-      "sourceBytes": 777038,
-      "importMs": 0.351,
-      "constructionMs": 0.1287,
-      "firstRenderMs": 0.3178,
-      "retainedBytes": 86592
+      "sourceBytes": 776117,
+      "importMs": 0.533,
+      "constructionMs": 0.2297,
+      "firstRenderMs": 0.4875,
+      "retainedBytes": 97168
     },
     {
       "label": "core + parsed equivalent",
       "modules": 31,
-      "sourceBytes": 765955,
-      "importMs": 0.753,
-      "constructionMs": 0.4256,
-      "firstRenderMs": 0.3514,
-      "retainedBytes": 468904
+      "sourceBytes": 765034,
+      "importMs": 1.38,
+      "constructionMs": 0.6405,
+      "firstRenderMs": 0.5284,
+      "retainedBytes": 474232
     }
   ],
+  "browser": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.7032.0 Chrome/152.0.7977.130 Safari/537.36",
+    "transferCompression": "none — the harness server does not compress; section 9.2's gzip/brotli ceilings are a separate measure",
+    "memoryKind": "performance.memory (coarse, whole-page)",
+    "note": "One variant per page load: measuring both in one document leaves the second with a warm module cache and zero cold-import, resource and transfer figures.",
+    "variants": [
+      {
+        "label": "root + raw-text catalog",
+        "resources": 32,
+        "encodedBytes": 777038,
+        "decodedBytes": 777038,
+        "coldImportMs": 25,
+        "importMs": 1.3,
+        "constructionMs": 0.2,
+        "firstRenderMs": 0.5,
+        "firstRender": "I read 3 books"
+      },
+      {
+        "label": "core + parsed equivalent",
+        "resources": 31,
+        "encodedBytes": 765955,
+        "decodedBytes": 765955,
+        "coldImportMs": 27.4,
+        "importMs": 1.9,
+        "constructionMs": 0.6,
+        "firstRenderMs": 0.6,
+        "firstRender": "I read 3 books"
+      }
+    ]
+  },
   "rebaselines": [
     {
       "reason": "M4: src/internal/plural.js grew to 1,068 lines implementing exact BigInt decimal arithmetic, CLDR operands, compact exponents, and the pinned JDK double-to-decimal contract. The M4 gate requires exact numeric conversion 'with an explicit JS implementation rather than assuming Number.prototype.toString is identical', so this growth is the milestone's substance, not incidental. Module count is unchanged at 19: the optional ordinal and range data stayed out of the root graph.",
@@ -665,36 +695,25 @@
       },
       "browserHalf": true,
       "previousSha256": "1a91b1983c0216e003378d4c80d74dcc58d325f15c5cca50017934ef16845356"
-    }
-  ],
-  "browser": {
-    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.7032.0 Chrome/152.0.7977.130 Safari/537.36",
-    "transferCompression": "none — the harness server does not compress; section 9.2's gzip/brotli ceilings are a separate measure",
-    "memoryKind": "performance.memory (coarse, whole-page)",
-    "note": "One variant per page load: measuring both in one document leaves the second with a warm module cache and zero cold-import, resource and transfer figures.",
-    "variants": [
-      {
-        "label": "root + raw-text catalog",
-        "resources": 32,
-        "encodedBytes": 777038,
-        "decodedBytes": 777038,
-        "coldImportMs": 25,
-        "importMs": 1.3,
-        "constructionMs": 0.2,
-        "firstRenderMs": 0.5,
-        "firstRender": "I read 3 books"
+    },
+    {
+      "reason": "Recipe revision 2 and createStrings lost its constant locale option before 1.0.0 (maintainer, 2026-09-27): every instance takes exactly one resolver, as a Java instance takes exactly one supplier; the refusal naming the replacement adds source bytes.",
+      "growth": [
+        "the recipe moved from revision 1 to 2; figures either side are not comparable as the same scenario, so the move is recorded with a reason"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 776117
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 765034
+        }
       },
-      {
-        "label": "core + parsed equivalent",
-        "resources": 31,
-        "encodedBytes": 765955,
-        "decodedBytes": 765955,
-        "coldImportMs": 27.4,
-        "importMs": 1.9,
-        "constructionMs": 0.6,
-        "firstRenderMs": 0.6,
-        "firstRender": "I read 3 books"
-      }
-    ]
-  }
+      "browserHalf": true,
+      "browserSha256": "d6c284010377182ec210e3e79fece7e6881bb3f437bdd662502486f3a870da84",
+      "previousSha256": "0f2419332f0c8ecb64f9891afe9fda94c75aa92cdbaa479c0c8dedf8dc4beb9d"
+    }
+  ]
 }

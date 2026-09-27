@@ -278,7 +278,7 @@ test("a body of EXACTLY maximumInputBytes loads end to end", async () => {
   assert.equal(loaded.failures.length, 0);
   assert.equal(state.enqueued, 8, "65,536 octets in 8 KiB chunks is exactly 8 deliveries");
   assert.equal(loaded.loadingLimits.maximumInputBytes, CAP, "the snapshot reports the cap that was applied");
-  assert.equal(createStrings({ loaded, locale: "en" }).get("Greeting").length, CAP - 15,
+  assert.equal(createStrings({ loaded, localeResolver: () => "en" }).get("Greeting").length, CAP - 15,
     "the at-cap body must survive all the way to a constructed instance");
 });
 

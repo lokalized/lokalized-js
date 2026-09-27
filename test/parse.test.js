@@ -369,7 +369,7 @@ test("each door reproduces JAVA's wording for that door, and the two do not drif
     // `locale` is named because B4 made the ambient locale source required (plan 3.2's "exactly one
     // of"), and without it this assertion would be satisfied by THAT refusal instead of the
     // expression one it is written to pin — an earlier guard answering for a later check.
-    () => createStrings({ fallbackLocale: "en", locale: "en", strings: { en: catalog } }),
+    () => createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: catalog } }),
     {
       message:
         "Invalid localized string 'A' for locale 'en': Invalid alternative expression 'count ==': " +
@@ -390,7 +390,7 @@ test("the construction door retains the evaluator's error as the CAUSE, as Java 
   const catalog = { A: { translation: "t", alternatives: [{ "count ==": { translation: "y" } }] } };
 
   try {
-    createStrings({ fallbackLocale: "en", locale: "en", strings: { en: catalog } });
+    createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: catalog } });
     assert.fail("expected a refusal");
   } catch (error) {
     assert.ok(error instanceof Error);
@@ -412,7 +412,7 @@ test("the FRAGMENT shape gets Java's other construction sentence, not the whole-
   };
 
   assert.throws(
-    () => createStrings({ fallbackLocale: "en", locale: "en", strings: { en: catalog } }),
+    () => createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: catalog } }),
     {
       message:
         "Invalid localized string 'A' for locale 'en': Invalid expression alternative 0 for " +
@@ -434,7 +434,7 @@ test("a NESTED alternative reports the ROOT key, not a path — measured against
   };
 
   assert.throws(
-    () => createStrings({ fallbackLocale: "en", locale: "en", strings: { en: nested } }),
+    () => createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: nested } }),
     {
       message:
         "Invalid localized string 'A' for locale 'en': Invalid alternative expression 'count ==': " +

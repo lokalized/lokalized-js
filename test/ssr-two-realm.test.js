@@ -100,14 +100,14 @@ test("the topology itself: two distinct module registries, with genuinely differ
 });
 
 test("clause 47: the ACCEPTED loaded case stamps across the boundary", () => {
-  const strings = createStrings({ loaded: loaded(), locale: "fr" });
+  const strings = createStrings({ loaded: loaded(), localeResolver: () => "fr" });
   const stamp = otherSsr.createSsrStamp(strings, CONTEXT);
   assert.equal(stamp.lookupLocale, "fr");
   assert.deepEqual(stamp.localeMatch, { locale: "fr", matchType: "exact" });
 });
 
 test("clause 47: the REJECTED direct-construction case is rejected across the boundary", () => {
-  const direct = createStrings({ strings: { en, fr }, fallbackLocale: "en", locale: "fr" });
+  const direct = createStrings({ strings: { en, fr }, fallbackLocale: "en", localeResolver: () => "fr" });
   assert.throws(() => otherSsr.createSsrStamp(direct, CONTEXT), /constructed directly/);
 });
 
@@ -119,7 +119,7 @@ test("clause 42/47: a DIFFERENT-VERSION helper stamps the RENDERING instance, no
   // SSR module's own constants", and plan 3.4:731 gives the reason for the IANA pair specifically:
   // automatic direct-locale match diagnostics are rendering-observable and must not drift between
   // server and client.
-  const strings = createStrings({ loaded: loaded(), locale: "fr" });
+  const strings = createStrings({ loaded: loaded(), localeResolver: () => "fr" });
   const stamp = otherSsr.createSsrStamp(strings, CONTEXT);
 
   assert.equal(stamp.producerVersion, RUNTIME_METADATA.producerVersion);
@@ -144,7 +144,7 @@ test("clause 42: the copy's own renderer produces a DIFFERENT stamp, which is th
   // so the fields are demonstrably reachable, and the previous test's result is about WHOSE they are.
   const theirs = otherCore.createStrings({
     loaded: { ...loaded(), dataFingerprint: "e".repeat(64) },
-    locale: "fr",
+    localeResolver: () => "fr",
   });
   const stamp = otherSsr.createSsrStamp(theirs, CONTEXT);
   assert.equal(stamp.producerVersion, otherMetadata.producerVersion);
@@ -156,6 +156,6 @@ test("a renderer and a helper from different copies still REFUSE incompatible pi
   // The other direction of the same boundary: the copy's CORE will not build a `Strings` from a
   // loader result produced against this core's data, because plan 3.4 requires exact equality. The
   // duplication-safety is about the STAMP channel, not about mixing data.
-  assert.throws(() => otherCore.createStrings({ loaded: loaded(), locale: "fr" }),
+  assert.throws(() => otherCore.createStrings({ loaded: loaded(), localeResolver: () => "fr" }),
     /produced against CLDR|this core carries CLDR/);
 });

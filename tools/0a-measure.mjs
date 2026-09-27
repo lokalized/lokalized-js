@@ -66,7 +66,12 @@ export async function measureVariant(root, variant) {
   /** @type {unknown} */
   let handed = null;
   const construct = (/** @type {any} */ mod) =>
-    mod.createStrings(handed = { ...RECIPE.construction, strings: catalogsFor(variant), tiebreakers: TIEBREAKERS });
+    mod.createStrings(handed = {
+      fallbackLocale: RECIPE.construction.fallbackLocale,
+      localeResolver: () => RECIPE.construction.localeResolverAnswers,
+      strings: catalogsFor(variant),
+      tiebreakers: TIEBREAKERS,
+    });
   const render = (/** @type {any} */ strings) => strings.get(RECIPE.render.key, { ...RECIPE.render.values });
 
   /** @type {number[]} */ const imports = [];

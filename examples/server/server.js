@@ -81,7 +81,9 @@ export async function startBookshop(options = {}) {
   // its own translations over the network it is serving.
   const local = await localCatalogManifest({ catalogVersion });
   const loaded = await loadEntireManifestFromFiles(local);
-  const strings = createStrings({ loaded, locale: loaded.fallbackLocale });
+  // ONE instance for every request, so the resolver cannot know a request's language: each render
+  // names it per call, from the negotiated match. The resolver answers only a lookup that forgot to.
+  const strings = createStrings({ loaded, localeResolver: () => loaded.fallbackLocale });
   const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
 
   const server = createServer();

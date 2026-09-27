@@ -22,7 +22,7 @@ const STRINGS = {
   en: { Greeting: { translation: "Hello, {{who}}" } },
 };
 
-const strings = () => createStrings({ fallbackLocale: "en", locale: "en", strings: STRINGS });
+const strings = () => createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: STRINGS });
 
 test("a null placeholder name in the Map form is refused", () => {
   const s = strings();

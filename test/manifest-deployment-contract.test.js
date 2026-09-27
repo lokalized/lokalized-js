@@ -307,7 +307,7 @@ test("clause 6: THE CONTROL — the same fixture at formatVersion 1 loads end to
   const loaded = await loadEntireManifest(manifestFor(["en", "fr"]), { fetch: transport.impl });
   assert.equal(loaded.complete, true);
   assert.equal(transport.calls.length, 2, "and the recorder is a live instrument, not always empty");
-  assert.equal(createStrings({ loaded, locale: "fr" }).get("Greeting"), "hello fr");
+  assert.equal(createStrings({ loaded, localeResolver: () => "fr" }).get("Greeting"), "hello fr");
 });
 
 // =================================================================================================
@@ -511,7 +511,7 @@ test("clause 6: a file entry with no usable sha256 is refused at validation, nam
   // THE CONTROL: the same entry with a correct lowercase digest loads, and the catalog it names is
   // really reachable — so the arms above died at the digest shape, not in an unrelated guard.
   const loaded = await loadEntireManifest(origin, { fetch: recordingFetch().impl });
-  assert.equal(createStrings({ loaded, locale: "fr" }).get("Greeting"), "hello fr");
+  assert.equal(createStrings({ loaded, localeResolver: () => "fr" }).get("Greeting"), "hello fr");
 });
 
 // =================================================================================================
@@ -558,9 +558,9 @@ test("clause 6: a body whose digest does not match is refused at EVERY plan posi
     assert.equal(partial.complete, false, corrupt);
     assert.ok(!(corrupt in partial.catalogs), `${corrupt}: an unverified catalog is not offered`);
     for (const locale of ["de", "en", "fr", "ja"])
-      assert.notEqual(createStrings({ loaded: partial, locale }).get("Greeting"), "SWAPPED!",
+      assert.notEqual(createStrings({ loaded: partial, localeResolver: () => locale }).get("Greeting"), "SWAPPED!",
         `${corrupt}: no instance anywhere may render the unverified body`);
-    assert.equal(createStrings({ loaded: partial, locale: corrupt }).get("Greeting"), "hello en",
+    assert.equal(createStrings({ loaded: partial, localeResolver: () => corrupt }).get("Greeting"), "hello en",
       `${corrupt}: it falls back instead`);
   }
 
@@ -569,7 +569,7 @@ test("clause 6: a body whose digest does not match is refused at EVERY plan posi
   const clean = await loadEntireManifest(manifest, { fetch: recordingFetch().impl });
   assert.equal(clean.complete, true);
   for (const locale of ["de", "en", "fr", "ja"])
-    assert.equal(createStrings({ loaded: clean, locale }).get("Greeting"), `hello ${locale}`);
+    assert.equal(createStrings({ loaded: clean, localeResolver: () => locale }).get("Greeting"), `hello ${locale}`);
 });
 
 test("clause 6: the SUBSET door binds bodies too — it is the one SSR and edge deployments call", async () => {
@@ -585,7 +585,7 @@ test("clause 6: the SUBSET door binds bodies too — it is the one SSR and edge 
     .map((f) => [f.locale, f.stage]), [["fr", "digest"]]);
 
   const control = await loadStrings(manifest, "fr", { fetch: recordingFetch().impl });
-  assert.equal(createStrings({ loaded: control, locale: "fr" }).get("Greeting"), "hello fr");
+  assert.equal(createStrings({ loaded: control, localeResolver: () => "fr" }).get("Greeting"), "hello fr");
 });
 
 test("clause 6: two entries pointing at ONE url are bound INDEPENDENTLY, not deduplicated", async () => {
@@ -635,7 +635,7 @@ test("clause 6: decodedBytes is compared to the BODY, and an encoded Content-Len
   assert.equal(exact.files.en.decodedBytes, bytes.length);
   const loaded = await loadEntireManifest(exact, { fetch: recordingFetch({ headers }).impl });
   assert.equal(loaded.complete, true, "a content-coded response must not be refused on its header");
-  assert.equal(createStrings({ loaded, locale: "en" }).get("Greeting"), "hello en");
+  assert.equal(createStrings({ loaded, localeResolver: () => "en" }).get("Greeting"), "hello en");
 
   // ARM (b): the DECLARATION is wrong and the bytes are right, so the digest still matches and cannot
   // pre-empt the length check. Altering the body instead would move the digest — zh-123 again — and
@@ -799,7 +799,7 @@ test("clause 6: a dev manifest points at the SCANNED SOURCES, awkward names incl
   assert.deepEqual(Object.keys(loaded.catalogs).sort(), ["de", "en-US", "fr", "pt-BR"]);
   assert.equal(loaded.complete, true);
   for (const locale of ["de", "en-US", "fr", "pt-BR"])
-    assert.equal(createStrings({ loaded, locale }).get("Greeting"), `hello ${locale}`,
+    assert.equal(createStrings({ loaded, localeResolver: () => locale }).get("Greeting"), `hello ${locale}`,
       "each catalog's marker is distinct, so a mix-up is visible as content");
 
   // CONTROL (a): the OTHER door onto the same directory — the Java-arbitrated one — agrees. Scoped to
@@ -835,7 +835,7 @@ test("clause 6: the dev door hashes RAW FILE BYTES — a BOM'd catalog generates
 
   const loaded = await loadEntireManifestFromFiles(manifest);
   assert.equal(loaded.complete, true, "and the load half re-reads and re-hashes the same octets");
-  assert.equal(createStrings({ loaded, locale: "en" }).get("Greeting"), "hello en");
+  assert.equal(createStrings({ loaded, localeResolver: () => "en" }).get("Greeting"), "hello en");
 });
 
 // =================================================================================================
@@ -940,8 +940,8 @@ test("clause 6: a lookup load requests a STRICT SUBSET and never warms the rest"
   } });
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(secondCalls, calls, "a second load re-requests the same set; nothing is served from a cache");
-  assert.equal(createStrings({ loaded: second, locale: "fr-CA" }).get("Greeting"),
-    createStrings({ loaded: first, locale: "fr-CA" }).get("Greeting"),
+  assert.equal(createStrings({ loaded: second, localeResolver: () => "fr-CA" }).get("Greeting"),
+    createStrings({ loaded: first, localeResolver: () => "fr-CA" }).get("Greeting"),
     "and it produced a real result, so an empty recorder could not be explained by an empty load");
 
   // THE CONTROL THAT STOPS A LOADER WHICH FETCHES NOTHING FROM PASSING: the whole-manifest door must

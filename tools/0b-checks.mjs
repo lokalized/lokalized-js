@@ -195,7 +195,7 @@ export function harnessProblems({ page, manifestText, server }, subject = SUBJEC
   // place a check reads them. (Not every recipe field is read by a check: its prose — the cache and
   // preload state, the region, the browser, among others — is frozen by the digest and read by people.)
   const { locale, key, values } = RECIPE.render;
-  const renderCalls = [`loadStrings(manifest, ${JSON.stringify(locale)})`, `createStrings({ loaded, locale: ${JSON.stringify(locale)} })`,
+  const renderCalls = [`loadStrings(manifest, ${JSON.stringify(locale)})`, `createStrings({ loaded, localeResolver: () => ${JSON.stringify(locale)} })`,
     `strings.get(${JSON.stringify(key)}, { ${Object.entries(values).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(", ")} })`];
   for (const call of renderCalls)
     if (page.split(call).length !== 2) problems.push(`tools/browser-0b/index.html does not make the recipe's render call ${call} exactly once`);

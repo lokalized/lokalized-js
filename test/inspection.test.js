@@ -16,7 +16,7 @@ import { createStrings } from "../src/index.js";
 const strings = () =>
   createStrings({
     fallbackLocale: "en",
-    locale: "en",
+    localeResolver: () => "en",
     strings: { en: { Beta: "b", Alpha: "a", Gamma: "g" }, "en-GB": { Alpha: "a" }, ro: { Alpha: "a" } },
     tiebreakers: { en: ["en", "en-GB"] },
   });

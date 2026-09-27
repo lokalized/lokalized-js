@@ -337,7 +337,7 @@ function bothPerCallSourcesStillRefused() {
 
   const strings = core.createStrings({
     fallbackLocale: "en",
-    locale: "en",
+    localeResolver: () => "en",
     strings: { en: { "K": "v" }, fr: { "K": "v" } },
   });
   const localeMatch = strings.getDirectLocaleContext("fr").localeMatch;
@@ -1374,7 +1374,10 @@ function createStringsOptionsFor(fixture, instanceBox, overrides, fixtureId) {
   // of the both-present literal is the user's recorded decision that B3 landed, not this arm's.
   let localeOption;
   if (overrides?.localeSource === undefined)
-    localeOption = localeSource ?? { locale: fixture.instanceLocale ?? fixture.fallbackLocale };
+    // Java's both-absent arm IS a supplier — `localeSupplier(matcher -> instanceLocale)` — so the port
+    // side is a resolver answering the same constant, and a refusal names `localeResolver result`
+    // exactly where Java names `localeSupplier result`.
+    localeOption = localeSource ?? { localeResolver: () => fixture.instanceLocale ?? fixture.fallbackLocale };
   else if (overrides.localeSource === "omit") localeOption = {};
   // Strings.java:288 / :310 — a NULL setter argument does not clear the sibling supplier, so the
   // surviving source decides and the instance BUILDS. The JS analogue of "the caller wrote the key
@@ -3413,7 +3416,7 @@ function runCase(testCase, fixture) {
       // Checked through the PUBLIC surface — a one-slot catalog rendered by `createStrings` — rather
       // than by reaching into the renderer, so what this compares is what an application would get.
       // The `en` locale means the library default leaves it un-isolated.
-      const slots = core.createStrings({ fallbackLocale: "en", locale: "en", strings: { en: { Slot: "{{slot}}" } } });
+      const slots = core.createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: { Slot: "{{slot}}" } } });
       const actual = expected.tuples.map((t) => {
         const constant = rootApi[t.name];
         if (!constant) unsupported(`language-form constant ${t.name} is not exported`);

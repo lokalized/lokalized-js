@@ -24,7 +24,7 @@ import { createStrings } from "../src/core/index.js";
 const build = (strings, tiebreakers) =>
   createStrings({
     fallbackLocale: "en",
-    locale: "en",
+    localeResolver: () => "en",
     strings,
     ...(tiebreakers ? { tiebreakers } : {}),
   });
@@ -61,7 +61,7 @@ describe("createStrings({ tiebreakers }) — ambiguity is refused at constructio
   it("groups by CANONICAL language code, so `mo` and `ro` collide", () => {
     // Not a spelling collision: CLDR canonicalizes `mo` to `ro`, so one language code carries both
     // and a request for `ro` has the same two answers `en` had. Java refuses this pair too.
-    assert.throws(() => createStrings({ fallbackLocale: "ro", locale: "ro", strings: { mo: { K: "a" }, ro: { K: "b" } } }), {
+    assert.throws(() => createStrings({ fallbackLocale: "ro", localeResolver: () => "ro", strings: { mo: { K: "a" }, ro: { K: "b" } } }), {
       message: /language code 'ro' because localized strings exist for the following locale\[s\]: \[mo, ro\]/,
     });
   });

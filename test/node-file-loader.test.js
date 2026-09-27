@@ -73,7 +73,7 @@ test("a whole-manifest file load constructs a Strings, through the DEFAULT strea
   assert.equal(loaded.complete, true);
   assert.deepEqual(loaded.coverage, { kind: "entire-manifest" });
 
-  const strings = createStrings({ loaded, locale: "fr" });
+  const strings = createStrings({ loaded, localeResolver: () => "fr" });
   assert.equal(strings.get("Hi"), "hello fr");
   assert.deepEqual(strings.getSupportedLocales(), ["de", "en", "fr"]);
 });
@@ -212,7 +212,7 @@ test("allow-partial keeps a load whose fallback arrived, and refuses one whose f
   assert.deepEqual(Object.keys(partial.catalogs), ["en"]);
   assert.equal(partial.failures.length, 1);
   // And it still constructs — the loaded branch accepts an incomplete result, and refuses to stamp it.
-  assert.equal(createStrings({ loaded: partial, locale: "en" }).get("Hi"), "hello en");
+  assert.equal(createStrings({ loaded: partial, localeResolver: () => "en" }).get("Hi"), "hello en");
 
   const { manifest: noFallback } = directoryManifest(["en", "fr"], { omit: "en" });
   await assert.rejects(
@@ -263,7 +263,7 @@ test("a manifest read from disk loads through the same door it describes", async
   const path = join(directory, "strings.manifest.json");
   writeFileSync(path, JSON.stringify(manifest));
   const loaded = await loadEntireManifestFromFiles(await readStringsManifest(path));
-  assert.equal(createStrings({ loaded, locale: "fr" }).get("Hi"), "hello fr");
+  assert.equal(createStrings({ loaded, localeResolver: () => "fr" }).get("Hi"), "hello fr");
 });
 
 // ------------------------------------------------------------- the two doors agree

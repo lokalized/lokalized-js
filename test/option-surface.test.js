@@ -75,7 +75,7 @@ const BOGUS = "zzUnknownOptionZZ";
  * a test below compares this table to that list, door by door, in both directions.
  */
 const ACCEPTS = /** @type {Record<string, readonly string[]>} */ ({
-  createStrings: ["strings", "fallbackLocale", "locale", "tiebreakers", "loadingLimits",
+  createStrings: ["strings", "fallbackLocale", "tiebreakers", "loadingLimits",
     "runtimeLimits", "loaded", "catalogIdentity", "onWarning", "pluralData", "phoneticResolver",
     "bidiIsolation", "fallbackPolicy", "onFailure", "onFallback", "localeResolver",
     "localeMatchResolver"],
@@ -166,12 +166,12 @@ const bodies = new Map(Object.entries(CATALOG).map(([tag, catalog]) => [`${tag}.
 const transport = /** @type {any} */ (async (/** @type {RequestInfo | URL} */ url) =>
   new Response(bodies.get(String(url).split("/").pop() ?? "")));
 
-const instance = createStrings({ strings: CATALOG, fallbackLocale: "en", locale: "en" });
+const instance = createStrings({ strings: CATALOG, fallbackLocale: "en", localeResolver: () => "en" });
 const configuration = instance.getLocaleConfiguration();
 
 /** Every public door that takes an options object, with a minimal call that SUCCEEDS. */
 const DOORS = {
-  createStrings: (o) => createStrings({ strings: CATALOG, fallbackLocale: "en", locale: "en", ...o }).get("A"),
+  createStrings: (o) => createStrings({ strings: CATALOG, fallbackLocale: "en", localeResolver: () => "en", ...o }).get("A"),
   parseStrings: (o) => parseStrings(CATALOG_TEXT, { locale: "en", ...o }).strings.length,
   mergeParsedStringsFiles: (o) => mergeParsedStringsFiles([parseStrings(CATALOG_TEXT, { locale: "en" })], o).strings.length,
   parseStringsManifest: (o) => parseStringsManifest(JSON.stringify(httpManifest), o).catalogVersion,
@@ -534,9 +534,9 @@ test("every LocaleConfiguration the library produces passes all three doors that
     new Response(bodies.get(String(url).split("/").pop() ?? ""))));
   const produced = {
     direct: instance.getLocaleConfiguration(),
-    subset: createStrings({ loaded: await loadStrings(httpManifest, "fr", { fetch: fr }), locale: "fr" })
+    subset: createStrings({ loaded: await loadStrings(httpManifest, "fr", { fetch: fr }), localeResolver: () => "fr" })
       .getLocaleConfiguration(),
-    entire: createStrings({ loaded: await loadEntireManifest(httpManifest, { fetch: fr }), locale: "fr" })
+    entire: createStrings({ loaded: await loadEntireManifest(httpManifest, { fetch: fr }), localeResolver: () => "fr" })
       .getLocaleConfiguration(),
     manifest: localeConfigurationForManifest(httpManifest),
   };
@@ -800,11 +800,11 @@ test("the two spellings of the load-time limits are a mirror, and each door NAME
 
   // `createStrings` spells it `loadingLimits` …
   assert.match(
-    outcome(() => createStrings({ strings: CATALOG, fallbackLocale: "en", locale: "en", loadingLimits: tight })),
+    outcome(() => createStrings({ strings: CATALOG, fallbackLocale: "en", localeResolver: () => "en", loadingLimits: tight })),
     /aggregate maximum of 1 translation nodes/,
     "the CORRECT spelling must still bite, or the refusal below proves nothing about the mirror");
   assert.match(
-    outcome(() => createStrings({ strings: CATALOG, fallbackLocale: "en", locale: "en", limits: tight })),
+    outcome(() => createStrings({ strings: CATALOG, fallbackLocale: "en", localeResolver: () => "en", limits: tight })),
     /`limits` is not the option name here; `loadingLimits` is/);
 
   // … and `parseStrings` spells the same thing `limits`. Each names the other's.

@@ -31,7 +31,7 @@ const PHONETIC = {
 };
 
 const instance = (/** @type {() => unknown} */ resolver, onFailure = () => THROW_EXCEPTION) =>
-  createStrings({ strings: PHONETIC, fallbackLocale: "en", locale: "en",
+  createStrings({ strings: PHONETIC, fallbackLocale: "en", localeResolver: () => "en",
     phoneticResolver: /** @type {any} */ (resolver), onFailure: /** @type {any} */ (onFailure) });
 
 const caught = (/** @type {() => unknown} */ body) => {
@@ -74,7 +74,7 @@ test("a library failure carries its own code up through the ladder rather than b
   // STILL be invalid-state: the code travels with the cause, because a library failure already knows
   // the category Java would have re-derived, and re-deriving could only disagree.
   const error = caught(() =>
-    createStrings({ strings: PHONETIC, fallbackLocale: "en", locale: "en",
+    createStrings({ strings: PHONETIC, fallbackLocale: "en", localeResolver: () => "en",
       onFailure: () => THROW_EXCEPTION }).get("Key", { term: "apple" }));
   assert.ok(error instanceof ResolutionError);
   assert.equal(error.code, "RESOLUTION_INVALID_STATE");

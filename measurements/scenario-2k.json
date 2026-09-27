@@ -28,7 +28,7 @@
   "iterations": 9,
   "graph": {
     "src/index.js": {
-      "bytes": 777038,
+      "bytes": 776117,
       "modules": 32,
       "files": [
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/core/index.js",
@@ -66,7 +66,7 @@
       ]
     },
     "src/core/index.js": {
-      "bytes": 765955,
+      "bytes": 765034,
       "modules": 31,
       "files": [
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/core/index.js",
@@ -108,83 +108,83 @@
       "label": "root + raw-text catalog",
       "entry": "src/index.js",
       "importMs": {
-        "median": 0.5852920000000097,
-        "min": 0.49662499999999454,
-        "max": 12.647082999999999,
-        "spread": 20.759651592708945,
+        "median": 0.5807910000000049,
+        "min": 0.4445840000000061,
+        "max": 11.831542000000002,
+        "spread": 19.605947750567587,
         "n": 9
       },
       "constructionMs": {
-        "median": 10.145459000000002,
-        "min": 8.196042000000006,
-        "max": 20.263959,
-        "spread": 1.1894895046148224,
+        "median": 8.79925,
+        "min": 7.587082999999993,
+        "max": 19.485500000000002,
+        "spread": 1.3522080859164143,
         "n": 9
       },
       "firstRenderMs": {
-        "median": 0.33454100000000153,
-        "min": 0.25891599999999926,
-        "max": 1.806709000000005,
-        "spread": 4.6266167674515195,
+        "median": 0.37120799999999576,
+        "min": 0.240791999999999,
+        "max": 1.667665999999997,
+        "spread": 3.8438665114976356,
         "n": 9
       },
       "steadyLookupNsFallback": {
-        "median": 52834.70850000003,
-        "min": 52390.666499999956,
-        "max": 54348.562500000015,
-        "spread": 0.03705700392006625,
+        "median": 51522.958500000015,
+        "min": 50710.77049999997,
+        "max": 53184.354500000016,
+        "spread": 0.04800935489758503,
         "n": 9
       },
       "steadyLookupNsDirect": {
-        "median": 23755.125000000022,
-        "min": 23483.771000000048,
-        "max": 24377.49999999994,
-        "spread": 0.03762257618092488,
+        "median": 23092.41650000001,
+        "min": 22710.95850000006,
+        "max": 23828.16700000001,
+        "spread": 0.04837988696418797,
         "n": 9
       },
-      "retainedAfterConstructionBytes": 1363392,
-      "retainedAfterSweepBytes": 1482224
+      "retainedAfterConstructionBytes": 1356088,
+      "retainedAfterSweepBytes": 1483968
     },
     {
       "label": "core + parsed equivalent",
       "entry": "src/core/index.js",
       "importMs": {
-        "median": 1.0219579999998132,
-        "min": 0.8747079999998277,
-        "max": 1.3416659999998046,
-        "spread": 0.45692484426959057,
+        "median": 1.0512909999997646,
+        "min": 0.9094999999997526,
+        "max": 1.494666000000052,
+        "spread": 0.5566165790446512,
         "n": 9
       },
       "constructionMs": {
-        "median": 6.046832999999879,
-        "min": 5.589249999999993,
-        "max": 8.2309580000001,
-        "spread": 0.43687464165128437,
+        "median": 6.397458999999799,
+        "min": 5.78387500000008,
+        "max": 8.264000000000124,
+        "spread": 0.38767344972435486,
         "n": 9
       },
       "firstRenderMs": {
-        "median": 0.3628750000002583,
-        "min": 0.3293340000000171,
-        "max": 0.5653330000000096,
-        "spread": 0.6503589390281076,
+        "median": 0.38312500000029104,
+        "min": 0.3429169999999431,
+        "max": 0.4291250000001128,
+        "spread": 0.22501272430696043,
         "n": 9
       },
       "steadyLookupNsFallback": {
-        "median": 52226.27049999983,
-        "min": 51990.10399999997,
-        "max": 55275.54149999992,
-        "spread": 0.06290775635606528,
+        "median": 51810.35399999996,
+        "min": 50541.77099999993,
+        "max": 54506.041500000036,
+        "spread": 0.07651502439068666,
         "n": 9
       },
       "steadyLookupNsDirect": {
-        "median": 23604.95849999984,
-        "min": 23306.041499999992,
-        "max": 24572.66699999991,
-        "spread": 0.053659297897089155,
+        "median": 22798.896000000015,
+        "min": 22637.37500000002,
+        "max": 22986.93749999984,
+        "spread": 0.015332431008932253,
         "n": 9
       },
-      "retainedAfterConstructionBytes": 1278864,
-      "retainedAfterSweepBytes": 1490504
+      "retainedAfterConstructionBytes": 1277592,
+      "retainedAfterSweepBytes": 1488504
     }
   ]
 }

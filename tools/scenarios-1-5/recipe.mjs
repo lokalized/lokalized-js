@@ -197,10 +197,16 @@ export const ENTRIES = Object.freeze({
  * `--write --reason` accepts, where containment is what the scenario IS and cannot be re-recorded away.
  * That holds only while the runner applies it, so `test/scenarios-1-5.test.js` pins the runner handing
  * every verdict to the run's verdict: with the call deleted, a review re-recorded exactly that growth.
+ *
+ * **REVISION 2 OF ALL FIVE (2026-09-27), and of the suite.** `createStrings` lost its constant `locale`
+ * option before 1.0.0 (the maintainer: an instance needs a resolver, as a Java instance needs a
+ * supplier). The fixtures are unchanged — each still names the tag — and `harness.mjs` now builds the
+ * resolver that answers it, which moves the harness bytes inside every recipe digest. Same fixture,
+ * same render, same columns and rules; a changed method, hence a revision.
  */
 export const RECIPES = Object.freeze({
   1: Object.freeze({
-    revision: 1, title: "self-contained no-build browser root", input: "raw", fixture: "base",
+    revision: 2, title: "self-contained no-build browser root", input: "raw", fixture: "base",
     variants: Object.freeze([
       Object.freeze({ label: "root module", form: "no-build", files: Object.freeze(["lokalized.js"]) }),
     ]),
@@ -208,13 +214,13 @@ export const RECIPES = Object.freeze({
     mustNotReach: Object.freeze([OPTIONAL_DATA.ordinal, OPTIONAL_DATA.ranges, OPTIONAL_DATA.fullRange]),
   }),
   2: Object.freeze({
-    revision: 1, title: "bundler import of `lokalized`", input: "raw", fixture: "base",
+    revision: 2, title: "bundler import of `lokalized`", input: "raw", fixture: "base",
     variants: Object.freeze([Object.freeze({ label: "esbuild", form: "bundler", entry: "root" })]),
     mustReach: Object.freeze(["src/index.js"]),
     mustNotReach: Object.freeze([OPTIONAL_DATA.ordinal, OPTIONAL_DATA.ranges, OPTIONAL_DATA.fullRange]),
   }),
   3: Object.freeze({
-    revision: 1, title: "`lokalized/core` with an already parsed catalog", input: "parsed", fixture: "base",
+    revision: 2, title: "`lokalized/core` with an already parsed catalog", input: "parsed", fixture: "base",
     variants: Object.freeze([
       Object.freeze({ label: "esbuild", form: "bundler", entry: "core" }),
       Object.freeze({ label: "no-build core.js", form: "no-build", files: Object.freeze(["core.js"]) }),
@@ -223,7 +229,7 @@ export const RECIPES = Object.freeze({
     mustNotReach: Object.freeze(["src/index.js", OPTIONAL_DATA.ordinal, OPTIONAL_DATA.ranges, OPTIONAL_DATA.fullRange]),
   }),
   4: Object.freeze({
-    revision: 1, title: "root plus ordinal data", input: "raw", fixture: "ordinal",
+    revision: 2, title: "root plus ordinal data", input: "raw", fixture: "ordinal",
     variants: Object.freeze([
       Object.freeze({ label: "esbuild", form: "bundler", entry: "ordinal" }),
       Object.freeze({ label: "no-build core.js + data/ordinal.js", form: "no-build",
@@ -234,7 +240,7 @@ export const RECIPES = Object.freeze({
     mustNotReach: Object.freeze([OPTIONAL_DATA.ranges, OPTIONAL_DATA.fullRange]),
   }),
   5: Object.freeze({
-    revision: 1, title: "root plus range data", input: "raw", fixture: "ranges",
+    revision: 2, title: "root plus range data", input: "raw", fixture: "ranges",
     variants: Object.freeze([
       Object.freeze({ label: "esbuild", form: "bundler", entry: "ranges" }),
       Object.freeze({ label: "no-build core.js + data/ranges.js", form: "no-build",
@@ -310,26 +316,27 @@ export function currentDigests() {
 
 /** @type {Readonly<Record<string, Readonly<Record<number, string>>>>} */
 export const RECIPE_DIGESTS = Object.freeze({
-  1: Object.freeze({ 1: "3f41582f933a4dc821e99eb9782fc5c5c355981cc182efa097a581ab455e4c1f" }),
-  2: Object.freeze({ 1: "7f5af5b3153a0e66820a91d0ecaff0e7d92295b89910053f58fb702d5e8631af" }),
-  3: Object.freeze({ 1: "8eafa50ef953b5a72ca5bb0b8fc78a88f041ba3a2b0558850105ce2e98bce90f" }),
-  4: Object.freeze({ 1: "b6a8322ff7e302268843ec8bd7a11742d0509664892eca7702db859911787df1" }),
-  5: Object.freeze({ 1: "5b19e25e2408d242b82e04b4a3db5f0ff4e78eb6a8ab4e293105f3a7aa3cf03f" }),
+  1: Object.freeze({ 1: "3f41582f933a4dc821e99eb9782fc5c5c355981cc182efa097a581ab455e4c1f", 2: "5cd78517b2c845256503d92415771f2fa592732e62574604567ad15d9cee42f0" }),
+  2: Object.freeze({ 1: "7f5af5b3153a0e66820a91d0ecaff0e7d92295b89910053f58fb702d5e8631af", 2: "874ca02b665610ed39571cf2392691cdaee84bffb1b94b45db1ce4a6d9509fa1" }),
+  3: Object.freeze({ 1: "8eafa50ef953b5a72ca5bb0b8fc78a88f041ba3a2b0558850105ce2e98bce90f", 2: "035e756c33bf208e665fb590008730ef8aa8ceb818cf54eee28ddee448385ad8" }),
+  4: Object.freeze({ 1: "b6a8322ff7e302268843ec8bd7a11742d0509664892eca7702db859911787df1", 2: "1427000796f584de2a21a543184662ddf97434ccd1a3156e3035b3ab0632a6f2" }),
+  5: Object.freeze({ 1: "5b19e25e2408d242b82e04b4a3db5f0ff4e78eb6a8ab4e293105f3a7aa3cf03f", 2: "5149c26b1d140f6589e2dfc50235583da5005a79cb8f533d85aff2459f3ac416" }),
 });
 
 /** @type {Readonly<Record<string, Readonly<Record<number, string>>>>} */
 export const FIXTURE_DIGESTS = Object.freeze({
-  1: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" }),
-  2: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" }),
-  3: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" }),
-  4: Object.freeze({ 1: "08aaf60d391b58ece02ca4b5d15137ee28974f14e119d0ec82d91eddab9d435c" }),
-  5: Object.freeze({ 1: "e58cdbf2da4bfe47eea335c15eec1a5a31936216766c49950f8efe87a5db5ad4" }),
+  1: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55", 2: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" }),
+  2: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55", 2: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" }),
+  3: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55", 2: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" }),
+  4: Object.freeze({ 1: "08aaf60d391b58ece02ca4b5d15137ee28974f14e119d0ec82d91eddab9d435c", 2: "08aaf60d391b58ece02ca4b5d15137ee28974f14e119d0ec82d91eddab9d435c" }),
+  5: Object.freeze({ 1: "e58cdbf2da4bfe47eea335c15eec1a5a31936216766c49950f8efe87a5db5ad4", 2: "e58cdbf2da4bfe47eea335c15eec1a5a31936216766c49950f8efe87a5db5ad4" }),
 });
 
-export const SUITE_REVISION = 1;
+export const SUITE_REVISION = 2;
 /** @type {Readonly<Record<number, string>>} */
 export const SUITE_DIGESTS = Object.freeze({
   1: "4894b2608203bb6b17dc91cc26140ab2a002e3c83ff87d8bfabe7563b23914db",
+  2: "805751baba31376f00c2d224797d4afbfea357c4f5e7ead0e252f6f1dd6bbeb5",
 });
 
 /**
@@ -354,4 +361,4 @@ export const HISTORY_ORIGIN_SHA256 = "f4c6a3d54ea213823931e84b4f40115fa95305c391
  * along with the figures it vouches for passes (`newestEntryProblems` in `check.mjs`).
  * @type {Readonly<{ index: number, sha256: string }> | undefined}
  */
-export const HISTORY_NEWEST_ENTRY = Object.freeze({ index: 0, sha256: "f4c6a3d54ea213823931e84b4f40115fa95305c391812ff0e58935da5f384557" });
+export const HISTORY_NEWEST_ENTRY = Object.freeze({ index: 1, sha256: "a5361b4f8d4a37468902fef5069e0c26676e0bd7f3f598a8f29c49a3e1b288d1" });

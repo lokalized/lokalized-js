@@ -40,7 +40,7 @@ const RLI = "⁧";
 function stringsFor(options) {
   return createStrings({
     fallbackLocale: "en",
-    locale: "en",
+    localeResolver: () => "en",
     strings: {
       en: { "Wrap.Value": "[{{value}}]", "Greeting.Named": "Hello, {{name}}" },
       he: { "Greeting.Named": "שלום, {{name}}" },
@@ -207,7 +207,7 @@ describe("createStrings({ bidiIsolation })", () => {
 describe("the donor rule", () => {
   const donor = createStrings({
     fallbackLocale: "en",
-    locale: "en",
+    localeResolver: () => "en",
     // `ar` holds only a marker, so an Arabic request for Greeting.Named is served by `en`.
     strings: { en: { "Locale.Marker": "en", "Greeting.Named": "Hello, {{name}}" }, ar: { "Locale.Marker": "ar" } },
   });
@@ -229,7 +229,7 @@ describe("the donor rule", () => {
   it("isolates an LTR request served by an RTL catalog", () => {
     const reversed = createStrings({
       fallbackLocale: "ar",
-      locale: "en",
+      localeResolver: () => "en",
       strings: { ar: { "Greeting.Named": "مرحبا، {{name}}" }, en: { "Locale.Marker": "en" } },
     });
     const result = reversed.getResult("Greeting.Named", { name: "Sarah" }, { locale: "en" });
@@ -241,7 +241,7 @@ describe("the donor rule", () => {
 describe("generated text is not isolated merely because it was generated", () => {
   const strings = createStrings({
     fallbackLocale: "en",
-    locale: "en",
+    localeResolver: () => "en",
     bidiIsolation: "all",
     strings: {
       en: {
@@ -287,7 +287,7 @@ describe("generated text is not isolated merely because it was generated", () =>
     };
     const values = { gender: GENDER_FEMININE, name: "Sarah", city: "القاهرة" };
     const build = (/** @type {string} */ bidiIsolation) =>
-      createStrings({ fallbackLocale: "en", locale: "en", strings: nested, .../** @type {any} */ ({ bidiIsolation }) });
+      createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: nested, .../** @type {any} */ ({ bidiIsolation }) });
 
     assert.equal(build("all").get("Nested", values), `<her ${FSI}Sarah${PDI} in ${FSI}القاهرة${PDI}>`);
     assert.equal(build("none").get("Nested", values), "<her Sarah in القاهرة>");

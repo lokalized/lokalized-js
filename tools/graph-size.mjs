@@ -362,7 +362,7 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
   const build = async (base) => {
     const mod = await import(`file://${join(base, relative(root, graph.entry))}`);
     const api = mod.createStrings ? mod : await import(`file://${join(base, "src/core/index.js")}`);
-    const strings = api.createStrings({ fallbackLocale: "en", locale: "en-AU", strings: CATALOG, tiebreakers: { en: ["en", "en-001"] } });
+    const strings = api.createStrings({ fallbackLocale: "en", localeResolver: () => "en-AU", strings: CATALOG, tiebreakers: { en: ["en", "en-001"] } });
     return strings.get("I read {{bookCount}} books", { bookCount: 3 });
   };
   const real = await build(root);

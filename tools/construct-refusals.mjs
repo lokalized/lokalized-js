@@ -90,12 +90,11 @@ export const CONSTRUCT_REFUSAL_ADAPTATIONS = [
       "You must specify exactly one of 'localeSupplier' or 'localeMatchSupplier' when creating a DefaultStrings instance",
     jsType: "RangeError",
     jsMessage:
-      "createStrings requires exactly one of 'locale', 'localeResolver' or 'localeMatchResolver'; received none",
+      "createStrings requires exactly one of 'localeResolver' or 'localeMatchResolver'; received none",
     why:
-      "The both-ABSENT arm of Java's `(localeSupplier == null) == (localeMatchSupplier == null)`. " +
-      "The JS union has THREE members, not two — plan 3.2's `LocaleSourceOptions` adds the constant " +
-      "`locale`, which Java expresses as a constant-returning localeSupplier — so the message names " +
-      "three options where Java names two. RangeError because the option COUNT is out of range; " +
+      "The both-ABSENT arm of Java's `(localeSupplier == null) == (localeMatchSupplier == null)`, " +
+      "member for member since the constant `locale` option was removed before 1.0.0: the message " +
+      "names the port's two resolvers where Java names its two suppliers. RangeError because the option COUNT is out of range; " +
       "this is the same refusal B3 already raised for the at-most-one half, deliberately reused " +
       "rather than duplicated, so a caller cannot get two different diagnostics for one rule.",
   },

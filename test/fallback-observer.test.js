@@ -93,7 +93,7 @@ import {
  */
 const FOUR_CANDIDATE = {
   fallbackLocale: "fr",
-  locale: "en-GB",
+  localeResolver: () => "en-GB",
   tiebreakers: { en: ["en-GB", "en-001", "en"] },
   strings: {
     "en-GB": { InEvery: "en-GB: everywhere" },
@@ -187,7 +187,7 @@ describe("onFallback — when it fires and when it must not", () => {
     const { events, observer } = recordingObserver();
     const strings = createStrings({
       fallbackLocale: "fr",
-      locale: "fr",
+      localeResolver: () => "fr",
       strings: { en: { K: "en: value" }, fr: { K: "fr: value" } },
       onFallback: observer,
     });

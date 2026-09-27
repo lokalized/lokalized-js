@@ -212,7 +212,7 @@ test("clause 75: the newly exported classes are CATCHABLE and NOT CONSTRUCTIBLE"
       // reached the evaluator at all. The `zh-123` shape, inside the fixture written to check it.
       createStrings({
         strings: { en: { K: { translation: "t", alternatives: [{ "a<==b": { translation: "y" } }] } } },
-        fallbackLocale: "en", locale: "en",
+        fallbackLocale: "en", localeResolver: () => "en",
       });
       return null;
     } catch (error) { return error; }
@@ -240,7 +240,7 @@ test("clause 75: the newly exported classes are CATCHABLE and NOT CONSTRUCTIBLE"
   const configFailure = (() => {
     try {
       createStrings(/** @type {any} */ ({
-        loaded: {}, strings: { en: { K: "v" } }, fallbackLocale: "en", locale: "en",
+        loaded: {}, strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en",
       }));
       return null;
     } catch (error) { return error; }

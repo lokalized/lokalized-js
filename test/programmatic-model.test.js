@@ -19,7 +19,7 @@ import { ordinalData } from "../src/data/ordinal.js";
 import { cardinalRangeData } from "../src/data/ranges.js";
 
 const en = (/** @type {unknown} */ catalog, /** @type {object} */ extra = {}) =>
-  createStrings({ fallbackLocale: "en", locale: "en", strings: { en: catalog }, ...extra });
+  createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: catalog }, ...extra });
 
 // --- define* validates, copies, and freezes ------------------------------------------------------
 
@@ -223,7 +223,7 @@ test("missingLanguageForms follows declared form order, never hash order", () =>
   // supplying only ONE must name the other three in exactly that order.
   const s = createStrings({
     fallbackLocale: "ru",
-    locale: "ru",
+    localeResolver: () => "ru",
     strings: { ru: { B: { translation: "{{b}}", placeholders: { b: { value: "c", translations: { CARDINALITY_ONE: "a" } } } } } },
   });
 
@@ -239,7 +239,7 @@ test("ordinality warnings need the optional ordinal data, and cardinality warnin
   // Without the table this module cannot import, an ordinality gap simply goes unreported — the same
   // trade `lokalized/parse` makes, and the reason the root graph stays free of the ordinal data.
   assert.deepEqual(
-    createStrings({ fallbackLocale: "en", locale: "en", strings: { en: catalog }, pluralData: { ordinal: ordinalData } })
+    createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: catalog }, pluralData: { ordinal: ordinalData } })
       .getWarnings().map((w) => w.type),
     ["INCOMPLETE_ORDINALITY_TRANSLATIONS"],
   );
@@ -373,7 +373,7 @@ test("tiebreakers are snapshotted into a frozen null-prototype record", () => {
   const supplied = { es: ["es-MX"] };
   const s = createStrings({
     fallbackLocale: "en",
-    locale: "en",
+    localeResolver: () => "en",
     strings: { en: { K: "v" }, "es-MX": { K: "v" } },
     tiebreakers: supplied,
   });
@@ -389,7 +389,7 @@ test("tiebreakers are snapshotted into a frozen null-prototype record", () => {
 test("a Map is accepted wherever a keyed record is, per plan 3.2", () => {
   const s = createStrings({
     fallbackLocale: "en",
-    locale: "en",
+    localeResolver: () => "en",
     strings: { en: { K: "v" }, "es-MX": { K: "v" } },
     tiebreakers: new Map([["es", ["es-MX"]]]),
   });

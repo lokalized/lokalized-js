@@ -83,7 +83,7 @@ const strings = createStrings({
     },
   },
   fallbackLocale: "en",
-  locale: "fr",
+  localeResolver: () => "fr",
 });
 
 strings.get("Cart.Items", { count: 1 });   // => "Votre panier contient 1 livre."
@@ -94,7 +94,15 @@ strings.get("Cart.Items", { count: 3 });   // => "Votre panier contient 3 livres
 `CARDINALITY_ONE` and everything else is `CARDINALITY_OTHER`; a Polish catalog would decide
 differently, and neither decision reaches your components.
 
-**A per-call locale overrides the instance one**, which is what a server handling many requests needs:
+**Two options pick the language, and they do different jobs.** `localeResolver` is how the instance
+finds the language of a lookup: a function it calls on every `get`. This one always answers `"fr"`;
+a server's would read the current request instead — see
+[One instance, many requests](#one-instance-many-requests). `fallbackLocale` is where a lookup ends
+up when that language has no translation for the key. Every instance needs a resolver: there is no
+option that fixes a language when the instance is built, the same rule as lokalized-java's
+`localeSupplier`.
+
+**A per-call locale overrides the resolver**, which is what a server handling many requests needs:
 
 <!-- example: quickstart -->
 
@@ -163,7 +171,7 @@ const strings = createStrings({
     },
   },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 strings.get("Players", { heOrShe: GENDER_FEMININE, groupSize: 5 });
@@ -185,7 +193,7 @@ const compiles = (expression) => {
     createStrings({
       strings: { en: { Players: { translation: "base", alternatives: [{ [expression]: "alt" }] } } },
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
     });
     return "loaded";
   } catch (error) {
@@ -239,7 +247,7 @@ const reader = createStrings({
     },
   },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 reader.get("Reader", { gender: GENDER_FEMININE });                    // => "She is here."
@@ -306,7 +314,7 @@ const cart = createStrings({
     },
   },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 cart.get("Cart", { count: 1 });                 // => "1 book"
@@ -336,7 +344,7 @@ const strings = createStrings({
   strings: { en: { Hi: "Hello" }, fr: { Hi: "Bonjour" }, "fr-CA": { Hi: "Salut" } },
   fallbackLocale: "en",
   tiebreakers: { fr: ["fr", "fr-CA"] },
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 strings.get("Hi", undefined, { locale: "fr-CA" });   // => "Salut"
@@ -353,7 +361,7 @@ strings.get(key, values, options)
 ```
 
 The two are separate bags, and putting a locale in the first one is the mistake worth knowing about,
-because **it does not fail — it quietly serves the instance's locale instead**:
+because **it does not fail — it quietly serves whatever the resolver answers instead**:
 
 <!-- example: matching -->
 
@@ -389,7 +397,7 @@ import { createStrings } from "lokalized";
 const ambiguous = () => createStrings({
   strings: { fr: { Hi: "Bonjour" }, "fr-CA": { Hi: "Salut" } },
   fallbackLocale: "fr",
-  locale: "fr",
+  localeResolver: () => "fr",
 });
 
 let refusal = "";
@@ -422,7 +430,7 @@ const strings = createStrings({
   strings: catalogs,
   fallbackLocale: "en",
   tiebreakers: { fr: ["fr", "fr-CA"] },
-  locale: "fr",
+  localeResolver: () => "fr",
 });
 
 strings.get("Cart.Items", { count: 2 });   // => "Votre panier contient 2 livres."
@@ -637,7 +645,7 @@ const loaded = await loadStrings(fetched, "fr-CA");
 Object.keys(loaded.catalogs);   // => ["fr-CA", "fr", "en"]
 loaded.complete;                // => true
 
-const strings = createStrings({ loaded, locale: "fr-CA" });
+const strings = createStrings({ loaded, localeResolver: () => "fr-CA" });
 
 strings.get("Cart.Items", { count: 2 });   // => "Votre panier compte 2 livres."
 ```
@@ -729,7 +737,7 @@ const strings = createStrings({
   strings: { en: { Hi: "Hello" }, fr: { Hi: "Bonjour" }, "fr-CA": { Hi: "Salut" }, es: { Hi: "Hola" } },
   fallbackLocale: "en",
   tiebreakers: { fr: ["fr", "fr-CA"] },
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
@@ -797,7 +805,7 @@ import { createStrings } from "lokalized";
 const strings = createStrings({
   strings: { en: { Hi: "Hello" }, fr: { Hi: "Bonjour" } },
   fallbackLocale: "en",
-  locale: "fr",
+  localeResolver: () => "fr",
 });
 
 const result = strings.getResult("Hi", undefined, { locale: "fr-CA" });
@@ -841,7 +849,7 @@ const strings = createStrings({
     },
   },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 strings.getWarnings().map((warning) => warning.type);
@@ -888,7 +896,7 @@ const strings = createStrings({
     },
   },
   fallbackLocale: "fr",
-  locale: "fr",
+  localeResolver: () => "fr",
 });
 
 strings.get("Books", { n: 2 });   // => "2 livres"
@@ -948,7 +956,7 @@ const catalog = {
 const strings = createStrings({
   strings: catalog,
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
   pluralData: { ordinal: ordinalData },
 });
 
@@ -964,7 +972,7 @@ refusal names the option, so this is a minute lost rather than an afternoon:
 ```js
 let refusal = "";
 try {
-  createStrings({ strings: catalog, fallbackLocale: "en", locale: "en" });
+  createStrings({ strings: catalog, fallbackLocale: "en", localeResolver: () => "en" });
 } catch (error) {
   refusal = error.message;
 }
@@ -993,7 +1001,7 @@ const stay = createStrings({
     },
   },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
   pluralData: { ranges: cardinalRangeData },
 });
 
@@ -1009,7 +1017,7 @@ owes you.
 const bilingual = createStrings({
   strings: { en: { Hello: "Hello", Goodbye: "Goodbye" }, fr: { Hello: "Bonjour" } },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 bilingual.getMissingKeys("en", "fr");   // => ["Goodbye"]
@@ -1052,7 +1060,7 @@ import { RETURN_KEY, returnString } from "lokalized/core";
 const strings = createStrings({
   strings: { en: { Greeting: "Hello, {{name}}." } },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 // The default. Note that the KEY is interpolated with the values you passed.
@@ -1094,7 +1102,7 @@ const strings = createStrings({
   },
   fallbackLocale: "en",
   tiebreakers: { fr: ["fr", "fr-CA"] },
-  locale: "fr-CA",
+  localeResolver: () => "fr-CA",
 });
 
 // Nobody passed `gender`, so the fr-CA entry cannot resolve.
@@ -1139,7 +1147,7 @@ const strings = createStrings({
     fr: { Cart: "Votre panier" },
   },
   fallbackLocale: "en",
-  locale: "fr",
+  localeResolver: () => "fr",
   onFailure: (failure) => {
     missing.push([failure.key, failure.lookupLocale, failure.reason]);
     return { action: "return-key" };
@@ -1213,7 +1221,7 @@ import { createStrings } from "lokalized";
 
 const build = (options) => {
   try {
-    createStrings({ strings: { en: { A: "a", B: "b" } }, fallbackLocale: "en", locale: "en", ...options });
+    createStrings({ strings: { en: { A: "a", B: "b" } }, fallbackLocale: "en", localeResolver: () => "en", ...options });
     return "constructed";
   } catch (error) {
     return error.message.split(":").pop().trim();
@@ -1300,7 +1308,7 @@ const refusal = (run) => {
 refusal(() => createLocaleNegotiator({ supportedLocales: ["en", "fr"], fallbackLocale: "en", fallbackLocal: "fr" }));
 // => "createLocaleNegotiator does not take the option(s) [fallbackLocal]"
 
-const strings = createStrings({ strings: { en: { Items: "{{count}} items" } }, fallbackLocale: "en", locale: "en" });
+const strings = createStrings({ strings: { en: { Items: "{{count}} items" } }, fallbackLocale: "en", localeResolver: () => "en" });
 
 strings.get("Items", { count: 3 });   // => "3 items"
 refusal(() => strings.get("Items", undefined, { count: 3 }));
@@ -1356,7 +1364,7 @@ import { createStrings } from "lokalized";
 
 const refusal = (runtimeLimits) => {
   try {
-    createStrings({ strings: { en: { Hi: "Hello" } }, fallbackLocale: "en", locale: "en", runtimeLimits });
+    createStrings({ strings: { en: { Hi: "Hello" } }, fallbackLocale: "en", localeResolver: () => "en", runtimeLimits });
     return "accepted";
   } catch (error) {
     return error.constructor.name;
@@ -1385,7 +1393,7 @@ import { createStrings } from "lokalized";
 const arabic = createStrings({
   strings: { ar: { Greeting: "مرحبا {{name}}" } },
   fallbackLocale: "ar",
-  locale: "ar",
+  localeResolver: () => "ar",
 });
 
 const greeting = arabic.get("Greeting", { name: "Sarah" });
@@ -1398,7 +1406,7 @@ greeting;   // => "مرحبا ⁨Sarah⁩"
 const english = createStrings({
   strings: { en: { Greeting: "Hello {{name}}" } },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 english.get("Greeting", { name: "أحمد" });   // => "Hello أحمد"
@@ -1414,7 +1422,7 @@ import { createStrings } from "lokalized";
 
 const catalogs = { en: { Hi: "Hello {{name}}" }, ar: { Hi: "مرحبا {{name}}" } };
 const build = (bidiIsolation) =>
-  createStrings({ strings: catalogs, fallbackLocale: "en", locale: "en", bidiIsolation });
+  createStrings({ strings: catalogs, fallbackLocale: "en", localeResolver: () => "en", bidiIsolation });
 
 build(undefined).get("Hi", { name: "Sarah" }, { locale: "en" });   // => "Hello Sarah"
 build(undefined).get("Hi", { name: "Sarah" }, { locale: "ar" });   // => "مرحبا ⁨Sarah⁩"
@@ -1445,7 +1453,7 @@ import { createStrings } from "lokalized";
 const arabicFallback = createStrings({
   strings: { ar: { Hi: "مرحبا {{name}}" }, en: { Other: "thing" } },
   fallbackLocale: "ar",
-  locale: "ar",
+  localeResolver: () => "ar",
 });
 
 arabicFallback.get("Hi", { name: "Sarah" }, { locale: "en" });                        // => "مرحبا ⁨Sarah⁩"
@@ -1455,7 +1463,7 @@ arabicFallback.getResult("Hi", { name: "Sarah" }, { locale: "en" }).resolvedLoca
 const englishFallback = createStrings({
   strings: { en: { Hi: "Hello {{name}}" }, ar: { Other: "شيء" } },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 englishFallback.get("Hi", { name: "Sarah" }, { locale: "ar" });                        // => "Hello Sarah"
@@ -1475,7 +1483,7 @@ unknown-script placeholder `Zzzz`, which is an explicit script and is not right-
 ```js
 import { createStrings } from "lokalized";
 
-const probe = createStrings({ strings: { en: { A: "a" } }, fallbackLocale: "en", locale: "en" });
+const probe = createStrings({ strings: { en: { A: "a" } }, fallbackLocale: "en", localeResolver: () => "en" });
 const isolates = (tag) => probe.get("? {{v}} ?", { v: "x" }, { locale: tag }).includes("⁨");
 
 ["ar", "he", "fa", "ur", "yi", "ps", "dv", "ckb"].every(isolates);   // => true
@@ -1497,7 +1505,7 @@ well-formed isolate run, so a value carrying stray directional marks is repaired
 ```js
 import { createStrings } from "lokalized";
 
-const strings = createStrings({ strings: { ar: { V: "{{v}}" } }, fallbackLocale: "ar", locale: "ar" });
+const strings = createStrings({ strings: { ar: { V: "{{v}}" } }, fallbackLocale: "ar", localeResolver: () => "ar" });
 const isolate = (value) => strings.get("V", { v: value });
 
 // A value that is already one balanced isolate run is returned untouched.
@@ -1564,7 +1572,7 @@ function directionFor(tag) {
 const strings = createStrings({
   strings: { "x-private": { K: "V" }, en: { K: "E" } },
   fallbackLocale: "en",
-  locale: "x-private",
+  localeResolver: () => "x-private",
 });
 
 strings.getResult("K").resolvedLocale;   // => "x-private"
@@ -1586,7 +1594,7 @@ const strings = createStrings({
     en: { Welcome: "Welcome, {{name}}", "Legal.Terms": "Terms apply to {{name}}" },
   },
   fallbackLocale: "en",
-  locale: "he",
+  localeResolver: () => "he",
 });
 
 const welcome = strings.getResult("Welcome", { name: "Sarah" });
@@ -1634,7 +1642,7 @@ const strings = createStrings({
     he: { Plain: "שלום, {{name}}.", N: "{{n}}" },
   },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 strings.get("Bold", { title: "Dune" });                 // => "Read <strong>Dune</strong>."
@@ -1698,7 +1706,7 @@ a `document.title`, a `<title>`, a cache key, an analytics event:
 ```js
 import { createStrings } from "lokalized";
 
-const strings = createStrings({ strings: { ar: { M: "س {{v}}" } }, fallbackLocale: "ar", locale: "ar" });
+const strings = createStrings({ strings: { ar: { M: "س {{v}}" } }, fallbackLocale: "ar", localeResolver: () => "ar" });
 const rendered = strings.get("M", { v: "AB" });
 
 rendered.length;                  // => 6
@@ -1727,7 +1735,7 @@ import { createStrings, forLocale } from "lokalized/core";
 const strings = createStrings({
   strings: { en: { Hi: "Hi" }, fr: { Hi: "Salut" }, ja: { Hi: "Konnichiwa" } },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1781,8 +1789,8 @@ resolverCalls;                                   // => 8
 ```
 
 `AsyncLocalStorage` is Node's; the door is not. `localeResolver` is just a function you supply, so
-any per-request context works — and `createStrings` requires **exactly one** of the three locale
-doors, so there is no precedence rule to remember:
+any per-request context works — and `createStrings` requires **exactly one** of the two resolvers,
+so every instance says how it finds a language and there is no precedence rule to remember:
 
 <!-- example: fw-ambient -->
 
@@ -1797,11 +1805,14 @@ const doors = (options) => {
   }
 };
 
-doors({ locale: "fr" });                        // => "constructed"
-doors({ localeResolver: () => "fr" });          // => "constructed"
-doors({});                                      // => "received none"
-doors({ locale: "fr", localeResolver: () => "fr" });   // => "received [locale, localeResolver]"
+doors({ localeResolver: () => "fr" });                                 // => "constructed"
+doors({});                                                             // => "received none"
+doors({ localeResolver: () => "fr", localeMatchResolver: () => null });
+// => "received [localeResolver, localeMatchResolver]"
 ```
+
+There is no option that fixes a language when the instance is built. A resolver that always answers
+`"fr"` is the way to say that, and it reads as what it is: a function asked on every lookup.
 
 Reusing one instance is also the cheap shape. On a 300-key, four-locale fixture rendering a 20-key
 page, rebuilding per request measured **2.28 ms**, a shared instance with `forLocale(tag)` on each
@@ -1825,7 +1836,7 @@ const manifest = await createStringsManifestFromDirectory("examples/catalogs", {
   tiebreakers: { fr: ["fr", "fr-CA"] },
 });
 const loaded = await loadEntireManifestFromFiles(manifest);
-const server = createStrings({ loaded, locale: "fr-CA" });
+const server = createStrings({ loaded, localeResolver: () => "fr-CA" });
 
 // JSON empties the instance silently; `structuredClone` refuses outright.
 JSON.stringify(server);       // => "{}"
@@ -1837,7 +1848,7 @@ cloneFailure(server);               // => "DataCloneError"
 cloneFailure({ nested: server });   // => "DataCloneError"
 
 // The record survives both algorithms and still works.
-const client = createStrings({ loaded: JSON.parse(JSON.stringify(loaded)), locale: "fr-CA" });
+const client = createStrings({ loaded: JSON.parse(JSON.stringify(loaded)), localeResolver: () => "fr-CA" });
 
 client.get("Cart.Items", { count: 2 });   // => "Votre panier compte 2 livres."
 client.isCatalogComplete();               // => true
@@ -1872,7 +1883,7 @@ const loaded = await loadStrings(published, "fr", { fetch: transport });
 
 loaded.catalogs.fr.sources;                     // => ["https://cdn.example.com/i18n/fr.json"]
 JSON.stringify(loaded).includes("file://");     // => false
-createStrings({ loaded: JSON.parse(JSON.stringify(loaded)), locale: "fr" }).get("App.Title");
+createStrings({ loaded: JSON.parse(JSON.stringify(loaded)), localeResolver: () => "fr" }).get("App.Title");
 // => "La librairie Lokalized"
 ```
 
@@ -1922,7 +1933,7 @@ const asked = (instance, tag) => {
   }
 };
 
-const frOnly = createStrings({ loaded: await loadStringsFromFiles(manifest, "fr"), locale: "fr" });
+const frOnly = createStrings({ loaded: await loadStringsFromFiles(manifest, "fr"), localeResolver: () => "fr" });
 
 frOnly.getSupportedLocales();   // => ["en", "fr", "fr-CA"]
 asked(frOnly, "fr");            // => "La librairie Lokalized"
@@ -1933,7 +1944,7 @@ asked(frOnly, "fr-CA");
 frOnly.getLocaleConfiguration().supportedLocales;   // => ["en", "es", "fr", "fr-CA"]
 
 // The whole manifest answers for every locale, per call, and falls back for one it never had.
-const everything = createStrings({ loaded: await loadEntireManifestFromFiles(manifest), locale: "en" });
+const everything = createStrings({ loaded: await loadEntireManifestFromFiles(manifest), localeResolver: () => "en" });
 
 ["en", "fr", "fr-CA", "es"].map((tag) => asked(everything, tag));
 // => ["The Lokalized Bookshop", "La librairie Lokalized", "La librairie Lokalized du Canada", "La libreria Lokalized"]
@@ -1951,7 +1962,7 @@ is right depends on whether you can load more on demand.
 ```js
 import { createStrings, LokalizedError } from "lokalized/core";
 
-const strings = createStrings({ strings: { en: { K: "Hello" } }, fallbackLocale: "en", locale: "en" });
+const strings = createStrings({ strings: { en: { K: "Hello" } }, fallbackLocale: "en", localeResolver: () => "en" });
 
 let thrown;
 try { strings.getKeysForLocale("de"); } catch (error) { thrown = error; }
@@ -2007,7 +2018,7 @@ const loaded = await loadStringsFromDirectory("examples/catalogs", {
   tiebreakers: { fr: ["fr", "fr-CA"] },
 });
 
-const strings = createStrings({ loaded, locale: "en" });
+const strings = createStrings({ loaded, localeResolver: () => "en" });
 const stamp = createSsrStamp(strings, { kind: "locale", locale: "fr-CA" });
 
 Object.keys(stamp);
@@ -2081,7 +2092,7 @@ advice in the message is to render on the client or navigate — not to hydrate 
 <!-- example: ssr -->
 
 ```js
-const direct = createStrings({ strings: { en: { Hi: "Hello" } }, fallbackLocale: "en", locale: "en" });
+const direct = createStrings({ strings: { en: { Hi: "Hello" } }, fallbackLocale: "en", localeResolver: () => "en" });
 
 direct.getLoadVerification();   // => null
 
@@ -2127,7 +2138,7 @@ const refused = (instance) => {
 const claimed = createStrings({
   strings: { en: { Hi: "Hello" }, fr: { Hi: "Bonjour" } },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
   catalogIdentity: { catalogVersion: "2026.09.15", catalogFingerprint: "a".repeat(64) },
 });
 
@@ -2148,7 +2159,7 @@ const manifest = await createStringsManifestFromDirectory(directory, {
 
 rmSync(join(directory, "es.json"));
 const partial = await loadEntireManifestFromFiles(manifest, { partialFailure: "allow-partial" });
-const incomplete = createStrings({ loaded: partial, locale: "fr" });
+const incomplete = createStrings({ loaded: partial, localeResolver: () => "fr" });
 
 partial.complete;                 // => false
 incomplete.get("App.Title");      // => "La librairie Lokalized"
@@ -2176,7 +2187,7 @@ const manifest = await createStringsManifestFromDirectory("examples/catalogs", {
 fetchSet(manifest, "fr-CA").map((entry) => entry.locale);   // => ["fr-CA", "fr", "en"]
 
 const subset = await loadStringsFromFiles(manifest, "fr-CA");
-const client = createStrings({ loaded: subset, locale: "fr-CA" });
+const client = createStrings({ loaded: subset, localeResolver: () => "fr-CA" });
 
 subset.coverage;                // => { kind: "lookup", lookupLocale: "fr-CA" }
 Object.keys(subset.catalogs);   // => ["fr-CA", "fr", "en"]
@@ -2282,11 +2293,11 @@ enough:
 import { createStrings } from "lokalized";
 
 const catalog = { en: { Hi: "Hello, {{name}}" }, fr: { Hi: "Bonjour, {{name}}" } };
-const server = createStrings({ strings: catalog, fallbackLocale: "en", locale: "fr" });
+const server = createStrings({ strings: catalog, fallbackLocale: "en", localeResolver: () => "fr" });
 
 // Whatever the framework does to props, it is a JSON round trip at worst:
 const props = JSON.parse(JSON.stringify({ catalog, locale: "fr" }));
-const client = createStrings({ strings: props.catalog, fallbackLocale: "en", locale: props.locale });
+const client = createStrings({ strings: props.catalog, fallbackLocale: "en", localeResolver: () => props.locale });
 
 client.get("Hi", { name: "Ada" }) === server.get("Hi", { name: "Ada" });   // => true
 ```
@@ -2318,7 +2329,7 @@ const strings = createStrings({
     fr: { Notice: "Vous avez demande {{requested}}. Cette page est servie en {{served}}." },
   },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
@@ -2357,7 +2368,7 @@ import { createLocaleNegotiator, forAcceptLanguage } from "lokalized/negotiate";
 const strings = createStrings({
   strings: { en: { Hi: "Hello" }, fr: { Hi: "Bonjour" } },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
@@ -2431,7 +2442,7 @@ import { createLocaleNegotiator, forAcceptLanguage } from "lokalized/negotiate";
 const strings = createStrings({
   strings: { en: { Hi: "Hello" }, fr: { Hi: "Bonjour" } },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
@@ -2487,7 +2498,7 @@ cdn.catalogFingerprint === mirror.catalogFingerprint;   // => true
 
 // An instance built from a manifest hands you that identity, so the key can carry it.
 const local = await createStringsManifestFromDirectory(directory, { ...common, publicationBaseUrl: pathToFileURL("examples/catalogs/").href });
-const strings = createStrings({ loaded: await loadEntireManifestFromFiles(local), locale: "en" });
+const strings = createStrings({ loaded: await loadEntireManifestFromFiles(local), localeResolver: () => "en" });
 
 strings.getCatalogIdentity().catalogVersion;                                  // => "2026.09.15"
 strings.getCatalogIdentity().catalogFingerprint === cdn.catalogFingerprint;   // => true
@@ -2529,7 +2540,7 @@ The identity is `null` for a directly constructed instance, which has no verifie
 <!-- example: cache-fingerprint -->
 
 ```js
-createStrings({ strings: { en: { Hi: "Hello" } }, fallbackLocale: "en", locale: "en" }).getCatalogIdentity();   // => null
+createStrings({ strings: { en: { Hi: "Hello" } }, fallbackLocale: "en", localeResolver: () => "en" }).getCatalogIdentity();   // => null
 ```
 
 A deployment built that way has to take the version half of its key from its own build.
@@ -2554,7 +2565,7 @@ const BODY = `
     strings: { en: { Books: { translation: "{{who}} has {{n}} books.",
       placeholders: { who: { value: "g", translations: { GENDER_FEMININE: "She", GENDER_MASCULINE: "He" } } },
       alternatives: [{ "n == 0": "{{who}} has no books." }] } } },
-    fallbackLocale: "en", locale: "en",
+    fallbackLocale: "en", localeResolver: () => "en",
   });
   const evalWorks = (() => { try { (0, eval)("1"); return true; } catch { return false; } })();
   process.stdout.write(JSON.stringify({ evalWorks, zero: strings.get("Books", { g: GENDER_FEMININE, n: 0 }) }));`;
@@ -2583,7 +2594,7 @@ import { execFileSync } from "node:child_process";
 const RENDER = `
   try {
     const { createStrings } = await import("lokalized");
-    const strings = createStrings({ strings: { en: { Hi: "Hi {{n}}" } }, fallbackLocale: "en", locale: "en" });
+    const strings = createStrings({ strings: { en: { Hi: "Hi {{n}}" } }, fallbackLocale: "en", localeResolver: () => "en" });
     process.stdout.write(JSON.stringify({ rendered: strings.get("Hi", { n: 1 }) }));
   } catch (error) {
     process.stdout.write(JSON.stringify({ failed: error.constructor.name }));
@@ -2669,7 +2680,7 @@ one global:
   const strings = lokalized.createStrings({
     strings: { en: { Hi: "Hello {{name}}" }, fr: { Hi: "Bonjour {{name}}" } },
     fallbackLocale: "en",
-    locale: "fr",
+    localeResolver: () => "fr",
   });
 
   document.body.textContent = strings.get("Hi", { name: "Ada" });   // Bonjour Ada
@@ -2701,7 +2712,7 @@ write the URL, you need no map at all:
   const strings = createStrings({
     strings: { en: { Hi: "Hello {{name}}" }, fr: { Hi: "Bonjour {{name}}" } },
     fallbackLocale: "en",
-    locale: "fr",
+    localeResolver: () => "fr",
   });
 
   const greeting = strings.get("Hi", { name: "Ada" });   // => "Bonjour Ada"
@@ -2854,7 +2865,7 @@ const serving = (bytes) => async () => new Response(bytes);
 const attempt = async (manifest, bytes) => {
   try {
     const loaded = await loadEntireManifest(manifest, { fetch: serving(bytes) });
-    return { served: createStrings({ loaded, locale: "en" }).get("Pay.To") };
+    return { served: createStrings({ loaded, localeResolver: () => "en" }).get("Pay.To") };
   } catch (error) {
     return { refused: error.failures?.map((failure) => `${failure.locale}:${failure.stage}`) ?? error.name };
   }
@@ -2881,7 +2892,7 @@ const PUBLISHED_AT_BUILD_TIME = honest.manifest.catalogFingerprint;
 
 const pinned = async (manifest, bytes) => {
   const loaded = await loadEntireManifest(manifest, { fetch: serving(bytes) });
-  const strings = createStrings({ loaded, locale: "en" });
+  const strings = createStrings({ loaded, localeResolver: () => "en" });
   return strings.getCatalogIdentity().catalogFingerprint === PUBLISHED_AT_BUILD_TIME
     ? strings.get("Pay.To")
     : "refused: this is not the catalog this build was released with";
@@ -2989,7 +3000,7 @@ const identity = [
 const carries = (value) => identity.filter((field) => JSON.stringify(value).includes(field)).length;
 
 const loaded = await loadEntireManifestFromFiles(manifest);
-const strings = createStrings({ loaded, locale: "fr-CA" });
+const strings = createStrings({ loaded, localeResolver: () => "fr-CA" });
 const stamp = createSsrStamp(strings, { kind: "locale", locale: "fr-CA" });
 
 [carries(manifest), carries(loaded), carries(stamp)];   // => [7, 2, 7]
@@ -3052,11 +3063,11 @@ second table. Both columns are re-derived on every run, so they describe this co
 
 | import | minified | brotli |
 |---|---|---|
-| `import { createStrings } from "lokalized"` | 181,266 | 54,189 |
-| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 89,541 | 31,257 |
+| `import { createStrings } from "lokalized"` | 181,490 | 54,197 |
+| `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 89,508 | 31,244 |
 | `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,654 | 2,009 |
 | `import { GENDER_FEMININE } from "lokalized"` | 2,350 | 914 |
-| the four above, in one bundle | 222,213 | 64,411 |
+| the four above, in one bundle | 222,432 | 64,379 |
 <!-- bundle-table:end -->
 
 <!-- dist-table:start -->
@@ -3066,15 +3077,15 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 
 | load | files | raw | brotli |
 |---|---|---|---|
-| `lokalized` | 1 | 184,494 | 54,979 |
-| `lokalized/core` | 7 | 183,611 | 54,855 |
-| `lokalized/parse` | 5 | 159,522 | 48,641 |
-| `lokalized/load` | 7 | 178,080 | 53,817 |
+| `lokalized` | 1 | 184,718 | 55,075 |
+| `lokalized/core` | 7 | 183,835 | 54,791 |
+| `lokalized/parse` | 5 | 159,489 | 48,676 |
+| `lokalized/load` | 7 | 178,047 | 53,758 |
 | `lokalized/ssr` | 2 | 7,582 | 2,383 |
-| `lokalized/negotiate` | 4 | 90,810 | 31,666 |
-| `lokalized/data/ordinal` | 8 | 190,319 | 56,368 |
-| `lokalized/data/ranges` | 8 | 192,847 | 56,433 |
-| `lokalized.global.js`, the classic script | 1 | 243,314 | 68,890 |
+| `lokalized/negotiate` | 4 | 90,777 | 31,695 |
+| `lokalized/data/ordinal` | 8 | 190,543 | 56,321 |
+| `lokalized/data/ranges` | 8 | 193,071 | 56,463 |
+| `lokalized.global.js`, the classic script | 1 | 243,533 | 68,903 |
 <!-- dist-table:end -->
 
 **What a no-build page downloads.** The table above is what a bundler produces from the source; this
@@ -3092,9 +3103,9 @@ larger, so a figure quoted in it overstates what a visitor on a modern CDN actua
 not printed here, because a number nothing re-derives is how this section came to be wrong before.
 
 Three things are worth reading off that table. **Half of the root bundle is one pinned CLDR table** —
-replacing `likely-subtags` with an empty one takes the same bundle from 181,266 to 158,337 minified
+replacing `likely-subtags` with an empty one takes the same bundle from 181,490 to 158,561 minified
 bytes, which is the price of resolving `fr-CH` to `fr` without asking the host. **The tables are
-shared, not duplicated**: adding three more subpaths to the root costs 40,947 bytes, not another
+shared, not duplicated**: adding three more subpaths to the root costs 40,942 bytes, not another
 whole copy. And **`lokalized/ssr` carries no pinned data at all**, which is what lets the stamp
 module sit in a page that does no matching.
 
@@ -3118,7 +3129,7 @@ Object.keys(await import("lokalized/ssr"));   // => ["createSsrStamp", "validate
 ```
 
 `sideEffects` is declared `false` and bundlers honour it — removing that field takes the
-single-constant import from 2,350 to 78,562 minified bytes, 33× larger.
+single-constant import from 2,350 to 78,529 minified bytes, 33× larger.
 
 ---
 
@@ -3161,7 +3172,7 @@ import { createStrings } from "lokalized";
 
 let message = "";
 try {
-  createStrings({ strings: { en: { Hi: "Hello" } }, fallbackLocale: "de", locale: "en" });
+  createStrings({ strings: { en: { Hi: "Hello" } }, fallbackLocale: "de", localeResolver: () => "en" });
 } catch (error) {
   message = error.message;
 }
@@ -3280,8 +3291,8 @@ user-supplied text into HTML, that is yours to handle.
 question does not pay for the table, but plainly more work.
 
 **It starts faster.** Import, construct and render one string:
-**2.6 ms**
-against **14.7 ms**.
+**3.3 ms**
+against **20.4 ms**.
 lokalized decodes pinned CLDR tables at import; i18next asks the host and has nothing to decode.
 Reported, never gated — one machine, one run shape.
 
@@ -3304,7 +3315,7 @@ const strings = createStrings({
       translations: { CARDINALITY_ONE: "livre", CARDINALITY_OTHER: "livres" } } } } },
   },
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
 });
 
 // No escaping: an interpolated value is passed through exactly as given.

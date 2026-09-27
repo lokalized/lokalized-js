@@ -37,23 +37,23 @@
     {
       "label": "edge worker",
       "modules": 47,
-      "sourceBytes": 988734,
+      "sourceBytes": 987849,
       "nodeBuiltinEdges": 0,
       "ianaClosureBytes": 11358,
-      "importMs": 0.6568
+      "importMs": 0.4676
     },
     {
       "label": "server renderer",
       "modules": 54,
-      "sourceBytes": 1069064,
+      "sourceBytes": 1068358,
       "nodeBuiltinEdges": 10,
       "ianaClosureBytes": 11358,
-      "importMs": 19.8018
+      "importMs": 16.5804
     }
   ],
-  "negotiateMsPerHeader": 0.10758,
-  "firstRenderMs": 0.9204,
-  "retainedBytes": -16408,
+  "negotiateMsPerHeader": 0.06035,
+  "firstRenderMs": 0.8493,
+  "retainedBytes": -15592,
   "requestsPerRender": {
     "fr-CA": 4,
     "fr-CH": 4,
@@ -291,6 +291,42 @@
         "closureClasses": 369
       },
       "previousSha256": "ca56b77ab2b26ece4f9fd824c7216958811679736fe74d161f0a5c5ab606c643"
+    },
+    {
+      "reason": "Source graph moved: createStrings lost its constant locale option before 1.0.0 (maintainer, 2026-09-27): every instance takes exactly one resolver, as a Java instance takes exactly one supplier; the refusal naming the replacement adds source bytes.",
+      "growth": [],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 987849,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1068358,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "946c5ab81455642d1923d4106145d3ff1dcd91c583fa5160d4b3548824806547"
     }
   ]
 }

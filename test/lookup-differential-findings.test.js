@@ -110,7 +110,7 @@ describe("`und` is dropped case-SENSITIVELY, and only as a primary language subt
     // the first field and diverge on the third.
     const strings = createStrings({
       fallbackLocale: "fr",
-      locale: "fr",
+      localeResolver: () => "fr",
       strings: { fr: { Hello: "bonjour" }, nb: { Hello: "B" }, nn: { Hello: "N" } },
     });
 
@@ -142,7 +142,7 @@ describe("`throwExceptionFor` validates the attempted locales when it has no cau
   const throwing = (extra = {}) =>
     createStrings({
       fallbackLocale: "fr",
-      locale: "fr",
+      localeResolver: () => "fr",
       strings: EXHAUSTS,
       onFailure: () => ({ action: "throw" }),
       ...extra,
@@ -187,7 +187,7 @@ describe("`throwExceptionFor` validates the attempted locales when it has no cau
     const sentinel = new Error("resolver refuses");
     const strings = createStrings({
       fallbackLocale: "fr",
-      locale: "fr",
+      localeResolver: () => "fr",
       strings: {
         fr: {
           Hello: {

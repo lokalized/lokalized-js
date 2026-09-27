@@ -64,7 +64,7 @@ async function load(manifest, bytes) {
     const loaded = await loadEntireManifest(manifest, { fetch: serving(bytes) });
     return {
       ok: /** @type {const} */ (true),
-      served: createStrings({ loaded, locale: "en" }).get("Pay.To"),
+      served: createStrings({ loaded, localeResolver: () => "en" }).get("Pay.To"),
       fingerprint: loaded.catalogIdentity.catalogFingerprint,
     };
   } catch (error) {

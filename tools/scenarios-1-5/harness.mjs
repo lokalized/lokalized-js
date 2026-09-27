@@ -19,7 +19,11 @@ async function sample() {
 
   // RAW: each catalog reaches createStrings as JSON TEXT, which the library decodes and validates.
   // PARSED: as the objects themselves. Converting is the harness's work, done before any window opens.
-  const options = { ...fixture.options };
+  // A fixture's `locale` is the tag the instance's resolver answers. `createStrings` takes no constant
+  // language since 2026-09-27 (an instance needs a resolver, as a Java instance needs a supplier), and
+  // a fixture is JSON, which cannot carry a function — so the harness builds the resolver.
+  const { locale, ...declared } = fixture.options;
+  const options = { ...declared, localeResolver: () => locale };
   if (job.input === "raw")
     options.strings = Object.fromEntries(Object.entries(options.strings).map(([tag, catalog]) => [tag, JSON.stringify(catalog)]));
 

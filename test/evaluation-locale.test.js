@@ -96,7 +96,7 @@ const controlResolver = recordingResolver();
 
 const common = {
   fallbackLocale: "en",
-  locale: "en",
+  localeResolver: () => "en",
   pluralData: { ordinal: ordinalData, ranges: cardinalRangeData },
 };
 
@@ -150,12 +150,12 @@ describe("the evaluation locale is the supplying catalog's — every consumer", 
     // an ENGLISH request served by an Arabic catalog IS. Nothing about the request decides it.
     const ltrDonor = createStrings({
       fallbackLocale: "en",
-      locale: "en",
+      localeResolver: () => "en",
       strings: { en: { Greeting: "Hello, {{name}}" }, ar: { "Locale.Marker": "ar" } },
     });
     const rtlDonor = createStrings({
       fallbackLocale: "ar",
-      locale: "en",
+      localeResolver: () => "en",
       strings: { ar: { Greeting: "AR {{name}}" }, en: { "Locale.Marker": "en" } },
     });
 
