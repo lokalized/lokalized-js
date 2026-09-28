@@ -309,9 +309,9 @@ function javaDoubleText(value) {
  * 5. THE WEIGHT CHECK RUNS BEFORE THE GRAMMAR CHECK, so `fr;q=1.5` reports the weight and never
  *    reaches `range=`, and a NON-NUMERIC weight has its own wording with the raw text QUOTED.
  *
- * FROZEN ON THE WAY OUT, members included. Plan 3.4:900 declares this door
- * `readonly LanguageRange[]` where `LanguageRange` is `Readonly<{ range, weight }>`, and plan :345
- * makes every returned array frozen; the port returned a plain array of plain objects, so a caller
+ * FROZEN ON THE WAY OUT, members included. This door returns `readonly LanguageRange[]` where
+ * `LanguageRange` is `Readonly<{ range, weight }>`, and every returned array is frozen; the port
+ * once returned a plain array of plain objects, so a caller
  * could `sort` or `push` the list the library handed them. The freeze is at the RETURN rather than
  * per member, because `list` is built by `splice` — the insertion position IS the contract here
  * (member order is compared field for field) and a frozen array cannot be spliced into.
@@ -680,15 +680,15 @@ function normalizeAcceptLanguage(acceptLanguage) {
 /**
  * The two allowlisted `negotiate` type names the port declared nowhere until M8.
  *
- * **BOTH ARE DERIVED FROM WHAT SHIPS.** `LocaleMatcher` is plan 3.5:883's two-method interface, taken
+ * **BOTH ARE DERIVED FROM WHAT SHIPS.** `LocaleMatcher` is the two-method interface, taken
  * as a `Pick` of the negotiator this module actually returns rather than retyped — so a signature
  * change in the runtime moves the declared type with it instead of leaving the two to disagree.
- * `LanguageRange` is core's type re-exported, and plan 3.1:372 says so in as many words ("re-exports
- * core's `LanguageRange` type"): a second definition here would be a second thing to keep in step.
+ * `LanguageRange` is core's type re-exported: a second definition here would be a second thing to
+ * keep in step.
  *
  * @typedef {import("../core/index.js").LanguageRange} LanguageRange
  * @typedef {ReturnType<typeof createLocaleNegotiator>} LocaleNegotiator
- *   Plan 3.4:882's `interface LocaleNegotiator extends LocaleMatcher` — the whole object
+ *   `interface LocaleNegotiator extends LocaleMatcher` — the whole object
  *   `createLocaleNegotiator` returns, where `LocaleMatcher` below is the two-method narrowing of it.
  *   DERIVED from the factory rather than restated, so a method added to one and not the other is
  *   impossible by construction; the allowlist has named it since M7 and `declared-surface.test.js`
@@ -875,11 +875,9 @@ export function createLocaleNegotiator(configuration) {
 }
 
 /**
- * PLAN 3.4:904-913's TWO OPTION HELPERS, and the sentence that explains why they exist at all is
- * about the module GRAPH rather than about convenience:
- *
- *   ":933 — `forLanguageRanges` and `forAcceptLanguage` negotiate immediately and return core
- *   `localeMatch` options, so the browser/root graph does not contain the whole-list solver."
+ * THE TWO OPTION HELPERS, and the reason they exist at all is about the module GRAPH rather than
+ * about convenience: `forLanguageRanges` and `forAcceptLanguage` negotiate immediately and return
+ * core `localeMatch` options, so the browser/root graph does not contain the whole-list solver.
  *
  * An application that wanted per-call whole-list negotiation without these would have to hand core a
  * MATCHER and let core call it — which puts this module, its full IANA language table and the range
@@ -890,9 +888,8 @@ export function createLocaleNegotiator(configuration) {
  *
  * **NEITHER FUNCTION IMPORTS CORE**, and that is the same point one level down: `forLocaleMatch` in
  * `lokalized/core` builds exactly this object, and importing it would drag core's whole graph into
- * this much smaller subpath (`measurements/subpath-graphs.json` has both counts). The option shape is STRUCTURAL (plan 3.4:713 says so in as many words —
- * "a `Strings` value created by one installed copy … remains usable by `lokalized/ssr` from
- * another"), so constructing the literal here is the intended shape and not duplication to be
+ * this much smaller subpath (`measurements/subpath-graphs.json` has both counts). The option shape
+ * is STRUCTURAL, so constructing the literal here is the intended shape and not duplication to be
  * tidied away. `test/negotiate-options.test.js` asserts the two literals are `deepEqual`, and
  * `subpath:graphs` is what would notice the import.
  */
@@ -918,9 +915,9 @@ export function forLanguageRanges(negotiator, ranges) {
 /**
  * Negotiate an `Accept-Language` field value FAIL-SOFT and return the per-call options core consumes.
  *
- * **THE UNMATCHED ANSWER IS A DIAGNOSTIC, NOT A FABRICATED MATCH, and plan 3.4:929-932 is precise
- * about the difference.** Unusable input makes `bestMatchForAcceptLanguage` return the configured
- * fallback TAG; it makes this return an unmatched result whose "own `locale` remains null", which
+ * **THE UNMATCHED ANSWER IS A DIAGNOSTIC, NOT A FABRICATED MATCH, and the difference is
+ * precise.** Unusable input makes `bestMatchForAcceptLanguage` return the configured
+ * fallback TAG; it makes this return an unmatched result whose own `locale` remains null, which
  * core then consumes by using the configured fallback as the lookup locale. So the two doors agree
  * on which catalog answers and disagree — deliberately — on what the caller can see about why.
  * Handing back `{ locale: fallbackLocale, matchType: "exact" }` would be the fabrication this
@@ -944,11 +941,11 @@ export function forAcceptLanguage(negotiator, acceptLanguage) {
 }
 
 /**
- * PLAN 3.4:914-915's TWO IANA CONSTANTS, re-exported here because this is the subpath that owns the
- * table they describe.
+ * THE TWO IANA CONSTANTS, re-exported here because this is the subpath that owns the table they
+ * describe.
  *
- * Plan 3.1's `negotiate` row promises a category in as many words — "re-exports core's
- * `LanguageRange` type and IANA metadata" — and S28's category gate recorded the metadata half as
+ * This subpath promises to re-export core's `LanguageRange` type and IANA metadata, and S28's
+ * category gate recorded the metadata half as
  * UNDELIVERED with the reason "nothing to re-export, because core exports none". **That reason went
  * stale the day M8's final batch landed the seven build-identity constants on `core`**, and nothing
  * re-checked it: the staleness arm of that gate fires when a category gains a MEMBER, never when its
@@ -966,5 +963,5 @@ export function forAcceptLanguage(negotiator, acceptLanguage) {
  */
 export const ianaRegistryDate = RUNTIME_METADATA.ianaRegistryDate;
 
-/** @see {@link ianaRegistryDate} — the pinned IANA data's content fingerprint (plan 5.1 :1680-1682). */
+/** @see {@link ianaRegistryDate} — the pinned IANA data's content fingerprint. */
 export const ianaDataFingerprint = RUNTIME_METADATA.ianaDataFingerprint;

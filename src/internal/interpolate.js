@@ -544,7 +544,7 @@ function renderNames() {
  * The corpus pins Java's `String.valueOf(Gender.FEMININE)`: `GENDER_FEMININE` renders as
  * `FEMININE`, `CARDINALITY_ONE` as `ONE`.
  *
- * TABLE LOOKUP, never prefix stripping. Plan section 3.7 forbids the derivation outright, and the
+ * TABLE LOOKUP, never prefix stripping. The derivation is ruled out entirely, and the
  * reason is that the two agree only by accident of the current 61 names: nothing in the format stops
  * a future axis from being a prefix of another, and `renderName` is defined as the Java member's own
  * name rather than as whatever is left after removing some characters. The catalog names reaching

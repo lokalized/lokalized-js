@@ -40,17 +40,17 @@ import { createStringsManifestFromDirectory, directoryPath } from "./manifest-di
 /** @typedef {import("../load/index.js").FetchEntry} FetchEntry */
 
 /**
- * Plan 6.2's `LoadStringsFromFilesOptions`.
+ * The options of `loadStringsFromFiles` and `loadEntireManifestFromFiles`.
  *
  * `readFile` may answer with the whole body or with a stream; the declared type says
  * `Promise<Uint8Array | AsyncIterable<Uint8Array>>` and both are honoured, because a test double has
  * no reason to build a stream and the default reader has every reason to be one.
  *
  * `partialFailure` is the Fetch doors' `PartialFailurePolicy`, referenced rather than spelled out,
- * because plan 6.2 derives these options from `LoadStringsOptions`. Until 2026-09-23 this typedef and
+ * because these options derive from `LoadStringsOptions`. Until 2026-09-23 this typedef and
  * `LoadStringsFromDirectoryOptions` below spelled it `"all-or-nothing" | "allow-partial"`, so the
- * plan's own `"reject"` failed to compile on these doors while `"all-or-nothing"` — a spelling the
- * plan does not have — compiled. At run time the two were always the same: `run-plan.js` reads
+ * documented `"reject"` failed to compile on these doors while `"all-or-nothing"` — a spelling the
+ * policy does not have — compiled. At run time the two were always the same: `run-plan.js` reads
  * `=== "allow-partial"`.
  *
  * @typedef {object} LoadStringsFromFilesOptions
@@ -165,10 +165,10 @@ const DIRECTORY_DOOR_OPTIONS = /** @type {const} */ ([
 const NODE_NEAR_MISSES = /** @type {const} */ ({ loadingLimits: "limits" });
 
 /**
- * Plan 6.2's `readStringsManifest`: a filesystem path or `file:` URL, through the same bounded parser.
+ * Read a manifest from a filesystem path or `file:` URL, through the same bounded parser.
  *
- * It deliberately does NOT accept an HTTP URL. Plan 6.2 is explicit that "HTTP callers use Fetch plus
- * `parseStringsManifest` rather than hiding network I/O in the Node helper" — a helper that quietly
+ * It deliberately does NOT accept an HTTP URL: HTTP callers use Fetch plus `parseStringsManifest`
+ * rather than hiding network I/O in the Node helper — a helper that quietly
  * fetched would put a network request behind a name that reads like a file read.
  *
  * @param {string | URL} path
@@ -207,7 +207,7 @@ export async function readStringsManifest(path, options = {}) {
 }
 
 /**
- * Plan 6.2's `loadStringsFromFiles` — a lookup subset, read from disk.
+ * Load a manifest's lookup subset, read from disk.
  *
  * @param {StringsManifestV1} manifest @param {string} lookupLocale
  * @param {LoadStringsFromFilesOptions} [options]
@@ -227,7 +227,7 @@ export async function loadStringsFromFiles(manifest, lookupLocale, options = {})
 }
 
 /**
- * Plan 6.2's `loadEntireManifestFromFiles` — every declared file, in normalized-tag order.
+ * Load every file a manifest declares, read from disk, in normalized-tag order.
  *
  * @param {StringsManifestV1} manifest @param {LoadStringsFromFilesOptions} [options]
  */
@@ -241,7 +241,7 @@ export async function loadEntireManifestFromFiles(manifest, options = {}) {
 }
 
 /**
- * Plan 6.2's `LoadStringsFromDirectoryOptions` — the generator's options without a publication URL,
+ * The options of `loadStringsFromDirectory` — the generator's options without a publication URL,
  * intersected with the file loaders' without their own `limits`.
  *
  * @typedef {object} LoadStringsFromDirectoryOptions
@@ -256,11 +256,10 @@ export async function loadEntireManifestFromFiles(manifest, options = {}) {
  */
 
 /**
- * Plan 6.2's `loadStringsFromDirectory`: "generates an internal manifest against the directory's
- * `file:` URL and whole-loads it".
+ * Generate an internal manifest against the directory's `file:` URL and whole-load it.
  *
- * **IT HAS NO PUBLICATION URL OPTION, and one supplied is REFUSED rather than dropped.** Plan 6.2
- * states the absence at the type level only; refusing at runtime follows S11a's decision about
+ * **IT HAS NO PUBLICATION URL OPTION, and one supplied is REFUSED rather than dropped.** The type
+ * states the absence; refusing at runtime as well follows S11a's decision about
  * `fetch` and `request` for the same reason — a caller who passed a publication base believes the
  * manifest they get back is publishable, and this one is internal to a local load.
  *

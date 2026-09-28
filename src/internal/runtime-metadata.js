@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The rendering core's own pinned identity — plan sections 5.1 and 7's compatibility metadata.
+ * The rendering core's own pinned identity — its compatibility metadata.
  *
  * WHY THESE ARE CONSTANTS IN SOURCE rather than read from a file. `src/` may not touch a Node
  * built-in, and these values must be available to a browser graph, so there is nowhere to read them
@@ -9,14 +9,14 @@
  * `package.json` and the two `lokalized-spec` locks and requires exact equality. A constant with a
  * test behind it is a pin; a constant without one is a guess that looks like a fact.
  *
- * WHY CORE HOLDS THEM AT ALL, which is the load-bearing part for `lokalized/ssr`. Plan 6.4 requires
- * the SSR stamp's producer/data/mode fields to come "from that verified record, never from the SSR
- * module's own constants", precisely so an SSR helper loaded from a DIFFERENT installed copy
+ * WHY CORE HOLDS THEM AT ALL, which is the load-bearing part for `lokalized/ssr`. The SSR stamp's
+ * producer/data/mode fields come from that verified record, never from the SSR module's own
+ * constants, precisely so an SSR helper loaded from a DIFFERENT installed copy
  * describes the rendering instance rather than itself. That only works if the renderer is the one
  * holding the identity — so these live here, travel out through `getLoadVerification()`, and
  * `src/ssr/index.js` declares no constant of its own.
  *
- * `ianaRegistryDate` DIVERGED FROM THE PLAN FOR A WHILE and no longer does — see its docblock.
+ * `ianaRegistryDate` was not always a registry date — see its docblock.
  */
 
 /**

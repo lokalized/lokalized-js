@@ -157,9 +157,9 @@ function localeIdentity(parts) {
 /**
  * Validate the discovery budget, which rides on the LOADER's options rather than inside `limits`.
  *
- * Plan 4.5's `StringsLoadingLimits` is the portable parser's seven-field contract and says in words
- * that discovery controls are not part of it; a filesystem directory walk is exactly the Node concern
- * that sentence describes. Recorded as decision D2, 2026-09-10.
+ * `StringsLoadingLimits` is the portable parser's seven-field contract, and discovery controls are
+ * deliberately not part of it: a filesystem directory walk is a Node concern. Recorded as decision
+ * D2, 2026-09-10.
  *
  * @param {number | undefined} supplied
  */

@@ -94,9 +94,9 @@ export function invalidState(message, options) {
 }
 
 /**
- * The nullish-cause leaf, which plan 3.5:1136-1140 requires and which has no Java counterpart at all.
+ * The nullish-cause leaf, which has no Java counterpart at all.
  *
- * Java cannot throw `null` (plan 2.5:254-256 says so), so a candidate that threw one has no recorded
+ * Java cannot throw `null`, so a candidate that threw one has no recorded
  * behaviour to match. Measured on the pristine port: a resolver doing `throw null` inside a
  * whole-message alternative reached `TranslationFailure.cause === null`, and core then read a null
  * cause as "no resolution cause" and raised a `MissingTranslationError` from the throw response. It

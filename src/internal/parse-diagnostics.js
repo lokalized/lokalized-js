@@ -18,7 +18,7 @@ import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "./lokalized-error.js";
 /**
  * A parse failure, carrying the source it came from and — when the failure is lexical — where.
  *
- * Plan section 3.4 makes this catch-only: consumers may `catch` it and test `instanceof`, but
+ * This is catch-only: consumers may `catch` it and test `instanceof`, but
  * constructing one is a library-internal act, so the constructor demands a module-private token no
  * consumer can obtain. That is stricter than a documented convention and cheaper than a
  * factory-only export, because it also refuses `class Mine extends StringsParseError` at
@@ -28,12 +28,12 @@ import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "./lokalized-error.js";
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
 export class StringsParseError extends LokalizedError {
   /**
-   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
-   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
-   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** The contract requires
+   * the runtime constructor to take an unexported token AND the declaration to expose no
+   * constructor or extension signature. The token was there; the declaration was not — `tsc`
    * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
    * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
-   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * refuses to `new` AND refuses to extend: exactly the two properties required. The static
    * raiser below is what lets the module's own factory still build one, since a private constructor
    * is callable only from inside the class body.
    *

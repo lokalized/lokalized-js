@@ -38,11 +38,11 @@ import { directoryLabel, discoverCatalogFiles, keyedByRenderedTag, resolveDiscov
 /** @typedef {import("../load/index.js").StringsManifestV1} StringsManifestV1 */
 
 /**
- * Plan 6.2's `DirectoryManifestOptions`, plus the Node-owned discovery budget.
+ * The options of `createStringsManifestFromDirectory`, plus the Node-owned discovery budget.
  *
  * `maximumDiscoveryEntries` is here for the reason maintainer decision D2 put it on
- * `readStringsFromDirectory`: plan 4.5's `StringsLoadingLimits` is the portable parser's seven-field
- * contract and says in words that discovery controls are not part of it. The two directory doors walk
+ * `readStringsFromDirectory`: `StringsLoadingLimits` is the portable parser's seven-field
+ * contract, and discovery controls are deliberately not part of it. The two directory doors walk
  * the same directory with the same budget, so a knob on one and not the other would be a difference
  * with no reason behind it.
  *
@@ -55,7 +55,7 @@ import { directoryLabel, discoverCatalogFiles, keyedByRenderedTag, resolveDiscov
  * @property {number} [maximumDiscoveryEntries]
  */
 
-/** A directory argument, as a filesystem path. Accepts a `file:` URL, as plan 6.2 types it. */
+/** A directory argument, as a filesystem path. Accepts a `file:` URL too. */
 export function directoryPath(/** @type {string | URL} */ directory) {
   if (directory instanceof URL) {
     if (directory.protocol !== "file:")

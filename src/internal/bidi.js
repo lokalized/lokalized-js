@@ -51,7 +51,7 @@ const POP_DIRECTIONAL_ISOLATE = "⁩";
 const RIGHT_TO_LEFT_SCRIPTS = new Set(decodeRightToLeftScripts().map((script) => script.toLowerCase()));
 
 /**
- * The three modes, as plan section 3.2 spells them.
+ * The three modes.
  *
  * Java's enum members are `NONE`, `ALWAYS` and `RTL_LOCALES`; the JS contract renames `ALWAYS` to
  * `"all"`, which is the only place the two vocabularies differ.

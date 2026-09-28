@@ -8,8 +8,8 @@
  * `MinimalJson` reader whose behaviour is observable through the loader: the accepted grammar, the
  * surrogate-pairing rule, and the line/column of the first syntax error.
  *
- * WHY A DEDICATED PARSER RATHER THAN A LEXICAL PREPASS OVER `JSON.parse`. Plan v7 4.2 asks for the
- * choice to be made on measured simplicity/size, so both were written to the same contract and run
+ * WHY A DEDICATED PARSER RATHER THAN A LEXICAL PREPASS OVER `JSON.parse`. The choice was made on
+ * measured simplicity/size, so both were written to the same contract and run
  * against the corpus. They agree exactly — each reproduces Java's answer for 97 of the 118 `parse`
  * cases, the other 21 needing capabilities above this layer (expression compilation, warnings):
  *

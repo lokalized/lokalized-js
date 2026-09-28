@@ -154,7 +154,7 @@ const REBASELINES_ORIGIN = "4f1b2eb3ceef3f5de7deb859d2b5fdb24445d58c81f4d5c36fa9
  * them. Move it forward once per landed batch — a deliberate edit, like the origin.
  * @type {{ index: number, sha256: string } | undefined}
  */
-const REBASELINES_FROZEN_THROUGH = { index: 25, sha256: "f40877a7039d28e66544a2ba1cc53fc1216b992d63c6d72fb53cff8986caa9f3" };
+const REBASELINES_FROZEN_THROUGH = { index: 27, sha256: "d0dc6ca552d0171593da824532dee631d6c469b61e9694ef9e81d6a0a70200f0" };
 
 const RECORD = "measurements/scenario-6.json";
 const REQUESTS = "requests per render";

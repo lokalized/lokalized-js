@@ -145,10 +145,9 @@ const EXPRESSION_ERROR_TOKEN = Symbol("lokalized.ExpressionEvaluationError");
 /**
  * The only way to raise one, because the class is now PUBLIC and its constructor is guarded.
  *
- * Plan 3.5:1092-1100 declares nine error classes as package exports of the form
- * `const X: CatchOnlyErrorClass<X>`, and :1107-1108 says the runtime constructors "require an
+ * The nine library error classes are package exports whose runtime constructors require an
  * unexported internal token, so plain-JavaScript direct construction and subclass instantiation fail
- * rather than creating partially initialized library errors". This class is raised from three modules,
+ * rather than creating partially initialized library errors. This class is raised from three modules,
  * so the token cannot stay module-private beside a single call site the way `DIGEST_ERROR_TOKEN` does;
  * the factory is what keeps it private, exactly as `loadingError` and `parseError` already do.
  *
@@ -162,12 +161,12 @@ export function expressionEvaluationError(message, options) {
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
 export class ExpressionEvaluationError extends LokalizedError {
   /**
-   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
-   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
-   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** The contract requires
+   * the runtime constructor to take an unexported token AND the declaration to expose no
+   * constructor or extension signature. The token was there; the declaration was not — `tsc`
    * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
    * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
-   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * refuses to `new` AND refuses to extend: exactly the two properties required. The static
    * raiser below is what lets the module's own factory still build one, since a private constructor
    * is callable only from inside the class body.
    *

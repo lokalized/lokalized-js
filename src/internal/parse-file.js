@@ -50,7 +50,7 @@ export const validateExpressionAtLoad = (expression) =>
 /**
  * The internal model, projected onto the public `LocalizedStringInput` shape.
  *
- * Every keyed record is a FROZEN NULL-PROTOTYPE object, per plan section 4.3: the property names
+ * Every keyed record is a FROZEN NULL-PROTOTYPE object: the property names
  * come from the catalog, so `__proto__` must land as an ordinary own property rather than reaching
  * an inherited setter, and a caller must not be able to mutate a parsed file into a different one.
  *

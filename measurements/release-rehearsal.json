@@ -30,8 +30,8 @@
         "specifier": "lokalized",
         "file": "dist/browser/lokalized.js",
         "files": 1,
-        "rawBytes": 184718,
-        "brotliBytes": 55075,
+        "rawBytes": 184707,
+        "brotliBytes": 54979,
         "exports": 70,
         "loadedInBrowser": true
       },
@@ -39,8 +39,8 @@
         "specifier": "lokalized/core",
         "file": "dist/browser/core.js",
         "files": 7,
-        "rawBytes": 183835,
-        "brotliBytes": 54791,
+        "rawBytes": 183824,
+        "brotliBytes": 54800,
         "exports": 21,
         "loadedInBrowser": true
       },
@@ -49,7 +49,7 @@
         "file": "dist/browser/parse.js",
         "files": 5,
         "rawBytes": 159489,
-        "brotliBytes": 48676,
+        "brotliBytes": 48710,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -58,7 +58,7 @@
         "file": "dist/browser/load.js",
         "files": 7,
         "rawBytes": 178047,
-        "brotliBytes": 53758,
+        "brotliBytes": 53801,
         "exports": 10,
         "loadedInBrowser": true
       },
@@ -66,8 +66,8 @@
         "specifier": "lokalized/ssr",
         "file": "dist/browser/ssr.js",
         "files": 2,
-        "rawBytes": 7582,
-        "brotliBytes": 2383,
+        "rawBytes": 7570,
+        "brotliBytes": 2371,
         "exports": 2,
         "loadedInBrowser": true
       },
@@ -76,7 +76,7 @@
         "file": "dist/browser/negotiate.js",
         "files": 4,
         "rawBytes": 90777,
-        "brotliBytes": 31695,
+        "brotliBytes": 31751,
         "exports": 6,
         "loadedInBrowser": true
       },
@@ -84,8 +84,8 @@
         "specifier": "lokalized/data/ordinal",
         "file": "dist/browser/data/ordinal.js",
         "files": 8,
-        "rawBytes": 190543,
-        "brotliBytes": 56321,
+        "rawBytes": 190532,
+        "brotliBytes": 56371,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -93,13 +93,13 @@
         "specifier": "lokalized/data/ranges",
         "file": "dist/browser/data/ranges.js",
         "files": 8,
-        "rawBytes": 193071,
-        "brotliBytes": 56463,
+        "rawBytes": 193060,
+        "brotliBytes": 56528,
         "exports": 2,
         "loadedInBrowser": true
       }
     ],
-    "sizesRecordedFor": "Packed sizes moved: createStrings lost its constant locale option before 1.0.0 (maintainer, 2026-09-27): every instance takes exactly one resolver, as a Java instance takes exactly one supplier; the refusal naming the replacement adds source bytes.",
+    "sizesRecordedFor": "Brotli sizes moved, raw sizes did not: the .d.ts-bound JSDoc no longer cites internal planning sections, and the bundled source maps carry the comments, so the content-hashed chunk names changed.",
     "capturedAgainst": {
       "files": {
         "dist/browser/chunks/chunk-2QVQLAF6.js": "ba3df99cb2e795608585b0d41ef59582750da7a9822e7b0551b39a98089d1a2c",

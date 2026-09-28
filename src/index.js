@@ -28,8 +28,8 @@ export { createStrings } from "./core/index.js";
 export { chooseBrowserLocale, chooseLocaleForPreferredLanguages } from "./core/index.js";
 
 /**
- * Plan 3.7 puts the tagged-value TYPES on `core` (plan 3.1s "tagged-value types" category) and the
- * CONSTANTS on the root, so the root names the type through its owner rather than redeclaring it.
+ * The tagged-value TYPES live on `core` and the CONSTANTS on the root, so the root names the type
+ * through its owner rather than redeclaring it.
  *
  * The third parameter defaults here too, or the root would publish a stricter arity than the
  * subpath it forwards to — see core's own block for the registry statements that ask for it.

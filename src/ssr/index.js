@@ -29,14 +29,14 @@ import { configurationError } from "../internal/configuration-error.js";
 /**
  * The narrow serialized match projection.
  *
- * Plan 6.4: it "intentionally contains only selected locale and match type. It never leaks requested
- * ranges, q-values, fallback configuration, or the supported/considered locale inventory." A full
+ * It intentionally contains only the selected locale and match type. It never leaks requested
+ * ranges, q-values, fallback configuration, or the supported/considered locale inventory. A full
  * `LocaleMatchResult` carries all four — `requestedLanguageRanges`, `effectiveWeight`,
  * `fallbackLocale`, `consideredLocales` — so the narrowing is a privacy boundary rather than a
  * convenience, and `test/ssr-stamp.test.js` checks it by diffing the WHOLE serialized object against
  * an expected key set rather than by spot-checking fields.
  *
- * The match type is plan 6.4:2214's `LocaleMatchType`, referenced through core rather than spelled
+ * The match type is core's `LocaleMatchType`, referenced through core rather than spelled
  * out again — a JSDoc `import(...)` sits in a comment, so `tools/graph-walk.mjs` strips it before
  * matching and this adds NO module edge. `test/ssr-graph.test.js` pins this subpath to exactly two
  * modules and still does.
@@ -45,7 +45,7 @@ import { configurationError } from "../internal/configuration-error.js";
  */
 
 /**
- * Plan 6.4's `LokalizedSsrStampV1`, transcribed field for field.
+ * The version-1 SSR stamp: what a server serializes into a page for the client to validate.
  *
  * @typedef {Readonly<{ formatVersion: 1, producerImplementation: "lokalized-js",
  *   producerVersion: string, catalogVersion: string, catalogFingerprint: string, cldrVersion: string,
@@ -94,8 +94,8 @@ function verifiedRecordFor(strings) {
   if (record === null || record === undefined)
     throw configurationError(
       "This Strings instance was constructed directly, so there is no verified manifest load to " +
-      "stamp. Plan 6.4 makes direct construction ineligible even when the caller supplied a " +
-      "shape-valid catalog identity, because core validates an identity's SHAPE and not its truth",
+      "stamp. Direct construction is ineligible even when the caller supplied a shape-valid " +
+      "catalog identity, because core validates an identity's SHAPE and not its truth",
     );
   if (!isRecord(record) || record.source !== "verified-manifest-v1")
     throw configurationError(
@@ -286,7 +286,7 @@ function requireCoverage(coverage, lookupLocale) {
 }
 
 /**
- * Stamp a rendered page's locale selection, plan 6.4.
+ * Stamp a rendered page's locale selection.
  *
  * @param {any} strings the `Strings` that rendered the page
  * @param {SsrLocaleContext | any} context the rendering context, or a `TranslationResult` from it
@@ -320,19 +320,20 @@ export function createSsrStamp(strings, context) {
 }
 
 /**
- * Validate a server's stamp against the client instance about to hydrate, plan 6.4.
+ * Validate a server's stamp against the client instance about to hydrate.
  *
  * **THE LOCAL INSTANCE IS VERIFIED FIRST, and the order is the contract rather than an
- * implementation detail.** Plan 6.4: validation "performs the same local-instance verification
- * BEFORE comparing the serialized fields, so a caller cannot validate against incomplete or
- * direct-construction state merely by presenting a well-shaped stamp." Building the local stamp is
+ * implementation detail.** Validation performs the same local-instance verification BEFORE
+ * comparing the serialized fields, so a caller cannot validate against incomplete or
+ * direct-construction state merely by presenting a well-shaped stamp. Building the local stamp is
  * how that is guaranteed structurally: there is no route to the comparison that skips it.
  *
- * **THE COMPARISON IS EXHAUSTIVE OVER THE STAMP, not a maintained field list.** Plan 6.4 names
- * fifteen fields; a hand-copied list of fifteen is precisely the kind of text this project has
+ * **THE COMPARISON IS EXHAUSTIVE OVER THE STAMP, not a maintained field list.** The stamp carries
+ * fifteen values, counting `localeMatch`'s two members; a hand-copied list of fifteen is precisely
+ * the kind of text this project has
  * repeatedly found asserting the inverse of what it described, and it would silently stop covering a
  * sixteenth. So every own field of the locally built stamp is compared, `localeMatch` by its two
- * members, and `test/ssr-stamp.test.js` asserts that the set of compared paths IS the plan's fifteen.
+ * members, and `test/ssr-stamp.test.js` asserts that the set of compared paths IS those fifteen.
  *
  * @param {LokalizedSsrStampV1} stamp the stamp the server serialized into the page
  * @param {any} strings the client `Strings` about to hydrate

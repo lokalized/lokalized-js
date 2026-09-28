@@ -55,20 +55,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 32,
-      "sourceBytes": 776117,
-      "importMs": 0.533,
-      "constructionMs": 0.2297,
-      "firstRenderMs": 0.4875,
-      "retainedBytes": 97168
+      "sourceBytes": 773869,
+      "importMs": 0.285,
+      "constructionMs": 0.1233,
+      "firstRenderMs": 0.3057,
+      "retainedBytes": 97064
     },
     {
       "label": "core + parsed equivalent",
       "modules": 31,
-      "sourceBytes": 765034,
-      "importMs": 1.38,
-      "constructionMs": 0.6405,
-      "firstRenderMs": 0.5284,
-      "retainedBytes": 474232
+      "sourceBytes": 762837,
+      "importMs": 0.718,
+      "constructionMs": 0.3702,
+      "firstRenderMs": 0.2918,
+      "retainedBytes": 471960
     }
   ],
   "browser": {
@@ -714,6 +714,40 @@
       "browserHalf": true,
       "browserSha256": "d6c284010377182ec210e3e79fece7e6881bb3f437bdd662502486f3a870da84",
       "previousSha256": "0f2419332f0c8ecb64f9891afe9fda94c75aa92cdbaa479c0c8dedf8dc4beb9d"
+    },
+    {
+      "reason": "Source shrank: two shipped error messages (the createStrings runtimeLimits refusal and the createSsrStamp direct-construction refusal) no longer cite internal planning sections.",
+      "growth": [],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 776106
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 765023
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "d6c284010377182ec210e3e79fece7e6881bb3f437bdd662502486f3a870da84",
+      "previousSha256": "dfa54ffd49ab319511cea6f5ab0936b98d99192c03ae15e2aa2d723d19f3f872"
+    },
+    {
+      "reason": "Source shrank: the JSDoc emitted into the published .d.ts files no longer cites internal planning sections.",
+      "growth": [],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 773869
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 762837
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "d6c284010377182ec210e3e79fece7e6881bb3f437bdd662502486f3a870da84",
+      "previousSha256": "8664287665192dd85146cb5ba3534d22f996c2c916876ff331375ee95e8c15c0"
     }
   ]
 }

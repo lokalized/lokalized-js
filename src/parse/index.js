@@ -58,7 +58,7 @@ const freeze = Object.freeze;
 /** @typedef {import("../internal/catalog.js").ParseLimits} StringsLoadingLimits */
 /**
  * @typedef {Pick<StringsLoadingLimits, "maximumLocalizedStringsFiles" | "maximumTranslationNodes"
- *   | "maximumWarnings">} ParsedCatalogLimits plan 4.1's three limits that apply to an ALREADY-PARSED
+ *   | "maximumWarnings">} ParsedCatalogLimits The three limits that apply to an ALREADY-PARSED
  *   catalog. The raw boundaries — input bytes, reader characters, JSON nesting — have no text left to
  *   bound by the time one exists, which is the distinction the name carries.
  */
@@ -189,7 +189,7 @@ export function parseStrings(input, options) {
 const DEFINE_SOURCE = "<defined>";
 
 /**
- * Validate, defensively copy, and freeze one programmatic localized string — plan section 3.6.
+ * Validate, defensively copy, and freeze one programmatic localized string.
  *
  * The validation is not a second implementation of the file rules; it IS the file rules. The input
  * is run through the shared model walk, and the frozen result is projected back out of the internal
@@ -218,7 +218,7 @@ export function defineLocalizedString(input) {
 }
 
 /**
- * Validate, defensively copy, and freeze a programmatic catalog — plan section 3.6.
+ * Validate, defensively copy, and freeze a programmatic catalog.
  *
  * Validated as ONE catalog rather than as N independent strings, which is the difference that
  * matters: duplicate keys are rejected, and a subtree shared between two root keys is proved once.
@@ -335,28 +335,28 @@ function requireParsedStringsFile(file, index) {
 }
 
 /**
- * MERGE EXACT-LOCALE SHARDS — plan 2.3:172-190 and 3.6:1477-1496.
+ * MERGE EXACT-LOCALE SHARDS.
  *
  * An application whose translations are split by route or namespace parses each shard separately and
  * merges before construction; V1 manifests and the runtime loader model ONE assembled resource per
  * locale, so the splitting is the application's and the assembly happens here.
  *
- * **THE LOCALE RULE IS EXACT AND THE PLAN SAYS WHY IN ONE EXAMPLE.** "Matching primary language,
- * likely script, or `equivalent(a, b)` is insufficient. For example, `pt` and `pt-PT` must remain
- * separate because their cardinal rules differ for `0`, `0.0`, and `1.5`." An entry is evaluated
+ * **THE LOCALE RULE IS EXACT, AND ONE EXAMPLE SAYS WHY.** Matching primary language, likely script,
+ * or `equivalent(a, b)` is insufficient: `pt` and `pt-PT` must remain separate because their
+ * cardinal rules differ for `0`, `0.0`, and `1.5`. An entry is evaluated
  * under the locale of the file that supplied it, so merging across two tags silently re-evaluates
  * half the catalog under the wrong plural rules. Tags are NORMALIZED first — `en-us` and `en-US` are
  * one locale — and then compared exactly.
  *
- * **LAST-WRITE-WINS IS FORBIDDEN (plan 2.3:190).** A repeated key is either the same definition,
+ * **LAST-WRITE-WINS IS FORBIDDEN.** A repeated key is either the same definition,
  * which unions its origins, or a conflict, which is refused with both origins named. There is no
  * third behaviour, and the absence of one is the point: shards that disagree are an authoring bug
  * that a silent winner turns into a mystery at render time.
  *
- * **WHAT IT REVALIDATES, AND WHAT IT CANNOT.** Plan 3.6:1493-1496: "Raw input-byte, reader-character,
- * total-byte, and JSON-nesting limits are enforceable only where the original string/bytes or stream
- * is observed; normalized `ParsedStringsFile` values do not pretend to reconstruct them from lost
- * whitespace, escapes, or BOMs." So the three limits that survive are the model ones, and the merged
+ * **WHAT IT REVALIDATES, AND WHAT IT CANNOT.** Raw input-byte, reader-character, total-byte, and
+ * JSON-nesting limits are enforceable only where the original string/bytes or stream is observed;
+ * normalized `ParsedStringsFile` values do not pretend to reconstruct them from lost whitespace,
+ * escapes, or BOMs. So the three limits that survive are the model ones, and the merged
  * catalog is walked once against them rather than each input being re-charged: after dedup the merged
  * set IS what exists, and charging the pre-dedup sum would refuse a merge of two identical shards at
  * a budget the result fits inside.

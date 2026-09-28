@@ -60,12 +60,12 @@ import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "./lokalized-error.js";
  * The hidden key under which an OPTIONAL plural-data carrier hangs the classifier core needs.
  *
  * `lokalized/data/ordinal` and `lokalized/data/ranges` are outside the root graph on purpose — the
- * root must never reach their tables — so `createStrings` cannot import their classifiers. Plan
- * section 3.2 has the consumer hand the data over instead (`pluralData: { ordinal: ordinalData }`),
- * and section 3.2's `OrdinalData`/`CardinalRangeData` are declared as provenance carriers alone. The
+ * root must never reach their tables — so `createStrings` cannot import their classifiers. The
+ * consumer hands the data over instead (`pluralData: { ordinal: ordinalData }`),
+ * and `OrdinalData`/`CardinalRangeData` are declared as provenance carriers alone. The
  * capability therefore travels on the carrier under a key that is not part of the published shape: a
  * symbol is invisible to `Object.keys`, `JSON.stringify`, and the generated declarations, so the
- * public type stays exactly what the plan says it is.
+ * public type stays exactly what it is declared to be.
  *
  * `Symbol.for` rather than `Symbol()` deliberately. An application may legitimately install a
  * separate copy of the optional module — that is precisely the case the provenance comparison in
@@ -94,8 +94,8 @@ export const PLURAL_DATA_RUNTIME = Symbol.for("lokalized.plural-data-runtime.v1"
  * one argument to name. So this widens the diagnostic exactly where Java's is wider and nowhere
  * else.
  *
- * The sentence stays the port's own rather than becoming Java's: plan 3.3:771 names
- * `UnsupportedLocaleError` and its wording for this surface, and that is a recorded maintainer
+ * The sentence stays the port's own rather than becoming Java's: this surface raises
+ * `UnsupportedLocaleError` with its own wording, and that is a recorded maintainer
  * decision (M7 decision 3) — what was owed here is the ROLE, not Java's spelling of it.
  */
 /**
@@ -110,12 +110,12 @@ export function unsupportedLocaleError(localeTag, role) {
 
 export class UnsupportedLocaleError extends LokalizedError {
   /**
-   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
-   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
-   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** The contract requires
+   * the runtime constructor to take an unexported token AND the declaration to expose no
+   * constructor or extension signature. The token was there; the declaration was not — `tsc`
    * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
    * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
-   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * refuses to `new` AND refuses to extend: exactly the two properties required. The static
    * raiser below is what lets the module's own factory still build one, since a private constructor
    * is callable only from inside the class body.
    *
@@ -138,9 +138,9 @@ export class UnsupportedLocaleError extends LokalizedError {
     );
     this.name = "UnsupportedLocaleError";
     /**
-     * PLAN 3.5:1049-1051 NAMES THIS FIELD `locale`, and the port called it `localeTag` — a private
+     * THE PUBLIC NAME OF THIS FIELD IS `locale`, and the port called it `localeTag` — a private
      * spelling, because the class was exported from no subpath until S35 and one test read it. The
-     * plan's name wins now that a consumer can see it: `interface UnsupportedLocaleError extends
+     * public name wins now that a consumer can see it: `interface UnsupportedLocaleError extends
      * LokalizedError { readonly code: "UNSUPPORTED_LOCALE"; readonly locale: LocaleTag; }`.
      * BOOT-M0-0518 declares it `readonly` with the rest of the record.
      * @type {string}

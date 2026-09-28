@@ -38,7 +38,7 @@ import { validateStringsManifest } from "./manifest.js";
 /**
  * The candidates a lookup would attempt, in order — INCLUDING those the manifest cannot serve.
  *
- * Plan 6.1: "chain includes attempted candidates without files." A candidate that resolves to no file
+ * The chain includes attempted candidates without files. A candidate that resolves to no file
  * stays in the list as its own normalized tag, because it was still attempted: a caller reasoning
  * about coverage needs to see the locale that was tried and missed, not a list silently narrowed to
  * the ones that happened to exist.
@@ -70,7 +70,7 @@ export function chain(manifest, lookupLocale, options = {}) {
 /**
  * The files a lookup would actually fetch, in first-use order.
  *
- * Plan 6.1: "fetchSet contains only manifest-backed files, deduplicated in first-use order." The
+ * The fetch set contains only manifest-backed files, deduplicated in first-use order. The
  * dedup is already first-wins on the POST-RESOLUTION tag inside the candidate walk — two candidates
  * that resolve to one file collapse there — so this filter does not re-deduplicate; it selects. Said
  * out loud because a second dedup here would be dead code that LOOKS like the rule being enforced,

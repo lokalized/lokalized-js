@@ -59,25 +59,25 @@ export const DEFAULT_REQUEST = Object.freeze({ mode: "cors", credentials: "same-
 export { StringsLoadingError } from "./run-plan.js";
 
 /**
- * Plan 6.2: the loader fails CLOSED when WebCrypto is absent, before any catalog I/O.
+ * The loader fails CLOSED when WebCrypto is absent, before any catalog I/O.
  *
- * **A REAL CLASS, because plan 8.5 requires a CATCHABLE one.** This was a plain `Error` with its
+ * **A REAL CLASS, because it must be CATCHABLE.** This was a plain `Error` with its
  * `name` and `code` assigned after construction, so a consumer could only recognise it by string —
  * `error.name === "DigestUnavailableError"` — and never by `instanceof`. The name and code are
  * unchanged, so every string-matching consumer and every recorded message keeps working; what is
- * added is the thing the clause actually asks for. The construction token mirrors `StringsParseError`
+ * added is `instanceof`. The construction token mirrors `StringsParseError`
  * and `StringsLoadingError`.
  */
   // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
 export class DigestUnavailableError extends LokalizedError {
   /**
-   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
-   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
-   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** The contract requires
+   * the runtime constructor to take an unexported token AND the declaration to expose no
+   * constructor or extension signature. The token was there; the declaration was not — `tsc`
    * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
    * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
-   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * refuses to `new` AND refuses to extend: exactly the two properties required. The static
    * raiser below is what lets the module's own factory still build one, since a private constructor
    * is callable only from inside the class body.
    *

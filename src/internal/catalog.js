@@ -100,7 +100,7 @@ const MAXIMUM_ALTERNATIVE_DEPTH = 128;
  */
 
 /**
- * Plan 4.5's seven-field `StringsLoadingLimits`, which is the name both `lokalized/parse` and
+ * The seven-field `StringsLoadingLimits`, which is the name both `lokalized/parse` and
  * `lokalized/load` publish this type under. Four of the seven are AGGREGATE, across a whole load —
  * `maximumTotalInputBytes`, `maximumLocalizedStringsFiles`, `maximumTranslationNodes` and
  * `maximumWarnings` — and the two byte/character bounds are per-resource.
@@ -152,7 +152,7 @@ const MAXIMUM_ALTERNATIVE_DEPTH = 128;
  *
  * Each row is `[axis, JS constant prefix, Java enum member names]`, so a tuple is
  * `(axis, prefix + member, member)` and `renderName` is the member NAME rather than anything derived
- * by stripping a prefix off the constant — plan section 3.7 forbids that derivation. The corpus's
+ * by stripping a prefix off the constant — that derivation is ruled out. The corpus's
  * `languageForms` case carries all 61 authoritative tuples and proves this table exact.
  */
 /**
@@ -160,7 +160,7 @@ const MAXIMUM_ALTERNATIVE_DEPTH = 128;
  *
  * It lives HERE rather than beside the constants in `src/index.js` because a module-scope
  * `@typedef` in a published entry point is EMITTED as a public type — measured in S29 — and this
- * map is an implementation detail plan 3.7 never names. `src/index.js` references it inline, which
+ * map is an implementation detail no public contract names. `src/index.js` references it inline, which
  * is the form that does not export. No module joins any graph: the root already reaches this file
  * for `LANGUAGE_FORM_NAMES` itself.
  *
@@ -505,8 +505,8 @@ export class LoadingSession {
    *
    * A sequential walk (`src/node/directory.js`) can thread one session and let the parser charge it
    * as it goes. A CONCURRENT one cannot: `src/load/run-plan.js` runs up to eight parses at once, and a
-   * shared counter would make which file is blamed depend on completion order, where plan 6.2:2077
-   * fixes the failure list to fetch-plan order. So that runner parses each file against its own
+   * shared counter would make which file is blamed depend on completion order, where the failure
+   * list is fixed to fetch-plan order. So that runner parses each file against its own
    * session and replays the measured contributions here, in plan order; its own header carries the
    * rest of the reasoning.
    *
@@ -1234,12 +1234,12 @@ function parseCatalogMembers(session, members, duplicates, onRootParsed) {
 /**
  * Bounded parse of one already-decoded catalog object into the internal model.
  *
- * A decoded object cannot carry duplicates, byte length, or source locations — plan 4.1: it is not
- * a raw strings-file input. `parseCatalogSource` is the entry point that owns those guarantees.
+ * A decoded object cannot carry duplicates, byte length, or source locations: it is not a raw
+ * strings-file input. `parseCatalogSource` is the entry point that owns those guarantees.
  *
- * The load's `session` is threaded through when there is one, and that is not an optimisation. Plan
- * 3.2 requires the model/file/node/warning limits to apply "across all raw and already-parsed
- * catalogs": a session created here instead would give every decoded catalog its own private budget,
+ * The load's `session` is threaded through when there is one, and that is not an optimisation. The
+ * model/file/node/warning limits apply across all raw and already-parsed catalogs: a session
+ * created here instead would give every decoded catalog its own private budget,
  * so a construction whose catalogs jointly blow the node limit would be accepted, and a caller's
  * `loadingLimits` would silently govern only the catalogs that happened to arrive as text.
  *
@@ -1718,9 +1718,9 @@ function buildDefinitionFromInput(session, rootKey, key, declarationPath, input,
 /**
  * Validate a programmatic catalog — `readonly LocalizedStringInput[]` — into the internal model.
  *
- * Charged to the same `LoadingSession` as every other catalog form. Plan 4.1 is explicit that
- * programmatic values "receive model/schema validation and node limits, not source-level
- * guarantees": there is no text to bound and no duplicate JSON member to find, but the translation
+ * Charged to the same `LoadingSession` as every other catalog form. Programmatic values receive
+ * model/schema validation and node limits, not source-level guarantees: there is no text to bound
+ * and no duplicate JSON member to find, but the translation
  * NODE budget is a model limit and applies here exactly as it does to a parsed file.
  *
  * @param {readonly unknown[]} inputs

@@ -37,23 +37,23 @@
     {
       "label": "edge worker",
       "modules": 47,
-      "sourceBytes": 987849,
+      "sourceBytes": 984534,
       "nodeBuiltinEdges": 0,
       "ianaClosureBytes": 11358,
-      "importMs": 0.4676
+      "importMs": 0.4297
     },
     {
       "label": "server renderer",
       "modules": 54,
-      "sourceBytes": 1068358,
+      "sourceBytes": 1064855,
       "nodeBuiltinEdges": 10,
       "ianaClosureBytes": 11358,
-      "importMs": 16.5804
+      "importMs": 15.6316
     }
   ],
-  "negotiateMsPerHeader": 0.06035,
-  "firstRenderMs": 0.8493,
-  "retainedBytes": -15592,
+  "negotiateMsPerHeader": 0.0541,
+  "firstRenderMs": 0.8454,
+  "retainedBytes": -15464,
   "requestsPerRender": {
     "fr-CA": 4,
     "fr-CH": 4,
@@ -327,6 +327,78 @@
         "closureClasses": 369
       },
       "previousSha256": "946c5ab81455642d1923d4106145d3ff1dcd91c583fa5160d4b3548824806547"
+    },
+    {
+      "reason": "Source shrank: two shipped error messages (the createStrings runtimeLimits refusal and the createSsrStamp direct-construction refusal) no longer cite internal planning sections.",
+      "growth": [],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 987838,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1068335,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "f40877a7039d28e66544a2ba1cc53fc1216b992d63c6d72fb53cff8986caa9f3"
+    },
+    {
+      "reason": "Source shrank: the JSDoc emitted into the published .d.ts files no longer cites internal planning sections.",
+      "growth": [],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 984534,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1064855,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "8e446d0288e3366c7084df625f1b91753d20fe6332a220d9843be2deb5adac5e"
     }
   ]
 }

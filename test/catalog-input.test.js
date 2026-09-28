@@ -226,9 +226,14 @@ test("runtimeLimits is refused rather than ignored", () => {
   // Plan 4.6: v1 fixes Java's `TranslationRuntimeLimits` defaults and "a non-undefined
   // `runtimeLimits` option is a construction-time" error. Silently ignoring it would answer under a
   // bound the caller does not have, which is the one outcome that cannot be debugged from outside.
+  // The message is pinned whole: it ships to callers, so it must stand on its own and cite nothing a
+  // caller cannot read.
   assert.throws(
     () => createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: DOCUMENT }, runtimeLimits: {} }),
-    /runtimeLimits/,
+    {
+      name: "RangeError",
+      message: "createStrings({ runtimeLimits }) is not customizable: every instance runs under the same fixed runtime limits",
+    },
   );
   // Explicitly `undefined` is not "supplied": it is what the declared option type says.
   createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: DOCUMENT }, runtimeLimits: undefined });

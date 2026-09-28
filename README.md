@@ -3063,11 +3063,11 @@ second table. Both columns are re-derived on every run, so they describe this co
 
 | import | minified | brotli |
 |---|---|---|
-| `import { createStrings } from "lokalized"` | 181,490 | 54,197 |
+| `import { createStrings } from "lokalized"` | 181,479 | 54,390 |
 | `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 89,508 | 31,244 |
-| `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,654 | 2,009 |
+| `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,642 | 2,002 |
 | `import { GENDER_FEMININE } from "lokalized"` | 2,350 | 914 |
-| the four above, in one bundle | 222,432 | 64,379 |
+| the four above, in one bundle | 222,409 | 64,383 |
 <!-- bundle-table:end -->
 
 <!-- dist-table:start -->
@@ -3077,15 +3077,15 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 
 | load | files | raw | brotli |
 |---|---|---|---|
-| `lokalized` | 1 | 184,718 | 55,075 |
-| `lokalized/core` | 7 | 183,835 | 54,791 |
-| `lokalized/parse` | 5 | 159,489 | 48,676 |
-| `lokalized/load` | 7 | 178,047 | 53,758 |
-| `lokalized/ssr` | 2 | 7,582 | 2,383 |
-| `lokalized/negotiate` | 4 | 90,777 | 31,695 |
-| `lokalized/data/ordinal` | 8 | 190,543 | 56,321 |
-| `lokalized/data/ranges` | 8 | 193,071 | 56,463 |
-| `lokalized.global.js`, the classic script | 1 | 243,533 | 68,903 |
+| `lokalized` | 1 | 184,707 | 54,979 |
+| `lokalized/core` | 7 | 183,824 | 54,800 |
+| `lokalized/parse` | 5 | 159,489 | 48,710 |
+| `lokalized/load` | 7 | 178,047 | 53,801 |
+| `lokalized/ssr` | 2 | 7,570 | 2,371 |
+| `lokalized/negotiate` | 4 | 90,777 | 31,751 |
+| `lokalized/data/ordinal` | 8 | 190,532 | 56,371 |
+| `lokalized/data/ranges` | 8 | 193,060 | 56,528 |
+| `lokalized.global.js`, the classic script | 1 | 243,510 | 68,767 |
 <!-- dist-table:end -->
 
 **What a no-build page downloads.** The table above is what a bundler produces from the source; this
@@ -3103,9 +3103,9 @@ larger, so a figure quoted in it overstates what a visitor on a modern CDN actua
 not printed here, because a number nothing re-derives is how this section came to be wrong before.
 
 Three things are worth reading off that table. **Half of the root bundle is one pinned CLDR table** —
-replacing `likely-subtags` with an empty one takes the same bundle from 181,490 to 158,561 minified
+replacing `likely-subtags` with an empty one takes the same bundle from 181,479 to 158,550 minified
 bytes, which is the price of resolving `fr-CH` to `fr` without asking the host. **The tables are
-shared, not duplicated**: adding three more subpaths to the root costs 40,942 bytes, not another
+shared, not duplicated**: adding three more subpaths to the root costs 40,930 bytes, not another
 whole copy. And **`lokalized/ssr` carries no pinned data at all**, which is what lets the stamp
 module sit in a page that does no matching.
 

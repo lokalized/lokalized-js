@@ -314,8 +314,8 @@ const RANGE_TABLE = createRuleTable(RANGE_GROUPS.map((group) => ({ locales: grou
  * this module can prove which generated data it linked, and so `createStrings` can compare it
  * against the rendering core's own constants.
  *
- * The generator emits the two fields the canonical data lock exposes to the optional modules; plan
- * section 3.2's fuller `DataProvenance` (`formatVersion`, `generatorVersion`, `inputsSha256`) is a
+ * The generator emits the two fields the canonical data lock exposes to the optional modules; the
+ * fuller `DataProvenance` (`formatVersion`, `generatorVersion`, `inputsSha256`) is a
  * generator gap shared with `lokalized/data/ordinal` and is reported rather than papered over here.
  *
  * @type {Readonly<{ $lokalized: "cardinal-range-data", provenance: Readonly<{ cldrVersion: string, dataFingerprint: string }> }>}

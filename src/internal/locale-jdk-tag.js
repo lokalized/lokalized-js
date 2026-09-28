@@ -753,8 +753,8 @@ export function jdkLocaleWellFormed(tag) {
  * — would run a whole walk Java never starts, and the callback trace is where that shows.
  *
  * `RangeError`, not the `TypeError` `attemptedLocaleRefusal` raises, and the two are deliberately
- * different. Plan 2.2 scopes malformed-direct-input refusal to the caller's OWN direct locale and
- * puts it at the validation boundary; these three sites ARE that boundary, so this is
+ * different. Malformed-direct-input refusal is scoped to the caller's OWN direct locale and
+ * sits at the validation boundary; these three sites ARE that boundary, so this is
  * `normalizeTag`'s sibling and carries `normalizeTag`'s error class and the identical sentence tail.
  * `attemptedLocaleRefusal`'s locales are synthesized by the chain rather than spelled by the caller,
  * which is the argument recorded in its own docblock for the other class. Java raises

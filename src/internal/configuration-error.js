@@ -6,7 +6,7 @@ import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-err
  *
  * EXTRACTED from `src/data/ordinal.js` when `lokalized/load` needed the same failure, because two
  * factories that must produce the SAME `name` and `code` are two dialects of one thing — and the one
- * that drifts is the one nobody is looking at. Plan 3.7 calls these construction-time
+ * that drifts is the one nobody is looking at. These are construction-time
  * `ConfigurationError`s. The public catch-only hierarchy (`LokalizedError` and friends) is core's to
  * land; this carries the eventual `code` already, so that swap stays invisible to a consumer who
  * checks it.
@@ -19,10 +19,9 @@ import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-err
  * shape S22 fixed for `StringsLoadingError` and `DigestUnavailableError`, and the largest: it reaches
  * a caller from `core`, `load`, `ssr` and `node` alike.
  *
- * Plan 3.5:1100 declares it a package export, `const ConfigurationError:
- * CatchOnlyErrorClass<ConfigurationError>`, and :1107-1108 requires the runtime constructor to take
- * an unexported token so "plain-JavaScript direct construction and subclass instantiation fail
- * rather than creating partially initialized library errors". The FACTORY is what keeps the token
+ * It is a package export, and its runtime constructor takes an unexported token so plain-JavaScript
+ * direct construction and subclass instantiation fail rather than creating partially initialized
+ * library errors. The FACTORY is what keeps the token
  * private while 119 sites raise one, the same arrangement `loadingError` and `parseError` use.
  *
  * `name` and `code` are unchanged, so the fourteen places that match on the string keep working —
@@ -32,12 +31,12 @@ import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-err
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
 export class ConfigurationError extends LokalizedError {
   /**
-   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
-   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
-   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** The contract requires
+   * the runtime constructor to take an unexported token AND the declaration to expose no
+   * constructor or extension signature. The token was there; the declaration was not — `tsc`
    * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
    * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
-   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * refuses to `new` AND refuses to extend: exactly the two properties required. The static
    * raiser below is what lets the module's own factory still build one, since a private constructor
    * is callable only from inside the class body.
    *

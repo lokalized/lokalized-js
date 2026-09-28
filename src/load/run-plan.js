@@ -2,10 +2,10 @@
 /**
  * The plan RUNNER, shared by every door that loads a manifest's files.
  *
- * **WHY THIS IS ONE MODULE AND NOT TWO.** Plan 6.2's ordering rules are all of the form "not
- * completion order" — failures "ordered by fetch-plan order, not completion order", warnings by
- * "fetch-plan order and then depth-first declaration order, independent of request completion
- * timing" — and the partial-failure policy, the concurrency cap, the abort rule and the
+ * **WHY THIS IS ONE MODULE AND NOT TWO.** The ordering rules are all of the form "not completion
+ * order": failures are ordered by fetch-plan order, not completion order, and warnings by fetch-plan
+ * order and then depth-first declaration order, independent of request completion timing — and the
+ * partial-failure policy, the concurrency cap, the abort rule and the
  * digest-before-parse rule sit on top of them. Those were the hard part of the Fetch loader, and
  * `lokalized/node`'s file loaders have to obey every one of them identically. A second copy for the
  * file door would be a second thing to keep in step with a specification neither copy states, and
@@ -64,12 +64,12 @@ const MAXIMUM_ACTIVE_READS = 8;
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
 export class StringsLoadingError extends LokalizedError {
   /**
-   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** Plan 3.5:1107-1108
-   * requires the runtime constructor to take an unexported token AND the declaration to "expose no
-   * constructor or extension signature". The token was there; the declaration was not — `tsc`
+   * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** The contract requires
+   * the runtime constructor to take an unexported token AND the declaration to expose no
+   * constructor or extension signature. The token was there; the declaration was not — `tsc`
    * emitted `constructor(token: symbol, …)` for all five error classes, so a consumer's TypeScript
    * saw a constructible-looking class. `@private` emits `private constructor();`, which TypeScript
-   * refuses to `new` AND refuses to extend: exactly the two properties the plan names. The static
+   * refuses to `new` AND refuses to extend: exactly the two properties required. The static
    * raiser below is what lets the module's own factory still build one, since a private constructor
    * is callable only from inside the class body.
    *
@@ -483,7 +483,7 @@ export async function runPlan(manifest, plan, options, transport) {
 }
 
 /**
- * The whole-manifest plan, in plan 3.4:727's normalized-tag order.
+ * The whole-manifest plan, in normalized-tag order.
  *
  * Shared by both doors for the reason S10 found the hard way: `loadEntireManifest` planned in
  * `Object.entries(files)` order — the manifest's JSON key order — while `createStrings({ loaded })`

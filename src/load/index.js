@@ -34,30 +34,30 @@
  */
 
 /**
- * @typedef {"reject" | "allow-partial"} PartialFailurePolicy plan 6.2's policy, read at
+ * @typedef {"reject" | "allow-partial"} PartialFailurePolicy The partial-failure policy, read at
  *   `run-plan.js:236` as a bare string against an untyped literal until this named it. An
  *   adversarial pass classified it RENAMED; the plan-surface gate's "a RENAMED disposition names a
  *   spelling the port actually has" test refused, because there was no spelling at all.
  */
 
 /**
- * Plan 6.2's option bag for BOTH Fetch doors, `loadStrings` and `loadEntireManifest`.
+ * The option bag for BOTH Fetch doors, `loadStrings` and `loadEntireManifest`.
  *
- * `fetch` is the transport; an injected one is explicitly free to ignore the signal (plan
- * 6.2:2098-2100), which is why the loader owns cancellation rather than delegating it. It is typed as
- * the call the loader makes, a string URL and an init object, rather than as plan 6.2's
- * `typeof globalThis.fetch`: the plan's type refused a custom transport typed
+ * `fetch` is the transport; an injected one is explicitly free to ignore the signal, which is why
+ * the loader owns cancellation rather than delegating it. It is typed as the call the loader makes, a
+ * string URL and an init object, rather than as `typeof globalThis.fetch`: that type refused a
+ * custom transport typed
  * `(url: string) => Promise<Response>` (TS2322), and the global `fetch` is still assignable to this
  * one. The maintainer's decision of 2026-09-23 (amendment A31).
  * `partialFailure` defaults to `"reject"`, and the declared union is the ONLY guard a misspelled
  * policy has: `run-plan.js` reads `=== "allow-partial"`, so at run time any other string is the
- * default. `request` is declared as the plan declares it, two members; the runtime forwards whatever
+ * default. `request` is declared with two members; the runtime forwards whatever
  * `RequestInit` members a JavaScript caller adds, and the declaration does not promise that.
  *
  * **WRAPPED AND APPLIED ON 2026-09-23.** Until then this type was declared and exported, and neither
  * door used it: both annotated their options `any`, so a TypeScript caller writing `{ transport }` or
- * `{ partialFailure: "allow_partial" }` got no error at all. Its members were also mutable where plan
- * 6.2 declares every one `readonly` — the same wrap, for the same reason, as `ParseStringsOptions`.
+ * `{ partialFailure: "allow_partial" }` got no error at all. Its members were also mutable where
+ * every one should be `readonly` — the same wrap, for the same reason, as `ParseStringsOptions`.
  * `npm run declarations` carries the four probes that hold both.
  *
  * @typedef {Readonly<{
@@ -71,12 +71,9 @@
 
 /**
  * The manifest a browser or edge runtime loads from.
-
-/**
- * The manifest a browser or edge runtime loads from.
  *
- * Plan section 6.1 (`interface StringsManifestV1`). `formatVersion` is the literal `1` rather than a
- * number, so a future format cannot be mistaken for this one by a structural check.
+ * `formatVersion` is the literal `1` rather than a number, so a future format cannot be mistaken for
+ * this one by a structural check.
  *
  * @typedef {object} StringsManifestV1
  * @property {1} formatVersion
@@ -104,7 +101,7 @@
 /**
  * One file the loader intends to fetch, after planning.
  *
- * Plan section 6.1 (`interface FetchEntry`). `url` is the ABSOLUTE serialized URL — resolution
+ * `url` is the ABSOLUTE serialized URL — resolution
  * against the manifest's `baseUrl` happens during planning, so nothing downstream re-resolves it.
  *
  * @typedef {object} FetchEntry
@@ -117,8 +114,8 @@
 /**
  * The canonical projection a catalog fingerprint is computed over.
  *
- * Plan section 6.1 (`interface CatalogIdentityInputV1`). What it OMITS is the point, and slice S6
- * owes one negative test per omitted field: `baseUrl`, per-file `url` and `decodedBytes` are all
+ * What it OMITS is the point, with one negative test per omitted field: `baseUrl`, per-file `url`
+ * and `decodedBytes` are all
  * absent, so moving a catalog to a different host or re-encoding it does NOT change its identity,
  * while changing a locale's bytes does.
  *
@@ -142,7 +139,7 @@
 /**
  * One file that did not load.
  *
- * Plan section 6.2 (`interface LoadFailure`). The `stage` is a seven-member sequence rather than a
+ * The `stage` is a seven-member sequence rather than a
  * boolean because the partial-failure policy and the diagnostics both discriminate on WHERE it went
  * wrong; collapsing it would make "the digest did not match" indistinguishable from "the JSON was
  * malformed", which are different problems for whoever published the catalog.
@@ -157,10 +154,9 @@
 /**
  * The result of a load, and the input `createStrings({ loaded })` accepts.
  *
- * Plan section 6.2 (`interface LoadedStrings`). It carries its own provenance — identity, CLDR
- * version, data fingerprint and the resolved limits — because `createStrings` REVALIDATES all of it
- * rather than trusting the caller; plan 8.3 names four fabricated-`LoadedStrings` fixtures that must
- * each be REJECTED with a `ConfigurationError` rather than downgraded.
+ * It carries its own provenance — identity, CLDR version, data fingerprint and the resolved limits —
+ * because `createStrings` REVALIDATES all of it rather than trusting the caller: a fabricated
+ * `LoadedStrings` is REJECTED with a `ConfigurationError` rather than downgraded.
  *
  * @typedef {object} LoadedStrings
  * @property {Readonly<Record<string, ParsedStringsFile>>} catalogs

@@ -77,8 +77,8 @@ const isPlainRecord = (value) =>
 /**
  * A manifest file tag: well-formed AND known to the pinned CLDR data.
  *
- * Plan :1892 is explicit that "manifest file tags remain pinned-data-known, valid tags; broadening
- * lookup input does not loosen manifest validation". The asymmetry is the rule: any well-formed tag
+ * Manifest file tags remain pinned-data-known, valid tags; broadening lookup input does not loosen
+ * manifest validation. The asymmetry is the rule: any well-formed tag
  * is a legal thing to LOOK UP, while a manifest KEY is a claim about what was published, and a
  * publisher naming a locale CLDR has never heard of has made a mistake rather than a request.
  *
