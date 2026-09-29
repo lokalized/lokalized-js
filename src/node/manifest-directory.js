@@ -33,6 +33,7 @@ import { RUNTIME_METADATA } from "../internal/runtime-metadata.js";
 import { computeCatalogIdentity } from "../load/identity.js";
 import { catalogIdentityInputFor } from "../load/identity.js";
 import { requireManifestTag, validateStringsManifest } from "../load/manifest.js";
+import { equivalentTags } from "../internal/locale-cldr.js";
 import { directoryLabel, discoverCatalogFiles, keyedByRenderedTag, resolveDiscoveryLimit } from "./discovery.js";
 
 /** @typedef {import("../load/index.js").StringsManifestV1} StringsManifestV1 */
@@ -215,16 +216,14 @@ export async function createStringsManifestFromDirectory(directory, options) {
   // the JDK, and a required corpus case), and this door cannot, because a manifest without a
   // fallback locale is not a manifest. Said plainly because the two doors genuinely differ.
   //
-  // Only the EXACT-tag arm of plan 2.2's resolution is implemented; the sole-CLDR-equivalent and
-  // tiebreaker-ordered arms remain owed, and a tag that would resolve through them is refused here
-  // rather than silently resolved by a rule this port does not yet have.
+  // An equivalent spelling is enough here; validation below elects the exact file tag.
   // NORMALIZED WITH THE VALIDATOR'S OWN FUNCTION, never compared raw. Found by review: `en-us` was
   // refused over a directory holding `en-US.json`, because the keys are rendered tags and the option
   // was not normalized — while `validateStringsManifest` would have accepted the identical spelling
   // one line later. Two normalizations in one call that disagree is the shape this project keeps
   // finding; the fix is to have only one.
   const fallbackLocale = requireManifestTag(options.fallbackLocale, "`fallbackLocale`");
-  if (!Object.prototype.hasOwnProperty.call(files, fallbackLocale))
+  if (!Object.keys(files).some((tag) => equivalentTags(tag, fallbackLocale)))
     throw configurationError(
       `No catalog in ${label} is the declared fallbackLocale '${fallbackLocale}'; the directory ` +
       `holds [${Object.keys(files).join(", ")}]. A manifest's fallback must be a locale it publishes`);

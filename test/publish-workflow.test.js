@@ -273,6 +273,10 @@ test("the dist-tag is constrained, because --tag disables package.json's own saf
   assert.match(guard, /"latest"|'latest'/);
   assert.match(guard, /prerelease|includes\("-"\)/,
     "the guard must refuse `latest` for a prerelease version specifically, not merely spell-check the tag");
+  assert.match(guard, /!prerelease\s*&&\s*tag\s*!==\s*"latest"/,
+    "a stable release must move the default install tag, rather than silently land under next");
+  assert.equal(at(tree, "on", "workflow_dispatch", "inputs", "tag", "default")?.value, "latest",
+    "a stable release should default to latest in the dispatch form");
 });
 
 test("it refuses to publish bytes whose digest the releaser did not supply — in BOTH jobs, fatally", () => {

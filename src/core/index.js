@@ -48,6 +48,7 @@ import {
   CANDIDATE_CHAIN_MEMO_SIZE,
   candidateChainMemo,
   compareTags,
+  electFallbackLocale,
   matchFor,
   normalizedLanguageCode,
   normalizeTag,
@@ -296,7 +297,7 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  *   | Readonly<{ kind: "entire-manifest" }>} StringsLoadCoverage
  * @typedef {Readonly<{ fallbackLocale: string, supportedLocales: readonly string[],
  *   tiebreakers: Readonly<Record<string, readonly string[]>> }>} LocaleConfiguration
- * @typedef {Readonly<{ source: "verified-manifest-v1", producerImplementation: "lokalized-js",
+ * @typedef {Readonly<{ source: "verified-manifest-v1" | "unverified-loaded-v1", producerImplementation: "lokalized-js",
  *   producerVersion: string, manifestLocaleConfiguration: LocaleConfiguration,
  *   catalogIdentity: CatalogIdentity, cldrVersion: string, dataFingerprint: string,
  *   ianaRegistryDate: string, ianaDataFingerprint: string, behavioralVectorsVersion: string,
@@ -2929,15 +2930,8 @@ function validateTiebreakers(supported, tiebreakers) {
  * @returns {string}
  */
 function resolveFallbackLocale(configured, supported, equivalentFallbackLocales, tiebreakers) {
-  if (supported.includes(configured)) return configured;
-  if (equivalentFallbackLocales.length === 1) return /** @type {string} */ (equivalentFallbackLocales[0]);
-
-  const languageCode = normalizedLanguageCode(javaSplit(canonicalLanguageTag(configured))[0] ?? "");
-  const ordered = resolveTiebreakers(tiebreakers, supported).get(languageCode);
-
-  if (ordered !== undefined)
-    for (const tiebreaker of ordered)
-      if (equivalentFallbackLocales.includes(tiebreaker)) return tiebreaker;
+  const elected = electFallbackLocale(configured, supported, tiebreakers);
+  if (elected !== null) return elected;
 
   // Java's message names `tiebreakerLocalesByLanguageCode`, its constructor parameter; only that
   // half is reworded to the option a JavaScript caller has, on the rule `validateTiebreakers`
@@ -2949,6 +2943,7 @@ function resolveFallbackLocale(configured, supported, equivalentFallbackLocales,
 }
 
 /** The frozen, null-prototype empty record `getLocaleConfiguration()` reports when none were set. */
+/** @type {Readonly<Record<string, readonly string[]>>} */
 const EMPTY_TIEBREAKERS = freeze(Object.create(null));
 
 /**

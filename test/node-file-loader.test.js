@@ -78,6 +78,19 @@ test("a whole-manifest file load constructs a Strings, through the DEFAULT strea
   assert.deepEqual(strings.getSupportedLocales(), ["de", "en", "fr"]);
 });
 
+test("an unknown partial failure policy is rejected before reading a file", async () => {
+  const { manifest } = directoryManifest(["en"]);
+  let reads = 0;
+  await assert.rejects(
+    () => loadEntireManifestFromFiles(manifest, {
+      readFile: async () => { ++reads; throw new Error("unexpected read"); },
+      partialFailure: /** @type {any} */ ("allow_partial"),
+    }),
+    /partialFailure must be 'reject' or 'allow-partial'/,
+  );
+  assert.equal(reads, 0);
+});
+
 test("a lookup-subset file load plans and records exactly what the browser door would", async () => {
   const { manifest } = directoryManifest(["fr", "en", "de"]);
   const loaded = await loadStringsFromFiles(manifest, "FR");

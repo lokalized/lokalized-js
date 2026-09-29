@@ -6,19 +6,19 @@
     "sha256": "805751baba31376f00c2d224797d4afbfea357c4f5e7ead0e252f6f1dd6bbeb5"
   },
   "compressors": {
-    "zlib": "1.3.1-e00f703",
+    "zlib": "1.2.12",
     "brotli": "1.2.0"
   },
   "run": {
-    "tarballSha256": "229bd39f78b100898cc524e58e217a432d5421fd0a4402e8a11f3e9e276ce94c",
-    "outputGraphSha256": "fa0c6b3b9f1939505cb0c1b3ac6d73c6f4ccee4990be5dadbad352eed404eefa",
+    "tarballSha256": "03063e777ad7fe7e51a396a74722e6121f16b4b0040f0d5dc968cf153bd0ef27",
+    "outputGraphSha256": "6ce58074fa389652f4d612b7fdba188d9aebd5d082304fbb5510180963a8bae7",
     "dataFingerprint": "9b4f24165b6dd1ee6dbb5f0822abc7bcde49c5b94d35903045826b45e1f30e68",
     "ianaDataFingerprint": "87b3a43b03f490206cead05d865357bd7cfc3953a52ec4d8405243f699385815",
     "identityRebuild": "34 of 34 shipped dist/browser files byte-identical",
-    "resultSha256": "3d3bb55d3aced4983900d787392e53f85f5e78cccfc851dc780ec8be43425a0f",
+    "resultSha256": "b9b631ccca04e39e738b5ea297cba498a79d6bbc291ab30b1e7174c3ecbd6bd4",
     "environment": {
-      "node": "v24.18.0",
-      "v8": "13.6.233.17-node.50",
+      "node": "v26.5.0",
+      "v8": "14.6.202.34-node.24",
       "esbuild": "0.28.2",
       "platform": "darwin",
       "arch": "arm64",
@@ -38,13 +38,13 @@
             "lokalized.js"
           ],
           "columns": {
-            "rawSource": 776117,
+            "rawSource": 775144,
             "rawModules": 32,
-            "preMinify": 360978,
-            "minified": 184718,
-            "gzip9": 66677,
-            "brotliQ11": 55075,
-            "brotliQ5": 62014,
+            "preMinify": 361239,
+            "minified": 184882,
+            "gzip9": 66246,
+            "brotliQ11": 55072,
+            "brotliQ5": 62039,
             "requests": 1
           },
           "dataRows": {
@@ -87,10 +87,10 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 8.562,
-            "constructMs": 1.983,
-            "firstRenderMs": 1.924,
-            "retainedBytes": 2610024
+            "importMs": 8.517,
+            "constructMs": 1.874,
+            "firstRenderMs": 1.981,
+            "retainedBytes": 2403336
           }
         }
       }
@@ -107,13 +107,13 @@
             "(one bundle)"
           ],
           "columns": {
-            "rawSource": 776117,
+            "rawSource": 775144,
             "rawModules": 32,
-            "preMinify": 356409,
-            "minified": 181514,
-            "gzip9": 65744,
-            "brotliQ11": 54246,
-            "brotliQ5": 61109,
+            "preMinify": 356670,
+            "minified": 181678,
+            "gzip9": 65306,
+            "brotliQ11": 54274,
+            "brotliQ5": 61163,
             "requests": 1
           },
           "dataRows": {
@@ -156,10 +156,10 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 8.575,
-            "constructMs": 1.936,
-            "firstRenderMs": 2.067,
-            "retainedBytes": 2582048
+            "importMs": 8.324,
+            "constructMs": 1.842,
+            "firstRenderMs": 1.971,
+            "retainedBytes": 2379104
           }
         }
       }
@@ -176,13 +176,13 @@
             "(one bundle)"
           ],
           "columns": {
-            "rawSource": 765034,
+            "rawSource": 764112,
             "rawModules": 31,
-            "preMinify": 354748,
-            "minified": 180161,
-            "gzip9": 65327,
-            "brotliQ11": 53901,
-            "brotliQ5": 60697,
+            "preMinify": 355009,
+            "minified": 180325,
+            "gzip9": 64850,
+            "brotliQ11": 53851,
+            "brotliQ5": 60702,
             "requests": 1
           },
           "dataRows": {
@@ -224,31 +224,31 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 9.164,
-            "constructMs": 1.846,
-            "firstRenderMs": 2.025,
-            "retainedBytes": 2553160
+            "importMs": 8.292,
+            "constructMs": 1.637,
+            "firstRenderMs": 1.958,
+            "retainedBytes": 2350104
           }
         },
         "no-build core.js": {
           "form": "no-build",
           "files": [
-            "chunks/chunk-7REQHI3K.js",
-            "chunks/chunk-E25Z6R7X.js",
-            "chunks/chunk-LED5CWLB.js",
+            "chunks/chunk-CLASXSID.js",
+            "chunks/chunk-FDWQ7NLM.js",
+            "chunks/chunk-KCPTRZUC.js",
             "chunks/chunk-QU3LBEYR.js",
-            "chunks/chunk-TG2J2YGY.js",
-            "chunks/chunk-ZSYPX2PV.js",
+            "chunks/chunk-R2EDDRQC.js",
+            "chunks/chunk-UAAWCOPY.js",
             "core.js"
           ],
           "columns": {
-            "rawSource": 765034,
+            "rawSource": 764112,
             "rawModules": 31,
-            "preMinify": 361833,
-            "minified": 183835,
-            "gzip9": 68372,
-            "brotliQ11": 57055,
-            "brotliQ5": 63992,
+            "preMinify": 362173,
+            "minified": 184024,
+            "gzip9": 67887,
+            "brotliQ11": 57059,
+            "brotliQ5": 64056,
             "requests": 7
           },
           "dataRows": {
@@ -290,10 +290,10 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 10.075,
-            "constructMs": 1.876,
-            "firstRenderMs": 2.091,
-            "retainedBytes": 2704904
+            "importMs": 9.287,
+            "constructMs": 1.627,
+            "firstRenderMs": 2.155,
+            "retainedBytes": 2503064
           }
         }
       }
@@ -310,13 +310,13 @@
             "(one bundle)"
           ],
           "columns": {
-            "rawSource": 795843,
+            "rawSource": 794870,
             "rawModules": 34,
-            "preMinify": 367047,
-            "minified": 186997,
-            "gzip9": 67455,
-            "brotliQ11": 55443,
-            "brotliQ5": 62603,
+            "preMinify": 367308,
+            "minified": 187161,
+            "gzip9": 66998,
+            "brotliQ11": 55523,
+            "brotliQ5": 62658,
             "requests": 1
           },
           "dataRows": {
@@ -363,33 +363,33 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 9.006,
-            "constructMs": 1.524,
-            "firstRenderMs": 1.628,
-            "retainedBytes": 2636576
+            "importMs": 9.003,
+            "constructMs": 1.387,
+            "firstRenderMs": 1.683,
+            "retainedBytes": 2434344
           }
         },
         "no-build core.js + data/ordinal.js": {
           "form": "no-build",
           "files": [
-            "chunks/chunk-7REQHI3K.js",
-            "chunks/chunk-E25Z6R7X.js",
-            "chunks/chunk-LED5CWLB.js",
+            "chunks/chunk-CLASXSID.js",
+            "chunks/chunk-FDWQ7NLM.js",
+            "chunks/chunk-KCPTRZUC.js",
             "chunks/chunk-QU3LBEYR.js",
-            "chunks/chunk-TG2J2YGY.js",
-            "chunks/chunk-VS4MQYZI.js",
-            "chunks/chunk-ZSYPX2PV.js",
+            "chunks/chunk-R2EDDRQC.js",
+            "chunks/chunk-UAAWCOPY.js",
+            "chunks/chunk-Z7YBD3WG.js",
             "core.js",
             "data/ordinal.js"
           ],
           "columns": {
-            "rawSource": 795843,
+            "rawSource": 794870,
             "rawModules": 34,
-            "preMinify": 375281,
-            "minified": 191439,
-            "gzip9": 71464,
-            "brotliQ11": 59821,
-            "brotliQ5": 66971,
+            "preMinify": 375621,
+            "minified": 191628,
+            "gzip9": 70953,
+            "brotliQ11": 59844,
+            "brotliQ5": 67038,
             "requests": 9
           },
           "dataRows": {
@@ -436,10 +436,10 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 11.634,
-            "constructMs": 1.539,
-            "firstRenderMs": 1.751,
-            "retainedBytes": 2849448
+            "importMs": 11.402,
+            "constructMs": 1.422,
+            "firstRenderMs": 1.67,
+            "retainedBytes": 2652496
           }
         }
       }
@@ -456,13 +456,13 @@
             "(one bundle)"
           ],
           "columns": {
-            "rawSource": 800716,
+            "rawSource": 799728,
             "rawModules": 34,
-            "preMinify": 369028,
-            "minified": 189702,
-            "gzip9": 67553,
-            "brotliQ11": 55671,
-            "brotliQ5": 62817,
+            "preMinify": 369289,
+            "minified": 189866,
+            "gzip9": 67099,
+            "brotliQ11": 55755,
+            "brotliQ5": 62869,
             "requests": 1
           },
           "dataRows": {
@@ -509,33 +509,33 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 8.725,
-            "constructMs": 1.747,
-            "firstRenderMs": 1.695,
-            "retainedBytes": 2646344
+            "importMs": 8.76,
+            "constructMs": 1.639,
+            "firstRenderMs": 1.725,
+            "retainedBytes": 2444520
           }
         },
         "no-build core.js + data/ranges.js": {
           "form": "no-build",
           "files": [
-            "chunks/chunk-7REQHI3K.js",
-            "chunks/chunk-E25Z6R7X.js",
-            "chunks/chunk-LED5CWLB.js",
+            "chunks/chunk-CLASXSID.js",
+            "chunks/chunk-FDWQ7NLM.js",
+            "chunks/chunk-KCPTRZUC.js",
             "chunks/chunk-QU3LBEYR.js",
-            "chunks/chunk-TG2J2YGY.js",
-            "chunks/chunk-VS4MQYZI.js",
-            "chunks/chunk-ZSYPX2PV.js",
+            "chunks/chunk-R2EDDRQC.js",
+            "chunks/chunk-UAAWCOPY.js",
+            "chunks/chunk-Z7YBD3WG.js",
             "core.js",
             "data/ranges.js"
           ],
           "columns": {
-            "rawSource": 800716,
+            "rawSource": 799728,
             "rawModules": 34,
-            "preMinify": 376929,
-            "minified": 193967,
-            "gzip9": 71562,
-            "brotliQ11": 59889,
-            "brotliQ5": 67088,
+            "preMinify": 377269,
+            "minified": 194156,
+            "gzip9": 71055,
+            "brotliQ11": 59905,
+            "brotliQ5": 67152,
             "requests": 9
           },
           "dataRows": {
@@ -582,10 +582,10 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 11.411,
-            "constructMs": 1.858,
-            "firstRenderMs": 1.805,
-            "retainedBytes": 2849072
+            "importMs": 10.489,
+            "constructMs": 1.574,
+            "firstRenderMs": 1.719,
+            "retainedBytes": 2652512
           }
         }
       }
@@ -670,6 +670,67 @@
         "MOVED, NOT COMPARED: scenario 5 no-build core.js + data/ranges.js, revision 1 -> 2: brotliQ5 66997 -> 67088 (+91)"
       ],
       "previousSha256": "f4c6a3d54ea213823931e84b4f40115fa95305c391812ff0e58935da5f384557"
+    },
+    {
+      "reason": "The 1.0 fixes grow measured browser code; this host uses zlib 1.2.12 rather than the recorded 1.3.1, so retain the existing gzip reference while recording the source change.",
+      "date": "2026-09-29",
+      "suite": {
+        "revision": 2,
+        "sha256": "805751baba31376f00c2d224797d4afbfea357c4f5e7ead0e252f6f1dd6bbeb5"
+      },
+      "baselineSha256": "b9b631ccca04e39e738b5ea297cba498a79d6bbc291ab30b1e7174c3ecbd6bd4",
+      "changes": [
+        "GROWTH: scenario 1 root module: preMinify grew 360978 -> 361239",
+        "GROWTH: scenario 1 root module: minified grew 184718 -> 184882",
+        "GROWTH: scenario 2 esbuild: preMinify grew 356409 -> 356670",
+        "GROWTH: scenario 2 esbuild: minified grew 181514 -> 181678",
+        "GROWTH: scenario 3 esbuild: preMinify grew 354748 -> 355009",
+        "GROWTH: scenario 3 esbuild: minified grew 180161 -> 180325",
+        "GROWTH: scenario 3 no-build core.js: preMinify grew 361833 -> 362173",
+        "GROWTH: scenario 3 no-build core.js: minified grew 183835 -> 184024",
+        "GROWTH: scenario 4 esbuild: preMinify grew 367047 -> 367308",
+        "GROWTH: scenario 4 esbuild: minified grew 186997 -> 187161",
+        "GROWTH: scenario 4 no-build core.js + data/ordinal.js: preMinify grew 375281 -> 375621",
+        "GROWTH: scenario 4 no-build core.js + data/ordinal.js: minified grew 191439 -> 191628",
+        "GROWTH: scenario 5 esbuild: preMinify grew 369028 -> 369289",
+        "GROWTH: scenario 5 esbuild: minified grew 189702 -> 189866",
+        "GROWTH: scenario 5 no-build core.js + data/ranges.js: preMinify grew 376929 -> 377269",
+        "GROWTH: scenario 5 no-build core.js + data/ranges.js: minified grew 193967 -> 194156",
+        "STALE: scenario 1 root module: rawSource 776117 -> 775144",
+        "STALE: scenario 1 root module: brotliQ11 55075 -> 55072 (-3, within 276)",
+        "STALE: scenario 1 root module: brotliQ5 62014 -> 62039 (+25, within 311)",
+        "STALE: scenario 2 esbuild: rawSource 776117 -> 775144",
+        "STALE: scenario 2 esbuild: brotliQ11 54246 -> 54274 (+28, within 272)",
+        "STALE: scenario 2 esbuild: brotliQ5 61109 -> 61163 (+54, within 306)",
+        "STALE: scenario 3 esbuild: rawSource 765034 -> 764112",
+        "STALE: scenario 3 esbuild: brotliQ11 53901 -> 53851 (-50, within 270)",
+        "STALE: scenario 3 esbuild: brotliQ5 60697 -> 60702 (+5, within 304)",
+        "STALE: scenario 3 no-build core.js: rawSource 765034 -> 764112",
+        "STALE: scenario 3 no-build core.js: brotliQ11 57055 -> 57059 (+4, within 286)",
+        "STALE: scenario 3 no-build core.js: brotliQ5 63992 -> 64056 (+64, within 320)",
+        "STALE: scenario 4 esbuild: rawSource 795843 -> 794870",
+        "STALE: scenario 4 esbuild: brotliQ11 55443 -> 55523 (+80, within 278)",
+        "STALE: scenario 4 esbuild: brotliQ5 62603 -> 62658 (+55, within 314)",
+        "STALE: scenario 4 no-build core.js + data/ordinal.js: rawSource 795843 -> 794870",
+        "STALE: scenario 4 no-build core.js + data/ordinal.js: brotliQ11 59821 -> 59844 (+23, within 300)",
+        "STALE: scenario 4 no-build core.js + data/ordinal.js: brotliQ5 66971 -> 67038 (+67, within 335)",
+        "STALE: scenario 5 esbuild: rawSource 800716 -> 799728",
+        "STALE: scenario 5 esbuild: brotliQ11 55671 -> 55755 (+84, within 279)",
+        "STALE: scenario 5 esbuild: brotliQ5 62817 -> 62869 (+52, within 315)",
+        "STALE: scenario 5 no-build core.js + data/ranges.js: rawSource 800716 -> 799728",
+        "STALE: scenario 5 no-build core.js + data/ranges.js: brotliQ11 59889 -> 59905 (+16, within 300)",
+        "STALE: scenario 5 no-build core.js + data/ranges.js: brotliQ5 67088 -> 67152 (+64, within 336)",
+        "MOVED, NOT COMPARED: scenario 1 root module, zlib 1.3.1-e00f703 -> 1.2.12: gzip9 66677 -> 66246 (-431)",
+        "MOVED, NOT COMPARED: scenario 2 esbuild, zlib 1.3.1-e00f703 -> 1.2.12: gzip9 65744 -> 65306 (-438)",
+        "MOVED, NOT COMPARED: scenario 3 esbuild, zlib 1.3.1-e00f703 -> 1.2.12: gzip9 65327 -> 64850 (-477)",
+        "MOVED, NOT COMPARED: scenario 3 no-build core.js, zlib 1.3.1-e00f703 -> 1.2.12: gzip9 68372 -> 67887 (-485)",
+        "MOVED, NOT COMPARED: scenario 4 esbuild, zlib 1.3.1-e00f703 -> 1.2.12: gzip9 67455 -> 66998 (-457)",
+        "MOVED, NOT COMPARED: scenario 4 no-build core.js + data/ordinal.js, zlib 1.3.1-e00f703 -> 1.2.12: gzip9 71464 -> 70953 (-511)",
+        "MOVED, NOT COMPARED: scenario 5 esbuild, zlib 1.3.1-e00f703 -> 1.2.12: gzip9 67553 -> 67099 (-454)",
+        "MOVED, NOT COMPARED: scenario 5 no-build core.js + data/ranges.js, zlib 1.3.1-e00f703 -> 1.2.12: gzip9 71562 -> 71055 (-507)",
+        "gzip9 not compared (recorded with zlib 1.3.1-e00f703, running zlib 1.2.12)"
+      ],
+      "previousSha256": "a5361b4f8d4a37468902fef5069e0c26676e0bd7f3f598a8f29c49a3e1b288d1"
     }
   ]
 }

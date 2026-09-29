@@ -161,6 +161,12 @@ const INVENTORY = {
     evidence: ["test:manifest-fallback-resolution.test.js",
       "NONE: Java has no manifest door, so this decision has no Java counterpart to differ from"],
   },
+  "src/node/manifest-directory.js::createStringsManifestFromDirectory::equivalentTags": {
+    what: "Allows a directory publisher to name an equivalent fallback tag; manifest validation " +
+      "then elects the exact file tag. Java has no manifest publisher.",
+    evidence: ["test:node-directory-manifest.test.js",
+      "NONE: Java has no directory-to-manifest generator to compare with"],
+  },
 
   /* ---- the two DIRECT READS, the only places the table itself is consulted ---------------- */
 
@@ -400,10 +406,15 @@ const INVENTORY = {
         "the two is asserted by test/browser-chooser.test.js against the port alone.",
     ],
   },
-  "src/core/index.js::resolveFallbackLocale::canonicalLanguageTag": {
-    what: "Resolves the configured fallback locale to a LOADED catalog through the same tiebreaker " +
-      "map per-lookup resolution reads. `DefaultStrings.java:446-470`.",
-    evidence: ["diff:lookup", "corpus:fallback-policy", "test:tiebreaker-normalization.test.js"],
+  "src/internal/locale.js::electFallbackLocale::canonicalLanguageTag": {
+    what: "Derives the canonical language key for the tiebreaker that elects an exact loaded " +
+      "fallback file. The direct door follows `DefaultStrings.java:446-470`.",
+    evidence: ["diff:lookup", "corpus:fallback-policy", "test:manifest-fallback-resolution.test.js"],
+  },
+  "src/internal/locale.js::electFallbackLocale::equivalentTags": {
+    what: "Identifies exact catalog tags equivalent to a configured fallback before the " +
+      "tiebreaker elects one. Both direct construction and manifest validation use this rule.",
+    evidence: ["diff:lookup", "corpus:owed-init", "test:manifest-fallback-resolution.test.js"],
   },
 };
 

@@ -16,15 +16,15 @@
  * a spread. A `LoadedStrings` is an ordinary object a caller can build by hand, so every field that
  * would otherwise be believed is recomputed here.
  *
- * AND THE RECORD IS AN OUTPUT OF THAT RECOMPUTATION, not a copy of the input. Plan 3.4:711 calls
- * `getLoadVerification()` "the duplication-safe SSR provenance channel", which only means anything if
- * what travels through it was PROVED here rather than transcribed: `plannedLocales` is this core's
+ * AND THE RECORD IS AN OUTPUT OF THAT RECOMPUTATION, not a copy of the input. The structural checks
+ * establish consistency; only the loader's private provenance marker establishes that it actually
+ * checked catalog bytes. `plannedLocales` is this core's
  * own plan, `coveredLocales` is the catalog set construction actually received, and the CLDR/IANA
  * identity is this core's pinned data, never the loader's claim about it.
  */
 import { candidateChain, compareTags, normalizeTag } from "./locale.js";
 import { configurationError } from "./configuration-error.js";
-import { RUNTIME_METADATA } from "./runtime-metadata.js";
+import { RUNTIME_METADATA, isVerifiedLoad } from "./runtime-metadata.js";
 import { decode as decodePinnedProvenance } from "../data/provenance.js";
 
 /** @param {unknown} value */
@@ -282,7 +282,8 @@ function verificationRecord(
 ) {
   const pinned = decodePinnedProvenance();
   return Object.freeze({
-    source: /** @type {const} */ ("verified-manifest-v1"),
+    source: /** @type {"verified-manifest-v1" | "unverified-loaded-v1"} */ (
+      isVerifiedLoad(loaded) ? "verified-manifest-v1" : "unverified-loaded-v1"),
     producerImplementation: RUNTIME_METADATA.producerImplementation,
     producerVersion: RUNTIME_METADATA.producerVersion,
     manifestLocaleConfiguration: Object.freeze({

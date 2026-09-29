@@ -129,9 +129,19 @@ if (isEntryPoint) {
   /** @type {Set<string>} */
   const created = new Set();
   // FSEvents also reports the watched folder's own creation, which is not the command's.
-  const watcher = watch(directory, (_event, name) => {
-    if (name && name !== basename(directory) && !FOREIGN_ENTRIES.has(String(name))) created.add(String(name));
-  });
+  /** @type {import("node:fs").FSWatcher | null} */
+  let watcher = null;
+  let watchUnavailable = false;
+  try {
+    watcher = watch(directory, (_event, name) => {
+      if (name && name !== basename(directory) && !FOREIGN_ENTRIES.has(String(name))) created.add(String(name));
+    });
+    // Some hosts exhaust their FSEvents handles after watch() returns. The directory listing below
+    // still enforces the leak gate; only the report-only count of transient creations is unavailable.
+    watcher.on("error", () => { watchUnavailable = true; watcher?.close(); watcher = null; });
+  } catch {
+    watchUnavailable = true;
+  }
 
   // A signal sent to this wrapper alone is forwarded (the handlers above), so it still stops the
   // command and the folder is still removed; a terminal's Ctrl-C reaches both, and the command's own
@@ -143,7 +153,7 @@ if (isEntryPoint) {
     process.exit(2);
   });
   child.on("exit", (code, signal) => setTimeout(() => {
-    watcher.close();
+    watcher?.close();
     const left = leftoversIn(directory);
     const status = code ?? 128 + (signal ? constants.signals[signal] : 0);
     if (left.length > 0) {
@@ -154,7 +164,9 @@ if (isEntryPoint) {
         "around `process.exit` never runs).");
       process.exit(status !== 0 ? status : 1);
     }
-    console.log(`temp hygiene: ${created.size} temp entr${created.size === 1 ? "y" : "ies"} created, none left behind`);
+    console.log(watchUnavailable
+      ? "temp hygiene: transient creation count unavailable; none left behind"
+      : `temp hygiene: ${created.size} temp entr${created.size === 1 ? "y" : "ies"} created, none left behind`);
     process.exit(status);
   }, 100));
 }

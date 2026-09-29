@@ -20,6 +20,7 @@
  */
 import { canonicalBytes } from "../internal/jcs.js";
 import { sha256Hex } from "../internal/sha256.js";
+import { electFallbackLocale, normalizeTag } from "../internal/locale.js";
 
 /** @typedef {import("../core/index.js").CatalogIdentity} CatalogIdentity */
 /** @typedef {import("./index.js").CatalogIdentityInputV1} CatalogIdentityInputV1 */
@@ -120,10 +121,22 @@ export function catalogIdentityInputFor(manifest) {
   for (const [tag, file] of Object.entries(manifest.files ?? {}))
     localeToSha256[tag] = /** @type {{ sha256: string }} */ (file).sha256;
 
+  // Identity names the catalog actually used as the fallback. Two publishers who spell an alias
+  // differently but serve the same files must derive the same catalog fingerprint.
+  let resolvedFallbackLocale = manifest.fallbackLocale;
+  try {
+    const configured = normalizeTag(manifest.fallbackLocale);
+    const supported = Object.keys(manifest.files ?? {}).map(normalizeTag);
+    resolvedFallbackLocale = electFallbackLocale(configured, supported, manifest.tiebreakers) ?? configured;
+  } catch {
+    // Semantic validation owns malformed tags and tiebreakers; the identity projection must still
+    // be available when a caller builds an intentionally invalid manifest for a refusal test.
+  }
+
   return {
     formatVersion: 1,
     catalogVersion: manifest.catalogVersion,
-    resolvedFallbackLocale: manifest.fallbackLocale,
+    resolvedFallbackLocale,
     localeToSha256,
     tiebreakers: manifest.tiebreakers,
   };

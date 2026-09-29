@@ -27,6 +27,7 @@ import { createSsrStamp } from "../src/ssr/index.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
 import { loadEntireManifest, loadStrings } from "../src/load/fetch-loader.js";
 import { sha256Hex } from "../src/internal/sha256.js";
+import { parseStrings } from "../src/parse/index.js";
 import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
@@ -104,4 +105,39 @@ test("a LOOKUP-SUBSET load constructs, and its coverage tag is the normalized re
   // was planned from `fr` and cannot stamp an `en` render.
   assert.throws(() => createSsrStamp(strings, { kind: "locale", locale: "en" }),
     /covers lookup 'fr' only/);
+});
+
+test("a copied load with changed translations cannot claim the original catalog identity in an SSR stamp", async () => {
+  const source = manifest(["fr", "en"]);
+  const loaded = await loadEntireManifest(source, { fetch: fetchImpl });
+  const genuine = createStrings({ loaded, localeResolver: () => "fr" });
+  const original = createSsrStamp(genuine, { kind: "locale", locale: "fr" });
+  assert.equal(original.catalogFingerprint, source.catalogFingerprint);
+
+  const altered = {
+    ...loaded,
+    catalogs: { ...loaded.catalogs, fr: parseStrings('{"Hi":"changed"}', { locale: "fr" }) },
+  };
+  const strings = createStrings({ loaded: altered, localeResolver: () => "fr" });
+  assert.equal(strings.get("Hi"), "changed");
+  assert.equal(strings.getLoadVerification()?.source, "unverified-loaded-v1");
+  assert.throws(() => createSsrStamp(strings, { kind: "locale", locale: "fr" }),
+    /source 'verified-manifest-v1'/);
+
+  const roundTrip = createStrings({ loaded: JSON.parse(JSON.stringify(loaded)), localeResolver: () => "fr" });
+  assert.equal(roundTrip.get("Hi"), "hello fr");
+  assert.throws(() => createSsrStamp(roundTrip, { kind: "locale", locale: "fr" }),
+    /source 'verified-manifest-v1'/);
+});
+
+test("an unknown partial failure policy is rejected before fetching", async () => {
+  let calls = 0;
+  await assert.rejects(
+    () => loadEntireManifest(manifest(["en"]), {
+      fetch: async () => { ++calls; throw new Error("unexpected fetch"); },
+      partialFailure: /** @type {any} */ ("allow_partial"),
+    }),
+    /partialFailure must be 'reject' or 'allow-partial'/,
+  );
+  assert.equal(calls, 0);
 });

@@ -21,26 +21,17 @@
  *    MANDATORY and must be an exact permutation of that language's files, so the walk always finds an
  *    equivalent; only undetermined-language catalogs reach the arm at all. Both sentences are pinned
  *    below, in the same test, so the distinction is machine-checked rather than asserted in prose.
- * 3. **`localeConfigurationForManifest(m).fallbackLocale` is an unconditional ECHO of the declared
- *    tag today**, so `=== 'de'` for a manifest declaring 'de' passes under an implementation that
- *    resolves nothing at all. The discriminating manifest observations are `chain` and `fetchSet`,
- *    and every manifest assertion here uses those.
+ * 3. **Checking only the planned file can miss a configuration mismatch.** The loader record,
+ *    core instance, fetch plan and stamp are checked together below.
  * 4. **A manifest fixture whose `catalogFingerprint` is not recomputed is refused by the fingerprint
  *    guard BEFORE any fallback-resolution code runs** — measured, with a plausible-looking
  *    `ConfigurationError` that reads exactly like the probe's own refusal. So `manifest()` computes
  *    the fingerprint with the implementation's own `computeCatalogIdentity`, and every manifest probe
  *    asserts the manifest VALIDATES before it asserts anything about resolution.
  *
- * **SIX ROWS BELOW ARE MARKED `DIVERGENCE` AND PIN BEHAVIOUR THE CLAUSE DOES NOT ASK FOR — and two
- * more were, until the maintainer decided them (D3).** C6 and C7 now assert the REFUSAL the clause
- * asks for at the manifest door: a zero-candidate fallback and a still-ambiguous one both fail
- * validation before any per-file plan exists, so neither reaches a network request. The two that
- * remain are the tests whose own NAMES carry the word — C8 and C11 — so this count cannot drift out
- * of step with the file without a test name drifting too. (The first draft of this sentence told you
- * to count them with a grep, and the grep matched the sentence itself.) They are
- * written the way `DECLARED_MESSAGE_DIVERGENCES` is written: the divergence is REQUIRED to exist, so
- * a fix cannot land silently and a reader cannot mistake the pin for agreement. Each says what the
- * clause requires and what the port does instead. No src/ file was changed to write this file.
+ * C6 and C7 assert refusal at the manifest door for a zero-candidate fallback and a still-ambiguous
+ * one, before any file plan exists. C8 and C11 assert that non-exact fallback spelling resolves
+ * consistently throughout the loader, core, stamp and fingerprint.
  *
  * **WHAT IS NEW HERE AND WHAT IS A DUPLICATE, said out loud so nobody counts it twice.** The direct
  * door's zero, ambiguous and tiebreaker-walk rows have gated corpus cases already
@@ -48,7 +39,7 @@
  * `owed-init.refusal.fallback-equivalent-to-multiple-catalogs`,
  * `owed-ds.fallback-tiebreaker-walk{,-alt}`); they are kept as JS-door pins and labelled. The
  * MANIFEST door has no corpus case and no Java counterpart — Java has no manifest — so every
- * manifest row is this file's own evidence, and that is where all six divergences are.
+ * manifest row is this file's own evidence.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -166,9 +157,7 @@ test("clause 8 C1: the EXACT arm beats a tiebreaker list that names the equivale
   assert.equal(control.getLocaleConfiguration().fallbackLocale, "deu");
   assert.equal(control.get("Greeting"), "DEU!");
 
-  // THE MANIFEST DOOR, through `fetchSet`/`chain` rather than `localeConfigurationForManifest`:
-  // that accessor echoes the declared tag today (see C8), so `=== 'de'` would pass under an
-  // implementation that resolves nothing. The PLAN is what moves.
+  // THE MANIFEST DOOR: the plan must select the exact file tag.
   const m = validates(manifest(["de", "deu"], "de", { de: ["deu", "de"] }));
   assert.deepEqual(localesOf(fetchSet(m, "pt-BR")), ["de"]);
   assert.deepEqual([...chain(m, "pt-BR")], ["pt-BR", "pt", "de"]);
@@ -376,7 +365,7 @@ test("clause 8 C5: the OBVIOUS ambiguity fixture proves the neighbouring guard, 
 
 // ---------------------------------------------------------------------------------------------
 // C6 / C7 — ":145 — Zero or still-ambiguous matches fail construction/MANIFEST VALIDATION."
-// Both are DIVERGENCES today. Measured 2026-09-13; no src/ file was changed.
+// Both were formerly discovered as divergences and are now required refusals.
 // ---------------------------------------------------------------------------------------------
 
 test("clause 8 C6: a zero-candidate fallback is REFUSED at the manifest door, before any I/O", async () => {
@@ -471,42 +460,30 @@ test("clause 8 C7: an ambiguous fallback is REFUSED at the manifest door, not si
 // C8 — ":146 — All runtime configuration, match results … use that resolved exact loaded tag."
 // ---------------------------------------------------------------------------------------------
 
-test("clause 8 C8: DIVERGENCE — the loader's own record disagrees with the instance it builds", async () => {
+test("clause 8 C8: the loader's record and instance use the same resolved fallback", async () => {
   // THE FIXTURE MUST SPELL THE FALLBACK NON-EXACTLY or the conjunct is vacuous: with a fallback
   // spelled exactly as a file key the resolved and declared tags coincide and nothing can differ.
   const m = validates(manifest(["deu", "fr"], "de"));
   const loaded = await loadEntireManifest(m, { fetch: recordingFetch().impl });
 
-  assert.equal(loaded.fallbackLocale, "de",
-    "DIVERGENCE: :146 requires the RESOLVED loaded tag 'deu'");
+  assert.equal(loaded.fallbackLocale, "deu");
   assert.deepEqual({ ...loaded.manifestLocaleConfiguration },
-    { fallbackLocale: "de", supportedLocales: ["deu", "fr"], tiebreakers: {} },
-    "DIVERGENCE: a configuration whose fallback is not a member of its own supported set, which " +
-    "plan 3.4:842-843 forbids for any match result built from it");
+    { fallbackLocale: "deu", supportedLocales: ["deu", "fr"], tiebreakers: {} });
 
-  // THE SAME INSTANCE REPORTS TWO DIFFERENT FALLBACKS, which is the caller-visible form of the
-  // defect and the row the adversarial review predicted would be green. It is not: core resolves,
-  // the loader does not, and both answers are handed to the same caller.
+  // The instance and loader record must report the same exact file tag.
   const instance = createStrings({ loaded, localeResolver: () => "pt-BR" });
   assert.equal(instance.getLocaleConfiguration().fallbackLocale, "deu");
   assert.equal(
-    /** @type {any} */ (instance.getLoadVerification()).manifestLocaleConfiguration.fallbackLocale, "de");
-  assert.notEqual(
     instance.getLocaleConfiguration().fallbackLocale,
-    /** @type {any} */ (instance.getLoadVerification()).manifestLocaleConfiguration.fallbackLocale,
-    "DIVERGENCE: these must be one value; when they become one, this assertion is the thing to delete");
+    /** @type {any} */ (instance.getLoadVerification()).manifestLocaleConfiguration.fallbackLocale);
 
   // THE SSR OBSERVATION, which `unprovableParts` gave up as unreachable. `LokalizedSsrStampV1` has no
   // fallback field — true — but plan 6.4:2256 makes `createSsrStamp` compare the record's resolved
   // fallback against the instance's, and that comparison is live and falsifiable.
-  const refusal = thrown(() => createSsrStamp(instance, { kind: "locale", locale: "pt-BR" }));
-  assert.equal(refusal?.name, "ConfigurationError");
-  assert.equal(refusal?.message,
-    "The verification record's manifest locale configuration resolves a different fallback than " +
-    "this instance did");
+  assert.equal(typeof createSsrStamp(instance, { kind: "locale", locale: "pt-BR" }).lookupLocale,
+    "string");
 
-  // THE CONTROL: the same catalogs with the fallback spelled exactly stamp cleanly, so the refusal
-  // above is the spelling and not the fixture.
+  // The exact spelling produces the same stampable configuration.
   const exact = validates(manifest(["deu", "fr"], "deu"));
   const exactLoaded = await loadEntireManifest(exact, { fetch: recordingFetch().impl });
   const exactInstance = createStrings({ loaded: exactLoaded, localeResolver: () => "pt-BR" });
@@ -518,7 +495,7 @@ test("clause 8 C8: DIVERGENCE — the loader's own record disagrees with the ins
     "string");
 });
 
-test("clause 8 C8: the record fed back to its own instance is REJECTED; the resolved tag is accepted", async () => {
+test("clause 8 C8: the loader configuration can be fed back to its own instance", async () => {
   // THE ROUND TRIP, not field equality. Plan 3.4 names this record's purpose — "so an external
   // negotiator sees the same set used before subset loading" — and a field-equality test can be
   // satisfied by making every record raw and self-consistent while breaking exactly that use.
@@ -540,24 +517,19 @@ test("clause 8 C8: the record fed back to its own instance is REJECTED; the reso
   });
   assert.equal(accepted.get("Greeting"), "DEU!");
 
-  const rejection = thrown(() => createStrings({
+  const roundTrip = createStrings({
     loaded,
     localeMatchResolver: () => /** @type {any} */ ({
       ...ownMatch,
       fallbackLocale: configuration.fallbackLocale,
       consideredLocales: [...configuration.supportedLocales],
     }),
-  }).get("Greeting"));
-  assert.equal(rejection?.name, "RangeError");
-  assert.equal(rejection?.message, "The fallback locale must be present in considered locales",
-    "DIVERGENCE: the loader hands back a configuration its own instance calls structurally invalid — " +
-    "and the guard that fires is the CONTAINMENT one, which is the point: 'de' is not in [deu, fr]");
+  });
+  assert.equal(roundTrip.get("Greeting"), "DEU!");
 });
 
 test("clause 8 C8: the DIRECT door's supplied match requires the RESOLVED fallback", () => {
-  // The mirror of the row above at the door that WORKS (plan 3.4:845-848, "the instance's exact
-  // fallback"). Cheap, green today, and it pins "match results use the resolved tag" where the
-  // manifest-backed round trip cannot, because that one is red for a different reason.
+  // The direct door applies the same exact fallback requirement to supplied matches.
   const strings = { strings: catalogsFor(["deu", "fr"]), fallbackLocale: "de" };
   const probe = createStrings({ ...strings, localeResolver: () => "pt-BR" });
   const ownMatch = probe.getDirectLocaleContext("pt-BR").localeMatch;
@@ -677,18 +649,14 @@ test("clause 8 C10: the SSR stamp and lookup coverage carry the REQUEST, not the
 // C11 — `CatalogIdentityInputV1.resolvedFallbackLocale` (plan 6.1:1840).
 // ---------------------------------------------------------------------------------------------
 
-test("clause 8 C11: DIVERGENCE — identity hashes the DECLARED fallback, so two publishers of one catalog set disagree", () => {
+test("clause 8 C11: identity hashes the resolved fallback", () => {
   // THE OBSERVATION MUST BE CROSS-MANIFEST. A single manifest is self-consistent under either rule —
   // the same tag computes and checks — so nothing is visible from one. Both fingerprints here are
   // produced by the implementation at fixture-build time and both manifests validate, so a
   // declared/computed mismatch can never be misreported as fingerprint inequality.
   const declaredRaw = validates(manifest(["deu", "fr"], "de"));
   const declaredExact = validates(manifest(["deu", "fr"], "deu"));
-  assert.notEqual(declaredRaw.catalogFingerprint, declaredExact.catalogFingerprint,
-    "DIVERGENCE: both resolve to deu.json over byte-identical catalogs, so plan 6.1:1928's stated " +
-    "purpose — 'so server and CDN manifests can identify the same translations' — says these should " +
-    "be equal. INTERPRETIVE, and owed a maintainer ruling: should two publishers of the same " +
-    "catalogs who spell the fallback differently be told they hold different translations?");
+  assert.equal(declaredRaw.catalogFingerprint, declaredExact.catalogFingerprint);
 
   // THE TRANSPORT EXCLUSION still holds, so the inequality above is the fallback field and not a
   // fingerprint that moves for everything.
@@ -717,32 +685,26 @@ test("clause 8 C11: identity does read the fallback — the inclusion control th
 // Plan 6.2:2082 — allow-partial is gated on "the RESOLVED fallback-locale file".
 // ---------------------------------------------------------------------------------------------
 
-test("clause 8 :2082: DIVERGENCE — allow-partial tests the DECLARED fallback tag, so a resolved fallback that loaded is not credited", async () => {
+test("clause 8 :2082: allow-partial credits the resolved fallback file", async () => {
   // ":2082 — may return successes and ordered failures only if the RESOLVED fallback-locale file
-  // loaded and validated; fallback-file failure always rejects." The guard compares a failure row's
-  // locale against the DECLARED tag, which never matches a plan built from the RESOLVED one — so for
-  // a non-exactly-spelled fallback the guard can never be satisfied and allow-partial degenerates
-  // into reject-always. A fixture whose fallback is spelled exactly cannot see this.
+  // loaded and validated; fallback-file failure always rejects." A non-exact spelling exercises
+  // the distinction between the configured tag and the file actually loaded.
   const raw = validates(manifest(["deu", "fr"], "de"));
 
-  const spuriously = await rejected(() => loadEntireManifest(raw, {
+  const resolvedPartial = await loadEntireManifest(raw, {
     fetch: recordingFetch(new Set(["fr"])).impl, partialFailure: "allow-partial",
-  }));
-  assert.equal(spuriously?.name, "StringsLoadingError");
-  assert.match(String(spuriously?.message), /the resolved fallback-locale file is among them/,
-    "DIVERGENCE: deu.json — the resolved fallback file — loaded fine; only fr.json failed, and " +
-    ":2082 says this load may return successes and ordered failures");
+  });
+  assert.equal(resolvedPartial.complete, false);
+  assert.deepEqual(resolvedPartial.failures.map((failure) => failure.locale), ["fr"]);
+  assert.deepEqual(Object.keys(resolvedPartial.catalogs), ["deu"]);
 
-  // THE OTHER DIRECTION IS RIGHT TODAY, and it is right for the wrong reason — the guard refuses
-  // everything — so it is pinned with the control that proves the machinery works at all.
+  // A failure in the elected fallback file must still reject.
   const genuinely = await rejected(() => loadEntireManifest(raw, {
     fetch: recordingFetch(new Set(["deu"])).impl, partialFailure: "allow-partial",
   }));
   assert.equal(genuinely?.name, "StringsLoadingError");
 
-  // THE CONTROL: the identical catalogs with the fallback spelled EXACTLY do return a partial result
-  // when a non-fallback file fails, and still reject when the fallback file fails. So the divergence
-  // above is the spelling of the fallback tag and nothing else about the fixture.
+  // Exact spelling behaves the same way.
   const exact = validates(manifest(["deu", "fr"], "deu"));
   const partial = await loadEntireManifest(exact, {
     fetch: recordingFetch(new Set(["fr"])).impl, partialFailure: "allow-partial",

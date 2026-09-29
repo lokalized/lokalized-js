@@ -3,7 +3,7 @@
   "note": "Measurement, not a threshold. Nothing here ratchets; see the tool header.",
   "generatedBy": "tools/scenario-2k.mjs",
   "environment": {
-    "node": "v24.18.0",
+    "node": "v26.5.0",
     "platform": "darwin",
     "arch": "arm64"
   },
@@ -28,7 +28,7 @@
   "iterations": 9,
   "graph": {
     "src/index.js": {
-      "bytes": 776117,
+      "bytes": 775144,
       "modules": 32,
       "files": [
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/core/index.js",
@@ -66,7 +66,7 @@
       ]
     },
     "src/core/index.js": {
-      "bytes": 765034,
+      "bytes": 764112,
       "modules": 31,
       "files": [
         "/Users/Shared/ai-shared/lokalized/lokalized-js/src/core/index.js",
@@ -108,83 +108,83 @@
       "label": "root + raw-text catalog",
       "entry": "src/index.js",
       "importMs": {
-        "median": 0.5807910000000049,
-        "min": 0.4445840000000061,
-        "max": 11.831542000000002,
-        "spread": 19.605947750567587,
+        "median": 0.4644169999999974,
+        "min": 0.4029170000000022,
+        "max": 12.549083,
+        "spread": 26.15357749608663,
         "n": 9
       },
       "constructionMs": {
-        "median": 8.79925,
-        "min": 7.587082999999993,
-        "max": 19.485500000000002,
-        "spread": 1.3522080859164143,
+        "median": 8.710000000000008,
+        "min": 7.543915999999996,
+        "max": 18.166332999999995,
+        "spread": 1.2195656716417898,
         "n": 9
       },
       "firstRenderMs": {
-        "median": 0.37120799999999576,
-        "min": 0.240791999999999,
-        "max": 1.667665999999997,
-        "spread": 3.8438665114976356,
+        "median": 0.3370840000000044,
+        "min": 0.27062499999999545,
+        "max": 1.7823750000000018,
+        "spread": 4.484787174710122,
         "n": 9
       },
       "steadyLookupNsFallback": {
-        "median": 51522.958500000015,
-        "min": 50710.77049999997,
-        "max": 53184.354500000016,
-        "spread": 0.04800935489758503,
+        "median": 56654.41649999997,
+        "min": 56282.87499999999,
+        "max": 57184.12499999999,
+        "spread": 0.015907850714515795,
         "n": 9
       },
       "steadyLookupNsDirect": {
-        "median": 23092.41650000001,
-        "min": 22710.95850000006,
-        "max": 23828.16700000001,
-        "spread": 0.04837988696418797,
+        "median": 23351.708499999975,
+        "min": 23076.04150000009,
+        "max": 24184.396000000103,
+        "spread": 0.047463529274528814,
         "n": 9
       },
-      "retainedAfterConstructionBytes": 1356088,
-      "retainedAfterSweepBytes": 1483968
+      "retainedAfterConstructionBytes": 1360904,
+      "retainedAfterSweepBytes": 1464392
     },
     {
       "label": "core + parsed equivalent",
       "entry": "src/core/index.js",
       "importMs": {
-        "median": 1.0512909999997646,
-        "min": 0.9094999999997526,
-        "max": 1.494666000000052,
-        "spread": 0.5566165790446512,
+        "median": 0.8407090000000608,
+        "min": 0.7537499999998545,
+        "max": 1.207582999999886,
+        "spread": 0.5398217456932168,
         "n": 9
       },
       "constructionMs": {
-        "median": 6.397458999999799,
-        "min": 5.78387500000008,
-        "max": 8.264000000000124,
-        "spread": 0.38767344972435486,
+        "median": 5.707415999999739,
+        "min": 5.413583000000017,
+        "max": 5.9877080000001115,
+        "spread": 0.10059280767340611,
         "n": 9
       },
       "firstRenderMs": {
-        "median": 0.38312500000029104,
-        "min": 0.3429169999999431,
-        "max": 0.4291250000001128,
-        "spread": 0.22501272430696043,
+        "median": 0.31312500000012733,
+        "min": 0.28408400000034817,
+        "max": 0.36295800000016243,
+        "spread": 0.25189301397136027,
         "n": 9
       },
       "steadyLookupNsFallback": {
-        "median": 51810.35399999996,
-        "min": 50541.77099999993,
-        "max": 54506.041500000036,
-        "spread": 0.07651502439068666,
+        "median": 56583.02099999992,
+        "min": 56030.666999999994,
+        "max": 57416.99999999992,
+        "spread": 0.02450086572789968,
         "n": 9
       },
       "steadyLookupNsDirect": {
-        "median": 22798.896000000015,
-        "min": 22637.37500000002,
-        "max": 22986.93749999984,
-        "spread": 0.015332431008932253,
+        "median": 23080.166499999905,
+        "min": 23008.91700000011,
+        "max": 23470.187500000065,
+        "spread": 0.019985579393457017,
         "n": 9
       },
-      "retainedAfterConstructionBytes": 1277592,
-      "retainedAfterSweepBytes": 1488504
+      "retainedAfterConstructionBytes": 1299048,
+      "retainedAfterSweepBytes": 1408664
     }
   ]
 }

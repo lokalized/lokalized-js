@@ -74,7 +74,7 @@ on:
       tag:
         description: "npm dist-tag. `next` for a release candidate; `latest` only for a stable release."
         required: true
-        default: next
+        default: latest
 
 # The floor for any job that does not name its own. Deliberately WITHOUT `id-token`, so a job added
 # later cannot inherit the ability to mint a publish credential; the one job that needs it asks.
@@ -297,6 +297,10 @@ jobs:
             }
             if (prerelease && tag === "latest") {
               console.error(`::error::${version} is a prerelease and would become the default install under "latest"; publish it under "next"`);
+              process.exit(1);
+            }
+            if (!prerelease && tag !== "latest") {
+              console.error(`::error::${version} is stable and must become the default install under "latest"`);
               process.exit(1);
             }
             console.log(`dist-tag ${tag} suits ${version}`);

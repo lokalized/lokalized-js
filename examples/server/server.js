@@ -87,7 +87,13 @@ export async function startBookshop(options = {}) {
   const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
 
   const server = createServer();
-  await new Promise((resolve) => server.listen(options.port ?? 0, options.host ?? "127.0.0.1", () => resolve(undefined)));
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(options.port ?? 0, options.host ?? "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve(undefined);
+    });
+  });
   const address = server.address();
   if (address === null || typeof address === "string") throw new Error("expected a TCP address");
   const origin = `http://${address.address}:${address.port}`;

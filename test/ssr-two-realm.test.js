@@ -33,6 +33,7 @@ import { createSsrStamp as localCreateSsrStamp } from "../src/ssr/index.js";
 import { RUNTIME_METADATA } from "../src/internal/runtime-metadata.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
 import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
+import { markVerifiedLoad } from "../src/internal/runtime-metadata.js";
 
 const root = new URL("../", import.meta.url).pathname;
 
@@ -63,12 +64,13 @@ rewriteInCopy("src/data/provenance.js", pinnedProvenance().dataFingerprint, "e".
 const otherUrl = (/** @type {string} */ path) => pathToFileURL(join(otherCopy, path)).href;
 const otherSsr = await import(otherUrl("src/ssr/index.js"));
 const otherCore = await import(otherUrl("src/core/index.js"));
+const otherVerified = await import(otherUrl("src/internal/runtime-metadata.js"));
 const otherMetadata = (await import(otherUrl("src/internal/runtime-metadata.js"))).RUNTIME_METADATA;
 
 const en = parseStrings(JSON.stringify({ Hi: "hello" }), { locale: "en" });
 const fr = parseStrings(JSON.stringify({ Hi: "bonjour" }), { locale: "fr" });
 
-const loaded = () => ({
+const loaded = () => markVerifiedLoad({
   catalogs: { fr, en },
   tiebreakers: {},
   fallbackLocale: "en",
@@ -143,7 +145,7 @@ test("clause 42: the copy's own renderer produces a DIFFERENT stamp, which is th
   // a stamp field at all. Here the copy renders AND stamps, and its stamp carries its own identity —
   // so the fields are demonstrably reachable, and the previous test's result is about WHOSE they are.
   const theirs = otherCore.createStrings({
-    loaded: { ...loaded(), dataFingerprint: "e".repeat(64) },
+    loaded: otherVerified.markVerifiedLoad({ ...loaded(), dataFingerprint: "e".repeat(64) }),
     localeResolver: () => "fr",
   });
   const stamp = otherSsr.createSsrStamp(theirs, CONTEXT);

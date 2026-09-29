@@ -48,8 +48,15 @@ import { LoadingSession, resolveLimits } from "../internal/catalog.js";
 import { parseStringsWithSession } from "../internal/parse-file.js";
 import { localeConfigurationForManifest, validateStringsManifest } from "./manifest.js";
 import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-error.js";
+import { configurationError } from "../internal/configuration-error.js";
 
 const MAXIMUM_ACTIVE_READS = 8;
+
+/** @param {unknown} policy @param {string} door */
+export function requirePartialFailurePolicy(policy, door) {
+  if (policy !== undefined && policy !== "reject" && policy !== "allow-partial")
+    throw configurationError(`${door}: partialFailure must be 'reject' or 'allow-partial'`);
+}
 
 /**
  * The declared failure for a load that got past planning.
@@ -236,6 +243,7 @@ function tiebreakersForLoaded(declared, loadedTags) {
  * @param {any} options @param {LoadTransport} transport
  */
 export async function runPlan(manifest, plan, options, transport) {
+  requirePartialFailurePolicy(options.partialFailure, "runPlan");
     // PROJECTED to the validator's own surface. Forwarding a loader's whole options object
     // makes the validator refuse `fetch`/`readFile`/`signal` — a door refusing its own caller
     // for using that caller's documented options. Measured: leaving these wholesale reds 270

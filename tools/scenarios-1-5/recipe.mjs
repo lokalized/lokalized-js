@@ -361,4 +361,4 @@ export const HISTORY_ORIGIN_SHA256 = "f4c6a3d54ea213823931e84b4f40115fa95305c391
  * along with the figures it vouches for passes (`newestEntryProblems` in `check.mjs`).
  * @type {Readonly<{ index: number, sha256: string }> | undefined}
  */
-export const HISTORY_NEWEST_ENTRY = Object.freeze({ index: 1, sha256: "a5361b4f8d4a37468902fef5069e0c26676e0bd7f3f598a8f29c49a3e1b288d1" });
+export const HISTORY_NEWEST_ENTRY = Object.freeze({ index: 2, sha256: "2b951400af891f071d4e61151954cb0edc42740d70b60603649a9b7833007f5e" });

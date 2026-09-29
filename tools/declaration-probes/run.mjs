@@ -498,6 +498,37 @@ export const s = createStrings({
   runtimeLimits: { maximumExpressionTokens: 8 },
 });`,
   },
+  {
+    name: "SSR accepts a TranslationResult as its rendering context",
+    compiles: true,
+    throughPackage: true,
+    why: "the SSR API promises a TranslationResult context and must type it through both methods",
+    source: `import { createStrings } from "lokalized/core";
+import { createSsrStamp, validateSsrStamp } from "lokalized/ssr";
+const strings = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en" });
+const result = strings.getResult("K");
+export function use() { const stamp = createSsrStamp(strings, result); validateSsrStamp(stamp, strings, result); }`,
+  },
+  {
+    name: "SSR refuses an object with no Strings inspection methods",
+    compiles: false,
+    throughPackage: true,
+    refusedWith: "TS2345",
+    why: "an any-typed renderer parameter hid a malformed public call",
+    source: `import { createSsrStamp } from "lokalized/ssr";
+export const stamp = createSsrStamp({}, { kind: "locale", locale: "en" });`,
+  },
+  {
+    name: "SSR refuses a misspelled locale match type",
+    compiles: false,
+    throughPackage: true,
+    refusedWith: "TS2820",
+    why: "the rendering-context match arm must expose the eight valid match types, not any",
+    source: `import { createStrings } from "lokalized/core";
+import { createSsrStamp } from "lokalized/ssr";
+const strings = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en" });
+export const stamp = createSsrStamp(strings, { kind: "locale-match", localeMatch: { locale: "en", matchType: "excat" } });`,
+  },
 ];
 
 const directory = mkdtempSync(join(tmpdir(), "lokalized-declaration-probes-"));

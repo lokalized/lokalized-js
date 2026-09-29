@@ -926,6 +926,25 @@ export function resolveTiebreakers(tiebreakers, sortedSupported) {
 }
 
 /**
+ * Resolve a configured fallback to the exact catalog tag it names. Callers own the diagnostic when
+ * no unique election is possible; the selection rule itself is shared by direct and manifest loads.
+ *
+ * @param {string} configured normalized locale tag
+ * @param {readonly string[]} supported normalized catalog tags
+ * @param {Tiebreakers} tiebreakers
+ * @returns {string | null}
+ */
+export function electFallbackLocale(configured, supported, tiebreakers) {
+	if (supported.includes(configured)) return configured;
+	const equivalents = supported.filter((tag) => equivalentTags(tag, configured)).sort(compareTags);
+	if (equivalents.length === 0) return null;
+	if (equivalents.length === 1) return /** @type {string} */ (equivalents[0]);
+	const languageCode = normalizedLanguageCode(javaSplit(canonicalLanguageTag(configured))[0] ?? "");
+	const ordered = resolveTiebreakers(tiebreakers, supported).get(languageCode);
+	return ordered?.find((tag) => equivalents.includes(tag)) ?? null;
+}
+
+/**
  * @param {string} languageCode
  * @param {string[]} candidates
  * @param {Map<string, string[]>} tiebreakers

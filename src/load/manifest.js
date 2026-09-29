@@ -37,7 +37,7 @@ import {
   validateJsonNestingDepth,
 } from "../internal/json-parse.js";
 import { canonicalLanguageTag, equivalentTags, isKnownLanguageTag } from "../internal/locale-cldr.js";
-import { compareTags, normalizedLanguageCode, primaryLanguage } from "../internal/locale.js";
+import { compareTags, electFallbackLocale, normalizedLanguageCode, primaryLanguage } from "../internal/locale.js";
 import { javaSplit } from "../internal/locale-jdk-tag.js";
 
 /**
@@ -331,6 +331,11 @@ export function validateStringsManifest(input, options = {}) {
       );
   }
 
+  const resolvedFallbackLocale = electFallbackLocale(fallbackLocale, declaredLocales, tiebreakers);
+  if (resolvedFallbackLocale === null)
+    throw configurationError(
+      `A manifest's fallbackLocale '${fallbackLocale}' cannot be resolved to one declared catalog`);
+
   const manifest = /** @type {StringsManifestV1} */ (Object.freeze({
     formatVersion: /** @type {1} */ (1),
     catalogVersion: input.catalogVersion,
@@ -342,7 +347,7 @@ export function validateStringsManifest(input, options = {}) {
     cardinalityMode: /** @type {"exact"} */ (input.cardinalityMode),
     ianaRegistryDate: input.ianaRegistryDate,
     ianaDataFingerprint: input.ianaDataFingerprint,
-    fallbackLocale,
+    fallbackLocale: resolvedFallbackLocale,
     baseUrl: input.baseUrl,
     files: Object.freeze({ ...files }),
     tiebreakers: Object.freeze({ ...tiebreakers }),
@@ -513,4 +518,3 @@ function validateManifestTiebreakers(files, tiebreakers) {
         `unrelated: [${unrelated.join(", ")}]`);
   }
 }
-

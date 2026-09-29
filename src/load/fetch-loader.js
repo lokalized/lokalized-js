@@ -24,8 +24,9 @@ import { configurationError, refuseUnknownOptions } from "../internal/configurat
 import { normalizeTag } from "../internal/locale.js";
 import { fetchSet } from "./planning.js";
 import { validateStringsManifest } from "./manifest.js";
-import { hex, readBoundedStream, runPlan, wholeManifestPlan } from "./run-plan.js";
+import { hex, readBoundedStream, requirePartialFailurePolicy, runPlan, wholeManifestPlan } from "./run-plan.js";
 import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-error.js";
+import { markVerifiedLoad } from "../internal/runtime-metadata.js";
 
 /** @typedef {import("./index.js").StringsManifestV1} StringsManifestV1 */
 /** @typedef {import("./index.js").LoadStringsOptions} LoadStringsOptions */
@@ -202,6 +203,7 @@ export async function loadStrings(manifest, lookupLocale, options = {}) {
   // normalization all run before `preflight` (:218). `transport` is the near miss that cost real
   // time: it does not fail at the call, it sends the load to THE REAL NETWORK.
   options = refuseUnknownOptions("loadStrings", options, FETCH_DOOR_OPTIONS, FETCH_DOOR_NEAR_MISSES);
+  requirePartialFailurePolicy(options.partialFailure, "loadStrings");
 
   // PROJECTED to `fetchSet`'s own surface, which now refuses a member it does not read: handing it
   // this door's whole options object would refuse the caller's documented transport options.
@@ -211,19 +213,20 @@ export async function loadStrings(manifest, lookupLocale, options = {}) {
   // plan 2.2's own comment on the field ("Normalized planning input"). It is the tag plan 6.4 then
   // compares a rendering context against, so recording the caller's spelling would make coverage
   // depend on how the load was typed.
-  return Object.freeze({
+  return markVerifiedLoad(Object.freeze({
     ...loaded,
     coverage: Object.freeze({ kind: "lookup", lookupLocale: normalizeTag(lookupLocale) }),
-  });
+  }));
 }
 
 /** @param {StringsManifestV1} manifest @param {LoadStringsOptions} [options] */
 export async function loadEntireManifest(manifest, options = {}) {
   options = refuseUnknownOptions("loadEntireManifest", options, FETCH_DOOR_OPTIONS, FETCH_DOOR_NEAR_MISSES);
+  requirePartialFailurePolicy(options.partialFailure, "loadEntireManifest");
 
   // PROJECTED: the validator takes `limits` alone, and this door's own `fetch`/`signal`/`request`/
   // `partialFailure` are not its business.
   const validated = validateStringsManifest(manifest, { limits: options.limits });
   const loaded = await runPlan(manifest, wholeManifestPlan(validated), options, FETCH_TRANSPORT);
-  return Object.freeze({ ...loaded, coverage: Object.freeze({ kind: "entire-manifest" }) });
+  return markVerifiedLoad(Object.freeze({ ...loaded, coverage: Object.freeze({ kind: "entire-manifest" }) }));
 }

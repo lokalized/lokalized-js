@@ -25,6 +25,7 @@ import { parseStrings } from "../src/parse/index.js";
 import { createSsrStamp, validateSsrStamp } from "../src/ssr/index.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
 import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
+import { markVerifiedLoad } from "../src/internal/runtime-metadata.js";
 
 const en = parseStrings(JSON.stringify({ Hi: "hello" }), { locale: "en" });
 const fr = parseStrings(JSON.stringify({ Hi: "bonjour" }), { locale: "fr" });
@@ -35,7 +36,7 @@ const IDENTITY = { catalogVersion: "2026.09.11", catalogFingerprint: "a".repeat(
 /** A `LoadedStrings` this core accepts: manifest {en, fr}, loaded for lookup `fr`. */
 function loadedStrings(overrides = {}) {
   const pinned = pinnedProvenance();
-  return /** @type {any} */ ({
+  return /** @type {any} */ (markVerifiedLoad({
     catalogs: { fr, en },
     tiebreakers: {},
     fallbackLocale: "en",
@@ -49,7 +50,7 @@ function loadedStrings(overrides = {}) {
     warnings: [],
     complete: true,
     ...overrides,
-  });
+  }));
 }
 
 const loadedInstance = (overrides = {}) =>

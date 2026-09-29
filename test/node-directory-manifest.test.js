@@ -50,6 +50,19 @@ function directory(/** @type {Record<string, string | Uint8Array | null>} */ con
 const catalogs = (/** @type {string[]} */ tags) =>
   Object.fromEntries(tags.map((tag) => [`${tag}.json`, bodyFor(tag)]));
 
+test("an equivalent fallback file is accepted and recorded by its exact tag", async () => {
+  const path = directory(catalogs(["deu", "fr"]));
+  const manifest = await createStringsManifestFromDirectory(path, {
+    catalogVersion: "2026.09.11", fallbackLocale: "de",
+  });
+  assert.equal(manifest.fallbackLocale, "deu");
+  const loaded = await loadStringsFromDirectory(path, {
+    catalogVersion: "2026.09.11", fallbackLocale: "de",
+  });
+  assert.equal(loaded.fallbackLocale, "deu");
+  assert.equal(createStrings({ loaded, localeResolver: () => "ja" }).get("Hi"), "hello deu");
+});
+
 // ------------------------------------------------------------ discovery parity with the raw door
 
 test("an unrecognised stem is a SILENT SKIP without .json and FATAL with it", async () => {

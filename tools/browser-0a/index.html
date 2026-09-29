@@ -54,11 +54,10 @@
     }
 
     // Transfer sizes from the resource timeline: the browser-relevant "bytes", not source length.
-    const prefix = new URL(entry, location.href).href.split("?")[0];
-    const base = prefix.slice(0, prefix.lastIndexOf("/"));
+    const sourcePrefix = new URL("/src/", location.href).href;
     let encoded = 0, decoded = 0, resources = 0;
     for (const e of performance.getEntriesByType("resource")) {
-      if (!e.name.startsWith(base.slice(0, base.lastIndexOf("/")))) continue;
+      if (!e.name.startsWith(sourcePrefix) || !e.name.split("?")[0].endsWith(".js")) continue;
       if (e.name.includes("?m=")) continue; // count the cold graph once
       encoded += e.encodedBodySize || 0; decoded += e.decodedBodySize || 0; resources++;
     }

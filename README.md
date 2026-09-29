@@ -600,7 +600,11 @@ const server = createServer((request, response) => {
   served.push(name);
   if (broken.has(name)) return response.end(broken.get(name));
   response.end(name === "manifest.json" ? published : readFileSync(`examples/catalogs/${name}`));
-}).listen(0);
+});
+await new Promise((resolve, reject) => {
+  server.once("error", reject);
+  server.listen(0, "127.0.0.1", () => { server.off("error", reject); resolve(); });
+});
 const origin = `http://127.0.0.1:${server.address().port}`;
 ```
 
@@ -1859,6 +1863,10 @@ loaded.catalogs.en.sources[0].startsWith("file:///");   // => true
 loaded.requestedFiles[0].url.startsWith("file:///");    // => true
 ```
 
+A copied `LoadedStrings` can render translations, but its original byte verification cannot be
+proved after serialization. An SSR stamp requires an unmodified result from a loader in the same
+installed copy of lokalized. After a boundary, load catalogs again before creating a stamp.
+
 Those last two lines are the one to watch: **serializing a Node-file-door record into a page ships
 your server's absolute paths to every visitor.** That is a property of the door, not of the record
 type — the same catalogs loaded through the Fetch door carry only the public origin:
@@ -3063,11 +3071,11 @@ second table. Both columns are re-derived on every run, so they describe this co
 
 | import | minified | brotli |
 |---|---|---|
-| `import { createStrings } from "lokalized"` | 181,479 | 54,390 |
+| `import { createStrings } from "lokalized"` | 181,654 | 54,317 |
 | `import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"` | 89,508 | 31,244 |
 | `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,642 | 2,002 |
 | `import { GENDER_FEMININE } from "lokalized"` | 2,350 | 914 |
-| the four above, in one bundle | 222,409 | 64,383 |
+| the four above, in one bundle | 223,095 | 64,516 |
 <!-- bundle-table:end -->
 
 <!-- dist-table:start -->
@@ -3077,15 +3085,15 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 
 | load | files | raw | brotli |
 |---|---|---|---|
-| `lokalized` | 1 | 184,707 | 54,979 |
-| `lokalized/core` | 7 | 183,824 | 54,800 |
-| `lokalized/parse` | 5 | 159,489 | 48,710 |
-| `lokalized/load` | 7 | 178,047 | 53,801 |
+| `lokalized` | 1 | 184,882 | 55,072 |
+| `lokalized/core` | 7 | 184,024 | 55,065 |
+| `lokalized/parse` | 5 | 159,703 | 48,688 |
+| `lokalized/load` | 7 | 178,840 | 54,057 |
 | `lokalized/ssr` | 2 | 7,570 | 2,371 |
-| `lokalized/negotiate` | 4 | 90,777 | 31,751 |
-| `lokalized/data/ordinal` | 8 | 190,532 | 56,371 |
-| `lokalized/data/ranges` | 8 | 193,060 | 56,528 |
-| `lokalized.global.js`, the classic script | 1 | 243,510 | 68,767 |
+| `lokalized/negotiate` | 4 | 91,081 | 31,855 |
+| `lokalized/data/ordinal` | 8 | 190,732 | 56,471 |
+| `lokalized/data/ranges` | 8 | 193,260 | 56,586 |
+| `lokalized.global.js`, the classic script | 1 | 244,196 | 69,026 |
 <!-- dist-table:end -->
 
 **What a no-build page downloads.** The table above is what a bundler produces from the source; this
@@ -3103,9 +3111,9 @@ larger, so a figure quoted in it overstates what a visitor on a modern CDN actua
 not printed here, because a number nothing re-derives is how this section came to be wrong before.
 
 Three things are worth reading off that table. **Half of the root bundle is one pinned CLDR table** —
-replacing `likely-subtags` with an empty one takes the same bundle from 181,479 to 158,550 minified
+replacing `likely-subtags` with an empty one takes the same bundle from 181,654 to 158,725 minified
 bytes, which is the price of resolving `fr-CH` to `fr` without asking the host. **The tables are
-shared, not duplicated**: adding three more subpaths to the root costs 40,930 bytes, not another
+shared, not duplicated**: adding three more subpaths to the root costs 41,441 bytes, not another
 whole copy. And **`lokalized/ssr` carries no pinned data at all**, which is what lets the stamp
 module sit in a page that does no matching.
 

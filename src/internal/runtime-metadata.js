@@ -87,3 +87,18 @@ export const RUNTIME_METADATA = Object.freeze({
   // build: its IANA data is different, which is what the fingerprint exists to say.
   ianaDataFingerprint: "87b3a43b03f490206cead05d865357bd7cfc3953a52ec4d8405243f699385815",
 });
+
+// A parsed catalog cannot prove which bytes the loader hashed. The marker is local to this
+// installed copy and is deliberately absent from the serializable LoadedStrings record.
+const verifiedLoads = new WeakSet();
+
+/** @template {object} T @param {T} loaded @returns {T} */
+export function markVerifiedLoad(loaded) {
+  verifiedLoads.add(loaded);
+  return loaded;
+}
+
+/** @param {object} loaded */
+export function isVerifiedLoad(loaded) {
+  return verifiedLoads.has(loaded);
+}

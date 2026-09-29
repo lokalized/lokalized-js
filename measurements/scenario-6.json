@@ -37,23 +37,23 @@
     {
       "label": "edge worker",
       "modules": 47,
-      "sourceBytes": 984534,
+      "sourceBytes": 987584,
       "nodeBuiltinEdges": 0,
       "ianaClosureBytes": 11358,
-      "importMs": 0.4297
+      "importMs": 0.4408
     },
     {
       "label": "server renderer",
       "modules": 54,
-      "sourceBytes": 1064855,
+      "sourceBytes": 1068690,
       "nodeBuiltinEdges": 10,
       "ianaClosureBytes": 11358,
-      "importMs": 15.6316
+      "importMs": 16.3987
     }
   ],
-  "negotiateMsPerHeader": 0.0541,
-  "firstRenderMs": 0.8454,
-  "retainedBytes": -15464,
+  "negotiateMsPerHeader": 0.0611,
+  "firstRenderMs": 0.9378,
+  "retainedBytes": -8336,
   "requestsPerRender": {
     "fr-CA": 4,
     "fr-CH": 4,
@@ -399,6 +399,83 @@
         "closureClasses": 369
       },
       "previousSha256": "8e446d0288e3366c7084df625f1b91753d20fe6332a220d9843be2deb5adac5e"
+    },
+    {
+      "reason": "Fallback resolution and verified loader provenance change the edge and server source graphs for 1.0.",
+      "growth": [
+        "edge worker: source graph grew 984534 -> 987584 bytes",
+        "server renderer: source graph grew 1064855 -> 1068587 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 987584,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1068587,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "d0dc6ca552d0171593da824532dee631d6c469b61e9694ef9e81d6a0a70200f0"
+    },
+    {
+      "reason": "The server example now waits for its listener and propagates bind failures during the 1.0 release review.",
+      "growth": [
+        "server renderer: source graph grew 1068587 -> 1068690 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 987584,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1068690,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "ef1e547aba83f7fac86cec904ef229ca5ced64b4582b38f1c864f69162813302"
     }
   ]
 }

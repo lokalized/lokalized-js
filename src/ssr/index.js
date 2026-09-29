@@ -59,7 +59,7 @@ import { configurationError } from "../internal/configuration-error.js";
  * The rendering context a stamp describes.
  *
  * @typedef {Readonly<{ kind: "locale", locale: string }>
- *   | Readonly<{ kind: "locale-match", localeMatch: any }>} SsrLocaleContext
+ *   | Readonly<{ kind: "locale-match", localeMatch: SsrLocaleMatchV1 }>} SsrLocaleContext
  */
 
 /** The eight match types plan 3.2 declares. `none` is the one the null-locale rule keys on. */
@@ -288,8 +288,8 @@ function requireCoverage(coverage, lookupLocale) {
 /**
  * Stamp a rendered page's locale selection.
  *
- * @param {any} strings the `Strings` that rendered the page
- * @param {SsrLocaleContext | any} context the rendering context, or a `TranslationResult` from it
+ * @param {Pick<import("../core/index.js").Strings, "getLoadVerification" | "getCatalogIdentity" | "isCatalogComplete" | "getLocaleConfiguration" | "getSupportedLocales" | "getDirectLocaleContext">} strings the `Strings` that rendered the page
+ * @param {SsrLocaleContext | ReturnType<import("../core/index.js").Strings["getResult"]>} context the rendering context, or a `TranslationResult` from it
  * @returns {LokalizedSsrStampV1}
  */
 export function createSsrStamp(strings, context) {
@@ -336,8 +336,8 @@ export function createSsrStamp(strings, context) {
  * members, and `test/ssr-stamp.test.js` asserts that the set of compared paths IS those fifteen.
  *
  * @param {LokalizedSsrStampV1} stamp the stamp the server serialized into the page
- * @param {any} strings the client `Strings` about to hydrate
- * @param {SsrLocaleContext} expectedContext the context the client is rendering
+ * @param {Pick<import("../core/index.js").Strings, "getLoadVerification" | "getCatalogIdentity" | "isCatalogComplete" | "getLocaleConfiguration" | "getSupportedLocales" | "getDirectLocaleContext">} strings the client `Strings` about to hydrate
+ * @param {SsrLocaleContext | ReturnType<import("../core/index.js").Strings["getResult"]>} expectedContext the context the client is rendering
  * @returns {void}
  */
 export function validateSsrStamp(stamp, strings, expectedContext) {

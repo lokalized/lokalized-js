@@ -33,8 +33,9 @@ import { normalizeTag } from "../internal/locale.js";
 import { resolveLimits } from "../internal/catalog.js";
 import { fetchSet } from "../load/planning.js";
 import { parseStringsManifest, validateStringsManifest } from "../load/manifest.js";
-import { readBoundedStream, runPlan, wholeManifestPlan } from "../load/run-plan.js";
+import { readBoundedStream, requirePartialFailurePolicy, runPlan, wholeManifestPlan } from "../load/run-plan.js";
 import { createStringsManifestFromDirectory, directoryPath } from "./manifest-directory.js";
+import { markVerifiedLoad } from "../internal/runtime-metadata.js";
 
 /** @typedef {import("../load/index.js").StringsManifestV1} StringsManifestV1 */
 /** @typedef {import("../load/index.js").FetchEntry} FetchEntry */
@@ -215,15 +216,16 @@ export async function readStringsManifest(path, options = {}) {
 export async function loadStringsFromFiles(manifest, lookupLocale, options = {}) {
   refuseNetworkOptions(options);
   options = refuseUnknownOptions("loadStringsFromFiles", options, NODE_FILE_OPTIONS, NODE_NEAR_MISSES);
+  requirePartialFailurePolicy(options.partialFailure, "loadStringsFromFiles");
 
   // PROJECTED to `fetchSet`'s own surface, which now refuses a member it does not read: handing it
   // this door's whole options object would refuse the caller's documented transport options.
   const plan = fetchSet(manifest, lookupLocale, { limits: options.limits });
   const loaded = await runPlan(manifest, plan, options, FILE_TRANSPORT);
-  return Object.freeze({
+  return markVerifiedLoad(Object.freeze({
     ...loaded,
     coverage: Object.freeze({ kind: "lookup", lookupLocale: normalizeTag(lookupLocale) }),
-  });
+  }));
 }
 
 /**
@@ -234,10 +236,11 @@ export async function loadStringsFromFiles(manifest, lookupLocale, options = {})
 export async function loadEntireManifestFromFiles(manifest, options = {}) {
   refuseNetworkOptions(options);
   options = refuseUnknownOptions("loadEntireManifestFromFiles", options, NODE_FILE_OPTIONS, NODE_NEAR_MISSES);
+  requirePartialFailurePolicy(options.partialFailure, "loadEntireManifestFromFiles");
 
   const validated = validateStringsManifest(manifest, { limits: options.limits });
   const loaded = await runPlan(manifest, wholeManifestPlan(validated), options, FILE_TRANSPORT);
-  return Object.freeze({ ...loaded, coverage: Object.freeze({ kind: "entire-manifest" }) });
+  return markVerifiedLoad(Object.freeze({ ...loaded, coverage: Object.freeze({ kind: "entire-manifest" }) }));
 }
 
 /**

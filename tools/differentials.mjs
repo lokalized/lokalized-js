@@ -86,8 +86,12 @@ if (process.argv.includes("--run")) {
     let output = "";
     const temporary = privateTemporaryDirectory();
     try {
+      // HotSpot creates hsperfdata_<user> in TMPDIR even after every differential removes its own
+      // files. Suppress that runtime-owned telemetry so the private temp leak check stays meaningful.
+      const environment = temporaryEnvironment(temporary);
+      environment.JAVA_TOOL_OPTIONS = `${environment.JAVA_TOOL_OPTIONS ?? ""} -XX:-UsePerfData`.trim();
       output = execFileSync("npm", ["run", `diff:${name}`],
-        { cwd: root, encoding: "utf8", maxBuffer: 256e6, env: temporaryEnvironment(temporary) });
+        { cwd: root, encoding: "utf8", maxBuffer: 256e6, env: environment });
     } catch (error) {
       exit = /** @type {any} */ (error).status ?? -1;
       output = `${/** @type {any} */ (error).stdout ?? ""}${/** @type {any} */ (error).stderr ?? ""}`;
