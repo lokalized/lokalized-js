@@ -1,3 +1,4 @@
+import { currentApiVocabulary } from "../tools/api-vocabulary.mjs";
 // @ts-check
 /**
  * THE PLAN'S WHOLE DECLARED SURFACE, COMPARED TO THE PORT'S — a channel that did not exist.
@@ -31,7 +32,7 @@ import { test } from "node:test";
 
 const root = new URL("../", import.meta.url);
 const pkg = JSON.parse(readFileSync(new URL("package.json", root), "utf8"));
-const allowlist = JSON.parse(readFileSync(new URL("../lokalized-spec/symbol-allowlist.json", root), "utf8"));
+const allowlist = currentApiVocabulary(JSON.parse(readFileSync(new URL("../lokalized-spec/symbol-allowlist.json", root), "utf8")));
 
 /**
  * The port honours the contract, without a name a consumer could import. Each entry says what
@@ -42,13 +43,12 @@ const STRUCTURAL = /** @type {Record<string, string>} */ ({
   // the two ARMS the union actually needs and inlines the rest. The arms are delivered (S29).
   CommonCreateStringsOptions: "folded into both arms of the delivered CreateStringsOptions union",
   CreateStringsBehaviorOptions: "folded into both arms; every member appears on each",
-  LocaleSourceOptions: "the localeResolver/localeMatchResolver pair, an exactly-one union inlined on both arms",
-  TranslationBehaviorOptions: "folded into the delivered TranslationCallOptions",
+  LocaleSourceOptions: "the localeSupplier/localeMatchSupplier pair, an exactly-one union inlined on both arms",
+  TranslationBehaviorOptions: "folded into the delivered TranslationOptions",
   // Plan 3.2/3.7 type aliases over primitives and records. A parameter typed `string` honours
   // `type LocaleTag = string` exactly; a named alias would add no constraint a consumer can rely on.
   LocaleTag: "an alias for `string`; every locale parameter is typed `string`",
-  TranslationStatus: "a string union, inlined at each result member",
-  // `LocaleMatchType` SAT HERE reading "a string union, inlined on the delivered LocaleMatch", and
+  // `LocaleMatchType` SAT HERE reading "a string union, inlined on the delivered LocaleMatchResult", and
   // that was measured FALSE: `types/core/index.d.ts` declared `matchType: string`, so nothing was
   // inlined. The `why` field is free-form prose no rule reads — only the NAME's absence is tested —
   // so a false reason sat inside the table built to hold falsifiable ones. The type is delivered now
@@ -64,13 +64,11 @@ const STRUCTURAL = /** @type {Record<string, string>} */ ({
   TranslationResultBase: "folded into the delivered result shape",
   TranslatedResult: "folded into the delivered result shape",
   FailureResult: "folded into the delivered result shape",
-  TranslationResult: "the union of the two arms above, delivered flattened",
   // Plan 3.5's three response shapes are discriminated STRUCTURALLY, which the plan says outright;
-  // the port delivers the union as `FailureResponse` and the helpers that build each arm.
-  ReturnKeyResponse: "an arm of the delivered FailureResponse union",
-  ReturnStringResponse: "an arm of the delivered FailureResponse union",
-  ThrowResponse: "an arm of the delivered FailureResponse union",
-  PhoneticResolver: "inlined as the phoneticResolver option's function type",
+  // the port delivers the union as `TranslationFailureResponse` and the helpers that build each arm.
+  ReturnKeyResponse: "an arm of the delivered TranslationFailureResponse union",
+  ReturnStringResponse: "an arm of the delivered TranslationFailureResponse union",
+  ThrowResponse: "an arm of the delivered TranslationFailureResponse union",
   // Plan 3.6/3.7 input and value shapes, inlined at their single use site.
   LanguageFormTranslationInput: "an arm of the delivered LocalizedStringInput union",
   ExpressionTranslationInput: "an arm of the delivered LocalizedStringInput union",
@@ -81,13 +79,10 @@ const STRUCTURAL = /** @type {Record<string, string>} */ ({
   ParseStringsManifestOptions: "inlined on parseStringsManifest",
   // Plan 3.2's bidi union, reachable inline from the delivered option type — MEASURED at
   // `types/core/index.d.ts:364`, which is why this one is STRUCTURAL and its four siblings are not.
-  BidiIsolation: "reachable inline as `import(\"../internal/bidi.js\").BidiIsolation` on the option type",
 });
 
 /** The port ships the same contract under a different name. The port name must EXIST. */
 const RENAMED = /** @type {Record<string, string>} */ ({
-  TranslationOptions: "TranslationCallOptions",
-  LocaleMatchResult: "LocaleMatch",
 });
 
 /** Declared by the plan, delivered nowhere, owed by a named milestone. */

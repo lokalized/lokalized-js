@@ -38,9 +38,9 @@ function loadedStrings(overrides = {}) {
   const pinned = pinnedProvenance();
   return /** @type {any} */ (markVerifiedLoad({
     catalogs: { fr, en },
-    tiebreakers: {},
+    tiebreakerLocalesByLanguageCode: {},
     fallbackLocale: "en",
-    manifestLocaleConfiguration: { fallbackLocale: "en", supportedLocales: ["en", "fr"], tiebreakers: {} },
+    manifestLocaleConfiguration: { fallbackLocale: "en", supportedLocales: ["en", "fr"], tiebreakerLocalesByLanguageCode: {} },
     catalogIdentity: IDENTITY,
     ...BUILD_IDENTITY,
     loadingLimits: {},
@@ -54,7 +54,7 @@ function loadedStrings(overrides = {}) {
 }
 
 const loadedInstance = (overrides = {}) =>
-  createStrings({ loaded: loadedStrings(overrides), localeResolver: () => "fr" });
+  createStrings({ loaded: loadedStrings(overrides), localeSupplier: () => "fr" });
 
 /**
  * A `Strings`-shaped object whose inspection answers have been rewritten.
@@ -70,7 +70,7 @@ const DIRECT_FR = /** @type {const} */ ({ kind: "locale", locale: "fr" });
 // --------------------------------------------------------------- clause 38: eligibility
 
 test("clause 38: a DIRECTLY constructed instance cannot be stamped, identity or not", () => {
-  const plain = createStrings({ strings: { en, fr }, fallbackLocale: "en", localeResolver: () => "fr" });
+  const plain = createStrings({ localizedStringSupplier: () => ({ en, fr }), fallbackLocale: "en", localeSupplier: () => "fr" });
   assert.equal(plain.getCatalogIdentity(), null);
   assert.throws(() => createSsrStamp(plain, DIRECT_FR), /constructed directly/);
 
@@ -79,7 +79,7 @@ test("clause 38: a DIRECTLY constructed instance cannot be stamped, identity or 
   // truth"). The instance now reports an identity indistinguishable from a loaded one's, and is
   // still ineligible — which is the whole reason plan 6.4 keys on the verification record instead.
   const withIdentity = createStrings({
-    strings: { en, fr }, fallbackLocale: "en", localeResolver: () => "fr", catalogIdentity: IDENTITY,
+    localizedStringSupplier: () => ({ en, fr }), fallbackLocale: "en", localeSupplier: () => "fr", catalogIdentity: IDENTITY,
   });
   assert.deepEqual(withIdentity.getCatalogIdentity(), IDENTITY);
   assert.equal(withIdentity.getLoadVerification(), null);
@@ -92,7 +92,7 @@ test("clause 38: a DIRECTLY constructed instance cannot be stamped, identity or 
 test("clause 38: a shape-invalid direct identity is refused at construction", () => {
   assert.throws(
     () => createStrings({
-      strings: { en }, fallbackLocale: "en", localeResolver: () => "en",
+      localizedStringSupplier: () => ({ en }), fallbackLocale: "en", localeSupplier: () => "en",
       catalogIdentity: /** @type {any} */ ({ catalogVersion: 1 }),
     }),
     /must carry a string catalogVersion and catalogFingerprint/);
@@ -107,7 +107,7 @@ test("clause 39: an INCOMPLETE load is refused, and the partial load itself is l
   const partial = loadedStrings({
     catalogs: { en },
     coverage: { kind: "lookup", lookupLocale: "de" },
-    manifestLocaleConfiguration: { fallbackLocale: "en", supportedLocales: ["de", "en", "fr"], tiebreakers: {} },
+    manifestLocaleConfiguration: { fallbackLocale: "en", supportedLocales: ["de", "en", "fr"], tiebreakerLocalesByLanguageCode: {} },
     requestedFiles: [{ locale: "de" }, { locale: "en" }],
     complete: false,
   });
@@ -116,7 +116,7 @@ test("clause 39: an INCOMPLETE load is refused, and the partial load itself is l
   // tag must match the coverage record on every use" — and nothing enforced it until that rule
   // landed. `de` falls through to the `en` catalog, so the assertion is unchanged in substance: the
   // partial load builds and renders, and still cannot be stamped.
-  const instance = createStrings({ loaded: partial, localeResolver: () => "de" });
+  const instance = createStrings({ loaded: partial, localeSupplier: () => "de" });
   assert.equal(instance.get("Hi"), "hello");
   assert.throws(() => createSsrStamp(instance, { kind: "locale", locale: "de" }), /incomplete/);
 });
@@ -166,7 +166,7 @@ test("clause 40: a PERFECT stamp against an INVALID local instance is refused", 
   const stamp = createSsrStamp(real, DIRECT_FR);
   assert.doesNotThrow(() => validateSsrStamp(stamp, real, DIRECT_FR));
 
-  const direct = createStrings({ strings: { en, fr }, fallbackLocale: "en", localeResolver: () => "fr" });
+  const direct = createStrings({ localizedStringSupplier: () => ({ en, fr }), fallbackLocale: "en", localeSupplier: () => "fr" });
   assert.throws(() => validateSsrStamp(stamp, direct, DIRECT_FR), /constructed directly/);
   assert.throws(
     () => validateSsrStamp(stamp, doctored(real, { isCatalogComplete: () => false }), DIRECT_FR),
@@ -192,7 +192,7 @@ test("clause 41: entire-manifest coverage covers any valid rendering context", (
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr" }],
     }),
-    localeResolver: () => "fr",
+    localeSupplier: () => "fr",
   });
   for (const locale of ["fr", "en", "de"])
     assert.doesNotThrow(() => createSsrStamp(whole, { kind: "locale", locale }),
@@ -207,7 +207,7 @@ test("clause 37: the serialized stamp leaks nothing but the selected locale and 
   // plan 6.4 forbids — `requestedLanguageRanges`, `effectiveWeight`, `fallbackLocale` and
   // `consideredLocales` — so the assertion is against the WHOLE serialized shape, at every depth.
   const instance = loadedInstance();
-  const full = /** @type {any} */ (instance.getDirectLocaleContext("fr")).localeMatch;
+  const full = /** @type {any} */ (instance.getDirectLocaleContext("fr")).localeMatchResult;
   assert.ok("consideredLocales" in full && "requestedLanguageRanges" in full
     && "effectiveWeight" in full && "fallbackLocale" in full,
     "the fixture must actually carry the fields the projection has to drop");
@@ -216,9 +216,9 @@ test("clause 37: the serialized stamp leaks nothing but the selected locale and 
   assert.deepEqual(Object.keys(serialized).sort(), [
     "behavioralVectorsVersion", "cardinalityMode", "catalogFingerprint", "catalogVersion",
     "cldrVersion", "dataFingerprint", "formatVersion", "ianaDataFingerprint", "ianaRegistryDate",
-    "localeDataMode", "localeMatch", "lookupLocale", "producerImplementation", "producerVersion",
+    "localeDataMode", "localeMatchResult", "lookupLocale", "producerImplementation", "producerVersion",
   ]);
-  assert.deepEqual(Object.keys(serialized.localeMatch).sort(), ["locale", "matchType"]);
+  assert.deepEqual(Object.keys(serialized.localeMatchResult).sort(), ["locale", "matchType"]);
 });
 
 // --------------------------------------------------------------- clause 43: strict comparison
@@ -227,8 +227,8 @@ test("clause 37: the serialized stamp leaks nothing but the selected locale and 
 const PLAN_COMPARED_FIELDS = [
   "formatVersion", "catalogVersion", "catalogFingerprint", "cldrVersion", "dataFingerprint",
   "ianaRegistryDate", "ianaDataFingerprint", "behavioralVectorsVersion", "producerImplementation",
-  "producerVersion", "localeDataMode", "cardinalityMode", "lookupLocale", "localeMatch.locale",
-  "localeMatch.matchType",
+  "producerVersion", "localeDataMode", "cardinalityMode", "lookupLocale", "localeMatchResult.locale",
+  "localeMatchResult.matchType",
 ];
 
 test("clause 43: EVERY field of the stamp is compared, and they are the plan's fifteen", () => {
@@ -238,7 +238,7 @@ test("clause 43: EVERY field of the stamp is compared, and they are the plan's f
   // The paths the stamp actually has, derived from the stamp rather than typed out — so a sixteenth
   // field cannot be added without this failing, which is the failure mode a hand-kept list has.
   const paths = Object.keys(stamp).flatMap((field) =>
-    field === "localeMatch" ? Object.keys(stamp[field]).map((inner) => `${field}.${inner}`) : [field]);
+    field === "localeMatchResult" ? Object.keys(stamp[field]).map((inner) => `${field}.${inner}`) : [field]);
   assert.deepEqual(paths.slice().sort(), PLAN_COMPARED_FIELDS.slice().sort());
   assert.equal(paths.length, 15);
 
@@ -316,8 +316,8 @@ test("clause 45: a direct projection EQUALS the instance's own automatic result"
       }),
     }), { kind: "locale", locale });
     assert.equal(stamp.lookupLocale, context.lookupLocale);
-    assert.deepEqual(stamp.localeMatch,
-      { locale: context.localeMatch.locale, matchType: context.localeMatch.matchType });
+    assert.deepEqual(stamp.localeMatchResult,
+      { locale: context.localeMatchResult.locale, matchType: context.localeMatchResult.matchType });
   }
 });
 
@@ -329,21 +329,21 @@ test("clause 45: a selected locale MAY differ from the lookup locale", () => {
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr" }],
     }),
-    localeResolver: () => "fr",
+    localeSupplier: () => "fr",
   });
   const stamp = createSsrStamp(whole, { kind: "locale", locale: "fr-CA" });
   assert.equal(stamp.lookupLocale, "fr-CA");
-  assert.notEqual(stamp.localeMatch.locale, stamp.lookupLocale);
-  assert.equal(stamp.localeMatch.locale, "fr");
+  assert.notEqual(stamp.localeMatchResult.locale, stamp.lookupLocale);
+  assert.equal(stamp.localeMatchResult.locale, "fr");
 });
 
 test("clause 45: locale is null EXACTLY when the match type is 'none', both directions", () => {
   const instance = loadedInstance();
   assert.throws(
-    () => createSsrStamp(instance, { kind: "locale-match", localeMatch: { locale: null, matchType: "exact" } }),
+    () => createSsrStamp(instance, { kind: "locale-match", localeMatchResult: { locale: null, matchType: "exact" } }),
     /selects null exactly when its type is 'none'/);
   assert.throws(
-    () => createSsrStamp(instance, { kind: "locale-match", localeMatch: { locale: "fr", matchType: "none" } }),
+    () => createSsrStamp(instance, { kind: "locale-match", localeMatchResult: { locale: "fr", matchType: "none" } }),
     /selects null exactly when its type is 'none'/);
 });
 
@@ -353,14 +353,14 @@ test("clause 45: an unmatched supplied match takes the instance fallback as its 
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr" }],
     }),
-    localeResolver: () => "fr",
+    localeSupplier: () => "fr",
   });
-  const stamp = createSsrStamp(whole, { kind: "locale-match", localeMatch: { locale: null, matchType: "none" } });
+  const stamp = createSsrStamp(whole, { kind: "locale-match", localeMatchResult: { locale: null, matchType: "none" } });
   assert.equal(stamp.lookupLocale, "en");
-  assert.deepEqual(stamp.localeMatch, { locale: null, matchType: "none" });
+  assert.deepEqual(stamp.localeMatchResult, { locale: null, matchType: "none" });
 
   // And a MATCHED supplied match makes the selected locale the lookup locale.
-  const matched = createSsrStamp(whole, { kind: "locale-match", localeMatch: { locale: "fr", matchType: "exact" } });
+  const matched = createSsrStamp(whole, { kind: "locale-match", localeMatchResult: { locale: "fr", matchType: "exact" } });
   assert.equal(matched.lookupLocale, "fr");
 });
 
@@ -370,13 +370,13 @@ test("clause 45: a selected locale outside the instance's configuration is refus
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr" }],
     }),
-    localeResolver: () => "fr",
+    localeSupplier: () => "fr",
   });
   assert.throws(
-    () => createSsrStamp(whole, { kind: "locale-match", localeMatch: { locale: "de", matchType: "exact" } }),
+    () => createSsrStamp(whole, { kind: "locale-match", localeMatchResult: { locale: "de", matchType: "exact" } }),
     /must occur in the instance's applicable configuration/);
   assert.throws(
-    () => createSsrStamp(whole, { kind: "locale-match", localeMatch: { locale: "fr", matchType: "invented" } }),
+    () => createSsrStamp(whole, { kind: "locale-match", localeMatchResult: { locale: "fr", matchType: "invented" } }),
     /Unknown locale match type/);
 });
 
@@ -388,7 +388,7 @@ test("clause 46: a TranslationResult is accepted by ORIGIN, and one satisfying n
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr" }],
     }),
-    localeResolver: () => "fr",
+    localeSupplier: () => "fr",
   });
 
   // Origin 1, the automatic direct result: `fr-CA` selects `fr`, which is NOT the supplied-match
@@ -396,26 +396,26 @@ test("clause 46: a TranslationResult is accepted by ORIGIN, and one satisfying n
   const direct = whole.getResult("Hi", undefined, { locale: "fr-CA" });
   const directStamp = createSsrStamp(whole, direct);
   assert.equal(directStamp.lookupLocale, "fr-CA");
-  assert.equal(directStamp.localeMatch.locale, "fr");
+  assert.equal(directStamp.localeMatchResult.locale, "fr");
 
   // Origin 2, a supplied match: lookup is derived FROM the selection, and the pair is not the
   // automatic direct result for that lookup — `en` automatically selects `en` as `exact`, and this
   // one claims `wildcard`.
-  const supplied = { lookupLocale: "en", localeMatch: { locale: "en", matchType: "wildcard" } };
+  const supplied = { lookupLocale: "en", localeMatchResult: { locale: "en", matchType: "wildcard" } };
   const suppliedStamp = createSsrStamp(whole, supplied);
-  assert.deepEqual(suppliedStamp.localeMatch, { locale: "en", matchType: "wildcard" });
+  assert.deepEqual(suppliedStamp.localeMatchResult, { locale: "en", matchType: "wildcard" });
 
   // Doubly satisfying, and plan 6.4 says it is unambiguous "because both imply the same serialized
   // context" — asserted rather than assumed.
   const exact = whole.getResult("Hi", undefined, { locale: "fr" });
   const both = createSsrStamp(whole, exact);
   assert.deepEqual(both, createSsrStamp(whole, { kind: "locale", locale: "fr" }));
-  assert.deepEqual(both, createSsrStamp(whole, { kind: "locale-match", localeMatch: { locale: "fr", matchType: "exact" } }));
+  assert.deepEqual(both, createSsrStamp(whole, { kind: "locale-match", localeMatchResult: { locale: "fr", matchType: "exact" } }));
 
   // Satisfying NEITHER: lookup `en` with a match selecting `fr`. The automatic result for `en` is
   // `en`/exact, and a supplied match selecting `fr` would derive lookup `fr`.
   assert.throws(
-    () => createSsrStamp(whole, { lookupLocale: "en", localeMatch: { locale: "fr", matchType: "exact" } }),
+    () => createSsrStamp(whole, { lookupLocale: "en", localeMatchResult: { locale: "fr", matchType: "exact" } }),
     /is neither the automatic direct result for itself/);
 });
 
@@ -432,7 +432,7 @@ test("clause 48: whole server and fr-BE-planned client share identity and hydrat
   // The manifest publishes `en` and `fr-FR`; the direct context is `fr-BE`. Both instances end up
   // holding the SAME two catalogs — the subset plan for `fr-BE` reaches `fr-FR` and `en` — so the
   // only thing that differs is what each load was PLANNED from, which is the whole point.
-  const manifest = { fallbackLocale: "en", supportedLocales: ["en", "fr-FR"], tiebreakers: {} };
+  const manifest = { fallbackLocale: "en", supportedLocales: ["en", "fr-FR"], tiebreakerLocalesByLanguageCode: {} };
   const catalogs = { en, "fr-FR": frFR };
 
   const server = createStrings({
@@ -441,7 +441,7 @@ test("clause 48: whole server and fr-BE-planned client share identity and hydrat
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr-FR" }],
     }),
-    localeResolver: () => "en",
+    localeSupplier: () => "en",
   });
   const client = createStrings({
     loaded: loadedStrings({
@@ -449,7 +449,7 @@ test("clause 48: whole server and fr-BE-planned client share identity and hydrat
       coverage: { kind: "lookup", lookupLocale: "fr-BE" },
       requestedFiles: [{ locale: "fr-FR" }, { locale: "en" }],
     }),
-    localeResolver: () => "en",
+    localeSupplier: () => "en",
   });
 
   const context = /** @type {const} */ ({ kind: "locale", locale: "fr-BE" });
@@ -464,7 +464,7 @@ test("clause 48 REJECTION half: a client planned only for its diagnostic selecti
   // from `fr-FR`, the diagnostic selection, rather than from the requested `fr-BE`. Any
   // implementation that checked "are the needed catalogs present" instead of "what was this planned
   // from" passes the acceptance half and fails here.
-  const manifest = { fallbackLocale: "en", supportedLocales: ["en", "fr-FR"], tiebreakers: {} };
+  const manifest = { fallbackLocale: "en", supportedLocales: ["en", "fr-FR"], tiebreakerLocalesByLanguageCode: {} };
   const diagnostic = createStrings({
     loaded: loadedStrings({
       catalogs: { en, "fr-FR": frFR },
@@ -472,7 +472,7 @@ test("clause 48 REJECTION half: a client planned only for its diagnostic selecti
       coverage: { kind: "lookup", lookupLocale: "fr-FR" },
       requestedFiles: [{ locale: "fr-FR" }, { locale: "en" }],
     }),
-    localeResolver: () => "en",
+    localeSupplier: () => "en",
   });
   const context = /** @type {const} */ ({ kind: "locale", locale: "fr-BE" });
   assert.throws(() => createSsrStamp(diagnostic, context),
@@ -486,7 +486,7 @@ test("clause 48 REJECTION half: a client planned only for its diagnostic selecti
       coverage: { kind: "entire-manifest" },
       requestedFiles: [{ locale: "en" }, { locale: "fr-FR" }],
     }),
-    localeResolver: () => "en",
+    localeSupplier: () => "en",
   });
   assert.throws(() => validateSsrStamp(createSsrStamp(server, context), diagnostic, context),
     /covers lookup 'fr-FR' only/);

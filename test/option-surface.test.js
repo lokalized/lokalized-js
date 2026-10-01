@@ -15,7 +15,7 @@ import {
   chain, fetchSet, loadEntireManifest, loadStrings, localeConfigurationForManifest, parseStringsManifest,
   validateStringsManifest,
 } from "../src/load/index.js";
-import { createLocaleNegotiator, forLanguageRanges, parseLanguageRanges } from "../src/negotiate/index.js";
+import { createLocaleMatcher, forLanguageRanges, parseLanguageRanges } from "../src/negotiate/index.js";
 import {
   createStringsManifestFromDirectory, loadEntireManifestFromFiles, loadStringsFromDirectory,
   loadStringsFromFiles, readStringsFromDirectory, readStringsManifest,
@@ -53,7 +53,7 @@ import {
  * **A SOURCE DERIVATION WAS TRIED AND IS UNSOUND, which is why the door SET is derived from the
  * DECLARATIONS instead and each door's behaviour is measurement.**
  * Scanning `options.<name>` reports `src/core` as accepting twelve options and misses `strings`,
- * `loaded`, `loadingLimits`, `tiebreakers` and `catalogIdentity`, because `createStrings` reaches
+ * `loaded`, `loadingLimits`, `tiebreakerLocalesByLanguageCode` and `catalogIdentity`, because `createStrings` reaches
  * its options through five spellings — a plain read, an aliased `direct.x`, a cast-parenthesised
  * `(options).x` whose `)` breaks the anchor, a computed index, and a symbol. It also reports
  * `src/negotiate` as accepting `test`, from a regular expression.
@@ -69,38 +69,38 @@ const BOGUS = "zzUnknownOptionZZ";
  *
  * **HELD TO `src/` BY THE REFUSAL ITSELF, and this sentence used to claim something weaker was
  * enough.** It said the bogus-name sweep held the table to the real surface. That sweep only ever
- * sends one invented name, so dropping `request`, `bidiIsolation`, `onFallback` or `compactExponent`
+ * sends one invented name, so dropping `request`, `bidiIsolation`, `translationFallbackObserver` or `compactExponent`
  * from a door in `src/` left this file 10/10 — measured by a review on 2026-09-23; other files
  * happened to catch each one. Every refusal ends "It takes […]" with the door's own accepted list, so
  * a test below compares this table to that list, door by door, in both directions.
  */
 const ACCEPTS = /** @type {Record<string, readonly string[]>} */ ({
-  createStrings: ["strings", "fallbackLocale", "tiebreakers", "loadingLimits",
-    "runtimeLimits", "loaded", "catalogIdentity", "onWarning", "pluralData", "phoneticResolver",
-    "bidiIsolation", "fallbackPolicy", "onFailure", "onFallback", "localeResolver",
-    "localeMatchResolver"],
-  parseStrings: ["locale", "source", "limits", "onWarning", "pluralData"],
+  createStrings: ["localizedStringSupplier", "fallbackLocale", "tiebreakerLocalesByLanguageCode", "loadingLimits",
+    "runtimeLimits", "loaded", "catalogIdentity", "warningHandler", "pluralData", "phoneticResolver",
+    "bidiIsolation", "translationFallbackPolicy", "translationFailureHandler", "translationFallbackObserver", "localeSupplier",
+    "localeMatchSupplier"],
+  parseStrings: ["locale", "source", "limits", "warningHandler", "pluralData"],
   mergeParsedStringsFiles: ["limits"],
   parseStringsManifest: ["limits", "source"],
   validateStringsManifest: ["limits"],
   localeConfigurationForManifest: ["limits"],
   loadStrings: ["fetch", "limits", "partialFailure", "request", "signal"],
   loadEntireManifest: ["fetch", "limits", "partialFailure", "request", "signal"],
-  readStringsFromDirectory: ["limits", "maximumDiscoveryEntries", "onWarning", "pluralData"],
+  readStringsFromDirectory: ["limits", "maximumDiscoveryEntries", "warningHandler", "pluralData"],
   createStringsManifestFromDirectory: ["catalogVersion", "fallbackLocale", "limits",
-    "maximumDiscoveryEntries", "publicationBaseUrl", "tiebreakers"],
+    "maximumDiscoveryEntries", "publicationBaseUrl", "tiebreakerLocalesByLanguageCode"],
   loadStringsFromDirectory: ["catalogVersion", "fallbackLocale", "limits",
-    "maximumDiscoveryEntries", "partialFailure", "readFile", "signal", "tiebreakers"],
+    "maximumDiscoveryEntries", "partialFailure", "readFile", "signal", "tiebreakerLocalesByLanguageCode"],
   loadStringsFromFiles: ["limits", "partialFailure", "readFile", "signal"],
   loadEntireManifestFromFiles: ["limits", "partialFailure", "readFile", "signal"],
   readStringsManifest: ["limits", "signal"],
-  createLocaleNegotiator: ["fallbackLocale", "supportedLocales", "tiebreakers"],
-  chooseLocaleForPreferredLanguages: ["fallbackLocale", "supportedLocales", "tiebreakers"],
-  chooseBrowserLocale: ["fallbackLocale", "supportedLocales", "tiebreakers"],
+  createLocaleMatcher: ["fallbackLocale", "supportedLocales", "tiebreakerLocalesByLanguageCode"],
+  chooseLocaleForPreferredLanguages: ["fallbackLocale", "supportedLocales", "tiebreakerLocalesByLanguageCode"],
+  chooseBrowserLocale: ["fallbackLocale", "supportedLocales", "tiebreakerLocalesByLanguageCode"],
   pluralOperands: ["visibleDecimalPlaces", "compactExponent"],
-  get: ["locale", "localeMatch", "bidiIsolation", "fallbackPolicy", "onFailure", "onFallback"],
-  t: ["locale", "localeMatch", "bidiIsolation", "fallbackPolicy", "onFailure", "onFallback"],
-  getResult: ["locale", "localeMatch", "bidiIsolation", "fallbackPolicy", "onFailure", "onFallback"],
+  get: ["locale", "localeMatchResult", "bidiIsolation", "translationFallbackPolicy", "translationFailureHandler", "translationFallbackObserver"],
+  t: ["locale", "localeMatchResult", "bidiIsolation", "translationFallbackPolicy", "translationFailureHandler", "translationFallbackObserver"],
+  getResult: ["locale", "localeMatchResult", "bidiIsolation", "translationFallbackPolicy", "translationFailureHandler", "translationFallbackObserver"],
   chain: ["limits"],
   fetchSet: ["limits"],
 });
@@ -166,12 +166,12 @@ const bodies = new Map(Object.entries(CATALOG).map(([tag, catalog]) => [`${tag}.
 const transport = /** @type {any} */ (async (/** @type {RequestInfo | URL} */ url) =>
   new Response(bodies.get(String(url).split("/").pop() ?? "")));
 
-const instance = createStrings({ strings: CATALOG, fallbackLocale: "en", localeResolver: () => "en" });
+const instance = createStrings({ localizedStringSupplier: () => (CATALOG), fallbackLocale: "en", localeSupplier: () => "en" });
 const configuration = instance.getLocaleConfiguration();
 
 /** Every public door that takes an options object, with a minimal call that SUCCEEDS. */
 const DOORS = {
-  createStrings: (o) => createStrings({ strings: CATALOG, fallbackLocale: "en", localeResolver: () => "en", ...o }).get("A"),
+  createStrings: (o) => createStrings({ localizedStringSupplier: () => (CATALOG), fallbackLocale: "en", localeSupplier: () => "en", ...o }).get("A"),
   parseStrings: (o) => parseStrings(CATALOG_TEXT, { locale: "en", ...o }).strings.length,
   mergeParsedStringsFiles: (o) => mergeParsedStringsFiles([parseStrings(CATALOG_TEXT, { locale: "en" })], o).strings.length,
   parseStringsManifest: (o) => parseStringsManifest(JSON.stringify(httpManifest), o).catalogVersion,
@@ -200,11 +200,11 @@ const DOORS = {
 
   // **AND THESE NINE WERE MISSING FOR THE SAME REASON, found on 2026-09-23 by deriving the door set
   // from the published declarations rather than extending this list by hand** — the test below. All
-  // nine ignored an unknown member in silence. `createLocaleNegotiator`, and the two root choosers
+  // nine ignored an unknown member in silence. `createLocaleMatcher`, and the two root choosers
   // taking the same `LocaleConfiguration`, ran on the members spelled right; `get`, `t` and
   // `getResult` are the per-call options of every render; `chain` and `fetchSet` are the planning
   // doors of `lokalized/load`; `pluralOperands` built the operands of the undisplayed number.
-  createLocaleNegotiator: (o) => createLocaleNegotiator({ ...configuration, ...o }).bestMatchFor("fr"),
+  createLocaleMatcher: (o) => createLocaleMatcher({ ...configuration, ...o }).bestMatchFor("fr"),
   chooseLocaleForPreferredLanguages: (o) => chooseLocaleForPreferredLanguages({ ...configuration, ...o }, ["fr"]),
   chooseBrowserLocale: (o) => chooseBrowserLocale({ ...configuration, ...o }),
   pluralOperands: (o) => pluralOperands("1", { visibleDecimalPlaces: 1, ...o }).visibleDecimalPlaces,
@@ -235,7 +235,7 @@ const PARAMETER = /** @type {Record<keyof typeof DOORS, string>} */ ({
   loadStringsFromFiles: "loadStringsFromFiles#2",
   loadEntireManifestFromFiles: "loadEntireManifestFromFiles#1",
   readStringsManifest: "readStringsManifest#1",
-  createLocaleNegotiator: "createLocaleNegotiator#0",
+  createLocaleMatcher: "createLocaleMatcher#0",
   chooseLocaleForPreferredLanguages: "chooseLocaleForPreferredLanguages#0",
   chooseBrowserLocale: "chooseBrowserLocale#0",
   pluralOperands: "pluralOperands#1",
@@ -269,9 +269,9 @@ const RECORDS = /** @type {Record<string, string>} */ ({
   "ordinalityForOperands#0": "a tagged value built by pluralOperands()",
   "cardinalityForRange#0": "a language-form constant",
   "cardinalityForRange#1": "a language-form constant",
-  "forLocaleMatch#0": "a LocaleMatch the negotiator returned",
-  "forLanguageRanges#0": "the negotiator createLocaleNegotiator returned",
-  "forAcceptLanguage#0": "the negotiator createLocaleNegotiator returned",
+  "forLocaleMatch#0": "a LocaleMatchResult the negotiator returned",
+  "forLanguageRanges#0": "the negotiator createLocaleMatcher returned",
+  "forAcceptLanguage#0": "the negotiator createLocaleMatcher returned",
   "createSsrStamp#0": "a Strings instance",
   "validateSsrStamp#1": "a Strings instance",
   "validateSsrStamp#0": "a stamp createSsrStamp returned, which refuses an unknown FIELD by its own rule",
@@ -296,8 +296,8 @@ const RECORDS = /** @type {Record<string, string>} */ ({
  * below probes all three doors.
  */
 const REFUSING_ELEMENTS = /** @type {Record<string, string>} */ ({
-  "createLocaleNegotiator().matchForLanguageRanges#0[]": "a language range: `range` and `weight` only",
-  "createLocaleNegotiator().bestMatchForLanguageRanges#0[]": "a language range",
+  "createLocaleMatcher().matchForLanguageRanges#0[]": "a language range: `range` and `weight` only",
+  "createLocaleMatcher().bestMatchForLanguageRanges#0[]": "a language range",
   "forLanguageRanges#1[]": "a language range",
 });
 
@@ -487,7 +487,7 @@ function objectParameters() {
 test("every object-shaped parameter the package publishes is a door probed above or a declared record", () => {
   // **THE DOOR LIST ABOVE WAS WRITTEN BY HAND, AND BY HAND IT MISSED ELEVEN OF TWENTY-THREE.** M-D S33
   // swept twelve doors where `src/` guarded fourteen; the two it missed were found by ablation. On
-  // 2026-09-23 `createLocaleNegotiator` was found ignoring `{ fallbackLocal }` by a person, and
+  // 2026-09-23 `createLocaleMatcher` was found ignoring `{ fallbackLocal }` by a person, and
   // deriving the surface from the declarations named eight more beside it. A hand list goes stale in
   // exactly one direction — a new door is simply not on it — so the set is DERIVED and compared,
   // both ways, and a new object parameter now fails here until someone decides what it is.
@@ -498,7 +498,7 @@ test("every object-shaped parameter the package publishes is a door probed above
   // The third key was `loadStrings#2` until its options were typed, after which it was still FOUND —
   // through the object arm — and so proved nothing about this one. `validateStringsManifest`'s input
   // is `unknown` by design, and the member string says which arm produced it.
-  for (const key of ["createLocaleNegotiator#0", "createStrings().get#2", "validateStringsManifest#0"])
+  for (const key of ["createLocaleMatcher#0", "createStrings().get#2", "validateStringsManifest#0"])
     assert.ok(derived.has(key), `the derivation no longer finds ${key}, so it has gone blind somewhere`);
   assert.equal(derived.get("validateStringsManifest#0")?.members, "<unknown>",
     "the any/unknown arm did not produce validateStringsManifest#0, so it is no longer exercised");
@@ -527,23 +527,23 @@ test("every object-shaped parameter the package publishes is a door probed above
 test("every LocaleConfiguration the library produces passes all three doors that take one", async () => {
   // THE DRIFT GATE FOR THE SECOND COPIES. `lokalized/negotiate` may not import core, so the three
   // accepted members are spelled twice in `src/`. What must never happen is the documented call —
-  // `createLocaleNegotiator(strings.getLocaleConfiguration())` — being refused because a producer
+  // `createLocaleMatcher(strings.getLocaleConfiguration())` — being refused because a producer
   // grew a member the doors were not told about. Every producer is exercised: the direct instance,
   // a lookup-subset load, a whole-manifest load, and `localeConfigurationForManifest`.
   const fr = /** @type {typeof fetch} */ (/** @type {any} */ (async (/** @type {RequestInfo | URL} */ url) =>
     new Response(bodies.get(String(url).split("/").pop() ?? ""))));
   const produced = {
     direct: instance.getLocaleConfiguration(),
-    subset: createStrings({ loaded: await loadStrings(httpManifest, "fr", { fetch: fr }), localeResolver: () => "fr" })
+    subset: createStrings({ loaded: await loadStrings(httpManifest, "fr", { fetch: fr }), localeSupplier: () => "fr" })
       .getLocaleConfiguration(),
-    entire: createStrings({ loaded: await loadEntireManifest(httpManifest, { fetch: fr }), localeResolver: () => "fr" })
+    entire: createStrings({ loaded: await loadEntireManifest(httpManifest, { fetch: fr }), localeSupplier: () => "fr" })
       .getLocaleConfiguration(),
     manifest: localeConfigurationForManifest(httpManifest),
   };
   for (const [source, produce] of Object.entries(produced)) {
-    assert.deepEqual(Object.keys(produce).sort(), [...ACCEPTS.createLocaleNegotiator].sort(),
+    assert.deepEqual(Object.keys(produce).sort(), [...ACCEPTS.createLocaleMatcher].sort(),
       `${source}: a produced LocaleConfiguration carries a member the configuration doors do not accept`);
-    assert.equal(createLocaleNegotiator(produce).bestMatchFor("fr"), "fr", source);
+    assert.equal(createLocaleMatcher(produce).bestMatchFor("fr"), "fr", source);
     assert.equal(chooseLocaleForPreferredLanguages(produce, ["fr"]), "fr", source);
     assert.match(chooseBrowserLocale(produce), /^(en|fr)$/, source);
   }
@@ -569,7 +569,7 @@ const RAW = /** @type {Record<keyof typeof DOORS, (options: unknown) => unknown>
   loadStringsFromFiles: (x) => loadStringsFromFiles(fileManifest, "fr", /** @type {any} */ (x)).then((r) => Object.keys(r.catalogs)),
   loadEntireManifestFromFiles: (x) => loadEntireManifestFromFiles(fileManifest, /** @type {any} */ (x)).then((r) => Object.keys(r.catalogs)),
   readStringsManifest: (x) => readStringsManifest(manifestPath, /** @type {any} */ (x)).then((m) => m.catalogVersion),
-  createLocaleNegotiator: (x) => createLocaleNegotiator(/** @type {any} */ (x)).bestMatchFor("fr"),
+  createLocaleMatcher: (x) => createLocaleMatcher(/** @type {any} */ (x)).bestMatchFor("fr"),
   chooseLocaleForPreferredLanguages: (x) => chooseLocaleForPreferredLanguages(/** @type {any} */ (x), ["fr"]),
   chooseBrowserLocale: (x) => chooseBrowserLocale(/** @type {any} */ (x)),
   pluralOperands: (x) => pluralOperands("1", /** @type {any} */ (x)),
@@ -586,7 +586,7 @@ const RAW = /** @type {Record<keyof typeof DOORS, (options: unknown) => unknown>
  */
 const REFUSES_A_NON_OBJECT_ITSELF = /** @type {Record<string, RegExp>} */ ({
   createStringsManifestFromDirectory: /^threw:ConfigurationError:createStringsManifestFromDirectory requires catalogVersion and fallbackLocale/,
-  createLocaleNegotiator: /^threw:RangeError:A locale configuration is required$/,
+  createLocaleMatcher: /^threw:RangeError:A locale configuration is required$/,
   chooseLocaleForPreferredLanguages: /^threw:RangeError:A locale configuration is required$/,
   chooseBrowserLocale: /^threw:RangeError:A locale configuration is required$/,
 });
@@ -650,13 +650,13 @@ test("a non-object in the options position is refused, and `undefined`, `null` a
 });
 
 test("a language range refuses a member other than `range` and `weight`, at every door that takes a list", () => {
-  const negotiator = createLocaleNegotiator(configuration);
+  const negotiator = createLocaleMatcher(configuration);
   const excludeFrench = [{ range: "fr", weight: 0 }, { range: "en", weight: 0.5 }];
   const misspelled = [{ range: "fr", wieght: 0 }, { range: "en", weight: 0.5 }];
   const doors = {
     matchForLanguageRanges: (/** @type {any} */ ranges) => negotiator.matchForLanguageRanges(ranges).locale,
     bestMatchForLanguageRanges: (/** @type {any} */ ranges) => negotiator.bestMatchForLanguageRanges(ranges),
-    forLanguageRanges: (/** @type {any} */ ranges) => forLanguageRanges(negotiator, ranges).localeMatch.locale,
+    forLanguageRanges: (/** @type {any} */ ranges) => forLanguageRanges(negotiator, ranges).localeMatchResult.locale,
   };
   for (const [name, door] of Object.entries(doors)) {
     // THE CONTROL FIRST: the correct spelling must exclude French, or the refusal below proves
@@ -676,18 +676,18 @@ test("a language range refuses a member other than `range` and `weight`, at ever
   assert.equal(negotiator.bestMatchForAcceptLanguage("fr;q=0, en;q=0.5"), "en");
 });
 
-test("a load door refuses `onWarning` rather than accepting an observer it will never call", async () => {
+test("a load door refuses `warningHandler` rather than accepting an observer it will never call", async () => {
   // A SPECIFIC INSTANCE WORTH ITS OWN ARM. `readStringsFromDirectory`, `parseStrings` and
-  // `createStrings` all take `onWarning`; the manifest and network doors do NOT — they hand their
+  // `createStrings` all take `warningHandler`; the manifest and network doors do NOT — they hand their
   // warnings back on the returned record as `loaded.warnings`. Measured before the refusal landed:
-  // `loadStringsFromDirectory(dir, { onWarning })` fired the observer ZERO times and put two
+  // `loadStringsFromDirectory(dir, { warningHandler })` fired the observer ZERO times and put two
   // warnings on the record, so a caller watching the observer saw a clean load. That is the generic
   // property above with a name a reader will actually type, which is why it is asserted separately.
-  const accepted = await settle(DOORS.readStringsFromDirectory, { onWarning: () => {} });
-  assert.match(accepted, /^ok:/, "the door that DOES take onWarning must still take it");
+  const accepted = await settle(DOORS.readStringsFromDirectory, { warningHandler: () => {} });
+  assert.match(accepted, /^ok:/, "the door that DOES take warningHandler must still take it");
 
-  const refused = await settle(DOORS.loadStringsFromDirectory, { onWarning: () => {} });
-  assert.match(refused, /^threw:ConfigurationError:.*onWarning/,
+  const refused = await settle(DOORS.loadStringsFromDirectory, { warningHandler: () => {} });
+  assert.match(refused, /^threw:ConfigurationError:.*warningHandler/,
     "a load door must refuse an observer it will never call");
 });
 
@@ -800,11 +800,11 @@ test("the two spellings of the load-time limits are a mirror, and each door NAME
 
   // `createStrings` spells it `loadingLimits` …
   assert.match(
-    outcome(() => createStrings({ strings: CATALOG, fallbackLocale: "en", localeResolver: () => "en", loadingLimits: tight })),
+    outcome(() => createStrings({ localizedStringSupplier: () => (CATALOG), fallbackLocale: "en", localeSupplier: () => "en", loadingLimits: tight })),
     /aggregate maximum of 1 translation nodes/,
     "the CORRECT spelling must still bite, or the refusal below proves nothing about the mirror");
   assert.match(
-    outcome(() => createStrings({ strings: CATALOG, fallbackLocale: "en", localeResolver: () => "en", limits: tight })),
+    outcome(() => createStrings({ localizedStringSupplier: () => (CATALOG), fallbackLocale: "en", localeSupplier: () => "en", limits: tight })),
     /`limits` is not the option name here; `loadingLimits` is/);
 
   // … and `parseStrings` spells the same thing `limits`. Each names the other's.
@@ -857,7 +857,7 @@ test("the nested `limits` record is refused the same way, at every door that tak
   // before this landed: `limits: null`, `[]`, `"nonsense"`, `() => {}` and
   // `new Map([["maximumLocalizedStringsFiles", 1]])` were ALL silently accepted as the defaults.
   //
-  // The Map is the one that bites. `createStringsManifestFromDirectory` takes `tiebreakers` as a
+  // The Map is the one that bites. `createStringsManifestFromDirectory` takes `tiebreakerLocalesByLanguageCode` as a
   // plain record OR a ReadonlyMap, so a publisher who learned that from the sibling option and wrote
   // `limits: new Map(...)` got a clean four-file manifest with their budget dropped — while the
   // IDENTICAL budget as a plain object refused. One door, two opposite answers.

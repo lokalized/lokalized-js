@@ -34,7 +34,7 @@ const manifest = () => ({
   // SORTED ARRAY ELEMENTS pass every test here. Measured: with `["en", "en-001"]` that ablation
   // changed nothing; with this spelling it turns the pinned bytes red. Covering the array path is
   // not the same as discriminating the order within it.
-  tiebreakers: { en: ["en-001", "en"] },
+  tiebreakerLocalesByLanguageCode: { en: ["en-001", "en"] },
 });
 
 const fingerprintOf = (m) => computeCatalogIdentity(catalogIdentityInputFor(m)).catalogFingerprint;
@@ -47,10 +47,10 @@ test("the fingerprint is pinned to exact bytes, not merely stable", () => {
     new TextDecoder().decode(catalogIdentityBytes(catalogIdentityInputFor(manifest()))),
     '{"catalogVersion":"2026.09.10","formatVersion":1,' +
       `"localeToSha256":{"en":"${DIGEST_A}","fr":"${DIGEST_B}"},` +
-      '"resolvedFallbackLocale":"en","tiebreakers":{"en":["en-001","en"]}}',
+      '"resolvedFallbackLocale":"en","tiebreakerLocalesByLanguageCode":{"en":["en-001","en"]}}',
   );
   assert.equal(fingerprintOf(manifest()),
-    "8d3d2323154e6b97124761320d6065bc1e38630a9c317ab15d73a5b6591c3c6d");
+    "380d2b4b8854410af19453780a54c737eb3c709405b33bb2a7469b77adecde94");
 });
 
 test("EXCLUDED: transport and provenance fields do not move the fingerprint", () => {
@@ -94,8 +94,8 @@ test("INCLUDED: the controls that must move it", () => {
   assert.notEqual(fingerprintOf(otherBody), baseline, "a changed translation body must change identity");
 
   const otherTiebreakers = manifest();
-  otherTiebreakers.tiebreakers = { en: ["en"] };
-  assert.notEqual(fingerprintOf(otherTiebreakers), baseline, "tiebreakers are part of identity");
+  otherTiebreakers.tiebreakerLocalesByLanguageCode = { en: ["en"] };
+  assert.notEqual(fingerprintOf(otherTiebreakers), baseline, "tiebreakerLocalesByLanguageCode are part of identity");
 
   const extraLocale = manifest();
   extraLocale.files.de = { url: "https://cdn.example/v1/de.json", sha256: "d".repeat(64) };

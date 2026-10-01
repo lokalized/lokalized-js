@@ -77,10 +77,10 @@ export const CONSTRUCT_REFUSAL_ADAPTATIONS = [
     javaType: "java.lang.IllegalArgumentException",
     javaMessage: "You must specify a 'localizedStringSupplier' when creating a DefaultStrings instance",
     jsType: "TypeError",
-    jsMessage: "createStrings({ strings }) is required: supply a record or a Map of locale tag to catalog",
+    jsMessage: "createStrings({ localizedStringSupplier }) is required: supply a function returning a record or a Map of locale tag to catalog",
     why:
       "No catalog source at all. Java's source is a SUPPLIER of the catalog map; `createStrings` " +
-      "takes the map itself, so the JS counterpart of 'no supplier' is an absent `strings` option. " +
+      "uses the same supplier callback, so an absent `localizedStringSupplier` is the same missing source. " +
       "TypeError because a required option is missing, which is a shape mistake.",
   },
   {
@@ -90,7 +90,7 @@ export const CONSTRUCT_REFUSAL_ADAPTATIONS = [
       "You must specify exactly one of 'localeSupplier' or 'localeMatchSupplier' when creating a DefaultStrings instance",
     jsType: "RangeError",
     jsMessage:
-      "createStrings requires exactly one of 'localeResolver' or 'localeMatchResolver'; received none",
+      "createStrings requires exactly one of 'localeSupplier' or 'localeMatchSupplier'; received none",
     why:
       "The both-ABSENT arm of Java's `(localeSupplier == null) == (localeMatchSupplier == null)`, " +
       "member for member since the constant `locale` option was removed before 1.0.0: the message " +
@@ -103,7 +103,7 @@ export const CONSTRUCT_REFUSAL_ADAPTATIONS = [
     javaType: "java.lang.IllegalArgumentException",
     javaMessage: "The 'localizedStringSupplier' returned null",
     jsType: "TypeError",
-    jsMessage: "createStrings({ strings }) was null: supply a record or a Map of locale tag to catalog",
+    jsMessage: "localizedStringSupplier returned null: supply a record or a Map of locale tag to catalog",
     why:
       "Java's supplier answered null, which is NOT the same state as supplying no supplier — the " +
       "corpus keeps the two rows apart and so does the port: an omitted option is a caller who " +
@@ -254,7 +254,7 @@ export const CONSTRUCT_REFUSAL_ADAPTATIONS = [
       "locale[s]: [en, en-US]",
     jsType: "RangeError",
     jsMessage:
-      "You must specify tiebreaker locales via createStrings({ tiebreakers }) to resolve " +
+      "You must specify tiebreaker locales via createStrings({ tiebreakerLocalesByLanguageCode }) to resolve " +
       "ambiguity for language code 'en' because localized strings exist for the following " +
       "locale[s]: [en, en-US]",
     why:
@@ -272,7 +272,7 @@ export const CONSTRUCT_REFUSAL_ADAPTATIONS = [
     jsType: "RangeError",
     jsMessage:
       "Fallback locale 'und' is canonically equivalent to multiple loaded locales " +
-      "[und-bokmal, und-nynorsk]; configure createStrings({ tiebreakers }) to choose one",
+      "[und-bokmal, und-nynorsk]; configure createStrings({ tiebreakerLocalesByLanguageCode }) to choose one",
     why:
       "The same one-word substitution as `:426`, for the same reason. The locale list is Java's " +
       "verbatim and in Java's order, which is what makes the row discriminate the SET as well as " +

@@ -7,7 +7,7 @@
  * "abort rejects and is never converted into partial success" asserts that the outcome is an `Error`
  * which is not a `complete: false` object — and a loader that funnelled an aborted read into the
  * ordinary per-file failure path satisfies that exactly, because such a rejection is an `Error` too,
- * a `StringsLoadingError` a caller cannot tell from a 503. That probe also plans two files, so it can
+ * a `LocalizedStringLoadingError` a caller cannot tell from a 503. That probe also plans two files, so it can
  * say nothing about QUEUED work, and it never looks at the transport, so it cannot tell a loader that
  * forwarded the caller's signal from one that raced the signal privately and left every request it
  * opened running. Those are three separate propositions and the returned promise can only see one.
@@ -49,7 +49,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 
-import { loadEntireManifest, loadStrings, StringsLoadingError } from "../src/load/fetch-loader.js";
+import { loadEntireManifest, loadStrings, LocalizedStringLoadingError } from "../src/load/fetch-loader.js";
 import { fetchSet } from "../src/load/planning.js";
 import {
   createStringsManifestFromDirectory, loadEntireManifestFromFiles, loadStringsFromDirectory,
@@ -365,7 +365,7 @@ const fingerprint = (/** @type {any} */ error) => JSON.stringify([
 /**
  * One positive abort marker that cannot be reached through a failure row.
  *
- * Plan 6.2:2074-2077 enumerates the six kinds that reject with `StringsLoadingError` and abort is not
+ * Plan 6.2:2074-2077 enumerates the six kinds that reject with `LocalizedStringLoadingError` and abort is not
  * among them; the error table at plan 1114-1120 has no abort row either. So the class of an abort
  * rejection is unspecified and is NOT asserted — what is asserted is that the abort is reachable from
  * the rejection without going through the ordinary `failures` list, which is exactly what an
@@ -373,7 +373,7 @@ const fingerprint = (/** @type {any} */ error) => JSON.stringify([
  */
 const abortIsReachable = (/** @type {any} */ error, /** @type {AbortController} */ controller) =>
   error?.name === "AbortError" || error?.code === "ABORTED" ||
-  (error?.cause === controller.signal.reason && !(error instanceof StringsLoadingError));
+  (error?.cause === controller.signal.reason && !(error instanceof LocalizedStringLoadingError));
 
 /**
  * Bounded, and it FAILS printing the ledger.
@@ -474,8 +474,8 @@ test("C22.1 an abort rejection is structurally unlike the rejection an ordinary 
     const ordinary = await rejectionOf(
       capture(door.entire(door.manifestOf(source), { signal: neverFires.signal }, ordinaryStub)),
       `${door.name} ordinary failure`);
-    assert.ok(ordinary instanceof StringsLoadingError,
-      `${door.name}: expected a StringsLoadingError, got ${describe(ordinary)}`);
+    assert.ok(ordinary instanceof LocalizedStringLoadingError,
+      `${door.name}: expected a LocalizedStringLoadingError, got ${describe(ordinary)}`);
     assert.deepEqual([...ordinary.failures].map((f) => [f.locale, f.stage]), [["fr", door.stage]],
       `${door.name}: the baseline is one per-file failure for the outstanding file`);
 
@@ -749,7 +749,7 @@ test("C22.5 an aborted Fetch response body is released rather than left open", a
   const erroring = transportStub(source, { fr: "error-mid-body" });
   const failed = await rejectionOf(
     capture(door.entire(door.manifestOf(source), {}, erroring)), "C22.5 mid-body error");
-  assert.ok(failed instanceof StringsLoadingError, describe(failed));
+  assert.ok(failed instanceof LocalizedStringLoadingError, describe(failed));
   assert.deepEqual([...failed.failures].map((f) => [f.locale, f.stage]), [["fr", "fetch"]]);
   assert.match(String(failed.failures[0].cause?.message), new RegExp(ORDINARY_BODY_ERROR));
 

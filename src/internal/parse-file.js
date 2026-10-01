@@ -170,7 +170,7 @@ export function parseStringsWithSession(input, options, session) {
     emit: (warning) => {
       session.warn(warning, (admitted) => {
         warnings.push(/** @type {LocalizedStringWarning} */ (admitted));
-        options.onWarning?.(/** @type {LocalizedStringWarning} */ (admitted));
+        options.warningHandler?.(/** @type {LocalizedStringWarning} */ (admitted));
       });
     },
   });

@@ -96,17 +96,17 @@ const controlResolver = recordingResolver();
 
 const common = {
   fallbackLocale: "en",
-  localeResolver: () => "en",
+  localeSupplier: () => "en",
   pluralData: { ordinal: ordinalData, ranges: cardinalRangeData },
 };
 
 /** Only `en` is loaded, so a `cy` request is SERVED BY the English catalog. */
-const donor = createStrings({ ...common, strings: { en: CATALOG }, phoneticResolver: donorResolver.resolve });
+const donor = createStrings({ ...common, localizedStringSupplier: () => ({ en: CATALOG }), phoneticResolver: donorResolver.resolve });
 
 /** The same request, served by a `cy` catalog: the control that must move. */
 const control = createStrings({
   ...common,
-  strings: { en: CATALOG, cy: CATALOG },
+  localizedStringSupplier: () => ({ en: CATALOG, cy: CATALOG }),
   phoneticResolver: controlResolver.resolve,
 });
 
@@ -150,13 +150,13 @@ describe("the evaluation locale is the supplying catalog's — every consumer", 
     // an ENGLISH request served by an Arabic catalog IS. Nothing about the request decides it.
     const ltrDonor = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: { Greeting: "Hello, {{name}}" }, ar: { "Locale.Marker": "ar" } },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: { Greeting: "Hello, {{name}}" }, ar: { "Locale.Marker": "ar" } }),
     });
     const rtlDonor = createStrings({
       fallbackLocale: "ar",
-      localeResolver: () => "en",
-      strings: { ar: { Greeting: "AR {{name}}" }, en: { "Locale.Marker": "en" } },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ ar: { Greeting: "AR {{name}}" }, en: { "Locale.Marker": "en" } }),
     });
 
     assert.equal(ltrDonor.get("Greeting", { name: "Sarah" }, { locale: "ar" }), "Hello, Sarah");

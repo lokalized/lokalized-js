@@ -159,7 +159,7 @@ const READ_MANIFEST_OPTIONS = /** @type {const} */ (["limits", "signal"]);
  */
 const DIRECTORY_DOOR_OPTIONS = /** @type {const} */ ([
   "catalogVersion", "fallbackLocale", "limits", "maximumDiscoveryEntries", "partialFailure",
-  "readFile", "signal", "tiebreakers",
+  "readFile", "signal", "tiebreakerLocalesByLanguageCode",
 ]);
 
 /** `fetch` and `request` are refused by name at these doors, with a remedy; see FILE_TRANSPORT. */
@@ -250,7 +250,7 @@ export async function loadEntireManifestFromFiles(manifest, options = {}) {
  * @typedef {object} LoadStringsFromDirectoryOptions
  * @property {string} catalogVersion
  * @property {string} fallbackLocale
- * @property {Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]>} [tiebreakers]
+ * @property {Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]>} [tiebreakerLocalesByLanguageCode]
  * @property {import("../internal/catalog.js").ParseLimits} [limits]
  * @property {number} [maximumDiscoveryEntries]
  * @property {(url: string, signal?: AbortSignal) => Promise<Uint8Array | AsyncIterable<Uint8Array>>} [readFile]
@@ -312,7 +312,7 @@ export async function loadStringsFromDirectory(directory, options) {
   const manifest = await createStringsManifestFromDirectory(path, {
     catalogVersion: options.catalogVersion,
     fallbackLocale: options.fallbackLocale,
-    ...(options.tiebreakers === undefined ? {} : { tiebreakers: options.tiebreakers }),
+    ...(options.tiebreakerLocalesByLanguageCode === undefined ? {} : { tiebreakerLocalesByLanguageCode: options.tiebreakerLocalesByLanguageCode }),
     ...(options.limits === undefined ? {} : { limits: options.limits }),
     ...(options.maximumDiscoveryEntries === undefined
       ? {} : { maximumDiscoveryEntries: options.maximumDiscoveryEntries }),

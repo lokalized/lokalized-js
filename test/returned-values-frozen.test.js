@@ -11,7 +11,7 @@ import {
 	localeConfigurationForManifest, parseStringsManifest, validateStringsManifest,
 } from "../src/load/manifest.js";
 import {
-	createLocaleNegotiator, forAcceptLanguage, forLanguageRanges, parseLanguageRanges,
+	createLocaleMatcher, forAcceptLanguage, forLanguageRanges, parseLanguageRanges,
 } from "../src/negotiate/index.js";
 import {
 	createStringsManifestFromDirectory, loadEntireManifestFromFiles, loadStringsFromDirectory,
@@ -26,18 +26,18 @@ import { createSsrStamp } from "../src/ssr/index.js";
  * ONE LEVEL DOWN, which is where the requirement was false.
  *
  * Top-level returns were frozen and had been for milestones. What nothing had ever walked is what
- * hangs off them: `LocaleMatch` reached a caller with `consideredLocales`, `languageRange` and
+ * hangs off them: `LocaleMatchResult` reached a caller with `consideredLocales`, `languageRange` and
  * `requestedLanguageRanges` (and the `{range, weight}` pairs inside it) all writable, and
  * `parseLanguageRanges` returned a plain array of plain objects. 57 reachable unfrozen values
  * across the public accessors, measured before the repair; 0 after.
  *
  * **THE DEFECT HAD TEETH AND THIS IS WHERE THEY WERE, because it is not a per-call copy.** A
- * supplied `{ localeMatch }` is carried through BY REFERENCE into every result derived from it —
+ * supplied `{ localeMatchResult }` is carried through BY REFERENCE into every result derived from it —
  * the negotiate-once-render-many shape the shipped examples and the README's SSR section both
  * use. Measured: two renders from one supplied match share the match object AND its
  * `consideredLocales` array with the negotiator's own return, so one component writing to the
  * array it was handed retroactively changed an ALREADY-RETURNED sibling result and made the next
- * render throw `get({ localeMatch }) supplied a result for different supported locales` — a
+ * render throw `get({ localeMatchResult }) supplied a result for different supported locales` — a
  * failure arbitrarily far from its cause. `asserts a supplied match cannot be poisoned in place`
  * below is that scenario, and it is the arm that fails first if the freeze is reverted.
  *
@@ -108,9 +108,9 @@ async function publicReturns() {
 	add("readStringsFromDirectory().warnings", warnings);
 
 	const strings = createStrings(
-		{ strings: catalogs, localeResolver: () => "en", fallbackLocale: "en", tiebreakers: TIEBREAKERS });
+		{ localizedStringSupplier: () => (catalogs), localeSupplier: () => "en", fallbackLocale: "en", tiebreakerLocalesByLanguageCode: TIEBREAKERS });
 
-	// Each `getResult` arm reaches a DIFFERENT `localeMatch` shape: the automatic direct match, a
+	// Each `getResult` arm reaches a DIFFERENT `localeMatchResult` shape: the automatic direct match, a
 	// per-call locale's, a failure's, and a supplied whole-list match's. Before the repair all four
 	// carried the same three unfrozen members, so any one of them witnesses the defect — but a
 	// later narrowing that froze only one path would pass on a single arm.
@@ -128,7 +128,7 @@ async function publicReturns() {
 	add("getDirectLocaleContext()", strings.getDirectLocaleContext("fr-CA"));
 	add("forLocale()", forLocale("fr-CA"));
 
-	const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
+	const negotiator = createLocaleMatcher(strings.getLocaleConfiguration());
 	const ranges = parseLanguageRanges("fr-CH;q=0.9, en;q=0.4");
 	const match = negotiator.matchForLanguageRanges(ranges);
 	add("parseLanguageRanges()", ranges);
@@ -139,13 +139,13 @@ async function publicReturns() {
 	add("forLocaleMatch()", forLocaleMatch(match));
 	add("getResult(supplied match)", strings.getResult("App.Title", {}, forLocaleMatch(match)));
 	// The unmatched arm: `forAcceptLanguage` answers a diagnostic whose own `locale` is null, which
-	// is a different `LocaleMatch` construction site (`noMatch()`) from every arm above.
+	// is a different `LocaleMatchResult` construction site (`noMatch()`) from every arm above.
 	add("forAcceptLanguage(unmatched)", forAcceptLanguage(negotiator, "de"));
 
 	add("parseStrings()", parseStrings(JSON.stringify({ K: "v" }), { locale: "en" }));
 
 	const manifest = await createStringsManifestFromDirectory(
-		directory, { catalogVersion: "1", fallbackLocale: "en", tiebreakers: TIEBREAKERS });
+		directory, { catalogVersion: "1", fallbackLocale: "en", tiebreakerLocalesByLanguageCode: TIEBREAKERS });
 	// The manifest is written OUTSIDE the catalog directory on purpose: `readStringsFromDirectory`
 	// refuses `manifest.json` as a filename that is not a language tag, so dropping it beside the
 	// catalogs would make every later arm in this file fail for an unrelated reason.
@@ -163,26 +163,26 @@ async function publicReturns() {
 		resolvedFallbackLocale: manifest.fallbackLocale,
 		localeToSha256: Object.fromEntries(
 			Object.entries(manifest.files).map(([locale, file]) => [locale, file.sha256])),
-		tiebreakers: manifest.tiebreakers,
+		tiebreakerLocalesByLanguageCode: manifest.tiebreakerLocalesByLanguageCode,
 	}));
 	add("chain()", chain(manifest, "fr-CA"));
 	add("fetchSet()", fetchSet(manifest, "fr-CA"));
 
 	const whole = await loadStringsFromDirectory(
-		directory, { catalogVersion: "1", fallbackLocale: "en", tiebreakers: TIEBREAKERS });
+		directory, { catalogVersion: "1", fallbackLocale: "en", tiebreakerLocalesByLanguageCode: TIEBREAKERS });
 	add("loadStringsFromDirectory()", whole);
 	add("loadStringsFromFiles()", await loadStringsFromFiles(manifest, "fr-CA"));
 	add("loadEntireManifestFromFiles()", await loadEntireManifestFromFiles(manifest));
 
-	const loaded = createStrings({ loaded: whole, localeResolver: () => "en" });
+	const loaded = createStrings({ loaded: whole, localeSupplier: () => "en" });
 	add("loaded: getLoadVerification()", loaded.getLoadVerification());
 	add("loaded: getCatalogIdentity()", loaded.getCatalogIdentity());
 	add("loaded: getLocaleConfiguration()", loaded.getLocaleConfiguration());
 	add("loaded: getWarnings()", loaded.getWarnings());
 
-	const loadedNegotiator = createLocaleNegotiator(loaded.getLocaleConfiguration());
+	const loadedNegotiator = createLocaleMatcher(loaded.getLocaleConfiguration());
 	add("createSsrStamp()", createSsrStamp(
-		loaded, { kind: "locale-match", localeMatch: loadedNegotiator.matchFor("fr-CA") }));
+		loaded, { kind: "locale-match", localeMatchResult: loadedNegotiator.matchFor("fr-CA") }));
 
 	return returns;
 }
@@ -216,7 +216,7 @@ test("the walk DESCENDS: an unfrozen value under a frozen record is caught", () 
 	// the arm that matters is not "does it notice an unfrozen object" but "does it notice one
 	// behind a frozen one", at each depth the real defect occupied.
 	const planted = Object.freeze({
-		localeMatch: Object.freeze({
+		localeMatchResult: Object.freeze({
 			consideredLocales: ["en", "fr"],                       // depth 2, the real defect
 			requestedLanguageRanges: Object.freeze([{ range: "fr", weight: 1 }]), // depth 3, ditto
 			languageRange: { range: "fr", weight: 1 },             // depth 2, ditto
@@ -226,15 +226,15 @@ test("the walk DESCENDS: an unfrozen value under a frozen record is caught", () 
 	const { unfrozen, visited } = findUnfrozen(planted, "planted");
 	assert.ok(visited >= 6, "the planted fixture itself is not being walked");
 	assert.deepEqual(unfrozen.sort(), [
-		"planted.localeMatch.consideredLocales",
-		"planted.localeMatch.languageRange",
-		"planted.localeMatch.requestedLanguageRanges[0]",
+		"planted.localeMatchResult.consideredLocales",
+		"planted.localeMatchResult.languageRange",
+		"planted.localeMatchResult.requestedLanguageRanges[0]",
 	]);
 
 	// And the mirror: an all-frozen fixture of the same shape must report NOTHING, or the detector
 	// is answering "unfrozen" to everything and the arm above proves nothing.
 	const clean = Object.freeze({
-		localeMatch: Object.freeze({
+		localeMatchResult: Object.freeze({
 			consideredLocales: Object.freeze(["en", "fr"]),
 			requestedLanguageRanges: Object.freeze([Object.freeze({ range: "fr", weight: 1 })]),
 			languageRange: Object.freeze({ range: "fr", weight: 1 }),
@@ -250,8 +250,8 @@ test("a supplied match cannot be poisoned in place", async () => {
 	// already-returned `second` changed underneath its holder, and the third render threw.
 	const { catalogs } = readStringsFromDirectory(directory);
 	const strings = createStrings(
-		{ strings: catalogs, localeResolver: () => "en", fallbackLocale: "en", tiebreakers: TIEBREAKERS });
-	const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
+		{ localizedStringSupplier: () => (catalogs), localeSupplier: () => "en", fallbackLocale: "en", tiebreakerLocalesByLanguageCode: TIEBREAKERS });
+	const negotiator = createLocaleMatcher(strings.getLocaleConfiguration());
 
 	const match = negotiator.matchFor("fr-CH");
 	const options = forLocaleMatch(match);
@@ -261,18 +261,18 @@ test("a supplied match cannot be poisoned in place", async () => {
 	// The sharing is the premise, and it is asserted rather than assumed: if a future change made
 	// this a per-call copy, the writes below would stop being interesting and this arm would be
 	// silently testing nothing.
-	assert.equal(first.localeMatch, second.localeMatch, "the premise is gone: the match is no longer shared");
-	assert.equal(first.localeMatch.consideredLocales, match.consideredLocales);
+	assert.equal(first.localeMatchResult, second.localeMatchResult, "the premise is gone: the match is no longer shared");
+	assert.equal(first.localeMatchResult.consideredLocales, match.consideredLocales);
 
-	assert.throws(() => first.localeMatch.consideredLocales.push("zz-injected"), TypeError);
-	assert.throws(() => { first.localeMatch.consideredLocales[0] = "overwritten"; }, TypeError);
-	assert.throws(() => { first.localeMatch.locale = "hijacked"; }, TypeError);
-	assert.throws(() => first.localeMatch.requestedLanguageRanges.push({ range: "zz", weight: 1 }), TypeError);
+	assert.throws(() => first.localeMatchResult.consideredLocales.push("zz-injected"), TypeError);
+	assert.throws(() => { first.localeMatchResult.consideredLocales[0] = "overwritten"; }, TypeError);
+	assert.throws(() => { first.localeMatchResult.locale = "hijacked"; }, TypeError);
+	assert.throws(() => first.localeMatchResult.requestedLanguageRanges.push({ range: "zz", weight: 1 }), TypeError);
 
 	// …and the third render, which used to throw `supplied a result for different supported
 	// locales` because a sibling had grown the shared array, still answers what the first did.
 	assert.equal(strings.getResult("App.Title", {}, options).translation, first.translation);
-	assert.deepEqual([...second.localeMatch.consideredLocales], [...match.consideredLocales]);
+	assert.deepEqual([...second.localeMatchResult.consideredLocales], [...match.consideredLocales]);
 });
 
 test("parseLanguageRanges hands back a list the caller cannot reorder", () => {

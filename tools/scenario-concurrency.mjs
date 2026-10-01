@@ -30,7 +30,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createStrings, forLocale, forLocaleMatch } from "../src/core/index.js";
-import { createLocaleNegotiator, forAcceptLanguage } from "../src/negotiate/index.js";
+import { createLocaleMatcher, forAcceptLanguage } from "../src/negotiate/index.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const baselinePath = join(root, "measurements/scenario-concurrency.json");
@@ -68,7 +68,7 @@ function catalogFor(/** @type {string} */ locale) {
 const strings = Object.fromEntries(RECIPE.locales.map((locale) => [locale, catalogFor(locale)]));
 const fixtureSha256 = sha256(JSON.stringify(strings));
 
-const BASE = Object.freeze({ strings, fallbackLocale: "en" });
+const BASE = Object.freeze({ localizedStringSupplier: () => (strings), fallbackLocale: "en" });
 /** Request i asks for locale i % locales.length — deterministic, and every locale is exercised. */
 const localeFor = (/** @type {number} */ i) => RECIPE.locales[i % RECIPE.locales.length];
 const expected = (/** @type {number} */ i) => `${localeFor(i)}:0`;
@@ -96,15 +96,15 @@ async function request(/** @type {number} */ i, /** @type {(index: number) => Pr
   return seen;
 }
 
-const shared = build({ localeResolver: () => "en" });
-const negotiator = createLocaleNegotiator(shared.getLocaleConfiguration());
-const matchFor = (/** @type {number} */ i) => forAcceptLanguage(negotiator, localeFor(i)).localeMatch;
+const shared = build({ localeSupplier: () => "en" });
+const negotiator = createLocaleMatcher(shared.getLocaleConfiguration());
+const matchFor = (/** @type {number} */ i) => forAcceptLanguage(negotiator, localeFor(i)).localeMatchResult;
 const matches = RECIPE.locales.map((_, i) => matchFor(i));
 
 /** The shapes, each a function from a request index to the string it renders. */
 const SHAPES = {
   "rebuild-per-request": async (/** @type {number} */ i) => {
-    const instance = build({ localeResolver: () => localeFor(i) });
+    const instance = build({ localeSupplier: () => localeFor(i) });
     await yieldTurns(1);
     return instance.get("K0");
   },
@@ -159,7 +159,7 @@ if (!negativeWrong)
 // and skipped entirely when the call carries its own locale.
 resolverCalls = 0;
 const ambient = { locale: "en" };
-const resolved = build({ localeResolver: () => { resolverCalls += 1; return ambient.locale; } });
+const resolved = build({ localeSupplier: () => { resolverCalls += 1; return ambient.locale; } });
 const atConstruction = resolverCalls;
 resolved.getSupportedLocales();
 const afterInspection = resolverCalls;

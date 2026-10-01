@@ -60,18 +60,18 @@ export function catalogsFor(variant) {
 }
 
 /**
- * A fixture's digest: the catalogs AS HANDED OVER plus the tiebreakers. Serialized in insertion order
+ * A fixture's digest: the catalogs AS HANDED OVER plus the tiebreakerLocalesByLanguageCode. Serialized in insertion order
  * on purpose — for the raw-text variant the bytes are the input. One rule for the digest a variant
  * DECLARES and the digest of what the harness HANDS, so the two cannot be computed two ways.
- * @param {{ strings?: unknown, tiebreakers?: unknown }} options
+ * @param {{ strings?: unknown, tiebreakerLocalesByLanguageCode?: unknown }} options
  */
-const handedFixtureSha256 = ({ strings, tiebreakers }) => sha256(JSON.stringify({ strings, tiebreakers }));
+const handedFixtureSha256 = ({ strings, tiebreakerLocalesByLanguageCode }) => sha256(JSON.stringify({ strings, tiebreakerLocalesByLanguageCode }));
 
 /**
  * The fixture's digest for one variant.
  * @param {{ catalogInput: string }} variant
  */
-export const fixtureSha256 = (variant) => handedFixtureSha256({ strings: catalogsFor(variant), tiebreakers: TIEBREAKERS });
+export const fixtureSha256 = (variant) => handedFixtureSha256({ strings: catalogsFor(variant), tiebreakerLocalesByLanguageCode: TIEBREAKERS });
 
 /**
  * THE FROZEN RECIPE — plan 9.2:2787-2797: each scenario names its import specifier, fixed fixture
@@ -106,7 +106,9 @@ export const RECIPE = Object.freeze({
   // supplier). The SAME lookup locale is now answered by a resolver, so construction is handed a
   // function where it was handed a string — a changed method, hence a revision, with the fixture, the
   // render and every window unchanged.
-  revision: 2,
+  // 3 (2026-09-30): shared API names change the construction keys and harness bytes
+  // 4 (2026-09-30): catalogs are supplied once during construction, matching Java
+  revision: 4,
   description: "M2 static integration: the root with a fixed small embedded raw-text catalog, and " +
     "lokalized/core with its fixed already-parsed equivalent",
   freeze: "LATE, and stated rather than smoothed over. Plan 9.2:2806 has 0a owned by M2 and frozen at M0. M0 " +
@@ -121,20 +123,20 @@ export const RECIPE = Object.freeze({
       specifier: "lokalized",
       entry: "src/index.js",
       catalogInput: "raw-text",
-      fixtureSha256: "918cac740e657e54d1fa40262c4338a7b88d35139e831b5486a84ed1386b7d4f",
+      fixtureSha256: "f880b1003f9871a7b20cefa9768c5363a4a80d129a5856994e2d59a0ad1c5b08",
     }),
     Object.freeze({
       label: "core + parsed equivalent",
       specifier: "lokalized/core",
       entry: "src/core/index.js",
       catalogInput: "parsed",
-      fixtureSha256: "f0f95c3ef8f2ac2e4d261d3d80258b8c4a49141c7678d54f70e0a02d5456c279",
+      fixtureSha256: "d8f29369a09f0fdd101caac13436635ebc2acd13fd1aa2e32b624345de6b9bb8",
     }),
   ]),
-  // `localeResolverAnswers` is the tag the harness's `localeResolver` returns: a recipe is a declared
+  // `localeSupplierAnswers` is the tag the harness's `localeSupplier` returns: a recipe is a declared
   // OBJECT and a function has no digestible value, so the recipe names the answer and the harness
   // builds the function (`handedProblems` calls it back to compare).
-  construction: Object.freeze({ fallbackLocale: "en", localeResolverAnswers: "en-AU" }),
+  construction: Object.freeze({ fallbackLocale: "en", localeSupplierAnswers: "en-AU" }),
   // THE RENDER IS CHECKED, not only printed: a measurement whose first render came back as anything
   // else — the key, say — timed a failure path, and is refused rather than recorded.
   render: Object.freeze({ key: "I read {{bookCount}} books", values: Object.freeze({ bookCount: 3 }), expected: "I read 3 books" }),
@@ -187,6 +189,8 @@ export const recipeSha256 = sha256(JSON.stringify(RECIPE));
 export const RECIPE_DIGESTS = Object.freeze({
   1: "5dd067021ed31781ed17eb165e34f7246e80a393fb1f0efccc7e6e679c332d0d",
   2: "c986ed5096eba80ad937d426016e3afa0e763a6807d986d03d5ebe39a77d4841",
+  3: "7fc4c3557e399a9394abf344d089ed0833389a75954f06bd81a7afc108aaa5fd",
+  4: "36ee91632173a9ebb1bfacc91226b44d2089457b6836f5ab80448a656554b2a6",
 });
 
 /** The recipe's own consistency, which holds or fails whatever the record says. */
@@ -231,14 +235,15 @@ const sortedJson = (/** @type {object} */ value) =>
 export function handedProblems(variant, options) {
   if (!options || typeof options !== "object")
     return [`${variant.label}: the harness never handed createStrings its options, so nothing was measured`];
-  const { strings, tiebreakers, localeResolver, ...others } = /** @type {Record<string, unknown>} */ (options);
+  const { localizedStringSupplier, tiebreakerLocalesByLanguageCode, localeSupplier, ...others } = /** @type {Record<string, unknown>} */ (options);
   const rest = {
     ...others,
-    localeResolverAnswers: typeof localeResolver === "function" ? localeResolver() : localeResolver,
+    localeSupplierAnswers: typeof localeSupplier === "function" ? localeSupplier() : localeSupplier,
   };
   /** @type {string[]} */
   const problems = [];
-  const handed = handedFixtureSha256({ strings, tiebreakers });
+  const strings = typeof localizedStringSupplier === "function" ? localizedStringSupplier() : localizedStringSupplier;
+  const handed = handedFixtureSha256({ strings, tiebreakerLocalesByLanguageCode });
   if (handed !== variant.fixtureSha256)
     problems.push(`${variant.label}: the harness handed createStrings a fixture hashing ${handed.slice(0, 12)}, not the ` +
       `${variant.fixtureSha256.slice(0, 12)} the recipe declares for its ${variant.catalogInput} input`);

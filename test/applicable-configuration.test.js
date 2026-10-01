@@ -38,19 +38,19 @@ const frFR = catalogFor("fr-FR");
 /**
  * A `LoadedStrings` over a declared manifest, with only some of it actually loaded.
  * @param {{ declared: string[], catalogs: Record<string, any>, coverage: any, plan: string[],
- *   complete?: boolean, tiebreakers?: any }} shape
+ *   complete?: boolean, tiebreakerLocalesByLanguageCode?: any }} shape
  */
 function loaded(shape) {
   const pinned = pinnedProvenance();
   const complete = shape.complete ?? true;
   return /** @type {any} */ ({
     catalogs: shape.catalogs,
-    tiebreakers: shape.tiebreakers ?? {},
+    tiebreakerLocalesByLanguageCode: shape.tiebreakerLocalesByLanguageCode ?? {},
     fallbackLocale: "en",
     manifestLocaleConfiguration: {
       fallbackLocale: "en",
       supportedLocales: [...shape.declared].sort(),
-      tiebreakers: shape.tiebreakers ?? {},
+      tiebreakerLocalesByLanguageCode: shape.tiebreakerLocalesByLanguageCode ?? {},
     },
     catalogIdentity: { catalogVersion: "v1", catalogFingerprint: "a".repeat(64) },
     ...BUILD_IDENTITY,
@@ -86,9 +86,9 @@ test("the automatic diagnostic is computed over the FULL manifest, including a f
   // The control is a DIRECT instance holding all three catalogs, whose diagnostic is gated by the
   // corpus today. Pinning against it rather than against a hand-written expectation is what makes
   // this a comparison instead of a transcription.
-  const partial = createStrings({ loaded: partialWhole(), localeResolver: () => "de" });
+  const partial = createStrings({ loaded: partialWhole(), localeSupplier: () => "de" });
   const control = createStrings({
-    strings: { de: catalogFor("de"), en, fr }, fallbackLocale: "en", localeResolver: () => "de",
+    localizedStringSupplier: () => ({ de: catalogFor("de"), en, fr }), fallbackLocale: "en", localeSupplier: () => "de",
   });
 
   const sameFields = (/** @type {any} */ a, /** @type {any} */ b) => {
@@ -101,10 +101,10 @@ test("the automatic diagnostic is computed over the FULL manifest, including a f
   // THREE DOORS, because plan :864 lets the constant instance locale CACHE its diagnostic — an
   // implementation that widened only the recompute paths is right at two of them and stale at the
   // third, and a fixture probing one door cannot tell.
-  const viaContext = /** @type {any} */ (partial.getDirectLocaleContext("de")).localeMatch;
-  const viaConstant = /** @type {any} */ (partial.getResult("Hi")).localeMatch;
-  const viaPerCall = /** @type {any} */ (partial.getResult("Hi", undefined, forLocale("de"))).localeMatch;
-  const expected = /** @type {any} */ (control.getDirectLocaleContext("de")).localeMatch;
+  const viaContext = /** @type {any} */ (partial.getDirectLocaleContext("de")).localeMatchResult;
+  const viaConstant = /** @type {any} */ (partial.getResult("Hi")).localeMatchResult;
+  const viaPerCall = /** @type {any} */ (partial.getResult("Hi", undefined, forLocale("de"))).localeMatchResult;
+  const expected = /** @type {any} */ (control.getDirectLocaleContext("de")).localeMatchResult;
 
   for (const [name, actual] of [["context", viaContext], ["constant", viaConstant], ["per-call", viaPerCall]]) {
     sameFields(actual, expected);
@@ -117,7 +117,7 @@ test("the automatic diagnostic is computed over the FULL manifest, including a f
 test("a declared-but-unloaded selection never supplies a value", () => {
   // `de` is selected diagnostically and has no catalog, so per-key fallback starts at `de`, finds
   // nothing, and falls through to `en` — a catalog-less attempt (plan :622-623).
-  const partial = createStrings({ loaded: partialWhole(), localeResolver: () => "de" });
+  const partial = createStrings({ loaded: partialWhole(), localeSupplier: () => "de" });
   const result = /** @type {any} */ (partial.getResult("Hi"));
   assert.equal(result.lookupLocale, "de");
   assert.equal(result.resolvedLocale, "en", "the answering catalog is the fallback, not the selection");
@@ -126,7 +126,7 @@ test("a declared-but-unloaded selection never supplies a value", () => {
   assert.equal(result.isFallback, true);
 });
 
-test("the RESOLUTION channel does not widen — measured through the tiebreakers, not the set", () => {
+test("the RESOLUTION channel does not widen — measured through the tiebreakerLocalesByLanguageCode, not the set", () => {
   // **THE FIRST DRAFT OF THIS TEST WAS VACUOUS, and it is worth recording why.** It asserted the walk
   // over a partial whole-manifest load and passed identically whether the chain was computed from the
   // loaded set or the full manifest — because `candidateChain` already includes the requested tag and
@@ -155,31 +155,31 @@ test("the RESOLUTION channel does not widen — measured through the tiebreakers
         plan: ["en", "fr", "fr-CA"],
         complete: false,
       }),
-      // The RUNTIME tiebreakers, filtered to what loaded — what a real loader hands over.
-      tiebreakers: { fr: ["fr"] },
+      // The RUNTIME tiebreakerLocalesByLanguageCode, filtered to what loaded — what a real loader hands over.
+      tiebreakerLocalesByLanguageCode: { fr: ["fr"] },
       manifestLocaleConfiguration: {
         fallbackLocale: "en",
         supportedLocales: ["en", "fr", "fr-CA"],
-        tiebreakers: manifestOrders,
+        tiebreakerLocalesByLanguageCode: manifestOrders,
       },
     },
-    localeResolver: () => "fr",
+    localeSupplier: () => "fr",
   });
 
   const result = /** @type {any} */ (instance.getResult("Only"));
   assert.deepEqual(result.attemptedLocales, ["fr", "en"],
-    "the walk uses the FILTERED runtime tiebreakers; `fr-CA` never loaded and must not be attempted");
+    "the walk uses the FILTERED runtime tiebreakerLocalesByLanguageCode; `fr-CA` never loaded and must not be attempted");
   assert.equal(result.translation, "only en");
 
   // …while the SELECTION channel does read the manifest's orders, which is the paired half: the two
   // channels are looking at different tiebreaker lists in the same call.
   // Spread to compare by CONTENT: the configuration's record is null-prototype, which `deepEqual`
   // reports as a difference even when every entry matches.
-  assert.deepEqual({ ...instance.getLocaleConfiguration().tiebreakers }, manifestOrders);
+  assert.deepEqual({ ...instance.getLocaleConfiguration().tiebreakerLocalesByLanguageCode }, manifestOrders);
 });
 
 test("the inspection surfaces do NOT widen", () => {
-  const partial = createStrings({ loaded: partialWhole(), localeResolver: () => "de" });
+  const partial = createStrings({ loaded: partialWhole(), localeSupplier: () => "de" });
 
   // `getSupportedLocales()` is the LOADED set, and S10's stamp depends on that — it requires
   // `coveredLocales` to EQUAL it. Widening this is one edit away and no Java gate could see it.
@@ -199,8 +199,8 @@ test("the inspection surfaces do NOT widen", () => {
 test("a request in NEITHER set still resolves, and still considers the full manifest", () => {
   // The fixture that catches `consideredLocales = loadedSet ∪ {requested tag if declared}` — a
   // request-keyed patch that passes both tests above and fails only here.
-  const partial = createStrings({ loaded: partialWhole(), localeResolver: () => "de" });
-  const match = /** @type {any} */ (partial.getDirectLocaleContext("ja")).localeMatch;
+  const partial = createStrings({ loaded: partialWhole(), localeSupplier: () => "de" });
+  const match = /** @type {any} */ (partial.getDirectLocaleContext("ja")).localeMatchResult;
   assert.deepEqual(match.consideredLocales, ["de", "en", "fr"]);
   assert.equal(match.locale, null);
   assert.equal(match.matchType, "none");
@@ -212,11 +212,11 @@ test("a direct request EQUAL to the coverage tag is served, though the diagnosti
   // **THE DISCRIMINATING INPUT OF THE WHOLE CLAUSE.** `fr-BE` is the tag the subset was planned from;
   // its automatic diagnostic selects `fr-FR`. The two readings of the rule — "the request must match"
   // and "the selection must match" — give OPPOSITE answers on this one call.
-  const client = createStrings({ loaded: frBeSubset(), localeResolver: () => "fr-BE" });
+  const client = createStrings({ loaded: frBeSubset(), localeSupplier: () => "fr-BE" });
   const result = /** @type {any} */ (client.getResult("Hi"));
 
   assert.equal(result.lookupLocale, "fr-BE");
-  assert.equal(result.localeMatch.locale, "fr-FR", "the diagnostic legitimately differs");
+  assert.equal(result.localeMatchResult.locale, "fr-FR", "the diagnostic legitimately differs");
   assert.equal(result.attemptedLocales[0], "fr-BE", "per-key fallback STARTED at the request");
   assert.equal(result.resolvedLocale, "fr-FR");
   assert.equal(result.translation, "hello fr-FR");
@@ -227,7 +227,7 @@ test("a direct request for the DIAGNOSTIC SELECTION is refused, though every cat
   // PLANNED from `fr-FR` — its next `fr-FR` load would plan a different chain. An implementation that
   // checked "are the catalogs present" instead of "what was this planned from" passes the test above
   // and fails here.
-  const client = createStrings({ loaded: frBeSubset(), localeResolver: () => "fr-BE" });
+  const client = createStrings({ loaded: frBeSubset(), localeSupplier: () => "fr-BE" });
   const error = (() => { try { client.get("Hi", undefined, forLocale("fr-FR")); } catch (e) { return e; } })();
   assert.equal(/** @type {any} */ (error)?.name, "ConfigurationError");
   assert.equal(/** @type {any} */ (error).code, "CONFIGURATION");
@@ -243,7 +243,7 @@ test("getDirectLocaleContext does NOT throw on an uncovered tag", () => {
   // It starts no per-key fallback and is documented side-effect-free, so plan :619-621's "effective
   // lookup tag" never passes through it — and S10's stamp consumes it as its oracle, so a throw here
   // would change the SSR path for exactly the lookup-subset instances SSR exists for.
-  const client = createStrings({ loaded: frBeSubset(), localeResolver: () => "fr-BE" });
+  const client = createStrings({ loaded: frBeSubset(), localeSupplier: () => "fr-BE" });
   assert.doesNotThrow(() => client.getDirectLocaleContext("fr-FR"));
   assert.doesNotThrow(() => client.getDirectLocaleContext("ja"));
 });
@@ -255,7 +255,7 @@ test("a supplied match derives the covered tag from its SELECTION, or its fallba
     coverage: { kind: "lookup", lookupLocale: "fr-FR" },
     plan: ["fr-FR", "en"],
   });
-  const client = createStrings({ loaded: subset(), localeResolver: () => "fr-FR" });
+  const client = createStrings({ loaded: subset(), localeSupplier: () => "fr-FR" });
   const considered = ["en", "fr-FR"];
 
   // MATCHED: the lookup locale is the selected tag, which is the coverage tag → accepted.
@@ -281,7 +281,7 @@ test("a supplied match derives the covered tag from its SELECTION, or its fallba
 test("WHOLE-MANIFEST coverage permits any well-formed direct locale — regression guard", () => {
   // Keying the check on "has a verification record" rather than on the coverage KIND is the cheapest
   // possible regression: it would turn every whole-manifest instance red at once.
-  const whole = createStrings({ loaded: partialWhole(), localeResolver: () => "de" });
+  const whole = createStrings({ loaded: partialWhole(), localeSupplier: () => "de" });
   for (const locale of ["de", "en", "fr", "ja", "de-CH"])
     assert.doesNotThrow(() => whole.get("Hi", undefined, forLocale(locale)), locale);
 });
@@ -289,7 +289,7 @@ test("WHOLE-MANIFEST coverage permits any well-formed direct locale — regressi
 test("coverage is revalidated on EVERY use, and a refusal does not poison the instance", () => {
   // A check run once at construction would gate the first answer and trust every later one — and a
   // resolver may answer differently on each call.
-  const client = createStrings({ loaded: frBeSubset(), localeResolver: () => "fr-BE" });
+  const client = createStrings({ loaded: frBeSubset(), localeSupplier: () => "fr-BE" });
   const first = client.get("Hi");
   assert.throws(() => client.get("Hi", undefined, forLocale("en")), /loaded for lookup/);
   assert.equal(client.get("Hi"), first, "the instance still serves its covered tag afterwards");
@@ -298,7 +298,7 @@ test("coverage is revalidated on EVERY use, and a refusal does not poison the in
   let answer = "fr-BE";
   let calls = 0;
   const resolved = createStrings({
-    loaded: frBeSubset(), localeResolver: () => { ++calls; return answer; },
+    loaded: frBeSubset(), localeSupplier: () => { ++calls; return answer; },
   });
   assert.equal(resolved.get("Hi"), "hello fr-FR");
   answer = "en";
@@ -313,8 +313,8 @@ test("coverage is revalidated on EVERY use, and a refusal does not poison the in
 test("a supplied match must consider the FULL manifest — and a DIRECT instance the loaded set", () => {
   // The diagonal is the fixture. The same two match objects, against two instances holding the same
   // catalogs, must be accepted and refused in opposite directions.
-  const manifestBacked = createStrings({ loaded: partialWhole(), localeResolver: () => "de" });
-  const direct = createStrings({ strings: { en, fr }, fallbackLocale: "en", localeResolver: () => "en" });
+  const manifestBacked = createStrings({ loaded: partialWhole(), localeSupplier: () => "de" });
+  const direct = createStrings({ localizedStringSupplier: () => ({ en, fr }), fallbackLocale: "en", localeSupplier: () => "en" });
 
   const matchOver = (/** @type {string[]} */ consideredLocales) => /** @type {any} */ ({
     matchType: "exact", locale: "en", isMatch: true, fallbackLocale: "en",
@@ -332,24 +332,24 @@ test("a supplied match must consider the FULL manifest — and a DIRECT instance
 });
 
 test("caller ordering of consideredLocales is preserved, because it is a SET comparison", () => {
-  const manifestBacked = createStrings({ loaded: partialWhole(), localeResolver: () => "de" });
+  const manifestBacked = createStrings({ loaded: partialWhole(), localeSupplier: () => "de" });
   const shuffled = /** @type {any} */ ({
     matchType: "exact", locale: "en", isMatch: true, fallbackLocale: "en",
     consideredLocales: ["fr", "de", "en"], effectiveWeight: 1,
     languageRange: { range: "en", weight: 1 }, requestedLanguageRanges: [{ range: "en", weight: 1 }],
   });
   const result = /** @type {any} */ (manifestBacked.getResult("Hi", undefined, forLocaleMatch(shuffled)));
-  assert.deepEqual(result.localeMatch.consideredLocales, ["fr", "de", "en"], "verbatim, not re-sorted");
+  assert.deepEqual(result.localeMatchResult.consideredLocales, ["fr", "de", "en"], "verbatim, not re-sorted");
 });
 
 // ============================================================ direct construction unmoved
 
 test("direct construction sees neither change", () => {
-  const direct = createStrings({ strings: { en, fr }, fallbackLocale: "en", localeResolver: () => "fr" });
+  const direct = createStrings({ localizedStringSupplier: () => ({ en, fr }), fallbackLocale: "en", localeSupplier: () => "fr" });
   assert.equal(direct.getLoadVerification(), null);
   assert.deepEqual(direct.getLocaleConfiguration().supportedLocales, direct.getSupportedLocales());
   assert.deepEqual(
-    /** @type {any} */ (direct.getDirectLocaleContext("fr")).localeMatch.consideredLocales,
+    /** @type {any} */ (direct.getDirectLocaleContext("fr")).localeMatchResult.consideredLocales,
     ["en", "fr"]);
   // No coverage record exists, so no well-formed tag can ever be refused for coverage.
   for (const locale of ["fr", "en", "xq-QQ", "de-CH"])

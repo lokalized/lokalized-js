@@ -27,7 +27,7 @@
  *      AND a depth-1 sibling, or the walk is reached without being discriminated.
  *
  * **THE ORDINALITY SILENCE, and it is why this file does not simply reuse the corpus fixtures.**
- * Plan 6.2:1950-1959's `LoadStringsOptions` declares no `pluralData` and no `onWarning`, so the
+ * Plan 6.2:1950-1959's `LoadStringsOptions` declares no `pluralData` and no `warningHandler`, so the
  * manifest doors call `parseStrings` without ordinal data and `INCOMPLETE_ORDINALITY_TRANSLATIONS`
  * can never be reported here. That is derived from the option type, not preferred — the same shape as
  * S11b's hash-only manifest generator. The consequence is measured and load-bearing:
@@ -116,11 +116,11 @@ const warns = (/** @type {string} */ key, /** @type {string} */ placeholder) => 
  * which is how C6 produces an interior failure at a named stage.
  *
  * @param {Record<string, string>} bodies
- * @param {{ fallbackLocale: string, tiebreakers?: Record<string, readonly string[]>,
+ * @param {{ fallbackLocale: string, tiebreakerLocalesByLanguageCode?: Record<string, readonly string[]>,
  *   order?: readonly string[], baseUrl?: string, declaredDigestOf?: Record<string, string> }} options
  */
 function manifestOver(bodies, {
-  fallbackLocale, tiebreakers = {}, order, baseUrl = "https://cdn.example/v1/", declaredDigestOf = {},
+  fallbackLocale, tiebreakerLocalesByLanguageCode = {}, order, baseUrl = "https://cdn.example/v1/", declaredDigestOf = {},
 }) {
   /** @type {Record<string, { url: string, sha256: string }>} */
   const files = {};
@@ -138,7 +138,7 @@ function manifestOver(bodies, {
     fallbackLocale,
     baseUrl,
     files,
-    tiebreakers,
+    tiebreakerLocalesByLanguageCode,
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return /** @type {any} */ (draft);
@@ -387,7 +387,7 @@ const THREE_BODIES = Object.freeze({
 /** JSON key order `el, de, de-AT`, which is none of the three orders the plan could be confused with. */
 const threeManifest = () => manifestOver(THREE_BODIES, {
   fallbackLocale: "el",
-  tiebreakers: { de: ["de-AT", "de"] },
+  tiebreakerLocalesByLanguageCode: { de: ["de-AT", "de"] },
   order: ["el", "de", "de-AT"],
 });
 
@@ -613,7 +613,7 @@ const SIX_BODIES = Object.freeze({
 
 test("C5: a file's warnings are one contiguous block and the two orders compose", async () => {
   const m = manifestOver(SIX_BODIES, {
-    fallbackLocale: "el", tiebreakers: { de: ["de-AT", "de"] }, order: ["el", "de", "de-AT"],
+    fallbackLocale: "el", tiebreakerLocalesByLanguageCode: { de: ["de-AT", "de"] }, order: ["el", "de", "de-AT"],
   });
   const stub = gatedTransport(m, SIX_BODIES, { open: true });
   const loaded = await loadStrings(m, "de-AT", { fetch: stub.fetch });
@@ -837,7 +837,7 @@ test("M1: a file reached by two candidates contributes ONE block at its first-us
   // appended the fallback unconditionally emits `de`'s block TWICE, and the manifest fingerprints
   // identically either way — nothing downstream could detect the duplicate.
   const bodies = { "de-AT": JSON.stringify(warns("K", "pAT")), de: JSON.stringify(warns("K", "pDE")) };
-  const m = manifestOver(bodies, { fallbackLocale: "de", tiebreakers: { de: ["de-AT", "de"] } });
+  const m = manifestOver(bodies, { fallbackLocale: "de", tiebreakerLocalesByLanguageCode: { de: ["de-AT", "de"] } });
   assert.deepEqual(fetchSet(m, "de-AT").map((e) => e.locale), ["de-AT", "de"],
     "the fallback `de` is already in the plan; it must not be appended a second time");
 
@@ -868,7 +868,7 @@ test("M2/M3: the plan is TIEBREAKER-ordered, and a catalog-less candidate occupi
   /** @type {string[][]} */
   const observed = [];
   for (const tiebreaker of [["de-AT", "de-CH"], ["de-CH", "de-AT"]]) {
-    const m = manifestOver(bodies, { fallbackLocale: "el", tiebreakers: { de: tiebreaker } });
+    const m = manifestOver(bodies, { fallbackLocale: "el", tiebreakerLocalesByLanguageCode: { de: tiebreaker } });
     const stub = gatedTransport(m, bodies, { open: true });
     const loaded = await loadStrings(m, "de", { fetch: stub.fetch });
     assert.equal(loaded.complete, true);

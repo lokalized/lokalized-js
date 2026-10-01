@@ -204,9 +204,11 @@ export const ENTRIES = Object.freeze({
  * resolver that answers it, which moves the harness bytes inside every recipe digest. Same fixture,
  * same render, same columns and rules; a changed method, hence a revision.
  */
+// Revision 3 (2026-09-30): align construction and fixture keys with the shared API vocabulary
+// Revision 4 (2026-09-30): supply catalogs once during construction, matching Java
 export const RECIPES = Object.freeze({
   1: Object.freeze({
-    revision: 2, title: "self-contained no-build browser root", input: "raw", fixture: "base",
+    revision: 4, title: "self-contained no-build browser root", input: "raw", fixture: "base",
     variants: Object.freeze([
       Object.freeze({ label: "root module", form: "no-build", files: Object.freeze(["lokalized.js"]) }),
     ]),
@@ -214,13 +216,13 @@ export const RECIPES = Object.freeze({
     mustNotReach: Object.freeze([OPTIONAL_DATA.ordinal, OPTIONAL_DATA.ranges, OPTIONAL_DATA.fullRange]),
   }),
   2: Object.freeze({
-    revision: 2, title: "bundler import of `lokalized`", input: "raw", fixture: "base",
+    revision: 4, title: "bundler import of `lokalized`", input: "raw", fixture: "base",
     variants: Object.freeze([Object.freeze({ label: "esbuild", form: "bundler", entry: "root" })]),
     mustReach: Object.freeze(["src/index.js"]),
     mustNotReach: Object.freeze([OPTIONAL_DATA.ordinal, OPTIONAL_DATA.ranges, OPTIONAL_DATA.fullRange]),
   }),
   3: Object.freeze({
-    revision: 2, title: "`lokalized/core` with an already parsed catalog", input: "parsed", fixture: "base",
+    revision: 4, title: "`lokalized/core` with an already parsed catalog", input: "parsed", fixture: "base",
     variants: Object.freeze([
       Object.freeze({ label: "esbuild", form: "bundler", entry: "core" }),
       Object.freeze({ label: "no-build core.js", form: "no-build", files: Object.freeze(["core.js"]) }),
@@ -229,7 +231,7 @@ export const RECIPES = Object.freeze({
     mustNotReach: Object.freeze(["src/index.js", OPTIONAL_DATA.ordinal, OPTIONAL_DATA.ranges, OPTIONAL_DATA.fullRange]),
   }),
   4: Object.freeze({
-    revision: 2, title: "root plus ordinal data", input: "raw", fixture: "ordinal",
+    revision: 4, title: "root plus ordinal data", input: "raw", fixture: "ordinal",
     variants: Object.freeze([
       Object.freeze({ label: "esbuild", form: "bundler", entry: "ordinal" }),
       Object.freeze({ label: "no-build core.js + data/ordinal.js", form: "no-build",
@@ -240,7 +242,7 @@ export const RECIPES = Object.freeze({
     mustNotReach: Object.freeze([OPTIONAL_DATA.ranges, OPTIONAL_DATA.fullRange]),
   }),
   5: Object.freeze({
-    revision: 2, title: "root plus range data", input: "raw", fixture: "ranges",
+    revision: 4, title: "root plus range data", input: "raw", fixture: "ranges",
     variants: Object.freeze([
       Object.freeze({ label: "esbuild", form: "bundler", entry: "ranges" }),
       Object.freeze({ label: "no-build core.js + data/ranges.js", form: "no-build",
@@ -316,27 +318,29 @@ export function currentDigests() {
 
 /** @type {Readonly<Record<string, Readonly<Record<number, string>>>>} */
 export const RECIPE_DIGESTS = Object.freeze({
-  1: Object.freeze({ 1: "3f41582f933a4dc821e99eb9782fc5c5c355981cc182efa097a581ab455e4c1f", 2: "5cd78517b2c845256503d92415771f2fa592732e62574604567ad15d9cee42f0" }),
-  2: Object.freeze({ 1: "7f5af5b3153a0e66820a91d0ecaff0e7d92295b89910053f58fb702d5e8631af", 2: "874ca02b665610ed39571cf2392691cdaee84bffb1b94b45db1ce4a6d9509fa1" }),
-  3: Object.freeze({ 1: "8eafa50ef953b5a72ca5bb0b8fc78a88f041ba3a2b0558850105ce2e98bce90f", 2: "035e756c33bf208e665fb590008730ef8aa8ceb818cf54eee28ddee448385ad8" }),
-  4: Object.freeze({ 1: "b6a8322ff7e302268843ec8bd7a11742d0509664892eca7702db859911787df1", 2: "1427000796f584de2a21a543184662ddf97434ccd1a3156e3035b3ab0632a6f2" }),
-  5: Object.freeze({ 1: "5b19e25e2408d242b82e04b4a3db5f0ff4e78eb6a8ab4e293105f3a7aa3cf03f", 2: "5149c26b1d140f6589e2dfc50235583da5005a79cb8f533d85aff2459f3ac416" }),
+  1: Object.freeze({ 1: "3f41582f933a4dc821e99eb9782fc5c5c355981cc182efa097a581ab455e4c1f", 2: "5cd78517b2c845256503d92415771f2fa592732e62574604567ad15d9cee42f0" , 3: "86e7e63404a3a358d11f374fe40a9d3d95e641dbf9526af9ebed582833b42b5e" , 4: "a51259ceb1f9ded550669cdbaebedbfe5beec0bffb2ae580ab518c88bf4fb555"  }),
+  2: Object.freeze({ 1: "7f5af5b3153a0e66820a91d0ecaff0e7d92295b89910053f58fb702d5e8631af", 2: "874ca02b665610ed39571cf2392691cdaee84bffb1b94b45db1ce4a6d9509fa1" , 3: "f1ec3086c38b6603cea1e9e29d8e910e380f2fe4b7af08474e0fe8f4623300fe" , 4: "1b9e6c1b81e102d304d682449ffcb30d15d66ed1d78bd98b7c014aaf9c52c38c"  }),
+  3: Object.freeze({ 1: "8eafa50ef953b5a72ca5bb0b8fc78a88f041ba3a2b0558850105ce2e98bce90f", 2: "035e756c33bf208e665fb590008730ef8aa8ceb818cf54eee28ddee448385ad8" , 3: "fb5cfef92faf1f75428933c50b2c731b0ea00312cca6c6fd85afae097fc5bdde" , 4: "cfc328fc23346bf5b7ba2074c871ec0d827eb5eb4221f9388f1f713e0f8e19bb"  }),
+  4: Object.freeze({ 1: "b6a8322ff7e302268843ec8bd7a11742d0509664892eca7702db859911787df1", 2: "1427000796f584de2a21a543184662ddf97434ccd1a3156e3035b3ab0632a6f2" , 3: "b9b3fc6faadf098b2229ded0891a660eb4c23158776b0e2fb2f0ced8671cbddb" , 4: "dc875adaab0eda678e09711cb4853ad58c99e5ccadbcec27f8a3652c7024173c"  }),
+  5: Object.freeze({ 1: "5b19e25e2408d242b82e04b4a3db5f0ff4e78eb6a8ab4e293105f3a7aa3cf03f", 2: "5149c26b1d140f6589e2dfc50235583da5005a79cb8f533d85aff2459f3ac416" , 3: "a641562d96dfedd2c25d05a49916332ef5eacaf8b6b3f492c0233821f3cc92bc" , 4: "4d3d0b3ec32dd9fe823ab7e249e0186e5225d607b3aa3b3ea892dcc2696868bb"  }),
 });
 
 /** @type {Readonly<Record<string, Readonly<Record<number, string>>>>} */
 export const FIXTURE_DIGESTS = Object.freeze({
-  1: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55", 2: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" }),
-  2: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55", 2: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" }),
-  3: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55", 2: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" }),
-  4: Object.freeze({ 1: "08aaf60d391b58ece02ca4b5d15137ee28974f14e119d0ec82d91eddab9d435c", 2: "08aaf60d391b58ece02ca4b5d15137ee28974f14e119d0ec82d91eddab9d435c" }),
-  5: Object.freeze({ 1: "e58cdbf2da4bfe47eea335c15eec1a5a31936216766c49950f8efe87a5db5ad4", 2: "e58cdbf2da4bfe47eea335c15eec1a5a31936216766c49950f8efe87a5db5ad4" }),
+  1: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55", 2: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" , 3: "0e07bc5372a582fe5d670354389b968d253251b5261b64dfe88c959d5d30120c" , 4: "0e07bc5372a582fe5d670354389b968d253251b5261b64dfe88c959d5d30120c"  }),
+  2: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55", 2: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" , 3: "0e07bc5372a582fe5d670354389b968d253251b5261b64dfe88c959d5d30120c" , 4: "0e07bc5372a582fe5d670354389b968d253251b5261b64dfe88c959d5d30120c"  }),
+  3: Object.freeze({ 1: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55", 2: "879413e921644b0372133b1fb8b64eab67bdb0771c146f140bde99b96c4e5d55" , 3: "0e07bc5372a582fe5d670354389b968d253251b5261b64dfe88c959d5d30120c" , 4: "0e07bc5372a582fe5d670354389b968d253251b5261b64dfe88c959d5d30120c"  }),
+  4: Object.freeze({ 1: "08aaf60d391b58ece02ca4b5d15137ee28974f14e119d0ec82d91eddab9d435c", 2: "08aaf60d391b58ece02ca4b5d15137ee28974f14e119d0ec82d91eddab9d435c" , 3: "08aaf60d391b58ece02ca4b5d15137ee28974f14e119d0ec82d91eddab9d435c" , 4: "08aaf60d391b58ece02ca4b5d15137ee28974f14e119d0ec82d91eddab9d435c"  }),
+  5: Object.freeze({ 1: "e58cdbf2da4bfe47eea335c15eec1a5a31936216766c49950f8efe87a5db5ad4", 2: "e58cdbf2da4bfe47eea335c15eec1a5a31936216766c49950f8efe87a5db5ad4" , 3: "e58cdbf2da4bfe47eea335c15eec1a5a31936216766c49950f8efe87a5db5ad4" , 4: "e58cdbf2da4bfe47eea335c15eec1a5a31936216766c49950f8efe87a5db5ad4"  }),
 });
 
-export const SUITE_REVISION = 2;
+export const SUITE_REVISION = 4;
 /** @type {Readonly<Record<number, string>>} */
 export const SUITE_DIGESTS = Object.freeze({
   1: "4894b2608203bb6b17dc91cc26140ab2a002e3c83ff87d8bfabe7563b23914db",
   2: "805751baba31376f00c2d224797d4afbfea357c4f5e7ead0e252f6f1dd6bbeb5",
+  3: "87bf84f9199081bc2b79dd8ebead17a81df620e65e1494e5c9a55ba55e6e7e25",
+  4: "b39974d5a44f9e9d979c7af6550d21c3394005b2156fd85b3d4142544988a1e6",
 });
 
 /**
@@ -361,4 +365,4 @@ export const HISTORY_ORIGIN_SHA256 = "f4c6a3d54ea213823931e84b4f40115fa95305c391
  * along with the figures it vouches for passes (`newestEntryProblems` in `check.mjs`).
  * @type {Readonly<{ index: number, sha256: string }> | undefined}
  */
-export const HISTORY_NEWEST_ENTRY = Object.freeze({ index: 2, sha256: "2b951400af891f071d4e61151954cb0edc42740d70b60603649a9b7833007f5e" });
+export const HISTORY_NEWEST_ENTRY = Object.freeze({ index: 7, sha256: "b90447c64fe4e33dfd3a1bea88ab0da7262e3c8194fdbd68f529860bc36d674a" });

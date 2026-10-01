@@ -74,12 +74,12 @@ import { parseStrings } from "../src/parse/index.js";
 /**
  * Two CLDR-equivalent tags for one language, so a TIEBREAKER decides which catalog answers.
  *
- * A constants-only fixture is green over a payload that lost its tiebreakers whenever the language
- * has a single catalog — "the corpus is blind to tiebreakers" wearing this clause's hat. Covering the
+ * A constants-only fixture is green over a payload that lost its tiebreakerLocalesByLanguageCode whenever the language
+ * has a single catalog — "the corpus is blind to tiebreakerLocalesByLanguageCode" wearing this clause's hat. Covering the
  * round trip is not discriminating what the round trip carries, so each probe key is decided by a
  * DIFFERENT part of the payload:
  *
- *   - `k` is decided by `tiebreakers` — `FROM-SU` under `[hy-SU, hy-AM]`, `FROM-AM` flipped;
+ *   - `k` is decided by `tiebreakerLocalesByLanguageCode` — `FROM-SU` under `[hy-SU, hy-AM]`, `FROM-AM` flipped;
  *   - `items` is decided by the catalog's `placeholders` sub-record and a compiled alternative
  *     expression — `one-SU` at `n: 1`, `many-SU` otherwise.
  *
@@ -102,14 +102,14 @@ const catalogText = (mark) => JSON.stringify({
 const OPTIONS = Object.freeze({
   catalogVersion: "v1",
   fallbackLocale: "hy-AM",
-  tiebreakers: { hy: ["hy-SU", "hy-AM"] },
+  tiebreakerLocalesByLanguageCode: { hy: ["hy-SU", "hy-AM"] },
 });
 
 /**
  * The identity pin, and the fixture digests that guard it.
  *
  * PINNED RATHER THAN SELF-COMPARED. A copy-versus-original comparison stays GREEN over a defect that
- * degrades BOTH operands — measured on exactly this subject: with `tiebreakers` dropped from the
+ * degrades BOTH operands — measured on exactly this subject: with `tiebreakerLocalesByLanguageCode` dropped from the
  * identity projection the generator and every copy agree perfectly and the fingerprint is simply a
  * different number. That is the S11b shape ("fingerprinted byte-identically to declaring none")
  * reappearing inside the test written to catch it, so the expected value is written down.
@@ -123,11 +123,11 @@ const CATALOG_SHA256 = Object.freeze({
   "hy-AM": "7d849d71b62028f8aeecffffd0f2629e63286474775dcf8e7fd01f446d7d003d",
   "hy-SU": "1734d48fe8e021513d00d073ef307f1ef737ffa6f7394b5a1be9dc40c5d691e9",
 });
-const PINNED_FINGERPRINT = "1de8911458cf18c414f850d7442143064d1dd3795468eabe0bbd12d1293225db";
+const PINNED_FINGERPRINT = "7ce6912fa0e2af3b46b36750fc1c97ba2015c508f66ecf7a86ab242b7787fb09";
 const PINNED_IDENTITY_BYTES =
   '{"catalogVersion":"v1","formatVersion":1,"localeToSha256":' +
   `{"hy-AM":"${CATALOG_SHA256["hy-AM"]}","hy-SU":"${CATALOG_SHA256["hy-SU"]}"},` +
-  '"resolvedFallbackLocale":"hy-AM","tiebreakers":{"hy":["hy-SU","hy-AM"]}}';
+  '"resolvedFallbackLocale":"hy-AM","tiebreakerLocalesByLanguageCode":{"hy":["hy-SU","hy-AM"]}}';
 
 /** The twelve members plan 3.3 puts on an instance. A NAMED SET, not a count — see the K1 test. */
 const INSTANCE_MEMBERS = Object.freeze([
@@ -244,10 +244,10 @@ function mutableDeepCopy(node) {
 
 test("K1 a Strings instance carries no transferable state, through BOTH construction doors", async () => {
   const direct = createStrings({
-    fallbackLocale: "en", localeResolver: () => "en", strings: { en: [{ key: "hello", translation: "Hello" }] },
+    fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: [{ key: "hello", translation: "Hello" }] }),
   });
   const loaded = await loadStringsFromDirectory(fixtureDirectory(), OPTIONS);
-  const fromLoader = createStrings({ loaded, localeResolver: () => "hy" });
+  const fromLoader = createStrings({ loaded, localeSupplier: () => "hy" });
 
   // **THE CONTROL RUNS FIRST, and it is the load-bearing half.** `Reflect.ownKeys({})` is `[]` and
   // `JSON.stringify({})` is `"{}"` — the two headline assertions below are exactly the ones a DEAD
@@ -301,7 +301,7 @@ test("K2 structuredClone REFUSES a Strings instance, by name, and the instrument
   assert.equal(clonedPayload.fallbackLocale, "hy-AM");
   assert.notEqual(clonedPayload, loaded, "a stub returning its argument would pass every row below");
 
-  const strings = createStrings({ loaded, localeResolver: () => "hy" });
+  const strings = createStrings({ loaded, localeSupplier: () => "hy" });
   // The second control: a failed construction must not be able to masquerade as a refusal.
   assert.equal(strings.get("k"), "FROM-SU");
 
@@ -334,10 +334,10 @@ test("K3 every payload the clause names is function-free, plain and frozen, repo
   // CONTROL: each payload must be a LIVE one. A payload that failed to build is trivially clean.
   assert.equal(
     createStrings({
-      fallbackLocale: "hy-AM", localeResolver: () => "hy", tiebreakers: OPTIONS.tiebreakers,
-      strings: { "hy-AM": parseStrings(catalogText("AM"), { locale: "hy-AM" }), "hy-SU": parsed },
+      fallbackLocale: "hy-AM", localeSupplier: () => "hy", tiebreakerLocalesByLanguageCode: OPTIONS.tiebreakerLocalesByLanguageCode,
+      localizedStringSupplier: () => ({ "hy-AM": parseStrings(catalogText("AM"), { locale: "hy-AM" }), "hy-SU": parsed }),
     }).get("k"), "FROM-SU", "the ParsedStringsFile pair must build a working instance");
-  assert.equal(createStrings({ loaded, localeResolver: () => "hy" }).get("k"), "FROM-SU");
+  assert.equal(createStrings({ loaded, localeSupplier: () => "hy" }).get("k"), "FROM-SU");
   assert.deepEqual(Object.keys(validateStringsManifest(manifest).files), ["hy-AM", "hy-SU"]);
 
   /**
@@ -357,15 +357,15 @@ test("K3 every payload the clause names is function-free, plain and frozen, repo
       "loaded.catalogs.hy-AM.strings.0.translation",
       "loaded.catalogs.hy-SU.strings.1.placeholders.amount.alternatives.0.expression",
       "loaded.catalogs.hy-SU.originsByKey.items.0",
-      "loaded.tiebreakers.hy.0",
-      "loaded.manifestLocaleConfiguration.tiebreakers.hy.0",
+      "loaded.tiebreakerLocalesByLanguageCode.hy.0",
+      "loaded.manifestLocaleConfiguration.tiebreakerLocalesByLanguageCode.hy.0",
       "loaded.catalogIdentity.catalogFingerprint",
       "loaded.loadingLimits.maximumWarnings",
       "loaded.requestedFiles.0.url",
       "loaded.coverage.kind",
     ]],
     [manifest, "manifest", [
-      "manifest.baseUrl", "manifest.files.hy-SU.sha256", "manifest.tiebreakers.hy.1",
+      "manifest.baseUrl", "manifest.files.hy-SU.sha256", "manifest.tiebreakerLocalesByLanguageCode.hy.1",
     ]],
   ];
 
@@ -420,7 +420,7 @@ test("K4 a LoadedStrings crosses four boundaries and rebuilds an observationally
   // The SERVER's instance. Every copy is compared against IT, not only against literals: a defect
   // that moves server and client together satisfies a literal-only row (measured on the manifest
   // identity one conjunct over, where exactly that happens).
-  const reference = createStrings({ loaded, localeResolver: () => "hy" });
+  const reference = createStrings({ loaded, localeSupplier: () => "hy" });
 
   // …and the literals are kept as a SEPARATE discrimination assertion, so the pair cannot drift
   // together. `assert.equal(get("k"), "FROM-SU")` alone is a test that one catalog exists; the
@@ -433,7 +433,7 @@ test("K4 a LoadedStrings crosses four boundaries and rebuilds an observationally
   assert.notEqual(reference.getLoadVerification(), null, "the reference instance carries no record");
 
   for (const [name, copy] of Object.entries(copies)) {
-    const client = createStrings({ loaded: copy, localeResolver: () => "hy" });
+    const client = createStrings({ loaded: copy, localeSupplier: () => "hy" });
     for (const [key, argument] of [["k", undefined], ["items", { n: 1 }], ["items", { n: 3 }]]) {
       assert.equal(client.get(/** @type {string} */ (key), /** @type {any} */ (argument)),
         reference.get(/** @type {string} */ (key), /** @type {any} */ (argument)),
@@ -447,14 +447,14 @@ test("K4 a LoadedStrings crosses four boundaries and rebuilds an observationally
     assert.notEqual(client.getLoadVerification(), null, `${name}: no verification record survived`);
   }
 
-  // **THE DISCRIMINATION CONTROL.** Same fixture, tiebreakers flipped: every copy must answer
-  // `FROM-AM`. Without it the loop above passes over a payload whose tiebreakers were destroyed —
+  // **THE DISCRIMINATION CONTROL.** Same fixture, tiebreakerLocalesByLanguageCode flipped: every copy must answer
+  // `FROM-AM`. Without it the loop above passes over a payload whose tiebreakerLocalesByLanguageCode were destroyed —
   // the language would simply resolve to whatever catalog came first.
   const flipped = await loadStringsFromDirectory(fixtureDirectory(), {
-    ...OPTIONS, tiebreakers: { hy: ["hy-AM", "hy-SU"] },
+    ...OPTIONS, tiebreakerLocalesByLanguageCode: { hy: ["hy-AM", "hy-SU"] },
   });
   for (const [name, copy] of Object.entries(boundaryCopies(flipped))) {
-    const client = createStrings({ loaded: copy, localeResolver: () => "hy" });
+    const client = createStrings({ loaded: copy, localeSupplier: () => "hy" });
     assert.equal(client.get("k"), "FROM-AM", `${name}: the flipped tiebreaker did not survive`);
     assert.equal(client.get("items", { n: 1 }), "one-AM", `${name}: the flipped tiebreaker did not survive`);
   }
@@ -475,10 +475,10 @@ test("K4b a PARTIAL LoadedStrings crosses too, and its diagnostic cause is MEASU
   assert.equal(partial.failures.length, 1);
   assert.ok(partial.failures[0].cause instanceof Error, "the cause must be a real Error to be at risk");
 
-  const reference = createStrings({ loaded: partial, localeResolver: () => "hy" });
+  const reference = createStrings({ loaded: partial, localeSupplier: () => "hy" });
   assert.equal(reference.get("k"), "FROM-AM", "with hy-SU missing the surviving catalog answers");
   for (const [name, copy] of Object.entries(boundaryCopies(partial))) {
-    const client = createStrings({ loaded: copy, localeResolver: () => "hy" });
+    const client = createStrings({ loaded: copy, localeSupplier: () => "hy" });
     assert.equal(client.get("k"), reference.get("k"), name);
     assert.equal(client.isCatalogComplete(), false, `${name}: a partial load must stay partial`);
     // The SELECTION channel still reports the full manifest; the loaded set is the smaller one.
@@ -551,7 +551,7 @@ test("K5 a StringsManifestV1 keeps a PINNED identity across five copies, and reb
   assert.equal(local.catalogFingerprint, PINNED_FINGERPRINT,
     "identity excludes baseUrl, so the local and published manifests are the same catalogs");
   const crossed = JSON.parse(JSON.stringify(local));
-  const client = createStrings({ loaded: await loadEntireManifestFromFiles(crossed), localeResolver: () => "hy" });
+  const client = createStrings({ loaded: await loadEntireManifestFromFiles(crossed), localeSupplier: () => "hy" });
   assert.equal(client.get("k"), "FROM-SU");
   assert.equal(client.get("items", { n: 1 }), "one-SU");
   assert.equal(client.getCatalogIdentity()?.catalogFingerprint, PINNED_FINGERPRINT);
@@ -573,8 +573,8 @@ test("K7 raw and canonical catalog data cross the boundary and construct a clien
     "hy-SU": parseStrings(catalogText("SU"), { locale: "hy-SU", source: "hy-SU.json" }),
   };
   /** @param {Record<string, unknown>} strings */
-  const clientFor = (strings, tiebreakers = OPTIONS.tiebreakers) => createStrings({
-    fallbackLocale: "hy-AM", localeResolver: () => "hy", tiebreakers, strings,
+  const clientFor = (strings, tiebreakerLocalesByLanguageCode = OPTIONS.tiebreakerLocalesByLanguageCode) => createStrings({
+    fallbackLocale: "hy-AM", localeSupplier: () => "hy", tiebreakerLocalesByLanguageCode, localizedStringSupplier: () => (strings),
   });
 
   const reference = clientFor(canonical);

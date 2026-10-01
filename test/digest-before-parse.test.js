@@ -75,7 +75,7 @@ import { join } from "node:path";
 import { after, test } from "node:test";
 
 import {
-  StringsLoadingError, loadEntireManifest, loadStrings, validateStringsManifest,
+  LocalizedStringLoadingError, loadEntireManifest, loadStrings, validateStringsManifest,
 } from "../src/load/index.js";
 import {
   createStringsManifestFromDirectory, loadEntireManifestFromFiles, loadStringsFromFiles,
@@ -262,15 +262,15 @@ function assertServed(door, manifest, tag, served, urls, expectation) {
 /**
  * The one failure recorded for `tag`, after proving this is a load failure and not a refusal.
  *
- * `instanceof StringsLoadingError` first, because the Node door's pre-I/O scheme refusal (plan
+ * `instanceof LocalizedStringLoadingError` first, because the Node door's pre-I/O scheme refusal (plan
  * 6.1:1916-1918) is a `ConfigurationError` with no `failures` at all — reading `.stage` off one would
  * throw somewhere the message does not name the cause.
  *
  * @param {any} error @param {string} tag
  */
 function soleFailure(error, tag) {
-  assert.ok(error instanceof StringsLoadingError,
-    `expected StringsLoadingError; got ${error && error.name}: ${error && error.message}`);
+  assert.ok(error instanceof LocalizedStringLoadingError,
+    `expected LocalizedStringLoadingError; got ${error && error.name}: ${error && error.message}`);
   assert.equal(error.code, "STRINGS_LOADING");
   const mine = error.failures.filter((/** @type {any} */ f) => f.locale === tag);
   assert.equal(mine.length, 1, `expected exactly one '${tag}' failure, got ${JSON.stringify(error.failures)}`);
@@ -530,7 +530,7 @@ test("26.7 | two files failing at DIFFERENT stages each keep their own, in plan 
   assertServed(door, manifest, "de", FR_UNPARSEABLE, urls, { digestMatches: true });
   assertServed(door, manifest, "fr", FR_VALID_ELSEWHERE, urls, { digestMatches: false });
 
-  assert.ok(error instanceof StringsLoadingError, `got ${error && error.name}`);
+  assert.ok(error instanceof LocalizedStringLoadingError, `got ${error && error.name}`);
   assert.deepEqual(error.failures.map((/** @type {any} */ f) => [f.locale, f.stage]),
     [["de", "parse"], ["fr", "digest"]]);
 });

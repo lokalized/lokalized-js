@@ -68,7 +68,16 @@ for (const [locale, file] of Object.entries(/** @type {Record<string, { url: str
 }
 // THE MANIFEST AS SERVED: the checkout's build identity in place of the published build's (see above).
 const core = /** @type {Record<string, unknown>} */ (await import(pathToFileURL(join(root, "src/core/index.js")).href));
-const served = JSON.stringify({ ...manifest, ...Object.fromEntries(BUILD_IDENTITY_FIELDS.map((field) => [field, core[field]])) });
+// The archived page calls the published rc.2 API; adapt only this simulation to today's names
+const { tiebreakers, catalogFingerprint: _publishedFingerprint, ...manifestFields } = manifest;
+const currentManifest = {
+  ...manifestFields,
+  tiebreakerLocalesByLanguageCode: tiebreakers,
+  ...Object.fromEntries(BUILD_IDENTITY_FIELDS.map((field) => [field, core[field]])),
+};
+const { computeCatalogIdentity, catalogIdentityInputFor } = await import("../../src/load/identity.js");
+const served = JSON.stringify({ ...currentManifest,
+  catalogFingerprint: computeCatalogIdentity(catalogIdentityInputFor(currentManifest)).catalogFingerprint });
 
 /** @type {any[]} */
 const buffer = [];
@@ -98,7 +107,19 @@ const g = /** @type {any} */ (globalThis);
 g.__import = async (/** @type {string} */ file, /** @type {string} */ url) => {
   entry("script", url, file === "lokalized.js" ? 184494 : 20600);
   if (file === "load.js") for (const chunk of CHUNKS) entry("script", `${CODE}chunks/chunk-${chunk}.js`, 1000);
-  return import(pathToFileURL(join(root, file === "lokalized.js" ? "src/index.js" : "src/load/index.js")).href);
+  const module = await import(pathToFileURL(join(root, file === "lokalized.js" ? "src/index.js" : "src/load/index.js")).href);
+  if (file !== "lokalized.js") return { ...module, loadStrings: async (...args) => {
+    // The archived rc.2 page and capture checker use the published error name
+    try { return await module.loadStrings(...args); }
+    catch (error) {
+      if (error instanceof module.LocalizedStringLoadingError) error.name = "StringsLoadingError";
+      throw error;
+    }
+  } };
+  return { ...module, createStrings: (options) => {
+    const { localeResolver, strings, ...rest } = options;
+    return module.createStrings({ ...rest, localeSupplier: localeResolver, ...(strings === undefined ? {} : { localizedStringSupplier: () => strings }) });
+  } };
 };
 /** @type {string | null} */
 let captured = null;

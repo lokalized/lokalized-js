@@ -5,7 +5,7 @@
  * Plan 6.2:2051-2066 writes the contrast as two code blocks. The DIRECT flow loads
  * `loadStrings(manifest, "fr-BE")` and constructs `createStrings({ loaded, locale: "fr-BE" })`; the
  * WHOLE-LIST flow computes `matchedLookup = match.locale ?? match.fallbackLocale` in APPLICATION
- * code, loads from that, and constructs with `localeMatchResolver: () => match`. The clause is that
+ * code, loads from that, and constructs with `localeMatchSupplier: () => match`. The clause is that
  * those two preserved inputs are not the same value and not interchangeable.
  *
  * **WHY THE OBVIOUS PROBE PROVES NOTHING, and it is the whole reason this file exists.** A suite made
@@ -55,7 +55,7 @@ import {
   createStringsManifestFromDirectory, loadEntireManifestFromFiles, loadStringsFromDirectory,
   loadStringsFromFiles, readStringsFromDirectory,
 } from "../src/node/index.js";
-import { createLocaleNegotiator, parseLanguageRanges } from "../src/negotiate/index.js";
+import { createLocaleMatcher, parseLanguageRanges } from "../src/negotiate/index.js";
 
 // ---------------------------------------------------------------------------------------------
 // FIXTURE F — one directory, published twice.
@@ -89,7 +89,7 @@ const GENERATOR_OPTIONS = {
   // Both are REQUIRED by the manifest validator, not chosen: a manifest declaring two catalogs for
   // one language and no tiebreaker for it is refused, and `fr` is what makes `fr-FR` preferred to
   // `fr-CA` in the candidate walk — the discriminating fact plan 6.2:2593 supplies.
-  tiebreakers: { fr: ["fr-FR", "fr-CA"], zh: ["zh", "zh-Hant"] },
+  tiebreakerLocalesByLanguageCode: { fr: ["fr-FR", "fr-CA"], zh: ["zh", "zh-Hant"] },
 };
 
 const PUBLISHED_BASE = "https://catalogs.test/v1/";
@@ -250,8 +250,8 @@ for (const door of DOORS) {
     // row. Computed over the WHOLE-MANIFEST instance, never over `direct`: whole coverage permits any
     // direct locale (plan 3.4:621), so this reading is invariant under every mutation of the subset
     // loader, which a reading through `direct` would not be.
-    const whole = createStrings({ loaded: await door.whole(), localeResolver: () => "fr-BE" });
-    const diagnostic = /** @type {any} */ (whole.getDirectLocaleContext("fr-BE")).localeMatch;
+    const whole = createStrings({ loaded: await door.whole(), localeSupplier: () => "fr-BE" });
+    const diagnostic = /** @type {any} */ (whole.getDirectLocaleContext("fr-BE")).localeMatchResult;
     assert.equal(diagnostic.locale, "fr-FR");
     assert.equal(diagnostic.matchType, "likely-subtag");
 
@@ -277,7 +277,7 @@ for (const door of DOORS) {
     assert.ok(Object.keys(selected.catalogs).length > 0);
     assert.equal(selected.complete, true);
 
-    const strings = createStrings({ loaded: selected, localeResolver: () => "fr-FR" });
+    const strings = createStrings({ loaded: selected, localeSupplier: () => "fr-FR" });
     assert.equal(strings.get("Shared"), "shared fr-FR");
   });
 }
@@ -341,7 +341,7 @@ for (const door of DOORS) {
 
   test(`the full-manifest fields survive a lookup subset [${door.name}]`, async () => {
     // Plan 6.2:2106-2107: `manifestLocaleConfiguration` "always describes the validated full manifest"
-    // while runtime catalogs and tiebreakers "describe only the loaded coverage"; plan 6.2:2114:
+    // while runtime catalogs and tiebreakerLocalesByLanguageCode "describe only the loaded coverage"; plan 6.2:2114:
     // `catalogIdentity` "always identifies the full manifest even when only a lookup subset is loaded". 12.d DEPENDS on the first of those — it builds a negotiator from a subset's own
     // configuration — so a defect narrowing that field to the loaded set would be self-consistent and
     // invisible there. Measured here instead of assumed there.
@@ -349,8 +349,8 @@ for (const door of DOORS) {
     for (const tag of ["fr-be", "fr-FR", "ja"]) {
       const subset = await door.load(tag);
       assert.deepEqual(
-        { ...plain(subset.manifestLocaleConfiguration), tiebreakers: plain(subset.manifestLocaleConfiguration.tiebreakers) },
-        { ...plain(whole.manifestLocaleConfiguration), tiebreakers: plain(whole.manifestLocaleConfiguration.tiebreakers) },
+        { ...plain(subset.manifestLocaleConfiguration), tiebreakerLocalesByLanguageCode: plain(subset.manifestLocaleConfiguration.tiebreakerLocalesByLanguageCode) },
+        { ...plain(whole.manifestLocaleConfiguration), tiebreakerLocalesByLanguageCode: plain(whole.manifestLocaleConfiguration.tiebreakerLocalesByLanguageCode) },
         tag);
       assert.deepEqual(subset.manifestLocaleConfiguration.supportedLocales, MANIFEST_TAGS, tag);
       assert.deepEqual(plain(subset.catalogIdentity), plain(whole.catalogIdentity), tag);
@@ -391,12 +391,12 @@ test("12.b: RECORDED DID-NOT-FIRE — plan(selection) equals plan(argument), mea
 for (const door of DOORS) {
   test(`12.c [${door.name}]: the direct flow reports AND WALKS FROM the preserved input`, async () => {
     const subset = await door.load("fr-be");
-    const client = createStrings({ loaded: subset, localeResolver: () => "fr-BE" });
+    const client = createStrings({ loaded: subset, localeSupplier: () => "fr-BE" });
 
     const result = /** @type {any} */ (client.getResult("Shared"));
     assert.equal(result.lookupLocale, "fr-BE");
-    assert.equal(result.localeMatch.locale, "fr-FR", "the diagnostic legitimately differs");
-    assert.equal(result.localeMatch.matchType, "likely-subtag");
+    assert.equal(result.localeMatchResult.locale, "fr-FR", "the diagnostic legitimately differs");
+    assert.equal(result.localeMatchResult.matchType, "likely-subtag");
     assert.equal(result.resolvedLocale, "fr-FR", "and resolution answers from that other locale");
     // ASSERTED ALONGSIDE `lookupLocale`, and it is the half that cannot be faked: an implementation
     // could preserve the reported tag cosmetically while starting the walk at the selection, and then
@@ -416,10 +416,10 @@ for (const door of DOORS) {
     // THE CONTROL — the coinciding instance, where lookup, selection and resolution are one string.
     // It stays green under every mutation the rows above catch, which is precisely why it cannot
     // substitute for them.
-    const coinciding = createStrings({ loaded: await door.load("fr-FR"), localeResolver: () => "fr-FR" });
+    const coinciding = createStrings({ loaded: await door.load("fr-FR"), localeSupplier: () => "fr-FR" });
     const control = /** @type {any} */ (coinciding.getResult("Shared"));
     assert.equal(control.lookupLocale, "fr-FR");
-    assert.equal(control.localeMatch.locale, "fr-FR");
+    assert.equal(control.localeMatchResult.locale, "fr-FR");
     assert.equal(control.resolvedLocale, "fr-FR");
     assert.equal(control.translation, "shared fr-FR");
   });
@@ -429,14 +429,14 @@ for (const door of DOORS) {
     // nothing: on an instance already built with `fr-BE`, a `forLocale("fr-BE")` call is satisfied
     // byte-for-byte by an implementation that drops the per-call options on the floor. `de-CH` is the
     // instance tag here and whole-manifest coverage permits it (plan 3.4:621).
-    const whole = createStrings({ loaded: await door.whole(), localeResolver: () => "de-CH" });
+    const whole = createStrings({ loaded: await door.whole(), localeSupplier: () => "de-CH" });
     const ambient = /** @type {any} */ (whole.getResult("Shared"));
     assert.equal(ambient.lookupLocale, "de-CH");
     assert.equal(ambient.translation, "shared en", "de-CH resolves through the fallback");
 
     const perCall = /** @type {any} */ (whole.getResult("Shared", undefined, forLocale("fr-BE")));
     assert.equal(perCall.lookupLocale, "fr-BE", "the per-call door is honoured, not ignored");
-    assert.equal(perCall.localeMatch.locale, "fr-FR");
+    assert.equal(perCall.localeMatchResult.locale, "fr-FR");
     assert.equal(perCall.attemptedLocales[0], "fr-BE");
     assert.equal(perCall.translation, "shared fr-FR");
 
@@ -444,7 +444,7 @@ for (const door of DOORS) {
     // per-call door, on a lookup subset, refuses a tag the subset was not planned from — even though
     // this subset holds every catalog `fr-FR` would need. Neither half is satisfiable by an
     // implementation that ignores the per-call option.
-    const client = createStrings({ loaded: await door.load("fr-be"), localeResolver: () => "fr-BE" });
+    const client = createStrings({ loaded: await door.load("fr-be"), localeSupplier: () => "fr-BE" });
     const refused = attempt(() => ({
       get: (/** @type {string} */ key) => client.get(key, undefined, forLocale("fr-FR")),
     }));
@@ -475,7 +475,7 @@ for (const door of DOORS) {
     // manifest. That is also the zh-123 control for this row: a match whose `consideredLocales`
     // disagree with the applicable configuration is refused by plan 3.4's match validation BEFORE the
     // coverage rule is reached, so a hand-built match would give a green refusal for the wrong reason.
-    const negotiator = createLocaleNegotiator(whole.manifestLocaleConfiguration);
+    const negotiator = createLocaleMatcher(whole.manifestLocaleConfiguration);
     const match = negotiator.matchForLanguageRanges(parseLanguageRanges("fr-BE"));
 
     // Plan 6.2:2060, executed rather than transcribed — the range solver's election is whatever it is.
@@ -496,17 +496,17 @@ for (const door of DOORS) {
     const forSelection = await door.load(matchedLookup);
     assert.equal(forSelection.coverage.lookupLocale, matchedLookup);
 
-    const client = createStrings({ loaded: forSelection, localeMatchResolver: () => match });
+    const client = createStrings({ loaded: forSelection, localeMatchSupplier: () => match });
     const result = /** @type {any} */ (client.getResult("Shared"));
     assert.equal(result.lookupLocale, matchedLookup);
-    assert.equal(result.localeMatch.locale, match.locale);
+    assert.equal(result.localeMatchResult.locale, match.locale);
     assert.equal(result.attemptedLocales[0], matchedLookup, "and the walk STARTS there");
     assert.equal(result.translation, `shared ${matchedLookup}`);
 
     // (2) THE SAME OBSERVATION WITH THE COVERAGE RULE INERT. Under whole-manifest coverage nothing can
     // refuse a mis-derived lookup, so reading the range spelling or the configured fallback instead of
     // the selection shows up here as a WRONG VALUE rather than as someone else's ConfigurationError.
-    const overWhole = createStrings({ loaded: whole, localeMatchResolver: () => match });
+    const overWhole = createStrings({ loaded: whole, localeMatchSupplier: () => match });
     const wide = /** @type {any} */ (overWhole.getResult("Shared"));
     assert.equal(wide.lookupLocale, match.locale);
     assert.equal(wide.attemptedLocales[0], match.locale);
@@ -514,7 +514,7 @@ for (const door of DOORS) {
 
     // (3) The PER-CALL match door, on an instance whose own locale disagrees with it — the same
     // vacuity trap the per-call row in 12.c had to avoid.
-    const perCallHost = createStrings({ loaded: whole, localeResolver: () => "de-CH" });
+    const perCallHost = createStrings({ loaded: whole, localeSupplier: () => "de-CH" });
     const perCall = /** @type {any} */ (perCallHost.getResult("Shared", undefined, forLocaleMatch(match)));
     assert.equal(perCall.lookupLocale, match.locale);
     assert.equal(perCall.attemptedLocales[0], match.locale);
@@ -522,7 +522,7 @@ for (const door of DOORS) {
 
   test(`12.e [${door.name}]: an unmatched supplied match preserves the match's configured FALLBACK`, async () => {
     const whole = await door.whole();
-    const negotiator = createLocaleNegotiator(whole.manifestLocaleConfiguration);
+    const negotiator = createLocaleMatcher(whole.manifestLocaleConfiguration);
     const unmatched = negotiator.matchForLanguageRanges(parseLanguageRanges("ja, ko"));
 
     assert.equal(unmatched.locale, null);
@@ -536,15 +536,15 @@ for (const door of DOORS) {
     assert.equal(forFallback.coverage.lookupLocale, "en");
     assert.deepEqual(localesOf(forFallback), ["en"]);
 
-    const client = createStrings({ loaded: forFallback, localeMatchResolver: () => unmatched });
+    const client = createStrings({ loaded: forFallback, localeMatchSupplier: () => unmatched });
     const result = /** @type {any} */ (client.getResult("Shared"));
     assert.equal(result.lookupLocale, "en");
     assert.equal(result.resolvedLocale, "en");
-    assert.equal(result.localeMatch.matchType, "none");
+    assert.equal(result.localeMatchResult.matchType, "none");
     assert.equal(result.translation, "shared en");
 
     // With the coverage rule inert, again — so the null branch is observed as a value.
-    const overWhole = createStrings({ loaded: whole, localeMatchResolver: () => unmatched });
+    const overWhole = createStrings({ loaded: whole, localeMatchSupplier: () => unmatched });
     const wide = /** @type {any} */ (overWhole.getResult("Shared"));
     assert.equal(wide.lookupLocale, "en");
     assert.equal(wide.attemptedLocales[0], "en");
@@ -553,7 +553,7 @@ for (const door of DOORS) {
     // CONTROLS: the matched arm of 12.d over the same negotiator (so "unmatched" is not the only
     // thing this negotiator can produce), and this subset's own DIRECT door, proving the `en` subset
     // is loadable and complete on its own terms.
-    assert.equal(createStrings({ loaded: forFallback, localeResolver: () => "en" }).get("Shared"), "shared en");
+    assert.equal(createStrings({ loaded: forFallback, localeSupplier: () => "en" }).get("Shared"), "shared en");
     assert.equal(forFallback.complete, true);
   });
 }
@@ -565,7 +565,7 @@ for (const door of DOORS) {
 for (const door of DOORS) {
   test(`12.f [${door.name}]: THE CONTRAST — the two preserved inputs are not interchangeable`, async () => {
     const whole = await door.whole();
-    const negotiator = createLocaleNegotiator(whole.manifestLocaleConfiguration);
+    const negotiator = createLocaleMatcher(whole.manifestLocaleConfiguration);
     const match = negotiator.matchForLanguageRanges(parseLanguageRanges("fr-BE"));
     const matchedLookup = match.locale ?? match.fallbackLocale;
 
@@ -588,9 +588,9 @@ for (const door of DOORS) {
     // anyway: `configurationError` returns a plain Error with a name and a code and no structured
     // expected/actual, so nothing in the VALUE distinguishes a coverage refusal from a
     // match-configuration one.
-    const direct = (/** @type {any} */ loaded) => () => createStrings({ loaded, localeResolver: () => "fr-BE" });
+    const direct = (/** @type {any} */ loaded) => () => createStrings({ loaded, localeSupplier: () => "fr-BE" });
     const supplied = (/** @type {any} */ loaded) => () =>
-      createStrings({ loaded, localeMatchResolver: () => match });
+      createStrings({ loaded, localeMatchSupplier: () => match });
 
     const accepted = attempt(direct(forDirect));
     assert.equal(accepted.site, null);
@@ -616,7 +616,7 @@ for (const door of DOORS) {
     // ties the refusal to subsetting rather than to a label.
     const forJa = await door.load("ja");
     assert.ok(Object.keys(forJa.catalogs).length < MANIFEST_TAGS.length);
-    const jaAccepted = attempt(() => createStrings({ loaded: forJa, localeResolver: () => "ja" }));
+    const jaAccepted = attempt(() => createStrings({ loaded: forJa, localeSupplier: () => "ja" }));
     assert.equal(jaAccepted.site, null);
     assert.equal(jaAccepted.value, "shared en");
     assertRefused(attempt(direct(forJa)), `${door.name}: fr-BE against a subset planned from ja`);
@@ -633,18 +633,18 @@ for (const door of DOORS) {
     assert.equal(whole.complete, true);
     assert.deepEqual(Object.keys(whole.catalogs).sort(), MANIFEST_TAGS);
 
-    const negotiator = createLocaleNegotiator(whole.manifestLocaleConfiguration);
+    const negotiator = createLocaleMatcher(whole.manifestLocaleConfiguration);
     const match = negotiator.matchForLanguageRanges(parseLanguageRanges("fr-BE"));
 
     for (const [tag, expected] of /** @type {[string, string][]} */ ([
       ["fr-BE", "shared fr-FR"], ["fr-FR", "shared fr-FR"], ["ja", "shared en"], ["de-CH", "shared en"],
     ])) {
-      const cell = attempt(() => createStrings({ loaded: whole, localeResolver: () => tag }));
+      const cell = attempt(() => createStrings({ loaded: whole, localeSupplier: () => tag }));
       assert.equal(cell.site, null, `${tag} must be accepted under whole coverage`);
       assert.equal(cell.value, expected, tag);
     }
 
-    const viaMatch = attempt(() => createStrings({ loaded: whole, localeMatchResolver: () => match }));
+    const viaMatch = attempt(() => createStrings({ loaded: whole, localeMatchSupplier: () => match }));
     assert.equal(viaMatch.site, null);
     assert.equal(viaMatch.value, "shared fr-FR");
   });
@@ -663,7 +663,7 @@ test("the third door: loadStringsFromDirectory records ENTIRE-MANIFEST coverage;
   assert.equal(composed.coverage.kind, "entire-manifest");
   assert.equal(/** @type {any} */ (composed.coverage).lookupLocale, undefined);
   assert.deepEqual(Object.keys(composed.catalogs).sort(), MANIFEST_TAGS);
-  assert.equal(createStrings({ loaded: composed, localeResolver: () => "de-CH" }).get("Shared"), "shared en");
+  assert.equal(createStrings({ loaded: composed, localeSupplier: () => "de-CH" }).get("Shared"), "shared en");
 
   // …and the RAW door — the port of Java's `loadFromFilesystem` — carries no coverage record at all,
   // because it has no manifest, no digest and no plan to have been planned from. It returns
@@ -673,7 +673,7 @@ test("the third door: loadStringsFromDirectory records ENTIRE-MANIFEST coverage;
   assert.deepEqual(Object.keys(raw.catalogs).sort(), MANIFEST_TAGS);
   assert.equal(raw.coverage, undefined);
   assert.equal(raw.requestedFiles, undefined);
-  assert.throws(() => createStrings({ loaded: raw, localeResolver: () => "en" }), (error) => {
+  assert.throws(() => createStrings({ loaded: raw, localeSupplier: () => "en" }), (error) => {
     assert.equal(/** @type {any} */ (error).name, "ConfigurationError");
     return true;
   }, "a catalog map is not a LoadedStrings and must not be treated as one");

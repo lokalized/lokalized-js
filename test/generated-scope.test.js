@@ -95,9 +95,9 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
     const resolver = recordingResolver();
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
+      localeSupplier: () => "en",
       phoneticResolver: resolver.resolve,
-      strings: {
+      localizedStringSupplier: () => ({
         en: {
           Shadow: {
             translation: "{{word}} {{article}}",
@@ -113,7 +113,7 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
             },
           },
         },
-      },
+      }),
     });
 
     assert.equal(strings.get("Shadow", { word: "apple", swap: 1 }), "banana an");
@@ -128,9 +128,9 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
     const resolver = recordingResolver();
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
+      localeSupplier: () => "en",
       phoneticResolver: resolver.resolve,
-      strings: {
+      localizedStringSupplier: () => ({
         en: {
           Shadow: {
             translation: "{{word}} {{article}}",
@@ -146,7 +146,7 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
             },
           },
         },
-      },
+      }),
     });
 
     assert.equal(strings.get("Shadow", { word: "apple", swap: 1, other: "banana" }), "banana a");
@@ -165,9 +165,9 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
     const resolver = recordingResolver();
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
+      localeSupplier: () => "en",
       phoneticResolver: resolver.resolve,
-      strings: {
+      localizedStringSupplier: () => ({
         en: {
           Shadow: {
             translation: "{{word}} {{article}}",
@@ -183,7 +183,7 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
             },
           },
         },
-      },
+      }),
     });
 
     assert.equal(strings.get("Shadow", { word: "apple", swap: 2 }), "bananas an");
@@ -196,8 +196,8 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
     // than classifying the expanded template text.
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: {
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({
         en: {
           Sibling: {
             translation: "{{count}} {{noun}}",
@@ -207,7 +207,7 @@ describe("plan 8.3 — a generated fragment's selectors read raw caller input", 
             },
           },
         },
-      },
+      }),
     });
 
     // `noun` selects on `count`, which the CALLER never supplied — so it is absent, not "many".

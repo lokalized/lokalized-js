@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { createStrings, forLocaleMatch } from "../src/core/index.js";
-import { createLocaleNegotiator } from "../src/negotiate/index.js";
+import { createLocaleMatcher } from "../src/negotiate/index.js";
 
 /**
  * THE SUPPLIED-MATCH INGRESS — `LocaleUtils.requireWellFormed` at the three sites inside the PUBLIC
@@ -14,7 +14,7 @@ import { createLocaleNegotiator } from "../src/negotiate/index.js";
  * custom LocaleMatcher implementations can expose the same diagnostics"). The port's counterpart is
  * `validateLocaleMatchStructure`, reached from the allowlisted export `forLocaleMatch`
  * (`lokalized-spec/symbol-allowlist.json:104`, shipped through the `lokalized/core` subpath), from a
- * per-call `{ localeMatch }`, and from `localeMatchResolver`.
+ * per-call `{ localeMatchResult }`, and from `localeMatchSupplier`.
  *
  * WHY THIS FILE EXISTS, and it is the same reason `test/construction-ingress.test.js` does, one
  * object over. The port called `normalizeTag` at all three — the TAG-level guard, which ACCEPTS
@@ -193,26 +193,26 @@ describe("the same three checks through the consuming surfaces", () => {
   const build = () =>
     createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "fr",
-      strings: { fr: { Hello: "bonjour" }, en: { Hello: "hello" } },
+      localeSupplier: () => "fr",
+      localizedStringSupplier: () => ({ fr: { Hello: "bonjour" }, en: { Hello: "hello" } }),
     });
 
-  it("a per-call { localeMatch } is refused at the same site", () => {
+  it("a per-call { localeMatchResult } is refused at the same site", () => {
     assert.throws(
-      () => build().get("Hello", undefined, { localeMatch: { ...matched(), locale: "en-x-lvariant-NY", consideredLocales: ["en-x-lvariant-NY", "fr"] } }),
+      () => build().get("Hello", undefined, { localeMatchResult: { ...matched(), locale: "en-x-lvariant-NY", consideredLocales: ["en-x-lvariant-NY", "fr"] } }),
       { name: "RangeError", message: "Selected locale 'en-x-lvariant-NY' is not a well-formed IETF BCP 47 locale" },
     );
   });
 
-  it("a localeMatchResolver result is refused at the same site, not as a set disagreement", () => {
+  it("a localeMatchSupplier result is refused at the same site, not as a set disagreement", () => {
     // BEFORE the fix this reported `localeMatchSupplier returned a result for different supported
     // locales` for an ill-formed CONSIDERED locale and `The selected locale must be present in
     // considered locales` for an ill-formed SELECTED one — refusing, but for the wrong reason, from
     // the instance-dependent layer that runs after this one.
     const strings = createStrings({
       fallbackLocale: "fr",
-      strings: { fr: { Hello: "bonjour" }, en: { Hello: "hello" } },
-      localeMatchResolver: () => ({ ...matched(), consideredLocales: ["en-x-lvariant-NY", "fr"] }),
+      localizedStringSupplier: () => ({ fr: { Hello: "bonjour" }, en: { Hello: "hello" } }),
+      localeMatchSupplier: () => ({ ...matched(), consideredLocales: ["en-x-lvariant-NY", "fr"] }),
     });
 
     assert.throws(
@@ -221,21 +221,21 @@ describe("the same three checks through the consuming surfaces", () => {
     );
   });
 
-  it("createLocaleNegotiator can no longer report an ill-formed considered locale", () => {
-    // MEASURED before the fix: `createLocaleNegotiator({ fallbackLocale: "fr", supportedLocales:
+  it("createLocaleMatcher can no longer report an ill-formed considered locale", () => {
+    // MEASURED before the fix: `createLocaleMatcher({ fallbackLocale: "fr", supportedLocales:
     // ["fr", "en-x-lvariant-NY"] }).matchFor("fr").consideredLocales` answered
-    // `["en-x-lvariant-NY", "fr"]` — a `LocaleMatch` value Java's type system cannot construct,
+    // `["en-x-lvariant-NY", "fr"]` — a `LocaleMatchResult` value Java's type system cannot construct,
     // because `DefaultStrings.java:1945/:1951` hand `consideredLocales` to the very constructor that
     // refuses it. The negotiator refuses its own configuration first, which is why this asserts a
     // throw rather than a sorted list.
     assert.throws(
-      () => createLocaleNegotiator({ fallbackLocale: "fr", supportedLocales: ["fr", "en-x-lvariant-NY"] }).matchFor("fr"),
+      () => createLocaleMatcher({ fallbackLocale: "fr", supportedLocales: ["fr", "en-x-lvariant-NY"] }).matchFor("fr"),
       { message: /is not a well-formed IETF BCP 47 locale/ },
     );
   });
 
   it("CONTROL: a well-formed negotiator still answers", () => {
-    const match = createLocaleNegotiator({ fallbackLocale: "fr", supportedLocales: ["fr", "en"] }).matchFor("en");
+    const match = createLocaleMatcher({ fallbackLocale: "fr", supportedLocales: ["fr", "en"] }).matchFor("en");
     assert.equal(match.locale, "en");
     assert.deepEqual([...match.consideredLocales], ["en", "fr"]);
   });

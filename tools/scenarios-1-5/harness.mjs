@@ -22,10 +22,11 @@ async function sample() {
   // A fixture's `locale` is the tag the instance's resolver answers. `createStrings` takes no constant
   // language since 2026-09-27 (an instance needs a resolver, as a Java instance needs a supplier), and
   // a fixture is JSON, which cannot carry a function — so the harness builds the resolver.
-  const { locale, ...declared } = fixture.options;
-  const options = { ...declared, localeResolver: () => locale };
-  if (job.input === "raw")
-    options.strings = Object.fromEntries(Object.entries(options.strings).map(([tag, catalog]) => [tag, JSON.stringify(catalog)]));
+  const { locale, strings: declaredCatalogs, ...declared } = fixture.options;
+  const catalogs = job.input === "raw"
+    ? Object.fromEntries(Object.entries(declaredCatalogs).map(([tag, catalog]) => [tag, JSON.stringify(catalog)]))
+    : declaredCatalogs;
+  const options = { ...declared, localeSupplier: () => locale, localizedStringSupplier: () => catalogs };
 
   gc(); gc();
   const before = process.memoryUsage().heapUsed;

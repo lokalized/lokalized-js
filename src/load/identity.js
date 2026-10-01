@@ -4,7 +4,7 @@
  *
  * A catalog set's identity is a property of the TRANSLATIONS, deliberately not of how they were
  * served. The plan states the projection exactly: JCS is applied to
- * `{formatVersion, catalogVersion, resolvedFallbackLocale, localeToSha256, tiebreakers}` and the
+ * `{formatVersion, catalogVersion, resolvedFallbackLocale, localeToSha256, tiebreakerLocalesByLanguageCode}` and the
  * `catalogFingerprint` is the full lowercase hexadecimal SHA-256 of those exact UTF-8 bytes.
  *
  * WHAT IT EXCLUDES IS THE WHOLE POINT, and it is a behaviour rather than an omission: the fingerprint
@@ -64,11 +64,11 @@ function projection(input) {
   }
 
   /** @type {Record<string, string[]>} */
-  const tiebreakers = Object.create(null);
-  for (const [tag, candidates] of Object.entries(input.tiebreakers ?? {})) {
+  const tiebreakerLocalesByLanguageCode = Object.create(null);
+  for (const [tag, candidates] of Object.entries(input.tiebreakerLocalesByLanguageCode ?? {})) {
     if (!Array.isArray(candidates))
-      throw new TypeError(`The tiebreakers for '${tag}' must be an array of locale tags`);
-    tiebreakers[tag] = [...candidates];
+      throw new TypeError(`The tiebreakerLocalesByLanguageCode for '${tag}' must be an array of locale tags`);
+    tiebreakerLocalesByLanguageCode[tag] = [...candidates];
   }
 
   // A null-prototype object is not a "plain object" to the canonicalizer, so the projection is handed
@@ -79,7 +79,7 @@ function projection(input) {
     catalogVersion: input.catalogVersion,
     resolvedFallbackLocale: input.resolvedFallbackLocale,
     localeToSha256: { ...localeToSha256 },
-    tiebreakers: { ...tiebreakers },
+    tiebreakerLocalesByLanguageCode: { ...tiebreakerLocalesByLanguageCode },
   };
 }
 
@@ -127,9 +127,9 @@ export function catalogIdentityInputFor(manifest) {
   try {
     const configured = normalizeTag(manifest.fallbackLocale);
     const supported = Object.keys(manifest.files ?? {}).map(normalizeTag);
-    resolvedFallbackLocale = electFallbackLocale(configured, supported, manifest.tiebreakers) ?? configured;
+    resolvedFallbackLocale = electFallbackLocale(configured, supported, manifest.tiebreakerLocalesByLanguageCode) ?? configured;
   } catch {
-    // Semantic validation owns malformed tags and tiebreakers; the identity projection must still
+    // Semantic validation owns malformed tags and tiebreakerLocalesByLanguageCode; the identity projection must still
     // be available when a caller builds an intentionally invalid manifest for a refusal test.
   }
 
@@ -138,6 +138,6 @@ export function catalogIdentityInputFor(manifest) {
     catalogVersion: manifest.catalogVersion,
     resolvedFallbackLocale,
     localeToSha256,
-    tiebreakers: manifest.tiebreakers,
+    tiebreakerLocalesByLanguageCode: manifest.tiebreakerLocalesByLanguageCode,
   };
 }

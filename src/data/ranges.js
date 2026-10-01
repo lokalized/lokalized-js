@@ -62,7 +62,7 @@ import { decode as decodeProvenance } from "./provenance.js";
 
 const freeze = Object.freeze;
 
-/** @typedef {Readonly<{ $lokalized: "language-form", axis: string, name: string, renderName: string }>} CardinalityValue */
+/** @typedef {import("../core/index.js").Cardinality} Cardinality */
 
 /**
  * The library-owned failure for a module that cannot be paired with the root it was loaded beside.
@@ -113,7 +113,7 @@ const CARDINALITY_BY_CATEGORY = freeze({
  * A category is carried as its index in `CATEGORY_ORDER` from here on, so a range row is a pair of
  * small integers and a group's table is 36 bytes rather than 36 string keys.
  *
- * @type {CardinalityValue[]}
+ * @type {Cardinality[]}
  */
 const VALUE_BY_INDEX = [];
 /** @type {Map<string, number>} category name (`"one"`) to index, for reading the generated table */
@@ -125,7 +125,7 @@ for (let index = 0; index < CATEGORY_COUNT; index++) {
   const category = CATEGORY_ORDER[index];
   const value = category === undefined ? undefined : CARDINALITY_BY_CATEGORY[category];
 
-  // The root types these `CardinalityValue | undefined`, because it destructures them out of a
+  // The root types these `Cardinality | undefined`, because it destructures them out of a
   // `Record<string, …>` and `noUncheckedIndexedAccess` widens every such read. The guard is
   // therefore a type obligation rather than a real possibility — but it is also the one place this
   // module trusts the root's shape, so it is checked rather than cast away.
@@ -139,7 +139,7 @@ for (let index = 0; index < CATEGORY_COUNT; index++) {
 
 /**
  * @param {number} index
- * @returns {CardinalityValue}
+ * @returns {Cardinality}
  */
 function valueAt(index) {
   const value = VALUE_BY_INDEX[index];
@@ -343,7 +343,7 @@ export const cardinalRangeData = freeze({
  * The root's frozen `CARDINALITY_*` constant with this name.
  *
  * @param {string} name
- * @returns {CardinalityValue}
+ * @returns {Cardinality}
  */
 function cardinalityNamed(name) {
   const index = INDEX_BY_FORM_NAME.get(name);
@@ -371,12 +371,12 @@ function cardinalityNamed(name) {
  * documented default. A locale with no cardinal rules at all throws instead: an unsupported locale
  * is a caller error, not a range whose answer happens to be the end.
  *
- * @param {CardinalityValue} start the cardinality of the range's start value
- * @param {CardinalityValue} end the cardinality of the range's end value
+ * @param {Cardinality} start the cardinality of the range's start value
+ * @param {Cardinality} end the cardinality of the range's end value
  * @param {string} locale a BCP 47 locale tag. An ill-formed tag is not an error here any more than
  *   it is in `Locale.forLanguageTag`: it resolves to the undetermined locale, exactly as it does for
  *   `cardinalityForNumber`, and only a non-string is rejected outright.
- * @returns {CardinalityValue} one of the root's frozen `CARDINALITY_*` constants
+ * @returns {Cardinality} one of the root's frozen `CARDINALITY_*` constants
  * @throws {TypeError} if an endpoint is not a `CARDINALITY_*` value, or the locale is not a string
  * @throws {UnsupportedLocaleError} if the locale has no CLDR cardinal rules
  */

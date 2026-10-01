@@ -1,7 +1,7 @@
 // @ts-check
 
 /**
- * `createStrings({ tiebreakers })`'s construction-time rules.
+ * `createStrings({ tiebreakerLocalesByLanguageCode })`'s construction-time rules.
  *
  * A tiebreaker says which of two catalogs sharing a language code serves a broad request for it.
  * Java treats a missing one as a configuration error rather than a preference: `DefaultStrings`
@@ -9,7 +9,7 @@
  * instance whose resolution order falls out of catalog insertion order.
  *
  * The corpus cannot gate any of this. Every constructing fixture that loads two locales sharing a
- * language code also supplies tiebreakers, and the four fixtures that do not are `loadOnly` — Java
+ * language code also supplies tiebreakerLocalesByLanguageCode, and the four fixtures that do not are `loadOnly` — Java
  * parsed their strings files and never built a `Strings` from them. So the rules below were read off
  * the real `DefaultStrings` on the pinned JDK, and the messages are asserted against what it
  * printed, not against what the port happens to say.
@@ -20,24 +20,24 @@ import { describe, it } from "node:test";
 
 import { createStrings } from "../src/core/index.js";
 
-/** @param {Record<string, unknown>} strings @param {Record<string, string[]>} [tiebreakers] */
-const build = (strings, tiebreakers) =>
+/** @param {Record<string, unknown>} strings @param {Record<string, string[]>} [tiebreakerLocalesByLanguageCode] */
+const build = (strings, tiebreakerLocalesByLanguageCode) =>
   createStrings({
     fallbackLocale: "en",
-    localeResolver: () => "en",
-    strings,
-    ...(tiebreakers ? { tiebreakers } : {}),
+    localeSupplier: () => "en",
+    localizedStringSupplier: () => (strings),
+    ...(tiebreakerLocalesByLanguageCode ? { tiebreakerLocalesByLanguageCode } : {}),
   });
 
 const EN_PAIR = { en: { K: "a" }, "en-US": { K: "b" } };
 
-describe("createStrings({ tiebreakers }) — ambiguity is refused at construction", () => {
-  it("refuses two locales sharing a language code with no tiebreakers", () => {
+describe("createStrings({ tiebreakerLocalesByLanguageCode }) — ambiguity is refused at construction", () => {
+  it("refuses two locales sharing a language code with no tiebreakerLocalesByLanguageCode", () => {
     // The report that opened this gap: JS built the instance and answered lookups.
     assert.throws(() => build(EN_PAIR), {
       name: "RangeError",
       message:
-        "You must specify tiebreaker locales via createStrings({ tiebreakers }) to resolve " +
+        "You must specify tiebreaker locales via createStrings({ tiebreakerLocalesByLanguageCode }) to resolve " +
         "ambiguity for language code 'en' because localized strings exist for the following " +
         "locale[s]: [en, en-US]",
     });
@@ -61,7 +61,7 @@ describe("createStrings({ tiebreakers }) — ambiguity is refused at constructio
   it("groups by CANONICAL language code, so `mo` and `ro` collide", () => {
     // Not a spelling collision: CLDR canonicalizes `mo` to `ro`, so one language code carries both
     // and a request for `ro` has the same two answers `en` had. Java refuses this pair too.
-    assert.throws(() => createStrings({ fallbackLocale: "ro", localeResolver: () => "ro", strings: { mo: { K: "a" }, ro: { K: "b" } } }), {
+    assert.throws(() => createStrings({ fallbackLocale: "ro", localeSupplier: () => "ro", localizedStringSupplier: () => ({ mo: { K: "a" }, ro: { K: "b" } }) }), {
       message: /language code 'ro' because localized strings exist for the following locale\[s\]: \[mo, ro\]/,
     });
   });
@@ -84,7 +84,7 @@ describe("createStrings({ tiebreakers }) — ambiguity is refused at constructio
   });
 });
 
-describe("createStrings({ tiebreakers }) — a supplied list must be an exact permutation", () => {
+describe("createStrings({ tiebreakerLocalesByLanguageCode }) — a supplied list must be an exact permutation", () => {
   it("refuses a list that omits a loaded locale", () => {
     assert.throws(() => build(EN_PAIR, { en: ["en"] }), {
       name: "RangeError",

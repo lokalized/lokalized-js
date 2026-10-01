@@ -450,16 +450,16 @@ function pinnedRangeEquivalents(range) {
  * consumer imported from decided whether their editor stopped them. That is S28's asymmetry, and it
  * is exactly why that tool probes every subpath a name is published on rather than the first one.
  *
- * The SHAPE still differs from core's deliberately and is left alone: here `tiebreakers` is optional
- * and may be a `ReadonlyMap`, because `createLocaleNegotiator({ fallbackLocale, supportedLocales })`
- * with no tiebreakers at all is the ordinary call. Narrowing it to core's required-record form to
+ * The SHAPE still differs from core's deliberately and is left alone: here `tiebreakerLocalesByLanguageCode` is optional
+ * and may be a `ReadonlyMap`, because `createLocaleMatcher({ fallbackLocale, supportedLocales })`
+ * with no tiebreakerLocalesByLanguageCode at all is the ordinary call. Narrowing it to core's required-record form to
  * make the two identical would refuse that call, which is a real consumer pattern and one the
  * declaration probes themselves use.
  *
  * @typedef {Readonly<{
  *   fallbackLocale: string,
  *   supportedLocales: readonly string[],
- *   tiebreakers?: Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]>,
+ *   tiebreakerLocalesByLanguageCode?: Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]>,
  * }>} LocaleConfiguration
  */
 
@@ -557,24 +557,24 @@ function languageRangeFrom(value) {
  * import core (see `forLanguageRanges` below), and `test/option-surface.test.js` holds both copies to
  * every real `LocaleConfiguration` the library produces, so they cannot drift apart unnoticed.
  */
-const LOCALE_CONFIGURATION_MEMBERS = Object.freeze(["fallbackLocale", "supportedLocales", "tiebreakers"]);
+const LOCALE_CONFIGURATION_MEMBERS = Object.freeze(["fallbackLocale", "supportedLocales", "tiebreakerLocalesByLanguageCode"]);
 
 /**
  * @param {LocaleConfiguration} configuration
- * @returns {{ fallbackLocale: string, supportedLocales: string[], tiebreakers: LocaleConfiguration["tiebreakers"] }}
+ * @returns {{ fallbackLocale: string, supportedLocales: string[], tiebreakerLocalesByLanguageCode: LocaleConfiguration["tiebreakerLocalesByLanguageCode"] }}
  */
 function applicableConfiguration(configuration) {
 	if (typeof configuration !== "object" || configuration === null)
 		throw new RangeError("A locale configuration is required");
 
 	// A DOOR THE M-D S33 DECISION COVERS AND ITS SWEEP MISSED, because that sweep's door list was
-	// written by hand. `createLocaleNegotiator({ supportedLocales, fallbackLocale, fallbackLocal: "fr" })`
+	// written by hand. `createLocaleMatcher({ supportedLocales, fallbackLocale, fallbackLocal: "fr" })`
 	// constructed silently and negotiated against `fallbackLocale` — the typo did nothing and said
 	// nothing. Every source of a `LocaleConfiguration` this library has —
 	// `strings.getLocaleConfiguration()` on all three construction paths, and
 	// `localeConfigurationForManifest` — hands back exactly these three members, measured, so the
-	// documented `createLocaleNegotiator(strings.getLocaleConfiguration())` cannot be refused by it.
-	refuseUnknownOptions("createLocaleNegotiator", configuration, LOCALE_CONFIGURATION_MEMBERS);
+	// documented `createLocaleMatcher(strings.getLocaleConfiguration())` cannot be refused by it.
+	refuseUnknownOptions("createLocaleMatcher", configuration, LOCALE_CONFIGURATION_MEMBERS);
 
 	// THE NEGOTIATOR'S CONSTRUCTION INGRESS, and it exists because of what a matcher RETURNS rather
 	// than what it accepts. Every `matchFor*` result carries these tags as `consideredLocales` and
@@ -585,9 +585,9 @@ function applicableConfiguration(configuration) {
 	// `DefaultStrings.java:276` refuses an ill-formed catalog locale at construction; this port's
 	// `LocaleConfiguration` is hand-buildable, so the same guarantee has to be stated here.
 	//
-	// MEASURED before this check existed: `createLocaleNegotiator({ fallbackLocale: "fr",
+	// MEASURED before this check existed: `createLocaleMatcher({ fallbackLocale: "fr",
 	// supportedLocales: ["fr", "en-x-lvariant-NY"] }).matchFor("fr").consideredLocales` answered
-	// `["en-x-lvariant-NY", "fr"]` — a `LocaleMatch` VALUE JAVA'S TYPE SYSTEM CANNOT CONSTRUCT. The
+	// `["en-x-lvariant-NY", "fr"]` — a `LocaleMatchResult` VALUE JAVA'S TYPE SYSTEM CANNOT CONSTRUCT. The
 	// descriptions are Java's for the fields these become, not invented: `Considered locale` and
 	// `Fallback locale`. Refusing once at ingress rather than per result is Java's own arrangement —
 	// validate the set at construction and the result constructor's checks become unreachable — and
@@ -608,7 +608,7 @@ function applicableConfiguration(configuration) {
 				"from getLocaleConfiguration(), whose fallback is already resolved to a loaded catalog.",
 		);
 
-	return { fallbackLocale, supportedLocales, tiebreakers: configuration.tiebreakers };
+	return { fallbackLocale, supportedLocales, tiebreakerLocalesByLanguageCode: configuration.tiebreakerLocalesByLanguageCode };
 }
 
 /**
@@ -680,22 +680,23 @@ function normalizeAcceptLanguage(acceptLanguage) {
 /**
  * The two allowlisted `negotiate` type names the port declared nowhere until M8.
  *
- * **BOTH ARE DERIVED FROM WHAT SHIPS.** `LocaleMatcher` is the two-method interface, taken
+ * **BOTH ARE DERIVED FROM WHAT SHIPS.** `DirectLocaleMatcher` is the two-method interface, taken
  * as a `Pick` of the negotiator this module actually returns rather than retyped — so a signature
  * change in the runtime moves the declared type with it instead of leaving the two to disagree.
  * `LanguageRange` is core's type re-exported: a second definition here would be a second thing to
  * keep in step.
  *
  * @typedef {import("../core/index.js").LanguageRange} LanguageRange
- * @typedef {ReturnType<typeof createLocaleNegotiator>} LocaleNegotiator
- *   `interface LocaleNegotiator extends LocaleMatcher` — the whole object
- *   `createLocaleNegotiator` returns, where `LocaleMatcher` below is the two-method narrowing of it.
+ * @typedef {import("../core/index.js").LocaleMatchResult} LocaleMatchResult
+ * @typedef {ReturnType<typeof createLocaleMatcher>} LocaleMatcher
+ *   `interface LocaleMatcher extends DirectLocaleMatcher` — the whole object
+ *   `createLocaleMatcher` returns, where `DirectLocaleMatcher` below is the two-method narrowing of it.
  *   DERIVED from the factory rather than restated, so a method added to one and not the other is
  *   impossible by construction; the allowlist has named it since M7 and `declared-surface.test.js`
  *   has carried it in OWED ever since.
  *
 
- * @typedef {Pick<ReturnType<typeof createLocaleNegotiator>, "matchFor" | "bestMatchFor">} LocaleMatcher
+ * @typedef {Pick<ReturnType<typeof createLocaleMatcher>, "matchFor" | "bestMatchFor">} DirectLocaleMatcher
  */
 
 /**
@@ -757,8 +758,8 @@ function usableAcceptLanguageRanges(acceptLanguage) {
  *
  * @param {LocaleConfiguration} configuration
  */
-export function createLocaleNegotiator(configuration) {
-	const { fallbackLocale, supportedLocales, tiebreakers } = applicableConfiguration(configuration);
+export function createLocaleMatcher(configuration) {
+	const { fallbackLocale, supportedLocales, tiebreakerLocalesByLanguageCode } = applicableConfiguration(configuration);
 
 	/**
 	 * `LocaleUtils.requireWellFormed(locale, "Requested locale")` (`LocaleMatcher.java:64`).
@@ -791,7 +792,7 @@ export function createLocaleNegotiator(configuration) {
 	 * which works today.
 	 *
 	 * @param {Iterable<Readonly<{ range: string, weight?: number }>>} ranges
-	 * @returns {import("../internal/locale.js").LocaleMatch}
+	 * @returns {import("../internal/locale.js").LocaleMatchResult}
 	 */
 	const matchForLanguageRanges = (ranges) => {
 		if (ranges == null || typeof (/** @type {any} */ (ranges)[Symbol.iterator]) !== "function")
@@ -809,7 +810,7 @@ export function createLocaleNegotiator(configuration) {
 		// single locale, which is why `browser-chooser.shape.empty-range-list-yields-no-match` records
 		// NONE while still reporting every supported locale in `consideredLocales`. The solver owns that
 		// short-circuit; this door does not second-guess it.
-		return matchForRanges(members, supportedLocales, fallbackLocale, tiebreakers, pinnedRangeEquivalents);
+		return matchForRanges(members, supportedLocales, fallbackLocale, tiebreakerLocalesByLanguageCode, pinnedRangeEquivalents);
 	};
 
 	return Object.freeze({
@@ -833,10 +834,10 @@ export function createLocaleNegotiator(configuration) {
 		 * @param {string} locale
 		 */
 		matchFor: (locale) =>
-			matchFor(requestedLocale(locale), supportedLocales, fallbackLocale, tiebreakers),
+			matchFor(requestedLocale(locale), supportedLocales, fallbackLocale, tiebreakerLocalesByLanguageCode),
 		/** @param {string} locale */
 		bestMatchFor: (locale) =>
-			matchFor(requestedLocale(locale), supportedLocales, fallbackLocale, tiebreakers).locale
+			matchFor(requestedLocale(locale), supportedLocales, fallbackLocale, tiebreakerLocalesByLanguageCode).locale
 			?? fallbackLocale,
 		matchForLanguageRanges,
 		/** BOOT-M0-0449, the same element type as its sibling above.
@@ -877,12 +878,12 @@ export function createLocaleNegotiator(configuration) {
 /**
  * THE TWO OPTION HELPERS, and the reason they exist at all is about the module GRAPH rather than
  * about convenience: `forLanguageRanges` and `forAcceptLanguage` negotiate immediately and return
- * core `localeMatch` options, so the browser/root graph does not contain the whole-list solver.
+ * core `localeMatchResult` options, so the browser/root graph does not contain the whole-list solver.
  *
  * An application that wanted per-call whole-list negotiation without these would have to hand core a
  * MATCHER and let core call it — which puts this module, its full IANA language table and the range
  * solver into every graph that can render. Negotiating eagerly and handing core a plain
- * `localeMatch` keeps all of it on this side of the boundary. `test/pinned-data-only.test.js` names
+ * `localeMatchResult` keeps all of it on this side of the boundary. `test/pinned-data-only.test.js` names
  * `negotiate/index.js` among the modules the root graph may not reach, because a byte ratchet would
  * report the growth and not the reason.
  *
@@ -904,12 +905,12 @@ export function createLocaleNegotiator(configuration) {
  * BOOT-M0-0457 asks for a `readonly LanguageRange[]` here; an `Iterable` of the same element
  * accepts one and keeps the `Set` a caller may already hold.
  *
- * @param {LocaleNegotiator} negotiator
+ * @param {LocaleMatcher} negotiator
  * @param {Iterable<Readonly<{ range: string, weight?: number }>>} ranges
- * @returns {Readonly<{ localeMatch: import("../internal/locale.js").LocaleMatch }>}
+ * @returns {Readonly<{ localeMatchResult: import("../internal/locale.js").LocaleMatchResult }>}
  */
 export function forLanguageRanges(negotiator, ranges) {
-	return Object.freeze({ localeMatch: negotiator.matchForLanguageRanges(ranges) });
+	return Object.freeze({ localeMatchResult: negotiator.matchForLanguageRanges(ranges) });
 }
 
 /**
@@ -930,13 +931,13 @@ export function forLanguageRanges(negotiator, ranges) {
  * `noLocaleMatch`. Nothing here truncates — a 33-expanded-range header is refused whole, and the
  * result's `requestedLanguageRanges` is EMPTY rather than the first 32.
  *
- * @param {LocaleNegotiator} negotiator
+ * @param {LocaleMatcher} negotiator
  * @param {string | null | undefined} acceptLanguage the raw, already-combined field value
- * @returns {Readonly<{ localeMatch: import("../internal/locale.js").LocaleMatch }>}
+ * @returns {Readonly<{ localeMatchResult: import("../internal/locale.js").LocaleMatchResult }>}
  */
 export function forAcceptLanguage(negotiator, acceptLanguage) {
 	return Object.freeze({
-		localeMatch: negotiator.matchForLanguageRanges(usableAcceptLanguageRanges(acceptLanguage) ?? []),
+		localeMatchResult: negotiator.matchForLanguageRanges(usableAcceptLanguageRanges(acceptLanguage) ?? []),
 	});
 }
 

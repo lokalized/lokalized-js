@@ -55,7 +55,7 @@ import java.util.Locale.LanguageRange;
  *       TRUE OF A LOOKUP AND FALSE OF THE CLASS. That constructor is PUBLIC and documented as public
  *       ({@code LocaleMatchResult.java:65-80}), so {@code Selected locale}, {@code Fallback locale}
  *       ({@code :101}) and {@code Considered locale} are caller-facing through it and through the
- *       port's {@code forLocaleMatch} / {@code localeMatchResolver} / per-call {@code localeMatch}
+ *       port's {@code forLocaleMatch} / {@code localeMatchResolver} / per-call {@code localeMatchResult}
  *       surfaces. The port had NO counterpart for any of the three until 2026-09-09 and accepted all
  *       three ill-formed inputs. This tool still does not drive them — it has no supplied-match
  *       shape — and saying so is the point: probing only the per-call ingress would have gated one

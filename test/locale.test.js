@@ -17,7 +17,7 @@ import { describe, it } from "node:test";
 
 import { decodeLanguageEquivalents } from "../src/data/iana-range-equivalents.js";
 import { decodeRegionVariantEquivalents } from "../src/data/iana-identity-equivalents.js";
-import { createLocaleNegotiator, parseLanguageRanges } from "../src/negotiate/index.js";
+import { createLocaleMatcher, parseLanguageRanges } from "../src/negotiate/index.js";
 import {
 	IANA_IDENTITY_EQUIVALENTS,
 	candidateChain,
@@ -93,13 +93,13 @@ function consideredLocalesFor(testCase) {
 
 /**
  * Replicates the parts of the Java constructor the assembler owns: loader normalization of catalog
- * names, tiebreaker language-code normalization, the identity tiebreakers derived for a language
+ * names, tiebreaker language-code normalization, the identity tiebreakerLocalesByLanguageCode derived for a language
  * with one loaded locale, and the resolution of a fallback locale that is only canonically
  * equivalent to a loaded one (`hy-810` -> `hy-AM`).
  *
  * @param {any} fixture
  * @param {string[] | null} [consideredLocales]
- * @returns {{ supported: string[], tiebreakers: Record<string, string[]>, fallbackLocale: string }}
+ * @returns {{ supported: string[], tiebreakerLocalesByLanguageCode: Record<string, string[]>, fallbackLocale: string }}
  */
 function contextFor(fixture, consideredLocales) {
 	const supported = (consideredLocales ?? Object.keys(fixture.files ?? {}).map((name) => normalizeTag(name)))
@@ -107,10 +107,10 @@ function contextFor(fixture, consideredLocales) {
 		.sort(compareTags);
 
 	/** @type {Record<string, string[]>} */
-	const tiebreakers = {};
+	const tiebreakerLocalesByLanguageCode = {};
 
 	for (const [languageCode, locales] of Object.entries(fixture.tiebreakers ?? {}))
-		tiebreakers[languageCode] = /** @type {string[]} */ (locales).map((locale) => normalizeTag(locale));
+		tiebreakerLocalesByLanguageCode[languageCode] = /** @type {string[]} */ (locales).map((locale) => normalizeTag(locale));
 
 	const configured = normalizeTag(fixture.fallbackLocale);
 	let fallbackLocale = supported.includes(configured) ? configured : null;
@@ -122,7 +122,7 @@ function contextFor(fixture, consideredLocales) {
 		else if (equivalent.length > 1) {
 			const languageCode = primaryLanguage(configured);
 
-			for (const [suppliedCode, locales] of Object.entries(tiebreakers)) {
+			for (const [suppliedCode, locales] of Object.entries(tiebreakerLocalesByLanguageCode)) {
 				if (primaryLanguage(suppliedCode) !== languageCode) continue;
 				for (const locale of locales)
 					if (equivalent.includes(locale)) { fallbackLocale = locale; break; }
@@ -132,7 +132,7 @@ function contextFor(fixture, consideredLocales) {
 	}
 
 	assert.notEqual(fallbackLocale, null, `unresolvable fallback locale '${fixture.fallbackLocale}'`);
-	return { supported, tiebreakers, fallbackLocale: /** @type {string} */ (fallbackLocale) };
+	return { supported, tiebreakerLocalesByLanguageCode, fallbackLocale: /** @type {string} */ (fallbackLocale) };
 }
 
 describe("normalizeTag", () => {
@@ -325,9 +325,9 @@ function weightedRange(languageRange, requested) {
  * @param {any} expected the recorded LocaleMatchResult
  */
 function driveMatch(testCase, expected) {
-	const { supported, tiebreakers, fallbackLocale } =
+	const { supported, tiebreakerLocalesByLanguageCode, fallbackLocale } =
 		contextFor(corpus.fixtures[testCase.fixture], expected.consideredLocales);
-	const actual = matchFor(testCase.input.locale, supported, fallbackLocale, tiebreakers);
+	const actual = matchFor(testCase.input.locale, supported, fallbackLocale, tiebreakerLocalesByLanguageCode);
 
 	return [{
 		matchType: actual.matchType,
@@ -502,10 +502,10 @@ describe("candidateChain against the corpus", { skip: corpusSkip }, () => {
 		const failures = [];
 
 		for (const testCase of cases) {
-			const { supported, tiebreakers, fallbackLocale } =
+			const { supported, tiebreakerLocalesByLanguageCode, fallbackLocale } =
 				contextFor(corpus.fixtures[testCase.fixture], consideredLocalesFor(testCase));
 			const result = testCase.expected.result;
-			const chain = candidateChain(result.lookupLocale, supported, fallbackLocale, tiebreakers);
+			const chain = candidateChain(result.lookupLocale, supported, fallbackLocale, tiebreakerLocalesByLanguageCode);
 			/** @type {string[]} */
 			const attempted = result.attemptedLocales;
 
@@ -552,10 +552,10 @@ describe("candidateChain against the corpus", { skip: corpusSkip }, () => {
 			candidate.id === "resolution.direct.zh-tw.selection-and-resolution-diverge");
 		assert.ok(testCase, "expected the divergence case to exist in the corpus");
 
-		const { supported, tiebreakers, fallbackLocale } =
+		const { supported, tiebreakerLocalesByLanguageCode, fallbackLocale } =
 			contextFor(corpus.fixtures[testCase.fixture], consideredLocalesFor(testCase));
-		const selection = matchFor(testCase.input.locale, supported, fallbackLocale, tiebreakers);
-		const resolution = candidateChain(testCase.expected.result.lookupLocale, supported, fallbackLocale, tiebreakers);
+		const selection = matchFor(testCase.input.locale, supported, fallbackLocale, tiebreakerLocalesByLanguageCode);
+		const resolution = candidateChain(testCase.expected.result.lookupLocale, supported, fallbackLocale, tiebreakerLocalesByLanguageCode);
 
 		assert.equal(selection.locale, "zh-Hant");
 		assert.deepEqual(resolution, ["zh-TW", "zh-Hant", "en"]);
@@ -758,7 +758,7 @@ describe("the direct-match IANA identity table", () => {
 						single = `${match.locale}/${match.matchType}`;
 					} catch (error) { single = `threw ${/** @type {Error} */ (error).message}`; }
 					try {
-						const match = createLocaleNegotiator({ supportedLocales: [fallback, catalog], fallbackLocale: fallback })
+						const match = createLocaleMatcher({ supportedLocales: [fallback, catalog], fallbackLocale: fallback })
 							.matchForLanguageRanges([{ range: request, weight: 1 }]);
 						whole = `${match.locale}/${match.matchType}`;
 					} catch (error) { whole = `threw ${/** @type {Error} */ (error).message}`; }

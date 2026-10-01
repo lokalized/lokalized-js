@@ -19,7 +19,7 @@
       "en-001": { "Greeting": "Hello there, {{name}}" },
       "fr": { "Greeting": "Bonjour, {{name}}" }
     },
-    "tiebreakers": { "en": ["en", "en-001"] }
+    "tiebreakerLocalesByLanguageCode": { "en": ["en", "en-001"] }
   },
   "call": { "key": "I read {{bookCount}} books", "values": { "bookCount": 3 } },
   "expected": "I read 3 books"

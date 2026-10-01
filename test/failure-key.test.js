@@ -28,8 +28,8 @@ import * as root from "../src/index.js";
 /** A catalog with exactly one entry, so every interesting key is a MISSING one. */
 const strings = createStrings({
   fallbackLocale: "en",
-  localeResolver: () => "en",
-  strings: { en: { "Locale.Marker": "en", Slot: "{{slot}}" } },
+  localeSupplier: () => "en",
+  localizedStringSupplier: () => ({ en: { "Locale.Marker": "en", Slot: "{{slot}}" } }),
 });
 
 /** @param {string} key @param {Record<string, unknown>} [values] */

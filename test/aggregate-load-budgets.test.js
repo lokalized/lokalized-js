@@ -78,16 +78,16 @@ function directoryOf(bodies) {
  * A manifest over already-encoded bodies, shaped like `test/loader-warning-order.test.js`'s.
  *
  * @param {Record<string, string>} bodies
- * @param {{ fallbackLocale?: string, tiebreakers?: Record<string, readonly string[]> }} [options]
+ * @param {{ fallbackLocale?: string, tiebreakerLocalesByLanguageCode?: Record<string, readonly string[]> }} [options]
  */
-function manifestOver(bodies, { fallbackLocale = "en", tiebreakers = {} } = {}) {
+function manifestOver(bodies, { fallbackLocale = "en", tiebreakerLocalesByLanguageCode = {} } = {}) {
   /** @type {Record<string, { url: string, sha256: string }>} */
   const files = {};
   for (const tag of Object.keys(bodies))
     files[tag] = { url: `${tag}.json`, sha256: sha256Hex(utf8.encode(/** @type {string} */ (bodies[tag]))) };
   const draft = {
     formatVersion: 1, catalogVersion: "aggregate-budgets", catalogFingerprint: "0".repeat(64),
-    ...BUILD_IDENTITY, fallbackLocale, baseUrl: "https://cdn.example/v1/", files, tiebreakers,
+    ...BUILD_IDENTITY, fallbackLocale, baseUrl: "https://cdn.example/v1/", files, tiebreakerLocalesByLanguageCode,
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return /** @type {any} */ (draft);
@@ -416,7 +416,7 @@ test("D6: the subset door reconciles over its fetch plan, not over the manifest"
   const bodies = { en: oneNode("Hello"), "fr-CA": oneNode("Bonjour CA"), fr: oneNode("Bonjour") };
   // The tiebreaker is a precondition, not decoration: two `fr` catalogs with no declared order are
   // refused at validation, so without it this fixture never reaches a plan at all.
-  const manifest = manifestOver(bodies, { fallbackLocale: "en", tiebreakers: { fr: ["fr-CA", "fr"] } });
+  const manifest = manifestOver(bodies, { fallbackLocale: "en", tiebreakerLocalesByLanguageCode: { fr: ["fr-CA", "fr"] } });
 
   const loaded = await loadStrings(manifest, "fr-CA",
     { fetch: transportOver(bodies), limits: { maximumTranslationNodes: 3 } });

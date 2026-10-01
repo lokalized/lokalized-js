@@ -57,7 +57,7 @@ const FETCH_DOOR_NEAR_MISSES = /** @type {const} */ ({ transport: "fetch", loadi
 // places, and nothing compared them until the examples landed.
 export const DEFAULT_REQUEST = Object.freeze({ mode: "cors", credentials: "same-origin" });
 
-export { StringsLoadingError } from "./run-plan.js";
+export { LocalizedStringLoadingError } from "./run-plan.js";
 
 /**
  * The loader fails CLOSED when WebCrypto is absent, before any catalog I/O.
@@ -67,7 +67,7 @@ export { StringsLoadingError } from "./run-plan.js";
  * `error.name === "DigestUnavailableError"` — and never by `instanceof`. The name and code are
  * unchanged, so every string-matching consumer and every recorded message keeps working; what is
  * added is `instanceof`. The construction token mirrors `StringsParseError`
- * and `StringsLoadingError`.
+ * and `LocalizedStringLoadingError`.
  */
   // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.

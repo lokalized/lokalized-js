@@ -30,9 +30,9 @@ const PHONETIC = {
     placeholders: { a: { value: "term", translations: { PHONETIC_VOWEL: "an", PHONETIC_CONSONANT: "a" } } } } },
 };
 
-const instance = (/** @type {() => unknown} */ resolver, onFailure = () => THROW_EXCEPTION) =>
-  createStrings({ strings: PHONETIC, fallbackLocale: "en", localeResolver: () => "en",
-    phoneticResolver: /** @type {any} */ (resolver), onFailure: /** @type {any} */ (onFailure) });
+const instance = (/** @type {() => unknown} */ resolver, translationFailureHandler = () => THROW_EXCEPTION) =>
+  createStrings({ localizedStringSupplier: () => (PHONETIC), fallbackLocale: "en", localeSupplier: () => "en",
+    phoneticResolver: /** @type {any} */ (resolver), translationFailureHandler: /** @type {any} */ (translationFailureHandler) });
 
 const caught = (/** @type {() => unknown} */ body) => {
   try { body(); return null; } catch (error) { return /** @type {any} */ (error); }
@@ -74,8 +74,8 @@ test("a library failure carries its own code up through the ladder rather than b
   // STILL be invalid-state: the code travels with the cause, because a library failure already knows
   // the category Java would have re-derived, and re-deriving could only disagree.
   const error = caught(() =>
-    createStrings({ strings: PHONETIC, fallbackLocale: "en", localeResolver: () => "en",
-      onFailure: () => THROW_EXCEPTION }).get("Key", { term: "apple" }));
+    createStrings({ localizedStringSupplier: () => (PHONETIC), fallbackLocale: "en", localeSupplier: () => "en",
+      translationFailureHandler: () => THROW_EXCEPTION }).get("Key", { term: "apple" }));
   assert.ok(error instanceof ResolutionError);
   assert.equal(error.code, "RESOLUTION_INVALID_STATE");
   assert.ok(error.cause instanceof ResolutionError, "the leaf survives underneath the wrapper");

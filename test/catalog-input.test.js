@@ -15,7 +15,7 @@ import { createStrings } from "../src/core/index.js";
 import { parseStrings } from "../src/parse/index.js";
 
 const DOCUMENT = { "Greeting": "Hello, {{name}}" };
-const strings = (catalog) => createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: catalog } });
+const strings = (catalog) => createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: catalog }) });
 
 test("CatalogInput accepts an already-parsed object", () => {
   assert.equal(strings(DOCUMENT).get("Greeting", { name: "Ada" }), "Hello, Ada");
@@ -72,14 +72,14 @@ test("aggregate load limits span every catalog, not each one separately", () => 
   // Control: each catalog alone fits comfortably inside the budget.
   const budget = Math.floor(half.length * 1.5);
   assert.ok(half.length < budget, "each catalog must individually fit, or the test proves nothing");
-  createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: half }, loadingLimits: { maximumTotalInputBytes: budget } });
+  createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: half }), loadingLimits: { maximumTotalInputBytes: budget } });
 
   // Together they exceed it, and a per-catalog session would never notice.
   assert.throws(
     () => createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: half, fr: half },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: half, fr: half }),
       loadingLimits: { maximumTotalInputBytes: budget },
     }),
     /aggregate|total/i,
@@ -133,7 +133,7 @@ test("a ParsedStringsFile parsed for another locale is refused, not relabelled",
   // selection under it would then classify against the wrong language rather than fail.
   const parsed = parseStrings(JSON.stringify(DOCUMENT), { locale: "fr", source: "fr.json" });
   assert.throws(
-    () => createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: DOCUMENT, de: parsed } }),
+    () => createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: DOCUMENT, de: parsed }) }),
     /parsed for locale 'fr'/,
   );
 });
@@ -141,7 +141,7 @@ test("a ParsedStringsFile parsed for another locale is refused, not relabelled",
 test("a ParsedStringsFile's own case-different tag still matches its key", () => {
   const parsed = parseStrings(JSON.stringify(DOCUMENT), { locale: "en-us", source: "x" });
   assert.equal(
-    createStrings({ fallbackLocale: "en-US", localeResolver: () => "en-US", strings: { "EN-us": parsed } })
+    createStrings({ fallbackLocale: "en-US", localeSupplier: () => "en-US", localizedStringSupplier: () => ({ "EN-us": parsed }) })
       .get("Greeting", { name: "Ada" }),
     "Hello, Ada",
   );
@@ -166,8 +166,8 @@ test("model limits are charged across every catalog form, not just the raw ones"
   // governed only the catalogs that happened to arrive as text, and never the aggregate.
   const options = (strings) => ({
     fallbackLocale: "en",
-    localeResolver: () => "en",
-    strings,
+    localeSupplier: () => "en",
+    localizedStringSupplier: () => (strings),
     loadingLimits: { maximumTranslationNodes: 3 },
   });
 
@@ -201,21 +201,21 @@ test("loadingLimits' JSON nesting depth reaches the RAW form, and no longer the 
 
   // THE DECODED FORM: not charged at all, whatever the option says.
   assert.equal(
-    createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: deep } }).get("Deep", { count: 2 }),
+    createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: deep }) }).get("Deep", { count: 2 }),
     "m",
   );
 
   // THE RAW FORM: charged, and against the CALLER's number rather than the default — which is the
   // regression this test was written for. Both halves are asserted, so neither can drift alone.
   assert.throws(
-    () => createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: JSON.stringify(deep) } }),
+    () => createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: JSON.stringify(deep) }) }),
     /nesting depth/,
   );
   assert.equal(
     createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: JSON.stringify(deep) },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: JSON.stringify(deep) }),
       loadingLimits: { maximumJsonNestingDepth: 128 },
     }).get("Deep", { count: 2 }),
     "m",
@@ -229,14 +229,14 @@ test("runtimeLimits is refused rather than ignored", () => {
   // The message is pinned whole: it ships to callers, so it must stand on its own and cite nothing a
   // caller cannot read.
   assert.throws(
-    () => createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: DOCUMENT }, runtimeLimits: {} }),
+    () => createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: DOCUMENT }), runtimeLimits: {} }),
     {
       name: "RangeError",
       message: "createStrings({ runtimeLimits }) is not customizable: every instance runs under the same fixed runtime limits",
     },
   );
   // Explicitly `undefined` is not "supplied": it is what the declared option type says.
-  createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: DOCUMENT }, runtimeLimits: undefined });
+  createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: DOCUMENT }), runtimeLimits: undefined });
 });
 
 test("the catalog map may be a Map, not only a record", () => {
@@ -252,7 +252,7 @@ test("the catalog map may be a Map, not only a record", () => {
     ["de", new TextEncoder().encode(JSON.stringify({ "Greeting": "Hallo, {{name}}" }))],
     ["es", [{ key: "Greeting", translation: "Hola, {{name}}" }]],
   ]);
-  const instance = createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: map });
+  const instance = createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (map) });
 
   // SORTED, not the Map's insertion order — `getSupportedLocales` reports
   // `DefaultStrings.java:520-521`'s `sortedSupportedLocales` (plan 3.3:759). This line read
@@ -273,8 +273,8 @@ test("a catalog supplied where the catalog MAP belongs is refused, not indexed",
   // neither the mistake nor the option that carries it.
   for (const wrong of [[{ key: "Greeting", translation: "Hello" }], JSON.stringify(DOCUMENT), null]) {
     assert.throws(
-      () => createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: /** @type {any} */ (wrong) }),
-      (error) => error instanceof TypeError && /strings/.test(error.message),
+      () => createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ((wrong)) }),
+      (error) => error instanceof TypeError && /localizedStringSupplier/.test(error.message),
     );
   }
 });

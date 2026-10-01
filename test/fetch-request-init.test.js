@@ -74,11 +74,11 @@ const bodyFor = (/** @type {string} */ tag) => JSON.stringify({ Greeting: `hello
  * refused before any request — which is the zero-call arm, not a pass.
  *
  * @param {readonly string[]} tags
- * @param {{ fallbackLocale?: string, tiebreakers?: Record<string, readonly string[]>,
+ * @param {{ fallbackLocale?: string, tiebreakerLocalesByLanguageCode?: Record<string, readonly string[]>,
  *           strayOn?: string, declaredBytesOn?: string }} [shape]
  */
 function manifest(tags, shape = {}) {
-  const { fallbackLocale = "en", tiebreakers = {}, strayOn, declaredBytesOn } = shape;
+  const { fallbackLocale = "en", tiebreakerLocalesByLanguageCode = {}, strayOn, declaredBytesOn } = shape;
   const files = Object.fromEntries(tags.map((tag) => {
     const bytes = utf8.encode(bodyFor(tag));
     return [tag, {
@@ -96,14 +96,14 @@ function manifest(tags, shape = {}) {
     ...BUILD_IDENTITY,
     // https is mandatory: plan 6.1:1917-1918 makes the Fetch door refuse any other resolved scheme
     // before catalog I/O, and a `file:` fixture would land every test in the zero-call arm.
-    fallbackLocale, baseUrl: "https://catalogs.example.test/v1/", files, tiebreakers,
+    fallbackLocale, baseUrl: "https://catalogs.example.test/v1/", files, tiebreakerLocalesByLanguageCode,
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return /** @type {any} */ (draft);
 }
 
 /**
- * Twelve DISTINCT primary languages, which is what makes the fixture legal without tiebreakers:
+ * Twelve DISTINCT primary languages, which is what makes the fixture legal without tiebreakerLocalesByLanguageCode:
  * plan 6.2:2103 refuses a manifest declaring two catalogs for one language and no order between
  * them. Twelve, not two, because plan 6.2:2087's window is eight.
  */
@@ -112,7 +112,7 @@ const M12 = manifest(TWELVE);
 /** Under the window on purpose — see the override test that uses it. */
 const M4 = manifest(["en", "fr", "de", "es"]);
 /** Plan 8.3's own seed row, so the lookup door plans more than one file. */
-const MZH = manifest(["zh", "zh-Hant", "en"], { tiebreakers: { zh: ["zh", "zh-Hant"] } });
+const MZH = manifest(["zh", "zh-Hant", "en"], { tiebreakerLocalesByLanguageCode: { zh: ["zh", "zh-Hant"] } });
 /** M12 with init-shaped stray members on one file record, and a declared size on another. */
 const M12B = manifest(TWELVE, { strayOn: "de", declaredBytesOn: "fr" });
 

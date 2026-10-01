@@ -83,7 +83,7 @@ const freeze = Object.freeze;
  *   locale: string,
  *   source?: string,
  *   limits?: StringsLoadingLimits,
- *   onWarning?: (warning: LocalizedStringWarning) => void,
+ *   warningHandler?: (warning: LocalizedStringWarning) => void,
  *   pluralData?: Readonly<{ ordinal?: unknown, ranges?: unknown }>,
  * }>} ParseStringsOptions
  */
@@ -146,16 +146,16 @@ const freeze = Object.freeze;
 
 /**
  * Every member `parseStrings` reads. `limits` is read at this door; `source`, `locale`, `pluralData`
- * and `onWarning` are read in the shared body `parseStringsWithSession`, which this door hands its
+ * and `warningHandler` are read in the shared body `parseStringsWithSession`, which this door hands its
  * whole options object to.
  *
- * A recording proxy MISSES `onWarning` on a clean catalog, because it is read lazily inside the
+ * A recording proxy MISSES `warningHandler` on a clean catalog, because it is read lazily inside the
  * per-warning callback and a clean catalog produces none — the per-bucket blind spot this project
  * has recorded for the same technique one layer up. It is in the set because a warning-producing
  * fixture reaches it.
  */
 const PARSE_STRINGS_OPTIONS = /** @type {const} */ ([
-  "locale", "source", "limits", "onWarning", "pluralData",
+  "locale", "source", "limits", "warningHandler", "pluralData",
 ]);
 
 /**

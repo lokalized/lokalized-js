@@ -306,7 +306,7 @@ const OPEN_PORT_DEFECTS = {};
  *     **Malformed direct input fails at its validation boundary before candidate resolution**,
  *     fallback policy/observation, or failure handling".
  *   …and §3.3 again, for the per-call argument — "A direct per-call `locale` and a value returned by
- *     `localeResolver` need only normalize to a well-formed tag; unknown and unloaded tags are valid
+ *     `localeSupplier` need only normalize to a well-formed tag; unknown and unloaded tags are valid
  *     lookup requests and enter candidate resolution. **Malformed tags fail before candidate
  *     resolution.**"
  *

@@ -20,12 +20,12 @@
  * it declares NINE error classes as package exports of the form `const X: CatchOnlyErrorClass<X>`,
  * `DigestUnavailableError` among them at :1099, and :1107 says those runtime values "are public for
  * catching and `instanceof`" while the declarations "expose no constructor or extension signature".
- * Plan 3.1's `load` row permits it under the "loading errors" category `StringsLoadingError` already
+ * Plan 3.1's `load` row permits it under the "loading errors" category `LocalizedStringLoadingError` already
  * occupies. There was no widening to decide — only an undelivered promise, invisible because the
  * allowlist is generated from section **3.1 alone** and the plan declares these in **3.5**.
  *
  * **CLAUSE 75 IS TESTED HERE FOR THE HALF THAT NOW HOLDS.** `StringsParseError` has refused consumer
- * construction since M5; `StringsLoadingError` shipped without that guard and `DigestUnavailableError`
+ * construction since M5; `LocalizedStringLoadingError` shipped without that guard and `DigestUnavailableError`
  * was not a class at all — a plain `Error` with `name` and `code` assigned afterwards, recognisable
  * only by string comparison. Both now mirror `StringsParseError`. The remaining half of the clause —
  * that a CONSUMER can catch them by `instanceof` — needs `DigestUnavailableError` exported from
@@ -37,7 +37,7 @@ import { test } from "node:test";
 import { catalogIdentityInputFor } from "../src/load/identity.js";
 import { computeCatalogIdentity } from "../src/load/index.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
-import { loadEntireManifest, StringsLoadingError } from "../src/load/fetch-loader.js";
+import { loadEntireManifest, LocalizedStringLoadingError } from "../src/load/fetch-loader.js";
 import { sha256Hex } from "../src/internal/sha256.js";
 import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
@@ -50,7 +50,7 @@ function draftManifest(overrides = {}) {
   return /** @type {any} */ ({
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
     ...BUILD_IDENTITY,
-    fallbackLocale: "en", baseUrl: "https://cdn.example/v1/", files, tiebreakers: {},
+    fallbackLocale: "en", baseUrl: "https://cdn.example/v1/", files, tiebreakerLocalesByLanguageCode: {},
     ...overrides,
   });
 }
@@ -73,7 +73,7 @@ test("clause 2: the projection keeps EXACTLY the five identity fields", () => {
   // is also why the end-to-end "two origins" test below does NOT go red under that mutation: the
   // width of this projection is guarded HERE or nowhere.
   assert.deepEqual(Object.keys(catalogIdentityInputFor(draftManifest())).sort(),
-    ["catalogVersion", "formatVersion", "localeToSha256", "resolvedFallbackLocale", "tiebreakers"]);
+    ["catalogVersion", "formatVersion", "localeToSha256", "resolvedFallbackLocale", "tiebreakerLocalesByLanguageCode"]);
 });
 
 test("clause 2: the SAME translations served from two origins identify identically", () => {
@@ -112,7 +112,7 @@ test("clause 2: each excluded field, one at a time, with an INCLUDED control", (
   // pass every arm above.
   assert.notEqual(fingerprintOf(draftManifest({ catalogVersion: "v2" })), base, "catalogVersion");
   assert.notEqual(fingerprintOf(draftManifest({ fallbackLocale: "fr" })), base, "fallbackLocale");
-  assert.notEqual(fingerprintOf(draftManifest({ tiebreakers: { en: ["en"] } })), base, "tiebreakers");
+  assert.notEqual(fingerprintOf(draftManifest({ tiebreakerLocalesByLanguageCode: { en: ["en"] } })), base, "tiebreakerLocalesByLanguageCode");
 
   const otherBytes = draftManifest();
   otherBytes.files = { ...otherBytes.files, en: { ...otherBytes.files.en, sha256: "a".repeat(64) } };
@@ -123,7 +123,7 @@ test("clause 2: each excluded field, one at a time, with an INCLUDED control", (
 // Clause 75 — the library's errors are classes nobody outside the package may construct.
 // ---------------------------------------------------------------------------------------------
 
-test("clause 75: StringsLoadingError is a real Error subclass a consumer cannot construct", async () => {
+test("clause 75: LocalizedStringLoadingError is a real Error subclass a consumer cannot construct", async () => {
   // The control FIRST: the class must still be thrown and catchable by `instanceof`, or "not
   // constructible" would be satisfied by a class that is simply unusable.
   const manifest = draftManifest();
@@ -141,15 +141,15 @@ test("clause 75: StringsLoadingError is a real Error subclass a consumer cannot 
     },
   }).then(() => null, (e) => e);
 
-  assert.ok(thrown instanceof StringsLoadingError, "the loader really does throw this class");
+  assert.ok(thrown instanceof LocalizedStringLoadingError, "the loader really does throw this class");
   assert.ok(thrown instanceof Error, "and it is a genuine Error");
   assert.equal(thrown.code, "STRINGS_LOADING");
 
   // THE REFUSAL. A consumer who could construct one could fabricate a load failure that every
   // `instanceof` check in an application would believe.
-  assert.throws(() => new /** @type {any} */ (StringsLoadingError)("fake", []),
+  assert.throws(() => new /** @type {any} */ (LocalizedStringLoadingError)("fake", []),
     /not constructible/, "direct construction");
-  assert.throws(() => { class Mine extends StringsLoadingError {} ; new /** @type {any} */ (Mine)("fake", []); },
+  assert.throws(() => { class Mine extends LocalizedStringLoadingError {} ; new /** @type {any} */ (Mine)("fake", []); },
     /not constructible/, "and subclassing, which is refused at instantiation rather than discouraged");
 });
 
@@ -211,8 +211,8 @@ test("clause 75: the newly exported classes are CATCHABLE and NOT CONSTRUCTIBLE"
       // refused by the PLACEHOLDER guard, which raises a plain configuration error, so it never
       // reached the evaluator at all. The `zh-123` shape, inside the fixture written to check it.
       createStrings({
-        strings: { en: { K: { translation: "t", alternatives: [{ "a<==b": { translation: "y" } }] } } },
-        fallbackLocale: "en", localeResolver: () => "en",
+        localizedStringSupplier: () => ({ en: { K: { translation: "t", alternatives: [{ "a<==b": { translation: "y" } }] } } }),
+        fallbackLocale: "en", localeSupplier: () => "en",
       });
       return null;
     } catch (error) { return error; }
@@ -240,7 +240,7 @@ test("clause 75: the newly exported classes are CATCHABLE and NOT CONSTRUCTIBLE"
   const configFailure = (() => {
     try {
       createStrings(/** @type {any} */ ({
-        loaded: {}, strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en",
+        loaded: {}, localizedStringSupplier: () => ({ en: { K: "v" } }), fallbackLocale: "en", localeSupplier: () => "en",
       }));
       return null;
     } catch (error) { return error; }
@@ -253,7 +253,7 @@ test("clause 75: the newly exported classes are CATCHABLE and NOT CONSTRUCTIBLE"
 });
 
 test("clause 75: EVERY exported library error extends the base, and the base is not constructible", async () => {
-  // WRITTEN BECAUSE TWO ABLATIONS DID NOT FIRE. Making `StringsLoadingError` extend `Error` again,
+  // WRITTEN BECAUSE TWO ABLATIONS DID NOT FIRE. Making `LocalizedStringLoadingError` extend `Error` again,
   // and separately deleting the base's own token guard, both left the whole suite green — so the two
   // propositions `LokalizedError` exists FOR were asserted nowhere. A base class whose subclasses
   // need not extend it is a class, not a hierarchy, and that is exactly the difference plan 3.5:1092
@@ -265,7 +265,7 @@ test("clause 75: EVERY exported library error extends the base, and the base is 
   const exported = { ...core, ...parse, ...load };
 
   const EXPORTED_ERRORS = ["ConfigurationError", "DigestUnavailableError", "ExpressionEvaluationError",
-    "MissingTranslationError", "StringsLoadingError", "StringsParseError", "UnsupportedLocaleError"];
+    "MissingTranslationError", "LocalizedStringLoadingError", "StringsParseError", "UnsupportedLocaleError"];
 
   const detached = [];
   for (const name of EXPORTED_ERRORS) {
@@ -300,12 +300,12 @@ test("clause 75: plan 3.5 declares nine of these, and the record says which are 
 
   // Plan 3.5:1092-1100, in the plan's own order.
   const DECLARED = ["LokalizedError", "MissingTranslationError", "UnsupportedLocaleError",
-    "ExpressionEvaluationError", "ResolutionError", "StringsParseError", "StringsLoadingError",
+    "ExpressionEvaluationError", "ResolutionError", "StringsParseError", "LocalizedStringLoadingError",
     "DigestUnavailableError", "ConfigurationError"];
 
   assert.deepEqual(DECLARED.filter((name) => exported.has(name)).sort(),
     ["ConfigurationError", "DigestUnavailableError", "ExpressionEvaluationError",
-      "LokalizedError", "MissingTranslationError", "ResolutionError", "StringsLoadingError",
+      "LocalizedStringLoadingError", "LokalizedError", "MissingTranslationError", "ResolutionError",
       "StringsParseError", "UnsupportedLocaleError"],
     "ALL NINE of plan 3.5's error classes are exported as of decision D8. `LokalizedError` is the " +
     "base every one of them extends, which is what makes `instanceof LokalizedError` a single test " +

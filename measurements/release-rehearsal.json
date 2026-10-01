@@ -30,8 +30,8 @@
         "specifier": "lokalized",
         "file": "dist/browser/lokalized.js",
         "files": 1,
-        "rawBytes": 184882,
-        "brotliBytes": 55072,
+        "rawBytes": 186258,
+        "brotliBytes": 55126,
         "exports": 70,
         "loadedInBrowser": true
       },
@@ -39,8 +39,8 @@
         "specifier": "lokalized/core",
         "file": "dist/browser/core.js",
         "files": 7,
-        "rawBytes": 184024,
-        "brotliBytes": 55065,
+        "rawBytes": 185412,
+        "brotliBytes": 55092,
         "exports": 21,
         "loadedInBrowser": true
       },
@@ -48,8 +48,8 @@
         "specifier": "lokalized/parse",
         "file": "dist/browser/parse.js",
         "files": 5,
-        "rawBytes": 159703,
-        "brotliBytes": 48688,
+        "rawBytes": 159727,
+        "brotliBytes": 48783,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -57,8 +57,8 @@
         "specifier": "lokalized/load",
         "file": "dist/browser/load.js",
         "files": 7,
-        "rawBytes": 178840,
-        "brotliBytes": 54057,
+        "rawBytes": 179283,
+        "brotliBytes": 54032,
         "exports": 10,
         "loadedInBrowser": true
       },
@@ -66,8 +66,8 @@
         "specifier": "lokalized/ssr",
         "file": "dist/browser/ssr.js",
         "files": 2,
-        "rawBytes": 7570,
-        "brotliBytes": 2371,
+        "rawBytes": 7678,
+        "brotliBytes": 2379,
         "exports": 2,
         "loadedInBrowser": true
       },
@@ -75,8 +75,8 @@
         "specifier": "lokalized/negotiate",
         "file": "dist/browser/negotiate.js",
         "files": 4,
-        "rawBytes": 91081,
-        "brotliBytes": 31855,
+        "rawBytes": 91167,
+        "brotliBytes": 31812,
         "exports": 6,
         "loadedInBrowser": true
       },
@@ -84,8 +84,8 @@
         "specifier": "lokalized/data/ordinal",
         "file": "dist/browser/data/ordinal.js",
         "files": 8,
-        "rawBytes": 190732,
-        "brotliBytes": 56471,
+        "rawBytes": 192120,
+        "brotliBytes": 56678,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -93,13 +93,13 @@
         "specifier": "lokalized/data/ranges",
         "file": "dist/browser/data/ranges.js",
         "files": 8,
-        "rawBytes": 193260,
-        "brotliBytes": 56586,
+        "rawBytes": 194648,
+        "brotliBytes": 56790,
         "exports": 2,
         "loadedInBrowser": true
       }
     ],
-    "sizesRecordedFor": "The 1.0 review fixes fallback resolution, loader provenance, and public declarations; refresh packed sizes.",
+    "sizesRecordedFor": "Record packaged artifact sizes after approved shared API names and type exports",
     "capturedAgainst": {
       "files": {
         "dist/browser/chunks/chunk-CLASXSID.js": "a9bb4dc1b02c8d4fe43bde4ca463dce35d83512fadee90238f0c4a0718035c1a",

@@ -143,8 +143,8 @@ const record = (axis, verdict, i18nextResult, lokalizedResult, reading) =>
     resources: { en: { translation: suffix(en) }, fr: { translation: suffix(fr) }, pl: { translation: suffix(pl) } },
   });
   const strings = createStrings({
-    strings: { en: { b: cardinal(en) }, fr: { b: cardinal(fr) }, pl: { b: cardinal(pl) } },
-    fallbackLocale: "en", localeResolver: () => "en",
+    localizedStringSupplier: () => ({ en: { b: cardinal(en) }, fr: { b: cardinal(fr) }, pl: { b: cardinal(pl) } }),
+    fallbackLocale: "en", localeSupplier: () => "en",
   });
 
   let agree = 0;
@@ -186,11 +186,11 @@ const record = (axis, verdict, i18nextResult, lokalizedResult, reading) =>
   /** @type {any[]} */
   const warnings = [];
   const strings = createStrings({
-    strings: {
+    localizedStringSupplier: () => ({
       fr: { b: forms({ CARDINALITY_ONE: "livre", CARDINALITY_OTHER: "livres" }) },
       en: { b: forms({ CARDINALITY_ONE: "book", CARDINALITY_OTHER: "books" }) },
-    },
-    fallbackLocale: "en", localeResolver: () => "fr", onWarning: (/** @type {any} */ w) => warnings.push(w),
+    }),
+    fallbackLocale: "en", localeSupplier: () => "fr", warningHandler: (/** @type {any} */ w) => warnings.push(w),
   });
 
   // i18next's LOAD-TIME channel, which the first draft omitted entirely: it can be asked which
@@ -240,7 +240,7 @@ const record = (axis, verdict, i18nextResult, lokalizedResult, reading) =>
   // and that is a POLICY rather than an omission: `test/pinned-data-only.test.js` fails the build on
   // a bare `Intl` reference anywhere under src/, because rendering must not vary with host ICU.
   const strings = createStrings({
-    strings: { de: { sum: "Summe: {{v}}" } }, fallbackLocale: "de", localeResolver: () => "de",
+    localizedStringSupplier: () => ({ de: { sum: "Summe: {{v}}" } }), fallbackLocale: "de", localeSupplier: () => "de",
   });
   const lokalizedSum = plain(strings.get("sum", { v: 1234567.891 }));
 
@@ -258,7 +258,7 @@ const record = (axis, verdict, i18nextResult, lokalizedResult, reading) =>
 // 4 ── HTML ESCAPING. i18next escapes by default; lokalized has no escaping at all.
 {
   const instance = await fresh({ lng: "en", resources: { en: { translation: { hi: "Hi {{name}}" } } } });
-  const strings = createStrings({ strings: { en: { hi: "Hi {{name}}" } }, fallbackLocale: "en", localeResolver: () => "en" });
+  const strings = createStrings({ localizedStringSupplier: () => ({ en: { hi: "Hi {{name}}" } }), fallbackLocale: "en", localeSupplier: () => "en" });
   const hostile = "<script>x</script>";
   record("an interpolated value containing HTML",
     "I18NEXT-BETTER",
@@ -283,11 +283,11 @@ const record = (axis, verdict, i18nextResult, lokalizedResult, reading) =>
   } } } } } };
   let withoutData;
   try {
-    createStrings({ strings: catalog, fallbackLocale: "en", localeResolver: () => "en" });
+    createStrings({ localizedStringSupplier: () => (catalog), fallbackLocale: "en", localeSupplier: () => "en" });
     withoutData = "constructed";
   } catch (error) { withoutData = `refused: ${/** @type {Error} */ (error).message.slice(0, 70)}`; }
   const strings = createStrings({
-    strings: catalog, fallbackLocale: "en", localeResolver: () => "en", pluralData: { ordinal: ordinalData },
+    localizedStringSupplier: () => (catalog), fallbackLocale: "en", localeSupplier: () => "en", pluralData: { ordinal: ordinalData },
   });
   const lokalizedOrdinals = [1, 2, 3, 4, 11, 21].map((n) => plain(strings.get("p", { n })));
 
@@ -318,7 +318,7 @@ const record = (axis, verdict, i18nextResult, lokalizedResult, reading) =>
   const lokalizedMs = time(`
     const t0 = process.hrtime.bigint();
     const { createStrings } = await import("./src/core/index.js");
-    const s = createStrings({ strings: { fr: { b: { translation: "{{count}} {{w}}", placeholders: { w: { value: "count", translations: { CARDINALITY_ONE: "livre", CARDINALITY_OTHER: "livres" } } } } } }, fallbackLocale: "fr", localeResolver: () => "fr" });
+    const s = createStrings({ localizedStringSupplier: () => ({ fr: { b: { translation: "{{count}} {{w}}", placeholders: { w: { value: "count", translations: { CARDINALITY_ONE: "livre", CARDINALITY_OTHER: "livres" } } } } } }), fallbackLocale: "fr", localeSupplier: () => "fr" });
     s.get("b", { count: 2 });
     console.log(Number(process.hrtime.bigint() - t0) / 1e6);`);
 

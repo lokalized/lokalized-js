@@ -52,14 +52,14 @@ import { configurationError } from "../internal/configuration-error.js";
  *   dataFingerprint: string, ianaRegistryDate: string, ianaDataFingerprint: string,
  *   behavioralVectorsVersion: string, localeDataMode: "pinned" | "host-intl",
  *   cardinalityMode: "exact" | "host-intl", lookupLocale: string,
- *   localeMatch: SsrLocaleMatchV1 }>} LokalizedSsrStampV1
+ *   localeMatchResult: SsrLocaleMatchV1 }>} LokalizedSsrStampV1
  */
 
 /**
  * The rendering context a stamp describes.
  *
  * @typedef {Readonly<{ kind: "locale", locale: string }>
- *   | Readonly<{ kind: "locale-match", localeMatch: SsrLocaleMatchV1 }>} SsrLocaleContext
+ *   | Readonly<{ kind: "locale-match", localeMatchResult: SsrLocaleMatchV1 }>} SsrLocaleContext
  */
 
 /** The eight match types plan 3.2 declares. `none` is the one the null-locale rule keys on. */
@@ -187,7 +187,7 @@ function narrow(match) {
  * The rendering context, resolved to the pair a stamp serializes.
  *
  * @param {any} strings @param {any} context
- * @returns {{ lookupLocale: string, localeMatch: { locale: string | null, matchType: import("../core/index.js").LocaleMatchType } }}
+ * @returns {{ lookupLocale: string, localeMatchResult: { locale: string | null, matchType: import("../core/index.js").LocaleMatchType } }}
  */
 function projectionFor(strings, context) {
   if (!isRecord(context)) throw configurationError("A rendering context is required");
@@ -199,19 +199,19 @@ function projectionFor(strings, context) {
     // calling `strings.getDirectLocaleContext(locale)`." The selected locale may differ from the
     // lookup locale, and that difference is exactly what the stamp has to carry.
     const resolved = strings.getDirectLocaleContext(context.locale);
-    return { lookupLocale: resolved.lookupLocale, localeMatch: narrow(resolved.localeMatch) };
+    return { lookupLocale: resolved.lookupLocale, localeMatchResult: narrow(resolved.localeMatchResult) };
   }
 
   if (context.kind === "locale-match") {
-    const match = narrow(context.localeMatch);
+    const match = narrow(context.localeMatchResult);
     // Plan 6.4: "A match context derives lookup from the selected locale or the instance fallback
-    // when unmatched" — the same derivation core itself performs for a per-call `localeMatch`
+    // when unmatched" — the same derivation core itself performs for a per-call `localeMatchResult`
     // (`src/core/index.js`, `normalizeTag(match.locale ?? match.fallbackLocale)`), reached here
     // through the renderer so the normalization is the renderer's.
     const fallback = strings.getLocaleConfiguration().fallbackLocale;
     return {
       lookupLocale: normalizedThroughRenderer(strings, match.locale ?? fallback),
-      localeMatch: match,
+      localeMatchResult: match,
     };
   }
 
@@ -221,14 +221,14 @@ function projectionFor(strings, context) {
   // A `TranslationResult`. Plan 6.4 accepts one "only when its lookup/match pair satisfies one of
   // those two origins", so both are recomputed and at least one must hold. An exact result satisfies
   // BOTH without ambiguity, because both imply the same serialized context.
-  if (typeof context.lookupLocale !== "string" || context.localeMatch === undefined)
+  if (typeof context.lookupLocale !== "string" || context.localeMatchResult === undefined)
     throw configurationError(
       "A rendering context must be { kind: 'locale' }, { kind: 'locale-match' } or a TranslationResult");
 
-  const match = narrow(context.localeMatch);
+  const match = narrow(context.localeMatchResult);
   const lookupLocale = normalizedThroughRenderer(strings, context.lookupLocale);
 
-  const automatic = narrow(strings.getDirectLocaleContext(lookupLocale).localeMatch);
+  const automatic = narrow(strings.getDirectLocaleContext(lookupLocale).localeMatchResult);
   const fromDirect = automatic.locale === match.locale && automatic.matchType === match.matchType;
 
   const fallback = strings.getLocaleConfiguration().fallbackLocale;
@@ -241,18 +241,18 @@ function projectionFor(strings, context) {
       `'${automatic.matchType}') nor the lookup a supplied match selecting ` +
       `${JSON.stringify(match.locale)} would derive`);
 
-  return { lookupLocale, localeMatch: match };
+  return { lookupLocale, localeMatchResult: match };
 }
 
 /**
  * The invariants plan 6.4 states for both construction and validation.
  *
  * @param {any} strings
- * @param {{ lookupLocale: string, localeMatch: { locale: string | null, matchType: import("../core/index.js").LocaleMatchType } }} projection
+ * @param {{ lookupLocale: string, localeMatchResult: { locale: string | null, matchType: import("../core/index.js").LocaleMatchType } }} projection
  */
 function requireMatchInvariants(strings, projection) {
-  const { locale, matchType } = projection.localeMatch;
-  // "enforce `localeMatch.locale === null` exactly when `matchType === 'none'`" — both directions.
+  const { locale, matchType } = projection.localeMatchResult;
+  // "enforce `localeMatchResult.locale === null` exactly when `matchType === 'none'`" — both directions.
   if ((locale === null) !== (matchType === "none"))
     throw configurationError(
       `A locale match selects null exactly when its type is 'none'; this one selects ` +
@@ -312,9 +312,9 @@ export function createSsrStamp(strings, context) {
     localeDataMode: record.localeDataMode,
     cardinalityMode: record.cardinalityMode,
     lookupLocale: projection.lookupLocale,
-    localeMatch: Object.freeze({
-      locale: projection.localeMatch.locale,
-      matchType: projection.localeMatch.matchType,
+    localeMatchResult: Object.freeze({
+      locale: projection.localeMatchResult.locale,
+      matchType: projection.localeMatchResult.matchType,
     }),
   });
 }
@@ -329,10 +329,10 @@ export function createSsrStamp(strings, context) {
  * how that is guaranteed structurally: there is no route to the comparison that skips it.
  *
  * **THE COMPARISON IS EXHAUSTIVE OVER THE STAMP, not a maintained field list.** The stamp carries
- * fifteen values, counting `localeMatch`'s two members; a hand-copied list of fifteen is precisely
+ * fifteen values, counting `localeMatchResult`'s two members; a hand-copied list of fifteen is precisely
  * the kind of text this project has
  * repeatedly found asserting the inverse of what it described, and it would silently stop covering a
- * sixteenth. So every own field of the locally built stamp is compared, `localeMatch` by its two
+ * sixteenth. So every own field of the locally built stamp is compared, `localeMatchResult` by its two
  * members, and `test/ssr-stamp.test.js` asserts that the set of compared paths IS those fifteen.
  *
  * @param {LokalizedSsrStampV1} stamp the stamp the server serialized into the page
@@ -357,20 +357,20 @@ export function validateSsrStamp(stamp, strings, expectedContext) {
       `the client, or navigate, rather than hydrating mismatched translated content`);
 
   for (const field of Object.keys(local)) {
-    if (field === "localeMatch") continue;
+    if (field === "localeMatchResult") continue;
     if (/** @type {any} */ (stamp)[field] !== /** @type {any} */ (local)[field])
       throw configurationError(
         `Stamp field '${field}' is ${JSON.stringify(/** @type {any} */ (stamp)[field])} and this ` +
         `instance reports ${JSON.stringify(/** @type {any} */ (local)[field])}`);
   }
-  const presentedMatch = /** @type {any} */ (stamp).localeMatch;
+  const presentedMatch = /** @type {any} */ (stamp).localeMatchResult;
   if (!isRecord(presentedMatch))
-    throw configurationError("Stamp field 'localeMatch' is missing");
+    throw configurationError("Stamp field 'localeMatchResult' is missing");
   for (const field of /** @type {const} */ (["locale", "matchType"]))
-    if (presentedMatch[field] !== local.localeMatch[field])
+    if (presentedMatch[field] !== local.localeMatchResult[field])
       throw configurationError(
-        `Stamp field 'localeMatch.${field}' is ${JSON.stringify(presentedMatch[field])} and this ` +
-        `instance reports ${JSON.stringify(local.localeMatch[field])}`);
+        `Stamp field 'localeMatchResult.${field}' is ${JSON.stringify(presentedMatch[field])} and this ` +
+        `instance reports ${JSON.stringify(local.localeMatchResult[field])}`);
 
   // An UNKNOWN field cannot come from a compatible producer: strict v1 already required exact
   // `producerVersion` equality above, so anything this build did not emit was added after the fact.

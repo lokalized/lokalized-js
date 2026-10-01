@@ -362,7 +362,7 @@ test("the harness is held to the recipe: the options it hands createStrings and 
   // Each harness edit is made under a properly frozen new revision, so the recipe digest — which
   // carries the harness's bytes — is not what refuses it; the handed options are.
   const parsed = copy();
-  bumpRevision(parsed, () => edit(join(parsed, MEASURE), "strings: catalogsFor(variant),", `strings: catalogsFor({ catalogInput: "parsed" }),`));
+  bumpRevision(parsed, () => edit(join(parsed, MEASURE), "localizedStringSupplier: () => (catalogsFor(variant)),", `localizedStringSupplier: () => (catalogsFor({ catalogInput: "parsed" })),`));
   const handed = run(parsed);
   assert.equal(handed.status, 1, handed.out);
   assert.doesNotMatch(handed.out, /while revision stayed/);
@@ -372,12 +372,12 @@ test("the harness is held to the recipe: the options it hands createStrings and 
 
   const options = copy();
   bumpRevision(options, () => edit(join(options, MEASURE), "fallbackLocale: RECIPE.construction.fallbackLocale,", `fallbackLocale: "fr",`));
-  assert.match(run(options).out, /the harness handed construction options \{"fallbackLocale":"fr","localeResolverAnswers":"en-AU"\}, not the recipe's/);
+  assert.match(run(options).out, /the harness handed construction options \{"fallbackLocale":"fr","localeSupplierAnswers":"en-AU"\}, not the recipe's/);
 
   // The resolver is CALLED BACK, not trusted: one answering another tag is the same defect.
   const answers = copy();
-  bumpRevision(answers, () => edit(join(answers, MEASURE), "localeResolver: () => RECIPE.construction.localeResolverAnswers,", `localeResolver: () => "en-GB",`));
-  assert.match(run(answers).out, /the harness handed construction options \{"fallbackLocale":"en","localeResolverAnswers":"en-GB"\}, not the recipe's/);
+  bumpRevision(answers, () => edit(join(answers, MEASURE), "localeSupplier: () => RECIPE.construction.localeSupplierAnswers,", `localeSupplier: () => "en-GB",`));
+  assert.match(run(answers).out, /the harness handed construction options \{"fallbackLocale":"en","localeSupplierAnswers":"en-GB"\}, not the recipe's/);
 
   const exported = copy();
   const pkg = JSON.parse(readFileSync(join(exported, "package.json"), "utf8"));

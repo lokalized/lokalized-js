@@ -9,7 +9,7 @@
  * translation, with no error anywhere.
  *
  * That is the shape of defect this port exists to prevent: silent, plausible, and wrong. It had no
- * corpus coverage because the corpus fixtures all spell tiebreakers canonically, which is exactly
+ * corpus coverage because the corpus fixtures all spell tiebreakerLocalesByLanguageCode canonically, which is exactly
  * why it survived. Found by a sibling session auditing the locale kernel.
  */
 import { test } from "node:test";
@@ -19,8 +19,8 @@ import { createStrings } from "../src/core/index.js";
 /** Two catalogs of one language, neither matching a bare `en` request exactly, so the tiebreaker decides. */
 const CATALOGS = { "en-US": { "K": "from-US" }, "en-GB": { "K": "from-GB" } };
 
-const served = (tiebreakers) =>
-  createStrings({ fallbackLocale: "en-US", localeResolver: () => "en", strings: CATALOGS, tiebreakers })
+const served = (tiebreakerLocalesByLanguageCode) =>
+  createStrings({ fallbackLocale: "en-US", localeSupplier: () => "en", localizedStringSupplier: () => (CATALOGS), tiebreakerLocalesByLanguageCode })
     .get("K", undefined, { locale: "en" });
 
 test("the tiebreaker decides which catalog serves an ambiguous request", () => {
@@ -52,9 +52,9 @@ test("a malformed tiebreaker tag is rejected at CONSTRUCTION, not at lookup", ()
   assert.throws(
     () => createStrings({
       fallbackLocale: "en-US",
-      localeResolver: () => "en",
-      strings: CATALOGS,
-      tiebreakers: { en: ["en-GB", "en-US", "!!not-a-tag!!"] },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => (CATALOGS),
+      tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en-US", "!!not-a-tag!!"] },
     }),
     /not a well-formed IETF BCP 47 locale/,
   );

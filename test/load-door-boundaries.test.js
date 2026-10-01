@@ -43,7 +43,7 @@ function manifest(baseUrl, tags = ["en", "fr"]) {
   const draft = {
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
     ...BUILD_IDENTITY,
-    fallbackLocale: "en", baseUrl, files, tiebreakers: {},
+    fallbackLocale: "en", baseUrl, files, tiebreakerLocalesByLanguageCode: {},
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return /** @type {any} */ (draft);
@@ -169,13 +169,13 @@ test("clause 33: the loaded branch reuses THOSE limits — a relaxed load is not
   });
 
   assert.equal(loaded.loadingLimits.maximumTranslationNodes, 4);
-  assert.doesNotThrow(() => createStrings({ loaded, localeResolver: () => "en" }),
+  assert.doesNotThrow(() => createStrings({ loaded, localeSupplier: () => "en" }),
     "construction revalidates under the loader's own record, so the load is not re-judged");
 
   // THE OTHER DIRECTION: a FABRICATED record cannot widen the limits construction applies. The record
   // claims a translation-node budget of 1, which its own catalogs exceed, so construction must refuse
   // — a branch that ignored the record's limits in favour of the defaults would accept it.
   const understated = { ...loaded, loadingLimits: Object.freeze({ ...loaded.loadingLimits, maximumTranslationNodes: 1 }) };
-  assert.throws(() => createStrings({ loaded: understated, localeResolver: () => "en" }),
+  assert.throws(() => createStrings({ loaded: understated, localeSupplier: () => "en" }),
     /translation node/i, "the record's limits are the ones construction obeys");
 });

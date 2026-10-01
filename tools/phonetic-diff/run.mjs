@@ -415,13 +415,13 @@ const KNOWN_DIVERGENCES = {
   "resolver-absent": "Java's hint points at a Java builder method the JS API does not have",
   "expr-raw-operand-no-resolver": "same reworded configuration advice, on the expression path",
   // The PORT GAP this entry used to record is closed: `createStrings` now refuses en + en-US
-  // without tiebreakers, at construction, with Java's diagnosis word for word — same language code,
+  // without tiebreakerLocalesByLanguageCode, at construction, with Java's diagnosis word for word — same language code,
   // same collided locales, same empty resolver call list. What still differs is the two words no
   // port can share: JavaScript has no `IllegalArgumentException`, and the advice names the option a
   // JS caller actually has instead of Java's `tiebreakerLocalesByLanguageCode` constructor
   // parameter. Same rule as `resolver-absent` two entries down.
   "donor-en-us-loaded": "identical refusal and diagnosis; JS raises RangeError where Java raises "
-    + "IllegalArgumentException, and the advice names createStrings({ tiebreakers })",
+    + "IllegalArgumentException, and the advice names createStrings({ tiebreakerLocalesByLanguageCode })",
   // The port raises a plain Error from `createStrings`; `lokalized/parse` raises `StringsParseError`.
   // The message is identical; only the constructor name differs.
   "unclosed-token-beside-phonetic": "identical message; Java names its LocalizedStringLoadingException "
@@ -609,8 +609,8 @@ function runJs(s) {
   try {
     const strings = createStrings({
       fallbackLocale: s.fallback,
-      localeResolver: () => s.instance ?? s.fallback,
-      strings: s.catalogs,
+      localeSupplier: () => s.instance ?? s.fallback,
+      localizedStringSupplier: () => (s.catalogs),
       ...(resolver ? { phoneticResolver: resolver } : {}),
     });
     const r = strings.getResult(s.key, valuesFor(s.values), { locale: s.request });

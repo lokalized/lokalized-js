@@ -149,8 +149,8 @@ const distRows = (() => {
 const ROWS = [
   { id: "root", label: '`import { createStrings } from "lokalized"`',
     source: 'import { createStrings } from "lokalized"; console.log(createStrings);' },
-  { id: "negotiate", label: '`import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate"`',
-    source: 'import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate";\nconsole.log(createLocaleNegotiator, parseLanguageRanges);' },
+  { id: "negotiate", label: '`import { createLocaleMatcher, parseLanguageRanges } from "lokalized/negotiate"`',
+    source: 'import { createLocaleMatcher, parseLanguageRanges } from "lokalized/negotiate";\nconsole.log(createLocaleMatcher, parseLanguageRanges);' },
   { id: "ssr", label: '`import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"`',
     source: 'import { createSsrStamp, validateSsrStamp } from "lokalized/ssr";\nconsole.log(createSsrStamp, validateSsrStamp);' },
   { id: "constant", label: '`import { GENDER_FEMININE } from "lokalized"`',

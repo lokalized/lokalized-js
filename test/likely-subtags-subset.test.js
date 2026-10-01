@@ -52,13 +52,13 @@ const subsetFor = (/** @type {string[]} */ locales, /** @type {number} */ common
  */
 const PROBE = `
 import { createStrings } from "CORE_PATH";
-import { createLocaleNegotiator } from "NEGOTIATE_PATH";
+import { createLocaleMatcher } from "NEGOTIATE_PATH";
 const catalogs = Object.fromEntries(${JSON.stringify(SERVED)}.map((tag) => [tag, { K: tag + ": {{v}}" }]));
 // The tiebreaker is the library's own requirement, not the subset's: {fr, fr-CA} is an ambiguous
 // language code and construction refuses it without one. Both probes hit it identically.
-const strings = createStrings({ strings: catalogs, fallbackLocale: "en", localeResolver: () => "en",
-  tiebreakers: { fr: ["fr", "fr-CA"] } });
-const negotiator = createLocaleNegotiator({ fallbackLocale: "en", supportedLocales: ${JSON.stringify(SERVED)} });
+const strings = createStrings({ localizedStringSupplier: () => (catalogs), fallbackLocale: "en", localeSupplier: () => "en",
+  tiebreakerLocalesByLanguageCode: { fr: ["fr", "fr-CA"] } });
+const negotiator = createLocaleMatcher({ fallbackLocale: "en", supportedLocales: ${JSON.stringify(SERVED)} });
 const out = [];
 for (const tag of ${JSON.stringify(SERVED)}) out.push(["render", tag, strings.get("K", { v: "x" }, { locale: tag })]);
 for (const tag of REQUESTS) {

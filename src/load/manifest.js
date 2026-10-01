@@ -69,7 +69,7 @@ const isPlainRecord = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value)
   // A `Map` IS REFUSED, not quietly emptied. It passes the two tests above, and every read below
   // goes through `Object.entries`, which answers `[]` for one — so a manifest carrying a `Map` of
-  // tiebreakers validated cleanly and lost every order it declared, with a fingerprint identical to
+  // tiebreakerLocalesByLanguageCode validated cleanly and lost every order it declared, with a fingerprint identical to
   // declaring none. Found by review during S11b; no JSON can produce a `Map`, so the only way to
   // reach it is programmatically, which is exactly the caller who would never see the loss.
   && !(value instanceof Map) && !(value instanceof Set);
@@ -266,19 +266,19 @@ export function validateStringsManifest(input, options = {}) {
     });
   }
 
-  if (!isPlainRecord(input.tiebreakers)) throw configurationError("A manifest's tiebreakers must be an object");
+  if (!isPlainRecord(input.tiebreakerLocalesByLanguageCode)) throw configurationError("A manifest's tiebreakerLocalesByLanguageCode must be an object");
   /** @type {Record<string, readonly string[]>} */
-  const tiebreakers = Object.create(null);
-  for (const [rawTag, candidates] of Object.entries(input.tiebreakers)) {
+  const tiebreakerLocalesByLanguageCode = Object.create(null);
+  for (const [rawTag, candidates] of Object.entries(input.tiebreakerLocalesByLanguageCode)) {
     const tag = requireManifestTag(rawTag, "A manifest tiebreaker key");
     if (!Array.isArray(candidates))
-      throw configurationError(`The tiebreakers for '${tag}' must be an array of locale tags`);
-    tiebreakers[tag] = Object.freeze(
+      throw configurationError(`The tiebreakerLocalesByLanguageCode for '${tag}' must be an array of locale tags`);
+    tiebreakerLocalesByLanguageCode[tag] = Object.freeze(
       candidates.map((candidate, index) => requireManifestTag(candidate, `The tiebreaker for '${tag}' at index ${index}`)),
     );
   }
 
-  validateManifestTiebreakers(files, tiebreakers);
+  validateManifestTiebreakers(files, tiebreakerLocalesByLanguageCode);
 
   // PLAN 6.2:145 AT THE MANIFEST DOOR — "zero or still-ambiguous matches fail construction/MANIFEST
   // VALIDATION". The sentence names BOTH doors and only the direct one implemented it.
@@ -297,7 +297,7 @@ export function validateStringsManifest(input, options = {}) {
   // like the fingerprint guard below it.
   //
   // The DIAGNOSIS is Java's, word for word with the direct door's — which locales collided, and that
-  // tiebreakers are how a caller resolves it. Only the CLASS differs, because a manifest-door refusal
+  // tiebreakerLocalesByLanguageCode are how a caller resolves it. Only the CLASS differs, because a manifest-door refusal
   // is a `ConfigurationError`: the phase taxonomy S23 gated says this door's failures are
   // configuration, not resolution.
   const declaredLocales = Object.keys(files).sort(compareTags);
@@ -314,13 +314,13 @@ export function validateStringsManifest(input, options = {}) {
     // door. `validateManifestTiebreakers` has already required each list to be a permutation of that
     // language's files, so the first member that is an equivalent is the elected one.
     const languageCode = normalizedLanguageCode(javaSplit(canonicalLanguageTag(fallbackLocale))[0] ?? "");
-    const ordered = tiebreakers[languageCode];
+    const ordered = tiebreakerLocalesByLanguageCode[languageCode];
     const elected = ordered?.find((candidate) => equivalentFallbacks.includes(candidate));
     // THE REMEDY IS SPELLING THE TAG EXACTLY, NOT A TIEBREAKER, and that is measured rather than
     // assumed. `validateManifestTiebreakers` groups files by PRIMARY LANGUAGE and skips undetermined
     // and private-use tags outright — "they carry no broad-language matching semantics, so two of
     // them create no ambiguity for a tiebreaker to resolve" — so `primaryLanguage("und-bokmal")` is
-    // the empty string and a manifest tiebreaker keyed 'und' is itself refused ("declares tiebreakers
+    // the empty string and a manifest tiebreaker keyed 'und' is itself refused ("declares tiebreakerLocalesByLanguageCode
     // for 'und' but no file for that language"). A message telling a publisher to add one would send
     // them at a door that is locked. For a LANGUAGE-BEARING fallback the tiebreaker above is the
     // remedy and is already mandatory, so this arm is reached only by the undetermined case.
@@ -331,7 +331,7 @@ export function validateStringsManifest(input, options = {}) {
       );
   }
 
-  const resolvedFallbackLocale = electFallbackLocale(fallbackLocale, declaredLocales, tiebreakers);
+  const resolvedFallbackLocale = electFallbackLocale(fallbackLocale, declaredLocales, tiebreakerLocalesByLanguageCode);
   if (resolvedFallbackLocale === null)
     throw configurationError(
       `A manifest's fallbackLocale '${fallbackLocale}' cannot be resolved to one declared catalog`);
@@ -350,7 +350,7 @@ export function validateStringsManifest(input, options = {}) {
     fallbackLocale: resolvedFallbackLocale,
     baseUrl: input.baseUrl,
     files: Object.freeze({ ...files }),
-    tiebreakers: Object.freeze({ ...tiebreakers }),
+    tiebreakerLocalesByLanguageCode: Object.freeze({ ...tiebreakerLocalesByLanguageCode }),
   }));
 
   // THE FINGERPRINT IS RECOMPUTED, NOT TRUSTED, and this is the "before I/O" rejection: a manifest
@@ -371,7 +371,7 @@ export function validateStringsManifest(input, options = {}) {
  *
  * @param {StringsManifestV1} manifest
  * @param {{ limits?: import("../internal/catalog.js").ParseLimits }} [options]
- * @returns {Readonly<{ fallbackLocale: string, supportedLocales: readonly string[], tiebreakers: Readonly<Record<string, readonly string[]>> }>}
+ * @returns {Readonly<{ fallbackLocale: string, supportedLocales: readonly string[], tiebreakerLocalesByLanguageCode: Readonly<Record<string, readonly string[]>> }>}
  */
 export function localeConfigurationForManifest(manifest, options = {}) {
   options = refuseUnknownOptions("localeConfigurationForManifest", options, ["limits"],
@@ -382,7 +382,7 @@ export function localeConfigurationForManifest(manifest, options = {}) {
     // Sorted, so two manifests declaring the same locales in different orders produce the same
     // configuration — the same reason the identity projection canonicalizes.
     supportedLocales: Object.freeze(Object.keys(validated.files).sort()),
-    tiebreakers: validated.tiebreakers,
+    tiebreakerLocalesByLanguageCode: validated.tiebreakerLocalesByLanguageCode,
   });
 }
 
@@ -452,10 +452,10 @@ export function parseStringsManifest(input, options = {}) {
 }
 
 /**
- * Plan 6.2:2103 — "Manifest tiebreakers are validated against the FULL manifest".
+ * Plan 6.2:2103 — "Manifest tiebreakerLocalesByLanguageCode are validated against the FULL manifest".
  *
  * **THIS IS WHAT MAKES THE LOADER'S FILTER SAFE RATHER THAN SILENT.** `runPlan` filters the declared
- * tiebreakers down to the catalogs that actually loaded, so without this check a tiebreaker naming a
+ * tiebreakerLocalesByLanguageCode down to the catalogs that actually loaded, so without this check a tiebreaker naming a
  * tag the manifest never declared — `en-UK` for `en-GB`, the kind of thing a publisher writes once —
  * is simply dropped on the floor and the manifest resolves by a shorter order than its author wrote.
  * A filter that cannot distinguish "did not load" from "was never real" is the `ReadonlyMap` defect
@@ -471,9 +471,9 @@ export function parseStringsManifest(input, options = {}) {
  * broad-language matching semantics, so two of them create no ambiguity for a tiebreaker to resolve.
  *
  * @param {Record<string, unknown>} files declared files, keyed by normalized tag
- * @param {Record<string, readonly string[]>} tiebreakers normalized, in declared order
+ * @param {Record<string, readonly string[]>} tiebreakerLocalesByLanguageCode normalized, in declared order
  */
-function validateManifestTiebreakers(files, tiebreakers) {
+function validateManifestTiebreakers(files, tiebreakerLocalesByLanguageCode) {
   /** @type {Map<string, string[]>} */
   const declaredByLanguageCode = new Map();
   for (const tag of Object.keys(files)) {
@@ -489,23 +489,23 @@ function validateManifestTiebreakers(files, tiebreakers) {
   // the manifest describes coverage that can never be loaded. Refusing it here is the difference
   // between a publisher learning it at build time and a browser learning it at run time.
   for (const [languageCode, declared] of declaredByLanguageCode) {
-    if (declared.length > 1 && tiebreakers[languageCode] === undefined)
+    if (declared.length > 1 && tiebreakerLocalesByLanguageCode[languageCode] === undefined)
       throw configurationError(
         `The manifest declares ${declared.length} files for '${languageCode}' [${declared.join(", ")}] ` +
-        `and no tiebreakers for it, so no instance could resolve between them`);
+        `and no tiebreakerLocalesByLanguageCode for it, so no instance could resolve between them`);
   }
 
-  for (const [languageCode, candidates] of Object.entries(tiebreakers)) {
+  for (const [languageCode, candidates] of Object.entries(tiebreakerLocalesByLanguageCode)) {
     const declared = declaredByLanguageCode.get(languageCode);
     if (declared === undefined)
       throw configurationError(
-        `The manifest declares tiebreakers for '${languageCode}' but no file for that language`);
+        `The manifest declares tiebreakerLocalesByLanguageCode for '${languageCode}' but no file for that language`);
 
     const seen = new Set();
     for (const candidate of candidates) {
       if (seen.has(candidate))
         throw configurationError(
-          `The tiebreakers for '${languageCode}' name '${candidate}' twice; this list is a resolution ` +
+          `The tiebreakerLocalesByLanguageCode for '${languageCode}' name '${candidate}' twice; this list is a resolution ` +
           `order, so a repeat has no recoverable meaning`);
       seen.add(candidate);
     }
@@ -513,7 +513,7 @@ function validateManifestTiebreakers(files, tiebreakers) {
     const missing = declared.filter((tag) => !seen.has(tag));
     if (unrelated.length > 0 || missing.length > 0)
       throw configurationError(
-        `The tiebreakers for '${languageCode}' must be an exact permutation of the files the manifest ` +
+        `The tiebreakerLocalesByLanguageCode for '${languageCode}' must be an exact permutation of the files the manifest ` +
         `declares for that language [${declared.join(", ")}]; missing: [${missing.join(", ")}]; ` +
         `unrelated: [${unrelated.join(", ")}]`);
   }

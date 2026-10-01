@@ -45,7 +45,7 @@ function manifest(overrides = {}) {
     fallbackLocale: "en",
     baseUrl: "https://cdn.example/v1/",
     files: { en: { url: "en.json", sha256: SHA } },
-    tiebreakers: {},
+    tiebreakerLocalesByLanguageCode: {},
     ...overrides,
   };
   draft.catalogFingerprint =
@@ -138,7 +138,7 @@ test("the generator emits all seven, and its own validator is what proves it", a
   // the two halves had to land together. This asserts the seven are PRESENT and correct rather than
   // merely that the call succeeded.
   const generated = await createStringsManifestFromDirectory("examples/catalogs", {
-    catalogVersion: "v1", fallbackLocale: "en", tiebreakers: { fr: ["fr", "fr-CA"] },
+    catalogVersion: "v1", fallbackLocale: "en", tiebreakerLocalesByLanguageCode: { fr: ["fr", "fr-CA"] },
   });
   const identity = /** @type {any} */ (generated);
   assert.equal(identity.behavioralVectorsVersion, RUNTIME_METADATA.behavioralVectorsVersion);

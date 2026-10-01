@@ -135,8 +135,9 @@ try {
   writeFileSync(join(app, "esm.mjs"),
     `${specifiers.map((s, i) => `import * as m${i} from ${JSON.stringify(s)};`).join("\n")}\n` +
     `import { createStrings } from "lokalized";\n` +
-    `const s = createStrings({ strings: { en: { K: "Hello, {{n}}" }, fr: { K: "Bonjour, {{n}}" } },\n` +
-    `  fallbackLocale: "en", localeResolver: () => "fr" });\n` +
+    `const s = createStrings({ localizedStringSupplier: () => ({ en: { K: "Hello, {{n}}" }, fr: { K: "Bonjour, {{n}}" } }),
+` +
+    `  fallbackLocale: "en", localeSupplier: () => "fr" });\n` +
     `const counts = [${specifiers.map((_, i) => `Object.keys(m${i}).length`).join(", ")}];\n` +
     `console.log(JSON.stringify({ rendered: s.get("K", { n: "Ada" }), counts }));\n`, "utf8");
   const esm = JSON.parse(execFileSync(process.execPath, ["esm.mjs"], { cwd: app, encoding: "utf8" }));
@@ -161,12 +162,36 @@ try {
   }), "utf8");
   writeFileSync(join(app, "consumer.ts"),
     `import { createStrings, forLocaleMatch } from "lokalized/core";\n` +
-    `import type { Strings, LocaleMatch, TranslationFailure } from "lokalized/core";\n` +
-    `import { createLocaleNegotiator } from "lokalized/negotiate";\n` +
-    `const s: Strings = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en",\n` +
-    `  onFailure: (f: TranslationFailure) => { void f.localeMatch.matchType; return { action: "return-key" as const }; } });\n` +
-    `const m: LocaleMatch = createLocaleNegotiator({ fallbackLocale: "en", supportedLocales: ["en", "fr"] }).matchFor("fr-CA");\n` +
-    `export const out = s.get("K", {}, forLocaleMatch(m));\n`, "utf8");
+    `import type { Strings, LocaleMatchResult, TranslationFailure } from "lokalized/core";\n` +
+    `import type { TranslationResult, TranslationResultStatus, BidiIsolation, PhoneticResolver, LanguageForm, Phonetic, Cardinality, Ordinality, LocalizedStringWarningHandler } from "lokalized";\n` +
+    `import { PHONETIC_VOWEL, GENDER_FEMININE, CARDINALITY_ONE, ORDINALITY_ONE } from "lokalized";\n` +
+    `import { LocalizedStringLoadingError } from "lokalized/load";\n` +
+    `import { createLocaleMatcher } from "lokalized/negotiate";\n` +
+    `const s: Strings = createStrings({ localizedStringSupplier: () => ({ en: { K: "v" } }), fallbackLocale: "en", localeSupplier: () => "en",
+` +
+    `  translationFailureHandler: (f: TranslationFailure) => { void f.localeMatchResult.matchType; return { action: "return-key" as const }; } });\n` +
+    `const m: LocaleMatchResult = createLocaleMatcher({ fallbackLocale: "en", supportedLocales: ["en", "fr"] }).matchFor("fr-CA");\n` +
+    `export const out = s.get("K", {}, forLocaleMatch(m));\n` +
+    `const result: TranslationResult = s.getResult("K");\n` +
+    `const status: TranslationResultStatus = result.status;\n` +
+    `const isolation: BidiIsolation = "always";\n` +
+    `const phonetic: Phonetic = PHONETIC_VOWEL;\n` +
+    `const cardinal: Cardinality = CARDINALITY_ONE;\n` +
+    `const ordinal: Ordinality = ORDINALITY_ONE;\n` +
+    `const form: LanguageForm = GENDER_FEMININE;\n` +
+    `const resolver: PhoneticResolver = () => phonetic;\n` +
+    `const warnings: LocalizedStringWarningHandler = warning => { void warning.type; };\n` +
+    `void [status, isolation, cardinal, ordinal, form, resolver, warnings, LocalizedStringLoadingError];\n` +
+    `// @ts-expect-error A phonetic resolver must return a phonetic form\n` +
+    `const wrongResolver: PhoneticResolver = () => GENDER_FEMININE;\n` +
+    `// @ts-expect-error Translation results are immutable\n` +
+    `result.localeMatchResult = m;\n` +
+    `// @ts-expect-error The retired diagnostic name is not an alias\n` +
+    `void result.localeMatch;\n` +
+    `// @ts-expect-error The retired loading error name is not exported\n` +
+    `import { StringsLoadingError } from "lokalized/load";\n` +
+    `// @ts-expect-error The retired form type name is not exported\n` +
+    `import type { LanguageFormValue } from "lokalized";\n`, "utf8");
   try {
     execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "-p", "."],
       { cwd: app, encoding: "utf8", stdio: "pipe" });

@@ -34,7 +34,7 @@ function manifest(overrides = {}) {
       en: { url: "en.json", sha256: "a".repeat(64) },
       fr: { url: "fr.json", sha256: "b".repeat(64), decodedBytes: 140 },
     },
-    tiebreakers: {},
+    tiebreakerLocalesByLanguageCode: {},
     ...overrides,
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
@@ -52,7 +52,7 @@ test("a well-formed manifest validates and is defensively copied", () => {
       "en-001": { url: "en-001.json", sha256: "d".repeat(64) },
       fr: { url: "fr.json", sha256: "b".repeat(64), decodedBytes: 140 },
     },
-    tiebreakers: { en: ["en-001", "en"] },
+    tiebreakerLocalesByLanguageCode: { en: ["en-001", "en"] },
   });
   const validated = validateStringsManifest(source);
   assert.deepEqual(Object.keys(validated.files).sort(), ["en", "en-001", "fr"]);
@@ -60,9 +60,9 @@ test("a well-formed manifest validates and is defensively copied", () => {
   // Plan 6.1: `validateStringsManifest` "defensively copies". Mutating the caller's object afterwards
   // must not change what was validated, or a manifest could be swapped after its fingerprint checked.
   source.files.en.sha256 = "c".repeat(64);
-  source.tiebreakers.en.push("zz");
+  source.tiebreakerLocalesByLanguageCode.en.push("zz");
   assert.equal(validated.files.en.sha256, "a".repeat(64));
-  assert.deepEqual([...validated.tiebreakers.en], ["en-001", "en"]);
+  assert.deepEqual([...validated.tiebreakerLocalesByLanguageCode.en], ["en-001", "en"]);
   assert.throws(() => { /** @type {any} */ (validated).catalogVersion = "v2"; }, TypeError);
 });
 

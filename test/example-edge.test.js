@@ -35,7 +35,7 @@ import { after, describe, test } from "node:test";
 import { handleRequest } from "../examples/edge/worker.js";
 import { publishCatalogs } from "../examples/server/publish.js";
 import { recordingOracleRows } from "../tools/oracle-field-coverage.mjs";
-import { createLocaleNegotiator, parseLanguageRanges } from "../src/negotiate/index.js";
+import { createLocaleMatcher, parseLanguageRanges } from "../src/negotiate/index.js";
 import { fetchSet, localeConfigurationForManifest } from "../src/load/index.js";
 
 const BASE = "https://cdn.example/v1/";
@@ -106,7 +106,7 @@ async function call(request) {
 
 /** The match the worker would build for a header, computed independently of the worker. */
 function matchFor(/** @type {string} */ header) {
-  return createLocaleNegotiator(localeConfigurationForManifest(published.manifest))
+  return createLocaleMatcher(localeConfigurationForManifest(published.manifest))
     .matchForLanguageRanges(parseLanguageRanges(header));
 }
 
@@ -190,7 +190,7 @@ describe("match-preserving responses are never keyed by selected locale alone", 
   test("the key covers every field the match carries", async () => {
     // The instrument S32 built for the differentials, one layer over: hand the match through a
     // recording proxy and let EXECUTION say which fields the key derivation read. A field added to
-    // `LocaleMatch` later and not folded into the key re-opens the collision silently, which is
+    // `LocaleMatchResult` later and not folded into the key re-opens the collision silently, which is
     // exactly how the three dropped-column defects in that tool's header happened.
     const { matchPreservingCacheKey } = await import("../examples/app/cache-policy.js");
     const recorder = recordingOracleRows([/** @type {any} */ (matchFor("fr-CH"))]);

@@ -41,7 +41,7 @@ function manifest(baseUrl = "https://cdn.example/v1/", tags = ["en"]) {
   const draft = /** @type {any} */ ({
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
     ...BUILD_IDENTITY,
-    fallbackLocale: "en", baseUrl, files, tiebreakers: {},
+    fallbackLocale: "en", baseUrl, files, tiebreakerLocalesByLanguageCode: {},
   });
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return draft;
@@ -127,7 +127,7 @@ test("clause 15: a SCHEMA or fingerprint failure is a ConfigurationError, before
   }
 });
 
-test("clause 15: after a valid plan, a per-file failure is a StringsLoadingError", async () => {
+test("clause 15: after a valid plan, a per-file failure is a LocalizedStringLoadingError", async () => {
   const m = manifest("https://cdn.example/v1/", ["en", "fr"]);
   const error = await loadEntireManifest(m, {
     fetch: async (/** @type {string} */ url) =>
@@ -141,7 +141,7 @@ test("clause 15: after a valid plan, a per-file failure is a StringsLoadingError
       })()),
   }).then(() => null, (e) => e);
 
-  assert.equal(error?.name, "StringsLoadingError");
+  assert.equal(error?.name, "LocalizedStringLoadingError");
   assert.equal(error?.code, "STRINGS_LOADING");
   assert.equal(error?.failures?.length, 1, "and it carries the per-file failures the phase is named for");
 });
@@ -164,7 +164,7 @@ test("clause 27: an injected Uint8Array over the limit is refused BEFORE parsing
     limits: { maximumInputBytes: 1024 },
   }).then(() => null, (e) => e);
 
-  assert.equal(error?.name, "StringsLoadingError");
+  assert.equal(error?.name, "LocalizedStringLoadingError");
   assert.equal(error?.failures?.[0]?.stage, "limit",
     "refused at the LIMIT stage, which is before parse in the stage order");
 

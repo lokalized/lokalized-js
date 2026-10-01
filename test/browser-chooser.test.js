@@ -26,7 +26,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { chooseBrowserLocale, chooseLocaleForPreferredLanguages } from "../src/core/index.js";
-import { createLocaleNegotiator } from "../src/negotiate/index.js";
+import { createLocaleMatcher } from "../src/negotiate/index.js";
 
 const root = new URL("../", import.meta.url);
 const vectorsPath = process.env.LOKALIZED_SPEC_DIR
@@ -47,7 +47,7 @@ const skip = vectors ? false : `behavioral vectors not found at ${vectorsPath}`;
 const configurationFor = (/** @type {any} */ fixture) => ({
   fallbackLocale: fixture.fallbackLocale,
   supportedLocales: Object.keys(fixture.files),
-  tiebreakers: fixture.tiebreakers,
+  tiebreakerLocalesByLanguageCode: fixture.tiebreakers,
 });
 
 describe("chooseLocaleForPreferredLanguages", () => {
@@ -90,27 +90,27 @@ describe("chooseLocaleForPreferredLanguages", () => {
     // and the corpus records BOTH answers rather than asserting an equality that does not hold. A
     // chooser that agreed with the solver here would be a second RFC 4647 implementation in the
     // root graph — the one thing plan 3.1 keeps out of it.
-    const configuration = { fallbackLocale: "en", supportedLocales: ["en", "nsi", "nsl"], tiebreakers: null };
+    const configuration = { fallbackLocale: "en", supportedLocales: ["en", "nsi", "nsl"], tiebreakerLocalesByLanguageCode: null };
 
     assert.equal(chooseLocaleForPreferredLanguages(configuration, ["sgn-NO"]), "nsl");
     // The `.ranges` half reaches the solver THROUGH the header parser, which is where sgn-no picks
     // up its `sgn-nsl`/`nsl` IANA members; handing the solver a bare one-member list instead skips
     // that expansion and answers nsl, so the route matters as much as the door.
-    assert.equal(createLocaleNegotiator(configuration).bestMatchForAcceptLanguage("sgn-NO"), "nsi");
+    assert.equal(createLocaleMatcher(configuration).bestMatchForAcceptLanguage("sgn-NO"), "nsi");
 
     // The same divergence on the other recorded pair: `.collision.zh-cmn-solvers-diverge`.
     const collision = {
       fallbackLocale: "en",
       supportedLocales: ["cmn", "en", "mo", "ro", "zh"],
-      tiebreakers: { ro: ["mo", "ro"], zh: ["cmn", "zh"] },
+      tiebreakerLocalesByLanguageCode: { ro: ["mo", "ro"], zh: ["cmn", "zh"] },
     };
 
     assert.equal(chooseLocaleForPreferredLanguages(collision, ["zh-cmn"]), "cmn");
-    assert.equal(createLocaleNegotiator(collision).bestMatchForAcceptLanguage("zh-cmn"), "zh");
+    assert.equal(createLocaleMatcher(collision).bestMatchForAcceptLanguage("zh-cmn"), "zh");
   });
 
   it("advances past an unmatched preference — the strict kernel, not bestMatchFor", () => {
-    const configuration = { fallbackLocale: "en", supportedLocales: ["en", "fr", "de"], tiebreakers: null };
+    const configuration = { fallbackLocale: "en", supportedLocales: ["en", "fr", "de"], tiebreakerLocalesByLanguageCode: null };
 
     // THE FAILING HALF of the trap: built on `bestMatchFor`, entry one always "matches" and this
     // answers `en`. Measured — swapping the kernel for `bestMatchFor` makes exactly this line red.
@@ -122,7 +122,7 @@ describe("chooseLocaleForPreferredLanguages", () => {
   });
 
   it("examines at most 32 entries and truncates SILENTLY", () => {
-    const configuration = { fallbackLocale: "en", supportedLocales: ["en", "fr"], tiebreakers: null };
+    const configuration = { fallbackLocale: "en", supportedLocales: ["en", "fr"], tiebreakerLocalesByLanguageCode: null };
     // Well-formed, unmatchable, and deliberately private-use so no CLDR likely-subtag route can
     // rescue one of them into a match.
     const filler = (/** @type {number} */ count) =>
@@ -140,7 +140,7 @@ describe("chooseLocaleForPreferredLanguages", () => {
     // that must not become an error. `browser-chooser.limit.explicit-thirty-three-ranges-rejected`
     // records the strict list door throwing on 33.
     assert.throws(
-      () => createLocaleNegotiator(configuration).bestMatchForLanguageRanges(
+      () => createLocaleMatcher(configuration).bestMatchForLanguageRanges(
         filler(33).map((range) => ({ range, weight: 0.5 })),
       ),
       /At most 32 language ranges are supported, but received 33/,
@@ -158,9 +158,9 @@ describe("chooseLocaleForPreferredLanguages", () => {
     const first = {
       fallbackLocale: "hy-810",
       supportedLocales: ["hy-AM", "hy-SU"],
-      tiebreakers: { hy: ["hy-SU", "hy-AM"] },
+      tiebreakerLocalesByLanguageCode: { hy: ["hy-SU", "hy-AM"] },
     };
-    const reversed = { ...first, tiebreakers: { hy: ["hy-AM", "hy-SU"] } };
+    const reversed = { ...first, tiebreakerLocalesByLanguageCode: { hy: ["hy-AM", "hy-SU"] } };
 
     assert.equal(chooseLocaleForPreferredLanguages(first, ["zu", "xx"]), "hy-SU");
     assert.equal(chooseLocaleForPreferredLanguages(reversed, ["zu", "xx"]), "hy-AM");
@@ -175,7 +175,7 @@ describe("chooseLocaleForPreferredLanguages", () => {
     // return value and handed the kernel the configured spelling selects a DIFFERENT catalog for a
     // preference that did match — a wrong answer where nothing looks wrong. `en-840` is canonically
     // equivalent to `en-US` alone, so it resolves unambiguously and then decides `en`.
-    const regionalNumeric = { fallbackLocale: "en-840", supportedLocales: ["en-GB", "en-US"], tiebreakers: null };
+    const regionalNumeric = { fallbackLocale: "en-840", supportedLocales: ["en-GB", "en-US"], tiebreakerLocalesByLanguageCode: null };
 
     assert.equal(chooseLocaleForPreferredLanguages(regionalNumeric, ["en"]), "en-US");
     // CONTROL that the input really is sensitive: the same preference over the same catalogs
@@ -189,7 +189,7 @@ describe("chooseLocaleForPreferredLanguages", () => {
     // cannot be passing merely because something always rewrites the fallback.
     assert.equal(
       chooseLocaleForPreferredLanguages(
-        { fallbackLocale: "hy-SU", supportedLocales: ["hy-AM", "hy-SU"], tiebreakers: null },
+        { fallbackLocale: "hy-SU", supportedLocales: ["hy-AM", "hy-SU"], tiebreakerLocalesByLanguageCode: null },
         [],
       ),
       "hy-SU",
@@ -197,7 +197,7 @@ describe("chooseLocaleForPreferredLanguages", () => {
   });
 
   it("ignores malformed entries without abandoning the rest of the list", () => {
-    const configuration = { fallbackLocale: "en", supportedLocales: ["en", "fr"], tiebreakers: null };
+    const configuration = { fallbackLocale: "en", supportedLocales: ["en", "fr"], tiebreakerLocalesByLanguageCode: null };
 
     assert.equal(chooseLocaleForPreferredLanguages(configuration, ["not a tag!", "fr"]), "fr");
     assert.equal(chooseLocaleForPreferredLanguages(configuration, ["", "fr"]), "fr");
@@ -214,38 +214,38 @@ describe("chooseLocaleForPreferredLanguages", () => {
     // A fallback naming no loaded catalog is `createStrings`' own construction refusal, arriving
     // through the other door.
     assert.throws(
-      () => chooseLocaleForPreferredLanguages({ fallbackLocale: "de", supportedLocales: ["en", "fr"], tiebreakers: null }, []),
+      () => chooseLocaleForPreferredLanguages({ fallbackLocale: "de", supportedLocales: ["en", "fr"], tiebreakerLocalesByLanguageCode: null }, []),
       /Specified fallback locale is 'de' but no matching localized strings locale was found/,
     );
     // An ambiguous fallback with no tiebreaker to settle it is refused here exactly as it is at
     // construction — silently picking one is how a whole application serves the wrong catalog.
     assert.throws(
-      () => chooseLocaleForPreferredLanguages({ fallbackLocale: "hy-810", supportedLocales: ["hy-AM", "hy-SU"], tiebreakers: null }, []),
+      () => chooseLocaleForPreferredLanguages({ fallbackLocale: "hy-810", supportedLocales: ["hy-AM", "hy-SU"], tiebreakerLocalesByLanguageCode: null }, []),
       /canonically equivalent to multiple loaded locales/,
     );
     // A STRING is iterable, and iterating one yields single characters that are all malformed — so
     // `chooseLocaleForPreferredLanguages(config, navigator.language)` would answer the fallback for
     // every request instead of reporting the mistake. That is the `zh-123` shape at the API door.
     assert.throws(
-      () => chooseLocaleForPreferredLanguages({ fallbackLocale: "en", supportedLocales: ["en"], tiebreakers: null }, /** @type {any} */ ("en-US")),
+      () => chooseLocaleForPreferredLanguages({ fallbackLocale: "en", supportedLocales: ["en"], tiebreakerLocalesByLanguageCode: null }, /** @type {any} */ ("en-US")),
       /requires an iterable of preferred language tags/,
     );
     assert.throws(
-      () => chooseLocaleForPreferredLanguages({ fallbackLocale: "en", supportedLocales: ["en"], tiebreakers: null }, /** @type {any} */ (undefined)),
+      () => chooseLocaleForPreferredLanguages({ fallbackLocale: "en", supportedLocales: ["en"], tiebreakerLocalesByLanguageCode: null }, /** @type {any} */ (undefined)),
       /requires an iterable of preferred language tags/,
     );
     // CONTROL: the empty list this refusal tells callers to pass is accepted.
-    assert.equal(chooseLocaleForPreferredLanguages({ fallbackLocale: "en", supportedLocales: ["en"], tiebreakers: null }, []), "en");
+    assert.equal(chooseLocaleForPreferredLanguages({ fallbackLocale: "en", supportedLocales: ["en"], tiebreakerLocalesByLanguageCode: null }, []), "en");
   });
 
   it("accepts any iterable, not just an array", () => {
-    const configuration = { fallbackLocale: "en", supportedLocales: ["en", "fr"], tiebreakers: null };
+    const configuration = { fallbackLocale: "en", supportedLocales: ["en", "fr"], tiebreakerLocalesByLanguageCode: null };
     assert.equal(chooseLocaleForPreferredLanguages(configuration, new Set(["xx", "fr"])), "fr");
   });
 });
 
 describe("chooseBrowserLocale", () => {
-  const configuration = { fallbackLocale: "en", supportedLocales: ["en", "fr", "de"], tiebreakers: null };
+  const configuration = { fallbackLocale: "en", supportedLocales: ["en", "fr", "de"], tiebreakerLocalesByLanguageCode: null };
   const withNavigator = (/** @type {unknown} */ navigator, /** @type {() => void} */ body) => {
     const had = Object.hasOwn(globalThis, "navigator");
     const previous = /** @type {any} */ (globalThis).navigator;
@@ -277,7 +277,7 @@ describe("chooseBrowserLocale", () => {
   it("resolves the fallback the same way the pure helper does", () => {
     withNavigator({ languages: [] }, () =>
       assert.equal(
-        chooseBrowserLocale({ fallbackLocale: "hy-810", supportedLocales: ["hy-AM", "hy-SU"], tiebreakers: { hy: ["hy-SU", "hy-AM"] } }),
+        chooseBrowserLocale({ fallbackLocale: "hy-810", supportedLocales: ["hy-AM", "hy-SU"], tiebreakerLocalesByLanguageCode: { hy: ["hy-SU", "hy-AM"] } }),
         "hy-SU",
       ),
     );

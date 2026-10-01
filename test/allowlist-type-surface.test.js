@@ -1,3 +1,4 @@
+import { currentApiVocabulary } from "../tools/api-vocabulary.mjs";
 // @ts-check
 /**
  * THE HALF OF THE ALLOWLIST CONTRACT NOBODY WAS CHECKING: exported TYPES, and the plan's PROHIBITIONS.
@@ -28,7 +29,7 @@ import { test } from "node:test";
 
 const root = new URL("../", import.meta.url);
 const pkg = JSON.parse(readFileSync(new URL("package.json", root), "utf8"));
-const allowlist = JSON.parse(readFileSync(new URL("../lokalized-spec/symbol-allowlist.json", root), "utf8"));
+const allowlist = currentApiVocabulary(JSON.parse(readFileSync(new URL("../lokalized-spec/symbol-allowlist.json", root), "utf8")));
 
 /** Kept in step with the two sibling tests by hand; all three encode plan 3.1. */
 const OWNERS_BY_SUBPATH = /** @type {Record<string, string[]>} */ ({
@@ -45,6 +46,21 @@ const OWNERS_BY_SUBPATH = /** @type {Record<string, string[]>} */ ({
  * its category, and the category is ASSERTED against the owner's declaration below.
  */
 const CATEGORIZED_TYPES = /** @type {[string, string, string][]} */ ([
+  // Shared Java/JS type names approved before 1.0.0
+  ["core", "Gender", "tagged-value types"],
+  ["core", "GrammaticalCase", "tagged-value types"],
+  ["core", "Definiteness", "tagged-value types"],
+  ["core", "Classifier", "tagged-value types"],
+  ["core", "Formality", "tagged-value types"],
+  ["core", "Clusivity", "tagged-value types"],
+  ["core", "Animacy", "tagged-value types"],
+  ["core", "Cardinality", "tagged-value types"],
+  ["core", "Ordinality", "tagged-value types"],
+  ["core", "PhoneticResolver", "construction/translation/result types"],
+  ["core", "LocalizedStringWarningHandler", "construction/translation/result types"],
+  ["core", "TranslationResult", "construction/translation/result types"],
+  ["core", "TranslationResultStatus", "construction/translation/result types"],
+  ["core", "BidiIsolation", "construction/translation/result types"],
   // core — the options and result shapes `createStrings` and a lookup traffic in.
   // PLAN 3.7's TAGGED-VALUE FAMILY, delivered as a batch. S28's category gate had reported
   // "tagged-value types" as having NO delivered member; these are it. The 61 constants shipped in
@@ -55,8 +71,8 @@ const CATEGORIZED_TYPES = /** @type {[string, string, string][]} */ ([
   // recorded, in a fourth instance.
   ["core", "LocaleMatchType", "match/configuration structural types"],
   ["core", "TaggedLanguageFormValue", "tagged-value types"],
-  ["core", "LanguageFormValue", "tagged-value types"],
-  ["core", "PhoneticValue", "tagged-value types"],
+  ["core", "LanguageForm", "tagged-value types"],
+  ["core", "Phonetic", "tagged-value types"],
   ["core", "LanguageFormName", "tagged-value types"],
   ["core", "LanguageFormAxis", "tagged-value types"],
   ["core", "GenderFormName", "tagged-value types"],
@@ -78,20 +94,20 @@ const CATEGORIZED_TYPES = /** @type {[string, string, string][]} */ ([
   // call -- did not typecheck for a consumer. This gate caught both new names on its first run.
   ["core", "DirectCreateStringsOptions", "construction/translation/result types"],
   ["core", "LoadedCreateStringsOptions", "construction/translation/result types"],
-  ["core", "TranslationCallOptions", "construction/translation/result types"],
+  ["core", "TranslationOptions", "construction/translation/result types"],
   ["core", "Definition", "construction/translation/result types"],
   // core — what a negotiation produced and what a configuration looks like.
-  ["core", "LocaleMatch", "match/configuration structural types"],
+  ["core", "LocaleMatchResult", "match/configuration structural types"],
   ["core", "LocaleConfiguration", "match/configuration structural types"],
   ["core", "WeightedLanguageRange", "match/configuration structural types"],
   // core — plan 3.5's failure surface, the types beside the three helpers the runtime table carries.
-  ["core", "FailureHandler", "failure policy/observer/handler types and helpers"],
-  ["core", "FailureReason", "failure policy/observer/handler types and helpers"],
-  ["core", "FailureResponse", "failure policy/observer/handler types and helpers"],
-  ["core", "FallbackEvent", "failure policy/observer/handler types and helpers"],
-  ["core", "FallbackObserver", "failure policy/observer/handler types and helpers"],
-  ["core", "FallbackPolicy", "failure policy/observer/handler types and helpers"],
-  ["core", "BuiltinFallbackPolicy", "failure policy/observer/handler types and helpers"],
+  ["core", "TranslationFailureHandler", "failure policy/observer/handler types and helpers"],
+  ["core", "TranslationFailureReason", "failure policy/observer/handler types and helpers"],
+  ["core", "TranslationFailureResponse", "failure policy/observer/handler types and helpers"],
+  ["core", "TranslationFallbackEvent", "failure policy/observer/handler types and helpers"],
+  ["core", "TranslationFallbackObserver", "failure policy/observer/handler types and helpers"],
+  ["core", "TranslationFallbackPolicy", "failure policy/observer/handler types and helpers"],
+  ["core", "BuiltinTranslationFallbackPolicy", "failure policy/observer/handler types and helpers"],
   ["core", "PrecedingFailure", "failure policy/observer/handler types and helpers"],
   ["core", "TranslationFailure", "failure policy/observer/handler types and helpers"],
   // core — the shape of the pinned plural data a classifier reads.
@@ -120,7 +136,7 @@ const CATEGORIZED_TYPES = /** @type {[string, string, string][]} */ ([
   ["ssr", "SsrLocaleContext", "SSR stamp/context types"],
   ["ssr", "SsrLocaleMatchV1", "SSR stamp/context types"],
   // data/ordinal — the classifier return type.
-  ["data/ordinal", "OrdinalityValue", "number/operand ordinal classifiers and support probes"],
+  ["data/ordinal", "Ordinality", "number/operand ordinal classifiers and support probes"],
 ]);
 
 /**
@@ -149,10 +165,10 @@ const UNCATEGORIZED = /** @type {Record<string, string>} */ ({
     "parse's limit type on `./load`, reached through `LoadedStrings.loadingLimits`. Same shape.",
   "./load:LocalizedStringWarning":
     "parse's warning type on `./load`, reached through `LoadedStrings.warnings`. Same shape.",
-  "./data/ranges:CardinalityValue":
+  "./data/ranges:Cardinality":
     "the classifier return type on a subpath whose plan 3.1 row is two backticked names and NO " +
     "category at all, so nothing there can permit a type. `data/ordinal`'s row has a category and " +
-    "its `OrdinalityValue` is classified under it; the two rows are asymmetric in the plan itself.",
+    "its `Ordinality` is classified under it; the two rows are asymmetric in the plan itself.",
 });
 
 /**

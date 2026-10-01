@@ -40,7 +40,34 @@ export { chooseBrowserLocale, chooseLocaleForPreferredLanguages } from "./core/i
  * @typedef {import("./core/index.js").TaggedLanguageFormValue<A, N, R>} TaggedLanguageFormValue
  */
 
-/** @typedef {import("./core/index.js").LanguageFormValue} LanguageFormValue */
+// Shared public types are forwarded without adding runtime imports
+/** @typedef {import("./core/index.js").LanguageForm} LanguageForm */
+/** @typedef {import("./core/index.js").Gender} Gender */
+/** @typedef {import("./core/index.js").GrammaticalCase} GrammaticalCase */
+/** @typedef {import("./core/index.js").Definiteness} Definiteness */
+/** @typedef {import("./core/index.js").Classifier} Classifier */
+/** @typedef {import("./core/index.js").Formality} Formality */
+/** @typedef {import("./core/index.js").Clusivity} Clusivity */
+/** @typedef {import("./core/index.js").Animacy} Animacy */
+/** @typedef {import("./core/index.js").Cardinality} Cardinality */
+/** @typedef {import("./core/index.js").Ordinality} Ordinality */
+/** @typedef {import("./core/index.js").Phonetic} Phonetic */
+/** @typedef {import("./core/index.js").Strings} Strings */
+/** @typedef {import("./core/index.js").CreateStringsOptions} CreateStringsOptions */
+/** @typedef {import("./core/index.js").TranslationOptions} TranslationOptions */
+/** @typedef {import("./core/index.js").TranslationResult} TranslationResult */
+/** @typedef {import("./core/index.js").TranslationResultStatus} TranslationResultStatus */
+/** @typedef {import("./core/index.js").TranslationFailure} TranslationFailure */
+/** @typedef {import("./core/index.js").TranslationFailureReason} TranslationFailureReason */
+/** @typedef {import("./core/index.js").TranslationFailureHandler} TranslationFailureHandler */
+/** @typedef {import("./core/index.js").TranslationFailureResponse} TranslationFailureResponse */
+/** @typedef {import("./core/index.js").TranslationFallbackPolicy} TranslationFallbackPolicy */
+/** @typedef {import("./core/index.js").LocaleMatchResult} LocaleMatchResult */
+/** @typedef {import("./core/index.js").LocaleMatchType} LocaleMatchType */
+/** @typedef {import("./core/index.js").BidiIsolation} BidiIsolation */
+/** @typedef {import("./core/index.js").PhoneticResolver} PhoneticResolver */
+/** @typedef {import("./core/index.js").LocalizedStringWarning} LocalizedStringWarning */
+/** @typedef {import("./core/index.js").LocalizedStringWarningHandler} LocalizedStringWarningHandler */
 const freeze = Object.freeze;
 
 /**
@@ -156,10 +183,10 @@ export function pluralOperands(value, options) {
 
 /**
  * @param {string} category
- * @returns {Readonly<{ $lokalized: "language-form", axis: string, name: string, renderName: string }>}
+ * @returns {Cardinality}
  */
 function cardinalityConstant(category) {
-  const constant = /** @type {Record<string, LanguageFormValue | undefined>} */ (
+  const constant = /** @type {Record<string, Cardinality | undefined>} */ (
     /** @type {unknown} */ (LANGUAGE_FORMS))[`CARDINALITY_${category.toUpperCase()}`];
   if (constant === undefined) throw new RangeError(`Unsupported CLDR plural category '${category}'`);
   return constant;

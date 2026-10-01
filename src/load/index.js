@@ -95,7 +95,7 @@
  *   Per locale: the URL, the full lowercase SHA-256 of the RESPONSE-BODY OCTETS (not of the decoded
  *   text — the digest is taken after any content coding and before decoding), and an optional
  *   expected decoded size.
- * @property {Readonly<Record<string, readonly string[]>>} tiebreakers
+ * @property {Readonly<Record<string, readonly string[]>>} tiebreakerLocalesByLanguageCode
  */
 
 /**
@@ -124,7 +124,7 @@
  * @property {string} catalogVersion
  * @property {string} resolvedFallbackLocale
  * @property {Readonly<Record<string, string>>} localeToSha256
- * @property {Readonly<Record<string, readonly string[]>>} tiebreakers
+ * @property {Readonly<Record<string, readonly string[]>>} tiebreakerLocalesByLanguageCode
  */
 
 /**
@@ -160,9 +160,9 @@
  *
  * @typedef {object} LoadedStrings
  * @property {Readonly<Record<string, ParsedStringsFile>>} catalogs
- * @property {Readonly<Record<string, readonly string[]>>} tiebreakers
+ * @property {Readonly<Record<string, readonly string[]>>} tiebreakerLocalesByLanguageCode
  * @property {string} fallbackLocale
- * @property {Readonly<{ fallbackLocale: string, supportedLocales: readonly string[], tiebreakers: Readonly<Record<string, readonly string[]>> }>} manifestLocaleConfiguration
+ * @property {Readonly<{ fallbackLocale: string, supportedLocales: readonly string[], tiebreakerLocalesByLanguageCode: Readonly<Record<string, readonly string[]>> }>} manifestLocaleConfiguration
  * @property {import("../core/index.js").CatalogIdentity} catalogIdentity
  * @property {string} cldrVersion
  * @property {string} dataFingerprint
@@ -182,10 +182,10 @@ export { chain, fetchSet } from "./planning.js";
  * among nine package exports, and :1107 says those runtime values "are public for catching and
  * `instanceof`" while their declarations "expose no constructor or extension signature" — which is
  * exactly the shape S22 gave this class. Plan 3.1's `load` row permits it under the "loading errors"
- * category that `StringsLoadingError` already sits in. M8 clause 75 was recorded as blocked on a
+ * category that `LocalizedStringLoadingError` already sits in. M8 clause 75 was recorded as blocked on a
  * maintainer decision to widen the surface; there was no widening to decide.
  */
-export { DigestUnavailableError, StringsLoadingError, loadEntireManifest, loadStrings } from "./fetch-loader.js";
+export { DigestUnavailableError, LocalizedStringLoadingError, loadEntireManifest, loadStrings } from "./fetch-loader.js";
 export {
   localeConfigurationForManifest,
   parseStringsManifest,

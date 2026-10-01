@@ -14,7 +14,7 @@
  * `"GENDER_FEMININE"` as a string, which is not the tagged constant the resolver wants — the sample
  * rendered the KEY back and nothing but running it would have said so. A second draft destructured
  * `readStringsFromDirectory`'s return as a catalog map when it returns `{ catalogs, warnings }`, and
- * a third hit a real construction refusal for undeclared tiebreakers. All three are now in the
+ * a third hit a real construction refusal for undeclared tiebreakerLocalesByLanguageCode. All three are now in the
  * README *because* they were measured, and the third is documented as a feature.
  *
  * THE CONVENTION, which keeps the README readable:
@@ -42,7 +42,7 @@
  * README went out with two false sentences, both OUTSIDE any code block and therefore invisible
  * here: it said the root exports constants across ELEVEN axes (there are ten — `Object.values` of
  * the namespace filtered by `$lokalized` gives 61 forms over 10 distinct `axis` values), and it told
- * a reader to pass `{ onFailure: THROW_EXCEPTION }`, which is a `TypeError` because `onFailure` must
+ * a reader to pass `{ translationFailureHandler: THROW_EXCEPTION }`, which is a `TypeError` because `translationFailureHandler` must
  * be a FUNCTION and `THROW_EXCEPTION` is a value a handler RETURNS. Six agents re-deriving the
  * remaining sections by running the library found both.
  *

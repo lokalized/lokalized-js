@@ -36,10 +36,10 @@
  *
  *   | ablation                                    | of 13 | caught by | `npm run conformance` |
  *   |---|---:|---|---|
- *   | delete the duplicate arm                    | 10/3 | the duplicate refusal, the `onFailure` row, `return-string` | 1,959/1, exit 1 — the duplicate row |
+ *   | delete the duplicate arm                    | 10/3 | the duplicate refusal, the `translationFailureHandler` row, `return-string` | 1,959/1, exit 1 — the duplicate row |
  *   | delete the well-formedness arm              | 10/3 | the two ill-formed refusals and the ORDER row | 1,958/2, exit 1 — the two ill-formed rows |
  *   | validate `chain`, not the reached prefix    | 12/1 | the serving control | 1,957/3, exit 1 (`lvariant.early-serve.*`) |
- *   | throw from the walk instead of routing it   | 11/2 | the `onFailure` row and the rethrow-by-identity row | 1,957/3, exit 1 |
+ *   | throw from the walk instead of routing it   | 11/2 | the `translationFailureHandler` row and the rethrow-by-identity row | 1,957/3, exit 1 |
  *   | drop the failure-result validation          |  7/6 | every refusal row — nothing escapes at all | 1,957/3, exit 1 |
  *
  * The SECOND row is the one that changed, and it changed in the direction that matters: it read
@@ -75,7 +75,7 @@ const SERVES_EARLY = {
 };
 
 /** @param {Record<string, Record<string, string>>} strings */
-const stringsFor = (strings) => createStrings({ strings, fallbackLocale: "fr", localeResolver: () => "fr" });
+const stringsFor = (strings) => createStrings({ localizedStringSupplier: () => (strings), fallbackLocale: "fr", localeSupplier: () => "fr" });
 
 /**
  * What one lookup did: the translation, or the error's name and message.
@@ -173,15 +173,15 @@ describe("attempted-locale refusals: the CHAIN is what is validated, not the tag
     // layer would break these while fixing the lookups above.
     const strings = stringsFor(EXHAUSTS);
     for (const locale of ["en-US-x-lvariant-POSIX", "ja-JP-x-lvariant-JP", "th-TH-x-lvariant-TH"]) {
-      const { localeMatch } = strings.getDirectLocaleContext(locale);
-      assert.equal(localeMatch.matchType, "none");
-      assert.equal(localeMatch.locale, null);
+      const { localeMatchResult } = strings.getDirectLocaleContext(locale);
+      assert.equal(localeMatchResult.matchType, "none");
+      assert.equal(localeMatchResult.locale, null);
     }
   });
 });
 
 describe("attempted-locale refusals: where the refusal is disposed of", () => {
-  it("reports the refusal to onFailure as a RESOLUTION_FAILURE before it escapes", () => {
+  it("reports the refusal to translationFailureHandler as a RESOLUTION_FAILURE before it escapes", () => {
     // Java's `return new TranslationResult(...)` sits INSIDE the try at `DefaultStrings.java:713-726`,
     // so the constructor's exception is caught as THAT candidate's resolution failure, the walk ends,
     // and the handler is consulted exactly once with the full attempted list. A port that simply
@@ -189,10 +189,10 @@ describe("attempted-locale refusals: where the refusal is disposed of", () => {
     /** @type {unknown[]} */
     const failures = [];
     const strings = createStrings({
-      strings: EXHAUSTS,
+      localizedStringSupplier: () => (EXHAUSTS),
       fallbackLocale: "fr",
-      localeResolver: () => "fr",
-      onFailure: (failure) => {
+      localeSupplier: () => "fr",
+      translationFailureHandler: (failure) => {
         failures.push(failure);
         return { action: /** @type {const} */ ("return-key") };
       },
@@ -222,10 +222,10 @@ describe("attempted-locale refusals: where the refusal is disposed of", () => {
     // `throwExceptionFor` (`DefaultStrings.java:3196-3213`) builds no result, so it rethrows the
     // retained cause BY IDENTITY — the assertion below, which is the opposite of the one above.
     const strings = createStrings({
-      strings: EXHAUSTS,
+      localizedStringSupplier: () => (EXHAUSTS),
       fallbackLocale: "fr",
-      localeResolver: () => "fr",
-      onFailure: () => ({ action: /** @type {const} */ ("return-string"), translation: "x" }),
+      localeSupplier: () => "fr",
+      translationFailureHandler: () => ({ action: /** @type {const} */ ("return-string"), translation: "x" }),
     });
     assert.equal(lookup(strings, "en-US-x-lvariant-POSIX").name, "TypeError");
   });
@@ -234,10 +234,10 @@ describe("attempted-locale refusals: where the refusal is disposed of", () => {
     /** @type {{ cause: Error }[]} */
     const failures = [];
     const strings = createStrings({
-      strings: EXHAUSTS,
+      localizedStringSupplier: () => (EXHAUSTS),
       fallbackLocale: "fr",
-      localeResolver: () => "fr",
-      onFailure: (failure) => {
+      localeSupplier: () => "fr",
+      translationFailureHandler: (failure) => {
         failures.push(/** @type {{ cause: Error }} */ (failure));
         return { action: /** @type {const} */ ("throw") };
       },

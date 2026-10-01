@@ -24,7 +24,7 @@ import { decode as pinnedProvenance } from "../src/data/provenance.js";
 import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 /** @param {Record<string, {url: string, sha256: string, decodedBytes?: number}>} files */
-function manifest(files, { tiebreakers = {}, fallbackLocale = "en", baseUrl = "https://cdn.example/v1/" } = {}) {
+function manifest(files, { tiebreakerLocalesByLanguageCode = {}, fallbackLocale = "en", baseUrl = "https://cdn.example/v1/" } = {}) {
   const draft = {
     formatVersion: 1,
     catalogVersion: "v1",
@@ -36,7 +36,7 @@ function manifest(files, { tiebreakers = {}, fallbackLocale = "en", baseUrl = "h
     fallbackLocale,
     baseUrl,
     files,
-    tiebreakers,
+    tiebreakerLocalesByLanguageCode,
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return /** @type {any} */ (draft);
@@ -157,70 +157,70 @@ const JAVA_VERIFIED_CHAINS = [
   {
     what: "an exact manifest hit does NOT end the chain, and the catalog-less bare tag sits BETWEEN the hit and the sweep",
     files: ["en-GB", "en-US", "en-CA", "fr"], fallbackLocale: "fr",
-    tiebreakers: { en: ["en-CA", "en-GB", "en-US"] },
+    tiebreakerLocalesByLanguageCode: { en: ["en-CA", "en-GB", "en-US"] },
     lookup: "en-US", chain: ["en-US", "en", "en-CA", "en-GB", "fr"],
     fetched: ["en-US", "en-CA", "en-GB", "fr"],
   },
   {
     what: "the no/nb bridge INSERTS a candidate rather than resolving through one — `no` stays catalog-less",
-    files: ["nb", "en"], fallbackLocale: "en", tiebreakers: {},
+    files: ["nb", "en"], fallbackLocale: "en", tiebreakerLocalesByLanguageCode: {},
     lookup: "no", chain: ["no", "nb", "en"], fetched: ["nb", "en"],
   },
   {
     what: "the control: `nn` does NOT bridge to nb, so the manifest's only non-English file is never attempted",
-    files: ["nb", "en"], fallbackLocale: "en", tiebreakers: {},
+    files: ["nb", "en"], fallbackLocale: "en", tiebreakerLocalesByLanguageCode: {},
     lookup: "nn", chain: ["nn", "no", "en"], fetched: ["en"],
   },
   {
     what: "the bridged traversal is appended whole, regional-then-bare",
-    files: ["nb", "en"], fallbackLocale: "en", tiebreakers: {},
+    files: ["nb", "en"], fallbackLocale: "en", tiebreakerLocalesByLanguageCode: {},
     lookup: "no-NO", chain: ["no-NO", "no", "nb-NO", "nb", "en"], fetched: ["nb", "en"],
   },
   {
     what: "and the mirror order is ASYMMETRIC in the lookup tag — every implementer assumes symmetry",
-    files: ["nb", "en"], fallbackLocale: "en", tiebreakers: {},
+    files: ["nb", "en"], fallbackLocale: "en", tiebreakerLocalesByLanguageCode: {},
     lookup: "nb-NO", chain: ["nb-NO", "nb", "no", "no-NO", "en"], fetched: ["nb", "en"],
   },
   {
     what: "truncation STOPS at a likely-script boundary: the manifest has `sr` and it must never be attempted for a Latin request",
-    files: ["sr", "en"], fallbackLocale: "en", tiebreakers: {},
+    files: ["sr", "en"], fallbackLocale: "en", tiebreakerLocalesByLanguageCode: {},
     lookup: "sr-Latn-RS", chain: ["sr-Latn-RS", "sr-Latn", "en"], fetched: ["en"],
   },
   {
     what: "the control: a Cyrillic request DOES reach bare `sr`, which is what proves the truncator ran at all",
-    files: ["sr", "en"], fallbackLocale: "en", tiebreakers: {},
+    files: ["sr", "en"], fallbackLocale: "en", tiebreakerLocalesByLanguageCode: {},
     lookup: "sr-Cyrl-RS", chain: ["sr-Cyrl-RS", "sr-Cyrl", "sr", "en"], fetched: ["sr", "en"],
   },
   {
     what: "the script filter runs FIRST and the tiebreaker list then orders the survivors",
     files: ["sr-Cyrl-BA", "sr-Cyrl-RS", "sr-Latn", "en"], fallbackLocale: "en",
-    tiebreakers: { sr: ["sr-Cyrl-BA", "sr-Cyrl-RS", "sr-Latn"] },
+    tiebreakerLocalesByLanguageCode: { sr: ["sr-Cyrl-BA", "sr-Cyrl-RS", "sr-Latn"] },
     lookup: "sr-RS", chain: ["sr-RS", "sr", "sr-Cyrl-BA", "sr-Cyrl-RS", "en"],
     fetched: ["sr-Cyrl-BA", "sr-Cyrl-RS", "en"],
   },
   {
     what: "the control: only the survivors reorder; the Latin locale stays excluded in both arms",
     files: ["sr-Cyrl-BA", "sr-Cyrl-RS", "sr-Latn", "en"], fallbackLocale: "en",
-    tiebreakers: { sr: ["sr-Cyrl-RS", "sr-Cyrl-BA", "sr-Latn"] },
+    tiebreakerLocalesByLanguageCode: { sr: ["sr-Cyrl-RS", "sr-Cyrl-BA", "sr-Latn"] },
     lookup: "sr-RS", chain: ["sr-RS", "sr", "sr-Cyrl-RS", "sr-Cyrl-BA", "en"],
     fetched: ["sr-Cyrl-RS", "sr-Cyrl-BA", "en"],
   },
   {
     what: "the script filter OUTRANKS tiebreaker order — zh-Hans is excluded for a zh-TW request however the list is written",
     files: ["zh-Hans", "zh-Hant", "en"], fallbackLocale: "en",
-    tiebreakers: { zh: ["zh-Hant", "zh-Hans"] },
+    tiebreakerLocalesByLanguageCode: { zh: ["zh-Hant", "zh-Hans"] },
     lookup: "zh-TW", chain: ["zh-TW", "zh-Hant", "en"], fetched: ["zh-Hant", "en"],
   },
   {
     what: "the invariance twin: moving the EXCLUDED locale to the head of the list changes nothing",
     files: ["zh-Hans", "zh-Hant", "en"], fallbackLocale: "en",
-    tiebreakers: { zh: ["zh-Hans", "zh-Hant"] },
+    tiebreakerLocalesByLanguageCode: { zh: ["zh-Hans", "zh-Hant"] },
     lookup: "zh-TW", chain: ["zh-TW", "zh-Hant", "en"], fetched: ["zh-Hant", "en"],
   },
   {
     what: "the control: zh-CN swaps which catalog is excluded, so the pair is about SCRIPT rather than about zh",
     files: ["zh-Hans", "zh-Hant", "en"], fallbackLocale: "en",
-    tiebreakers: { zh: ["zh-Hant", "zh-Hans"] },
+    tiebreakerLocalesByLanguageCode: { zh: ["zh-Hant", "zh-Hans"] },
     lookup: "zh-CN", chain: ["zh-CN", "zh", "zh-Hans", "en"], fetched: ["zh-Hans", "en"],
   },
 ];
@@ -229,7 +229,7 @@ for (const row of JAVA_VERIFIED_CHAINS) {
   test(`SEQUENCE (Java-measured): ${row.what}`, () => {
     const m = manifest(Object.fromEntries(row.files.map((tag) => [tag, file(tag)])), {
       fallbackLocale: row.fallbackLocale,
-      tiebreakers: row.tiebreakers,
+      tiebreakerLocalesByLanguageCode: row.tiebreakerLocalesByLanguageCode,
     });
     assert.deepEqual([...chain(m, row.lookup)], row.chain);
     // The fetch set beside it is a PLAN PROJECTION, not a measurement — chain ∩ file keys, in
@@ -243,7 +243,7 @@ test("PROJECTION (plan-only): each entry carries ITS OWN file's digest", () => {
   // across the fixture — which is how this file was first written — an entry taking its digest from
   // the wrong manifest entry is byte-identical and completely invisible.
   const m = manifest({ "en-GB": file("en-GB"), "en-CA": file("en-CA"), en: file("en") },
-    { tiebreakers: { en: ["en-CA", "en-GB", "en"] } });
+    { tiebreakerLocalesByLanguageCode: { en: ["en-CA", "en-GB", "en"] } });
   for (const entry of fetchSet(m, "en-GB"))
     assert.equal(entry.sha256, digestFor(entry.locale),
       `${entry.locale} must carry its own digest, not another file's`);

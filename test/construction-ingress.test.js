@@ -41,7 +41,7 @@ describe("Fallback locale — DefaultStrings.java:248 / Strings.java:211", () =>
   it("refuses a fallback locale that is not well-formed", () => {
     // Java, measured: `Fallback locale 'en__NY' is not a well-formed IETF BCP 47 locale`.
     assert.throws(
-      () => createStrings({ fallbackLocale: ILL_FORMED, localeResolver: () => "fr", strings: CATALOGS }),
+      () => createStrings({ fallbackLocale: ILL_FORMED, localeSupplier: () => "fr", localizedStringSupplier: () => (CATALOGS) }),
       {
         name: "RangeError",
         message: "Fallback locale 'en-x-lvariant-NY' is not a well-formed IETF BCP 47 locale",
@@ -56,7 +56,7 @@ describe("Fallback locale — DefaultStrings.java:248 / Strings.java:211", () =>
     // Java, measured, says the same thing here:
     //   Specified fallback locale is 'de' but no matching localized strings locale was found.
     assert.throws(
-      () => createStrings({ fallbackLocale: "de", localeResolver: () => "fr", strings: CATALOGS }),
+      () => createStrings({ fallbackLocale: "de", localeSupplier: () => "fr", localizedStringSupplier: () => (CATALOGS) }),
       {
         name: "RangeError",
         message:
@@ -67,13 +67,13 @@ describe("Fallback locale — DefaultStrings.java:248 / Strings.java:211", () =>
   });
 
   it("CONTROL: a well-formed, loaded fallback constructs and serves", () => {
-    // No `en`/`en-US` pair here: that pair is ambiguous without tiebreakers and would refuse for a
+    // No `en`/`en-US` pair here: that pair is ambiguous without tiebreakerLocalesByLanguageCode and would refuse for a
     // reason that has nothing to do with this file, which is the trap the tiebreaker suite below
     // pins deliberately.
     const strings = createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "fr",
-      strings: { en: { Hello: "hello" }, fr: { Hello: "bonjour" } },
+      localeSupplier: () => "fr",
+      localizedStringSupplier: () => ({ en: { Hello: "hello" }, fr: { Hello: "bonjour" } }),
     });
     assert.equal(strings.get("Hello"), "bonjour");
   });
@@ -85,14 +85,14 @@ describe("Fallback locale — DefaultStrings.java:248 / Strings.java:211", () =>
     // sites collapse into one — but the ORDER against the neighbouring refusal is observable here
     // and is the same.
     assert.throws(
-      () => createStrings({ fallbackLocale: ILL_FORMED, localeResolver: () => "fr" }),
+      () => createStrings({ fallbackLocale: ILL_FORMED, localeSupplier: () => "fr" }),
       { name: "RangeError", message: /^Fallback locale /},
     );
     // The control that makes the ordering claim mean something: with a well-formed fallback the
     // very same call reports the missing catalog instead.
     assert.throws(
-      () => createStrings({ fallbackLocale: "fr", localeResolver: () => "fr" }),
-      { name: "TypeError", message: /^createStrings\(\{ strings \}\) is required/ },
+      () => createStrings({ fallbackLocale: "fr", localeSupplier: () => "fr" }),
+      { name: "TypeError", message: /^createStrings\(\{ localizedStringSupplier \}\) is required/ },
     );
   });
 });
@@ -103,8 +103,8 @@ describe("Localized strings locale — DefaultStrings.java:276", () => {
     assert.throws(
       () => createStrings({
         fallbackLocale: "fr",
-        localeResolver: () => "fr",
-        strings: { fr: { Hello: "bonjour" }, [ILL_FORMED]: { Hello: "hello" } },
+        localeSupplier: () => "fr",
+        localizedStringSupplier: () => ({ fr: { Hello: "bonjour" }, [ILL_FORMED]: { Hello: "hello" } }),
       }),
       {
         name: "RangeError",
@@ -119,12 +119,12 @@ describe("Localized strings locale — DefaultStrings.java:276", () => {
     assert.throws(
       () => createStrings({
         fallbackLocale: "fr",
-        localeResolver: () => "fr",
-        strings: {
+        localeSupplier: () => "fr",
+        localizedStringSupplier: () => ({
           fr: { Hello: "bonjour" },
           [ILL_FORMED]: { Hello: "hello" },
           "en-x-lvariant-ny": { Hello: "hello" },
-        },
+        }),
       }),
       { name: "RangeError", message: /^Localized strings locale / },
     );
@@ -134,8 +134,8 @@ describe("Localized strings locale — DefaultStrings.java:276", () => {
     assert.throws(
       () => createStrings({
         fallbackLocale: "fr",
-        localeResolver: () => "fr",
-        strings: { fr: { Hello: "bonjour" }, en: { Hello: "hello" }, EN: { Hello: "hello" } },
+        localeSupplier: () => "fr",
+        localizedStringSupplier: () => ({ fr: { Hello: "bonjour" }, en: { Hello: "hello" }, EN: { Hello: "hello" } }),
       }),
       { name: "RangeError", message: /both use IETF BCP 47 language tag/ },
     );
@@ -147,8 +147,8 @@ describe("Localized strings locale — DefaultStrings.java:276", () => {
     // would fail here while passing every assertion above.
     const strings = createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "en-fonipa",
-      strings: { fr: { Hello: "bonjour" }, "en-x-lvariant-fonipa": { Hello: "hello-fonipa" } },
+      localeSupplier: () => "en-fonipa",
+      localizedStringSupplier: () => ({ fr: { Hello: "bonjour" }, "en-x-lvariant-fonipa": { Hello: "hello-fonipa" } }),
     });
     // Sorted for comparison on purpose: what is asserted is that the catalog was ACCEPTED under the
     // lifted tag `en-fonipa`, not the order `getSupportedLocales` returns.
@@ -179,13 +179,13 @@ describe("getSupportedLocales ordering — DefaultStrings.java:520-521 and plan 
   const build = () =>
     createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "fr",
-      strings: {
+      localeSupplier: () => "fr",
+      localizedStringSupplier: () => ({
         fr: { Hello: "bonjour" },
         "en-fonipa": { Hello: "hello-fonipa" },
         de: { Hello: "hallo" },
         ar: { Hello: "marhaba" },
-      },
+      }),
     });
 
   it("getSupportedLocales is sorted by serialized tag, not by insertion order", () => {
@@ -199,8 +199,8 @@ describe("getSupportedLocales ordering — DefaultStrings.java:520-521 and plan 
   it("CONTROL: an already-sorted catalog set is unchanged — this is a sort, not a reversal", () => {
     const strings = createStrings({
       fallbackLocale: "ar",
-      localeResolver: () => "ar",
-      strings: { ar: { Hello: "marhaba" }, de: { Hello: "hallo" }, fr: { Hello: "bonjour" } },
+      localeSupplier: () => "ar",
+      localizedStringSupplier: () => ({ ar: { Hello: "marhaba" }, de: { Hello: "hallo" }, fr: { Hello: "bonjour" } }),
     });
     assert.deepEqual([...strings.getSupportedLocales()], ["ar", "de", "fr"]);
   });
@@ -212,9 +212,9 @@ describe("Tiebreaker locale — DefaultStrings.java:347", () => {
     assert.throws(
       () => createStrings({
         fallbackLocale: "fr",
-        localeResolver: () => "fr",
-        strings: CATALOGS,
-        tiebreakers: { en: [ILL_FORMED, "en", "en-US"] },
+        localeSupplier: () => "fr",
+        localizedStringSupplier: () => (CATALOGS),
+        tiebreakerLocalesByLanguageCode: { en: [ILL_FORMED, "en", "en-US"] },
       }),
       {
         name: "RangeError",
@@ -233,9 +233,9 @@ describe("Tiebreaker locale — DefaultStrings.java:347", () => {
       try {
         createStrings({
           fallbackLocale: "fr",
-          localeResolver: () => "fr",
-          strings: CATALOGS,
-          tiebreakers: { en: ["en", "en-US", member] },
+          localeSupplier: () => "fr",
+          localizedStringSupplier: () => (CATALOGS),
+          tiebreakerLocalesByLanguageCode: { en: ["en", "en-US", member] },
         });
         return "constructed";
       } catch (error) {
@@ -256,9 +256,9 @@ describe("Tiebreaker locale — DefaultStrings.java:347", () => {
     assert.throws(
       () => createStrings({
         fallbackLocale: "fr",
-        localeResolver: () => "fr",
-        strings: CATALOGS,
-        tiebreakers: { en: [ILL_FORMED] },
+        localeSupplier: () => "fr",
+        localizedStringSupplier: () => (CATALOGS),
+        tiebreakerLocalesByLanguageCode: { en: [ILL_FORMED] },
       }),
       { name: "RangeError", message: /^Tiebreaker locale / },
     );
@@ -268,9 +268,9 @@ describe("Tiebreaker locale — DefaultStrings.java:347", () => {
     assert.throws(
       () => createStrings({
         fallbackLocale: "fr",
-        localeResolver: () => "fr",
-        strings: CATALOGS,
-        tiebreakers: { en: ["en"] },
+        localeSupplier: () => "fr",
+        localizedStringSupplier: () => (CATALOGS),
+        tiebreakerLocalesByLanguageCode: { en: ["en"] },
       }),
       { name: "RangeError", message: /must be an exact permutation of loaded locales/ },
     );
@@ -278,14 +278,14 @@ describe("Tiebreaker locale — DefaultStrings.java:347", () => {
 
   it("CONTROL: a well-formed tiebreaker list constructs and resolves the ambiguity", () => {
     // `{en, en-US}` REFUSES to construct without a tiebreaker list — measured:
-    //   You must specify tiebreaker locales via createStrings({ tiebreakers }) …
+    //   You must specify tiebreaker locales via createStrings({ tiebreakerLocalesByLanguageCode }) …
     // so a construction that succeeds here is the ambiguity being resolved, and both catalogs
     // remain reachable afterwards.
     const strings = createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "en",
-      strings: CATALOGS,
-      tiebreakers: { en: ["en-US", "en"] },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => (CATALOGS),
+      tiebreakerLocalesByLanguageCode: { en: ["en-US", "en"] },
     });
     assert.equal(strings.get("Hello"), "hello");
     assert.equal(strings.get("Hello", undefined, { locale: "en-US" }), "hello-us");

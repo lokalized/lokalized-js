@@ -447,44 +447,254 @@
         }
       },
       "previousSha256": "ea44b6b0725206c9d4e6e2865d0415ad4aed78c455409c0e9bf51ab680d6c07f"
+    },
+    {
+      "reason": "Align shared public API names across ports before 1.0.0",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 778655
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 767623
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582266
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674380
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36550
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287988
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 708047
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 798381
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 803239
+        }
+      },
+      "previousSha256": "a525d24c143f756efc2c3e9bda7bbd0582ada9ca6e353fd9b474dcfeacca8ddb"
+    },
+    {
+      "reason": "Finalize documentation for the shared API vocabulary before 1.0.0",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 778396
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 767364
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582007
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674121
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36550
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287765
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 707788
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 798122
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 802980
+        }
+      },
+      "previousSha256": "ebc229f64c71c88f405403acab412d96b783be1e7713089f89da424bf53bf0f0"
+    },
+    {
+      "reason": "Use localizedStringSupplier for construction-time catalogs, matching Java before 1.0.0",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 778315
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 767283
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582007
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674121
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36550
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287765
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 707788
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 798041
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 802899
+        }
+      },
+      "previousSha256": "0a95b8d1d1110f6f574da49f8db216be625d403d5326a9a828a92c06a529f3b8"
+    },
+    {
+      "reason": "Complete the approved Java/JS API alignment with localeMatchResult, LocalizedStringLoadingError, and named public types",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 781720
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 768694
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582117
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674319
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36714
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287911
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 707954
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 801338
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 806213
+        }
+      },
+      "previousSha256": "6cc671759734fb740f45511477002d3b413e7e0f900c82e66fc5b87e074e7fa5"
+    },
+    {
+      "reason": "Correct supplier documentation after approved cross-port API naming cleanup",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 781778
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 768752
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582117
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674319
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36714
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287911
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 707954
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 801396
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 806271
+        }
+      },
+      "previousSha256": "093ee8bd50d87b8250746c961ee4a6547c94fe9141eb44a5f67528cba933e5bb"
     }
   ],
   "subpaths": {
     "lokalized": {
       "modules": 32,
-      "bytes": 775144
+      "bytes": 781778
     },
     "lokalized/core": {
       "modules": 31,
-      "bytes": 764112
+      "bytes": 768752
     },
     "lokalized/parse": {
       "modules": 30,
-      "bytes": 581153
+      "bytes": 582117
     },
     "lokalized/load": {
       "modules": 39,
-      "bytes": 672347
+      "bytes": 674319
     },
     "lokalized/ssr": {
       "modules": 3,
-      "bytes": 36550
+      "bytes": 36714
     },
     "lokalized/negotiate": {
       "modules": 19,
-      "bytes": 286654
+      "bytes": 287911
     },
     "lokalized/node": {
       "modules": 42,
-      "bytes": 705849
+      "bytes": 707954
     },
     "lokalized/data/ordinal": {
       "modules": 34,
-      "bytes": 794870
+      "bytes": 801396
     },
     "lokalized/data/ranges": {
       "modules": 34,
-      "bytes": 799728
+      "bytes": 806271
     }
   }
 }

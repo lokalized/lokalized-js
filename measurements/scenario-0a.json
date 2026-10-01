@@ -1,10 +1,10 @@
 {
   "scenario": "0a",
-  "revision": 2,
+  "revision": 4,
   "note": "Baseline, not a threshold. M2 is tracked by engineering measurement; no go/no-go line exists.",
   "recipe": {
     "scenario": "0a",
-    "revision": 2,
+    "revision": 4,
     "description": "M2 static integration: the root with a fixed small embedded raw-text catalog, and lokalized/core with its fixed already-parsed equivalent",
     "freeze": "LATE, and stated rather than smoothed over. Plan 9.2:2806 has 0a owned by M2 and frozen at M0. M0 certification was skipped and nothing here was frozen until 2026-09-25, during M-R, after 71 recorded rebaselines. Revision 1 declares the method the tool has used since M5a rather than choosing a new one; it does not make the M0 deadline met.",
     "artifact": "the working tree's src/, which package.json#exports ships unbundled for '.' and './core'. Not a packed tarball, which plan 9.2's 'same packed artifact' asks for",
@@ -14,19 +14,19 @@
         "specifier": "lokalized",
         "entry": "src/index.js",
         "catalogInput": "raw-text",
-        "fixtureSha256": "918cac740e657e54d1fa40262c4338a7b88d35139e831b5486a84ed1386b7d4f"
+        "fixtureSha256": "f880b1003f9871a7b20cefa9768c5363a4a80d129a5856994e2d59a0ad1c5b08"
       },
       {
         "label": "core + parsed equivalent",
         "specifier": "lokalized/core",
         "entry": "src/core/index.js",
         "catalogInput": "parsed",
-        "fixtureSha256": "f0f95c3ef8f2ac2e4d261d3d80258b8c4a49141c7678d54f70e0a02d5456c279"
+        "fixtureSha256": "d8f29369a09f0fdd101caac13436635ebc2acd13fd1aa2e32b624345de6b9bb8"
       }
     ],
     "construction": {
       "fallbackLocale": "en",
-      "localeResolverAnswers": "en-AU"
+      "localeSupplierAnswers": "en-AU"
     },
     "render": {
       "key": "I read {{bookCount}} books",
@@ -39,14 +39,14 @@
     "method": "Node. Per variant, 9 iterations of: import the entry under a fresh ?m= query (which re-evaluates the entry module alone; its dependencies load once per process, so the median import is a warm figure), construct, first render — each timed with performance.now(), median reported. The raw-text variant's JSON.stringify of its three documents runs inside its construction window (about 2 microseconds against a recorded construction median of about 130, measured 2026-09-25). Retained heap is heapUsed across two forced collections around one more import and construction, which needs --expose-gc: a run without it fails. Modules and source bytes are tools/graph-walk.mjs over the entry's relative import graph. All of it is the code in harness.file, whose bytes are harness.sha256",
     "harness": {
       "file": "tools/0a-measure.mjs",
-      "sha256": "e07a84eda92a1e129bc0b067ae972e3e465228562041900d5a38fdde54d6445d",
+      "sha256": "d7a216580145646fd4f280c67d34b12fb7269cd1854242c9089ff2c57823c267",
       "command": "node --expose-gc tools/scenario-0a.mjs, which imports harness.file"
     },
     "gated": "modules and sourceBytes per variant ratchet: growth fails until re-recorded with --reason, and every --write needs a reason and appends a chained history entry. Each row's modules and sourceBytes, as the harness returned them and as the run records them, must equal tools/graph-walk.mjs over the variant's declared entry, walked again apart from the harness. The render must equal render.expected. Timings and heap are reported and never compared, and each must be present and finite, in the run and in the record (A33 (4))",
     "browserHalf": "tools/browser-0a/index.html served by tools/browser-0a/serve.mjs, one variant per page load, merged by tools/browser-0a/record.mjs with a reason and a chained history entry. Never re-measured here; its staleness against the Node graph is reported, never gated; it is required present: a row per variant with its counts and finite timings; and it is bound by its digest to the newest history entry, so an edit by hand fails. The page hands the ALREADY-PARSED catalogs to BOTH variants, so its root row's construction does not include parsing, unlike the Node root variant above. Recorded rather than fixed: fixing it is a new browser capture",
     "notFrozen": "thresholds and regression tolerances — none exist, by A3/A4/A7 (restated as A33, 2026-09-25); runtime version and hardware, which move only the reported timings; tools/graph-walk.mjs, which takes the ratcheted figures and is shared with other tools and tests (subpath-graphs, scenario 2k and scenario 6 among them), so a digest of it here would make every edit to it a 0a revision: a change to it moves the harness's rows and their re-derivation alike, the ratchet sees any growth, and writing a shrink needs a reason; and tools/scenario-0a.mjs, which orchestrates, judges and copies the harness's rows into the record: the modules and sourceBytes it copies are walked again from each declared entry, the timings it rounds are held only to being present and finite, as every timing is, and each of its rules is run by test/scenario-0a-recipe.test.js"
   },
-  "recipeSha256": "c986ed5096eba80ad937d426016e3afa0e763a6807d986d03d5ebe39a77d4841",
+  "recipeSha256": "36ee91632173a9ebb1bfacc91226b44d2089457b6836f5ab80448a656554b2a6",
   "environments": [
     "node",
     "browser"
@@ -55,20 +55,20 @@
     {
       "label": "root + raw-text catalog",
       "modules": 32,
-      "sourceBytes": 775144,
-      "importMs": 0.348,
-      "constructionMs": 0.1115,
-      "firstRenderMs": 0.3468,
-      "retainedBytes": 92944
+      "sourceBytes": 781778,
+      "importMs": 0.326,
+      "constructionMs": 0.1251,
+      "firstRenderMs": 0.3195,
+      "retainedBytes": 101080
     },
     {
       "label": "core + parsed equivalent",
       "modules": 31,
-      "sourceBytes": 764112,
-      "importMs": 0.673,
-      "constructionMs": 0.3814,
-      "firstRenderMs": 0.3146,
-      "retainedBytes": 463888
+      "sourceBytes": 768752,
+      "importMs": 0.818,
+      "constructionMs": 0.438,
+      "firstRenderMs": 0.3456,
+      "retainedBytes": 478328
     }
   ],
   "browser": {
@@ -785,6 +785,86 @@
       "browserHalf": true,
       "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
       "previousSha256": "6213e1ba8a2ccaee8b045ea08a976f129f847edfc12a3d18265c10ca2736625c"
+    },
+    {
+      "reason": "Align shared public API names across ports before 1.0.0",
+      "growth": [
+        "the recipe moved from revision 2 to 3; figures either side are not comparable as the same scenario, so the move is recorded with a reason",
+        "root + raw-text catalog: source graph grew 775144 -> 778655 bytes",
+        "core + parsed equivalent: source graph grew 764112 -> 767623 bytes"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 778655
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 767623
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "6ac80acd85ed35135409a7c881e4f6efb96fa61d365dc696a029d4eabea7b565"
+    },
+    {
+      "reason": "Use localizedStringSupplier for construction-time catalogs, matching Java before 1.0.0",
+      "growth": [
+        "the recipe moved from revision 3 to 4; figures either side are not comparable as the same scenario, so the move is recorded with a reason"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 778315
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 767283
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "f8a10b5f741d4363c1c7683ce70a0a999324a5dd0ca5f58bb6fdce163af17cd9"
+    },
+    {
+      "reason": "Complete the approved Java/JS API alignment with consistent match-result and loading-error names",
+      "growth": [
+        "root + raw-text catalog: source graph grew 778315 -> 781720 bytes",
+        "core + parsed equivalent: source graph grew 767283 -> 768694 bytes"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 781720
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 768694
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "9e0dfb19c4c5a55a4e851ca83f32f4b5c52a65f63b5c9cb051d96658b05eaac8"
+    },
+    {
+      "reason": "Correct supplier documentation after approved cross-port API naming cleanup",
+      "growth": [
+        "root + raw-text catalog: source graph grew 781720 -> 781778 bytes",
+        "core + parsed equivalent: source graph grew 768694 -> 768752 bytes"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 781778
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 768752
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "6c69cf63f742fd425815e423c3995591ff3f3073e520e7e714ea69da2100ab34"
     }
   ]
 }

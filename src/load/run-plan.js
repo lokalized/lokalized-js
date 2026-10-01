@@ -64,12 +64,12 @@ export function requirePartialFailurePolicy(policy, door) {
  * Its `failures` are in PLAN order. A consumer diagnosing a broken deployment reads them against the
  * manifest, and completion order would reshuffle that list on every run.
  *
- * ONE CLASS FOR BOTH DOORS, deliberately: a caller that catches `StringsLoadingError` around a load
+ * ONE CLASS FOR BOTH DOORS, deliberately: a caller that catches `LocalizedStringLoadingError` around a load
  * should not have to know whether the bytes came from the network or the disk.
  */
   // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
-export class StringsLoadingError extends LokalizedError {
+export class LocalizedStringLoadingError extends LokalizedError {
   /**
    * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** The contract requires
    * the runtime constructor to take an unexported token AND the declaration to expose no
@@ -82,7 +82,7 @@ export class StringsLoadingError extends LokalizedError {
    *
    * @private
    * NOT CONSTRUCTIBLE BY A CONSUMER, and the token is what makes that enforceable rather than
-   * advisory — it also refuses `class Mine extends StringsLoadingError` at instantiation time.
+   * advisory — it also refuses `class Mine extends LocalizedStringLoadingError` at instantiation time.
    * `StringsParseError` has had exactly this shape since M5; this class shipped without it, so a
    * consumer could fabricate a load failure that every `instanceof` check would believe.
    *
@@ -91,10 +91,10 @@ export class StringsLoadingError extends LokalizedError {
    */
   constructor(token, message, failures) {
     if (token !== LOADING_ERROR_TOKEN)
-      throw new TypeError("StringsLoadingError is not constructible; it is thrown by the loaders");
+      throw new TypeError("LocalizedStringLoadingError is not constructible; it is thrown by the loaders");
 
     super(LOKALIZED_ERROR_TOKEN, "STRINGS_LOADING", message);
-    this.name = "StringsLoadingError";
+    this.name = "LocalizedStringLoadingError";
     /**
      * **`LoadFailure[]`, NOT `any[]` — it was `any[]` until M-R S3.** This is the field a consumer
      * reads while diagnosing a broken deployment, and `failures[0].stage` is the whole reason the
@@ -119,7 +119,7 @@ export class StringsLoadingError extends LokalizedError {
    * @param {symbol} token @param {string} message @param {readonly LoadFailure[]} failures
    */
   static raise(token, message, failures) {
-    return new StringsLoadingError(token, message, failures);
+    return new LocalizedStringLoadingError(token, message, failures);
   }
 }
 
@@ -132,7 +132,7 @@ const LOADING_ERROR_TOKEN = Symbol("lokalized.strings-loading-error");
  * @param {string} message @param {readonly LoadFailure[]} failures
  */
 export function loadingError(message, failures) {
-  return StringsLoadingError.raise(LOADING_ERROR_TOKEN, message, failures);
+  return LocalizedStringLoadingError.raise(LOADING_ERROR_TOKEN, message, failures);
 }
 
 /** @param {ArrayBuffer | Uint8Array} buffer */
@@ -203,7 +203,7 @@ async function loadOne(/** @type {FetchEntry} */ entry, /** @type {any} */ optio
 }
 
 /**
- * Plan 6.2:2103-2107 — the RESOLUTION channel's tiebreakers, filtered to what actually loaded.
+ * Plan 6.2:2103-2107 — the RESOLUTION channel's tiebreakerLocalesByLanguageCode, filtered to what actually loaded.
  *
  * **THE MANIFEST'S FULL SET CANNOT BE HANDED TO `createStrings` AND NEVER COULD BE.** The core
  * applies Java's construction rule (`DefaultStrings.<init>:394`): a language code's tiebreaker list
@@ -211,7 +211,7 @@ async function loadOne(/** @type {FetchEntry} */ entry, /** @type {any} */ optio
  * fetches the candidate chain and nothing else, so a manifest declaring `{en: [en-GB, en-US, en]}`
  * hands back a `complete: true` record naming three `en` catalogs when one arrived — and its own
  * core refuses it. That was live on the flagship `loadStrings` door until this filter existed, and
- * every test here missed it for one reason: every fixture declared `tiebreakers: {}`.
+ * every test here missed it for one reason: every fixture declared `tiebreakerLocalesByLanguageCode: {}`.
  *
  * Each declared list keeps its DECLARED ORDER; this list IS the resolution order for an ambiguous
  * language code, so re-deriving it from the loaded set would silently reorder it.
@@ -469,7 +469,7 @@ export async function runPlan(manifest, plan, options, transport) {
 
   return Object.freeze({
     catalogs: Object.freeze(catalogs),
-    tiebreakers: tiebreakersForLoaded(validated.tiebreakers, Object.keys(catalogs)),
+    tiebreakerLocalesByLanguageCode: tiebreakersForLoaded(validated.tiebreakerLocalesByLanguageCode, Object.keys(catalogs)),
     fallbackLocale: validated.fallbackLocale,
     // THE MANIFEST'S FULL CONFIGURATION, not the loaded subset, and it is not a convenience field.
     // `createStrings({ loaded })` recomputes the fetch plan from it (plan 3.4:727); without it the

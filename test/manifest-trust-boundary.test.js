@@ -64,7 +64,7 @@ async function load(manifest, bytes) {
     const loaded = await loadEntireManifest(manifest, { fetch: serving(bytes) });
     return {
       ok: /** @type {const} */ (true),
-      served: createStrings({ loaded, localeResolver: () => "en" }).get("Pay.To"),
+      served: createStrings({ loaded, localeSupplier: () => "en" }).get("Pay.To"),
       fingerprint: loaded.catalogIdentity.catalogFingerprint,
     };
   } catch (error) {
@@ -93,7 +93,7 @@ test("tampering with the catalog BYTES alone is caught at the digest", async () 
   const tampered = await load(honest.manifest, attacker.bytes);
 
   assert.equal(tampered.ok, false);
-  assert.equal(tampered.name, "StringsLoadingError");
+  assert.equal(tampered.name, "LocalizedStringLoadingError");
   assert.deepEqual(tampered.stages, ["en:digest"]);
 });
 

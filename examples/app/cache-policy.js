@@ -34,7 +34,7 @@
  */
 
 /**
- * @typedef {import("lokalized/core").LocaleMatch} LocaleMatch
+ * @typedef {import("lokalized/core").LocaleMatchResult} LocaleMatchResult
  */
 
 /** The `Vary` a match-preserving response must carry when it is shared-cacheable. */
@@ -60,7 +60,7 @@ function viewModelProjection(view) {
  * Naming the fields makes the coverage question answerable, and `test/example-edge.test.js` answers
  * it by EXECUTION: the match is handed to this function through a recording proxy
  * (`tools/oracle-field-coverage.mjs`, the instrument S32 built for the differentials), and a field
- * the match carries that this function never reads fails the test. A field added to `LocaleMatch`
+ * the match carries that this function never reads fails the test. A field added to `LocaleMatchResult`
  * later and not folded in here would otherwise re-open the collision silently, which is precisely
  * how the three dropped-column defects in `tools/oracle-field-coverage.mjs`'s header happened.
  *
@@ -68,7 +68,7 @@ function viewModelProjection(view) {
  * the nested `range`/`weight` are covered by authoring, not by the gate. Said here rather than left
  * to be assumed.
  *
- * @param {LocaleMatch} match
+ * @param {LocaleMatchResult} match
  * @returns {unknown[]}
  */
 function completeMatchProjection(match) {
@@ -78,7 +78,7 @@ function completeMatchProjection(match) {
     match.isMatch,
     match.fallbackLocale,
     match.effectiveWeight,
-    // `LocaleMatch.languageRange` is declared `string | WeightedLanguageRange | null` — a range door
+    // `LocaleMatchResult.languageRange` is declared `string | WeightedLanguageRange | null` — a range door
     // can hand back the raw range it was given. Collapsing the two shapes into one projection keeps
     // `"fr-ch"` and `{ range: "fr-ch", weight: 1 }` from hashing differently for no reason.
     match.languageRange === null ? null
@@ -108,7 +108,7 @@ async function sha256Hex(text) {
  * the identity `lokalized/load` computes is exactly the value that changes when any translation does.
  *
  * @param {Readonly<{
- *   match: LocaleMatch,
+ *   match: LocaleMatchResult,
  *   catalogFingerprint: string,
  *   view: Readonly<{ cartCount: number, readerName: string, readerGender: unknown }>,
  * }>} inputs

@@ -344,7 +344,7 @@ function portObservation(probe, directory) {
       ...(Object.keys(limits).length ? { limits } : {}),
       ...(maximumDiscoveryEntries === undefined ? {} : { maximumDiscoveryEntries }),
       pluralData: { ordinal: ordinalData },
-      onWarning: collect,
+      warningHandler: collect,
     });
     const locales = Object.keys(loaded.catalogs).sort();
     return {

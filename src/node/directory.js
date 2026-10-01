@@ -32,7 +32,7 @@ import { directoryLabel, discoverCatalogFiles, keyedByRenderedTag, resolveDiscov
  *   limits?: import("../internal/catalog.js").ParseLimits,
  *   maximumDiscoveryEntries?: number,
  *   pluralData?: Readonly<{ ordinal?: unknown, ranges?: unknown }>,
- *   onWarning?: (warning: import("../internal/parse-warnings.js").LocalizedStringWarning) => void,
+ *   warningHandler?: (warning: import("../internal/parse-warnings.js").LocalizedStringWarning) => void,
  * }} [options]
  * @returns {{ catalogs: Record<string, ParsedStringsFile>, warnings: readonly unknown[] }}
  */
@@ -41,7 +41,7 @@ export function readStringsFromDirectory(directory, options = {}) {
   // typo: 1 }` reports the resolveLimits RangeError and `{ maximumDiscoveryEntries: 0, typo: 1 }`
   // reports the discovery RangeError.
   options = refuseUnknownOptions("readStringsFromDirectory", options,
-    ["limits", "maximumDiscoveryEntries", "onWarning", "pluralData"], { loadingLimits: "limits" });
+    ["limits", "maximumDiscoveryEntries", "warningHandler", "pluralData"], { loadingLimits: "limits" });
 
   // VALIDATED IN THIS ORDER, and the order is observable when BOTH are wrong: the discovery budget
   // is refused before the seven portable limits are, because that is where Java refuses it — its
@@ -67,9 +67,9 @@ export function readStringsFromDirectory(directory, options = {}) {
         // Warnings STREAM: everything delivered before an abort stays delivered, across files and
         // within a file, and nothing is rolled back. A port that buffered them until success would
         // report a different warning count for every budget refusal.
-        onWarning: (warning) => {
+        warningHandler: (warning) => {
           warnings.push(warning);
-          options.onWarning?.(warning);
+          options.warningHandler?.(warning);
         },
       },
       session,

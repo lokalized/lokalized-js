@@ -19,12 +19,12 @@ import { createStrings, forLocale } from "../src/core/index.js";
 
 const strings = createStrings({
   fallbackLocale: "en",
-  localeResolver: () => "en",
-  strings: {
+  localeSupplier: () => "en",
+  localizedStringSupplier: () => ({
     en: { GREETING: "Hello" },
     fr: { GREETING: "Bonjour" },
     "nb-NO": { GREETING: "Hei" },
-  },
+  }),
 });
 
 describe("forLocale — syntactic normalization happens immediately", () => {

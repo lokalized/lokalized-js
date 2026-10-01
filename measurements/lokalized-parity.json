@@ -7,7 +7,7 @@
     "implementationVersion": "1.0.0-rc.2",
     "packageName": "lokalized",
     "packageVersion": "1.0.0-rc.2",
-    "implementationCommit": "5f6ee87d207038abc1d741deee57c82ff3bb8920",
+    "implementationCommit": "cb3a61c14ecd9086e11f226f6063a13665d43a8c",
     "javaReferenceCommit": "63b63e47c982f7a87873c52ac2289cc0392f3329",
     "javaReferenceTreeClean": true,
     "javaReferenceVersion": "3.1.0",
@@ -4616,7 +4616,7 @@
       ]
     },
     "xfailMetadata": [],
-    "sourceDateEpoch": 1790284505
+    "sourceDateEpoch": 1790700938
   },
   "undetermined": [
     {

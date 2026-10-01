@@ -53,14 +53,14 @@ const RIGHT_TO_LEFT_SCRIPTS = new Set(decodeRightToLeftScripts().map((script) =>
 /**
  * The three modes.
  *
- * Java's enum members are `NONE`, `ALWAYS` and `RTL_LOCALES`; the JS contract renames `ALWAYS` to
- * `"all"`, which is the only place the two vocabularies differ.
+ * Java's enum members are `NONE`, `ALWAYS` and `RTL_LOCALES`; JavaScript uses the same words
+ * as lowercase strings with hyphens
  *
- * @typedef {"none" | "rtl-locales" | "all"} BidiIsolation
+ * @typedef {"none" | "rtl-locales" | "always"} BidiIsolation
  */
 
 /** @type {ReadonlySet<string>} */
-const BIDI_ISOLATION_MODES = new Set(["none", "rtl-locales", "all"]);
+const BIDI_ISOLATION_MODES = new Set(["none", "rtl-locales", "always"]);
 
 /** The library default — `DefaultStrings.DEFAULT_BIDI_ISOLATION` (DefaultStrings.java:73/80). */
 export const DEFAULT_BIDI_ISOLATION = /** @type {BidiIsolation} */ ("rtl-locales");
@@ -69,7 +69,7 @@ export const DEFAULT_BIDI_ISOLATION = /** @type {BidiIsolation} */ ("rtl-locales
  * Validates a caller-supplied mode.
  *
  * Rejected rather than ignored: silently defaulting an unrecognized mode would turn a typo
- * (`"always"` for `"all"`) into isolation quietly disappearing from every RTL render.
+ * (`"all"` for `"always"`) into isolation quietly disappearing from every RTL render.
  *
  * @param {unknown} mode
  * @param {string} where the option path, for the diagnostic
@@ -78,7 +78,7 @@ export const DEFAULT_BIDI_ISOLATION = /** @type {BidiIsolation} */ ("rtl-locales
 export function validateBidiIsolation(mode, where) {
   if (typeof mode !== "string" || !BIDI_ISOLATION_MODES.has(mode))
     throw new RangeError(
-      `${where} must be one of 'none', 'rtl-locales', or 'all' but was ${JSON.stringify(mode)}`,
+      `${where} must be one of 'none', 'rtl-locales', or 'always' but was ${JSON.stringify(mode)}`,
     );
 
   return /** @type {BidiIsolation} */ (mode);
@@ -162,7 +162,7 @@ export function localeUsesRightToLeftScript(tag) {
  */
 export function shouldApplyBidiIsolation(mode, locale) {
   if (mode === "none") return false;
-  if (mode === "all") return true;
+  if (mode === "always") return true;
   return localeUsesRightToLeftScript(locale);
 }
 

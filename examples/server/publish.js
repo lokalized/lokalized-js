@@ -60,7 +60,7 @@ export async function publishCatalogs(options) {
   const generated = await createStringsManifestFromDirectory(CATALOG_DIRECTORY, {
     catalogVersion: options.catalogVersion,
     fallbackLocale: "en",
-    tiebreakers: TIEBREAKERS,
+    tiebreakerLocalesByLanguageCode: TIEBREAKERS,
     publicationBaseUrl: options.publicationBaseUrl,
   });
 
@@ -108,7 +108,7 @@ export async function localCatalogManifest(options) {
   return createStringsManifestFromDirectory(CATALOG_DIRECTORY, {
     catalogVersion: options.catalogVersion,
     fallbackLocale: "en",
-    tiebreakers: TIEBREAKERS,
+    tiebreakerLocalesByLanguageCode: TIEBREAKERS,
     publicationBaseUrl: CATALOG_DIRECTORY.href,
   });
 }

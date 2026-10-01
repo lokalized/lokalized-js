@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * M8 acceptance clause 19 — `createStrings({ loaded })` "preserves `LoadedStrings.warnings` exactly
- * … without resorting" (plan 3.2:629-632, whose subject is BOTH channels, `onWarning` AND
+ * … without resorting" (plan 3.2:629-632, whose subject is BOTH channels, `warningHandler` AND
  * `getWarnings()`).
  *
  * **WHY THE OBVIOUS PROBE PROVES NOTHING, twice over.**
@@ -96,7 +96,7 @@ const BODIES = {
 /**
  * The manifest, built programmatically so its digests and fingerprint are always right.
  *
- * `tiebreakers: { pl: [...] }` is mandatory rather than decorative: two loaded catalogs share the
+ * `tiebreakerLocalesByLanguageCode: { pl: [...] }` is mandatory rather than decorative: two loaded catalogs share the
  * language code `pl`, and the core applies Java's construction rule that a language's tiebreaker
  * list be an exact permutation of the catalogs it actually has.
  */
@@ -107,7 +107,7 @@ const MANIFEST = (() => {
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
     ...BUILD_IDENTITY,
     fallbackLocale: "ru", baseUrl: "https://cdn.example/v3/", files,
-    tiebreakers: { pl: ["pl", "pl-PL"] },
+    tiebreakerLocalesByLanguageCode: { pl: ["pl", "pl-PL"] },
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return /** @type {any} */ (draft);
@@ -202,7 +202,7 @@ test("the loaded branch returns the record's warning sequence, not a locale-sort
   // to an in-place sort, which is the likelier slip of the two.
   const recordSeq = loaded.warnings.map(pick);
 
-  const strings = createStrings({ loaded, localeResolver: () => "pl-PL" });
+  const strings = createStrings({ loaded, localeSupplier: () => "pl-PL" });
 
   // END-TO-END CONTROL, before any warning is read: this instance is fully built and renders, so a
   // red below is the branch reordering and not construction having quietly half-failed.
@@ -231,10 +231,10 @@ test("the SAME catalogs through the DIRECT door warn in a different order", asyn
   // holds under either reading of it.
   const directRecorded = /** @type {any[]} */ ([]);
   const direct = createStrings({
-    localeResolver: () => "pl-PL", fallbackLocale: "ru",
-    strings: { pl: BODIES.pl, "pl-PL": BODIES["pl-PL"], ru: BODIES.ru },
-    tiebreakers: { pl: ["pl", "pl-PL"] },
-    onWarning: (/** @type {any} */ w) => directRecorded.push(w),
+    localeSupplier: () => "pl-PL", fallbackLocale: "ru",
+    localizedStringSupplier: () => ({ pl: BODIES.pl, "pl-PL": BODIES["pl-PL"], ru: BODIES.ru }),
+    tiebreakerLocalesByLanguageCode: { pl: ["pl", "pl-PL"] },
+    warningHandler: (/** @type {any} */ w) => directRecorded.push(w),
   });
 
   assert.equal(direct.get("Apple.Count", { n: 1 }), "1 jablko");
@@ -260,7 +260,7 @@ test("within one file, declaration order survives: Zebra stays before Apple", as
   assert.equal(loaded.warnings[1].locale, "pl-PL");
   assert.equal(loaded.warnings[1].key, "Apple.Count");
 
-  const strings = createStrings({ loaded, localeResolver: () => "pl-PL" });
+  const strings = createStrings({ loaded, localeSupplier: () => "pl-PL" });
   assert.equal(strings.get("Apple.Count", { n: 1 }), "1 jablko");
 
   const got = strings.getWarnings();
@@ -279,7 +279,7 @@ test("nothing is dropped, deduplicated or added: four warnings in, four out", as
   const loaded = await fixtureP();
   const recordLength = loaded.warnings.length;
 
-  const strings = createStrings({ loaded, localeResolver: () => "pl-PL" });
+  const strings = createStrings({ loaded, localeSupplier: () => "pl-PL" });
   assert.equal(strings.get("Apple.Count", { n: 1 }), "1 jablko");
 
   // Asserted separately and BEFORE any elementwise comparison, so a multiplicity regression reports
@@ -300,7 +300,7 @@ test("every field survives verbatim, including missingLanguageForms order", asyn
   const loaded = await fixtureP();
   const recordSeq = loaded.warnings.map(pick);
 
-  const strings = createStrings({ loaded, localeResolver: () => "pl-PL" });
+  const strings = createStrings({ loaded, localeSupplier: () => "pl-PL" });
   assert.equal(strings.get("Apple.Count", { n: 1 }), "1 jablko");
   const got = strings.getWarnings();
   assert.equal(got.length, recordSeq.length);
@@ -322,13 +322,13 @@ test("every field survives verbatim, including missingLanguageForms order", asyn
     "plan 4.4:1555 — declared form order, never a tidy alphabetical one");
 });
 
-test("onWarning replays the record's sequence, once per warning, in the record's order", async () => {
+test("warningHandler replays the record's sequence, once per warning, in the record's order", async () => {
   const loaded = await fixtureP();
   const recordSeq = loaded.warnings.map(pick);
 
   const recorded = /** @type {any[]} */ ([]);
   const strings = createStrings({
-    loaded, localeResolver: () => "pl-PL", onWarning: (/** @type {any} */ w) => recorded.push(w),
+    loaded, localeSupplier: () => "pl-PL", warningHandler: (/** @type {any} */ w) => recorded.push(w),
   });
 
   // COUNT FIRST AND BY NAME. Plan 3.2:632 — "Applications that already handled parser warnings
@@ -347,7 +347,7 @@ test("onWarning replays the record's sequence, once per warning, in the record's
 test("getWarnings answers the same frozen sequence every call, in a fresh array", async () => {
   const loaded = await fixtureP();
   const recordSeq = loaded.warnings.map(pick);
-  const strings = createStrings({ loaded, localeResolver: () => "pl-PL" });
+  const strings = createStrings({ loaded, localeSupplier: () => "pl-PL" });
 
   const first = strings.getWarnings();
   const second = strings.getWarnings();
@@ -380,7 +380,7 @@ test("the whole-manifest ingress preserves its own record's order and multiplici
 
   const recorded = /** @type {any[]} */ ([]);
   const strings = createStrings({
-    loaded: whole, localeResolver: () => "pl-PL", onWarning: (/** @type {any} */ w) => recorded.push(w),
+    loaded: whole, localeSupplier: () => "pl-PL", warningHandler: (/** @type {any} */ w) => recorded.push(w),
   });
   assert.equal(strings.get("Apple.Count", { n: 1 }), "1 jablko");
   assert.equal(recorded.length, 4);
@@ -403,7 +403,7 @@ test("a PARTIAL record's surviving warnings are preserved exactly", async () => 
   const recordSeq = partial.warnings.map(pick);
   const recorded = /** @type {any[]} */ ([]);
   const strings = createStrings({
-    loaded: partial, localeResolver: () => "pl-PL", onWarning: (/** @type {any} */ w) => recorded.push(w),
+    loaded: partial, localeSupplier: () => "pl-PL", warningHandler: (/** @type {any} */ w) => recorded.push(w),
   });
   assert.equal(strings.get("Apple.Count", { n: 1 }), "1 jablko");
   assert.deepEqual(strings.getWarnings().map(pick), recordSeq);
@@ -414,23 +414,23 @@ test("a PARTIAL record's surviving warnings are preserved exactly", async () => 
     ["pl-PL/Zebra.Count", "pl-PL/Apple.Count", "ru/Apple.Count"]);
 });
 
-test("the localeResolver ingress preserves the same sequence", async () => {
+test("the localeSupplier ingress preserves the same sequence", async () => {
   // The second of the three ingress shapes `createStrings` names at :733 — "exactly one of 'locale',
-  // 'localeResolver' or 'localeMatchResolver'". `loaded` is ONE branch in the clause's wording and
+  // 'localeSupplier' or 'localeMatchSupplier'". `loaded` is ONE branch in the clause's wording and
   // three shapes in the type, and nothing in the plan says one stands for all three.
   const loaded = await fixtureP();
   const recordSeq = loaded.warnings.map(pick);
 
   const recorded = /** @type {any[]} */ ([]);
   const strings = createStrings({
-    loaded, localeResolver: () => "pl-PL", onWarning: (/** @type {any} */ w) => recorded.push(w),
+    loaded, localeSupplier: () => "pl-PL", warningHandler: (/** @type {any} */ w) => recorded.push(w),
   });
   assert.equal(strings.get("Apple.Count", { n: 1 }), "1 jablko");
   assert.deepEqual(strings.getWarnings().map(pick), recordSeq);
   assert.deepEqual(recorded.map(pick), recordSeq);
 });
 
-test("the localeMatchResolver ingress preserves the same sequence", async () => {
+test("the localeMatchSupplier ingress preserves the same sequence", async () => {
   // The third ingress: the instance takes its locale from a SUPPLIED MATCH rather than from a tag.
   // Nothing else about the record changes, so a branch that preserved warnings on the direct-locale
   // path and re-derived them here would pass every test above this one.
@@ -443,7 +443,7 @@ test("the localeMatchResolver ingress preserves the same sequence", async () => 
     // A complete, well-formed `LocaleMatchResult`; a bare `{ locale }` is refused by
     // `validateLocaleMatchStructure` before construction ever reaches the warnings, which would be
     // the `zh-123` shape — a probe rejected by an earlier guard that never reaches the check.
-    localeMatchResolver: () => ({
+    localeMatchSupplier: () => ({
       requestedLanguageRanges: [{ range: "pl-PL", weight: 1 }],
       locale: "pl-PL",
       languageRange: { range: "pl-PL", weight: 1 },
@@ -454,7 +454,7 @@ test("the localeMatchResolver ingress preserves the same sequence", async () => 
       // 3.4:845-847), not the catalogs that loaded, so all three tags belong here.
       consideredLocales: ["pl", "pl-PL", "ru"],
     }),
-    onWarning: (/** @type {any} */ w) => recorded.push(w),
+    warningHandler: (/** @type {any} */ w) => recorded.push(w),
   });
   assert.equal(strings.get("Apple.Count", { n: 1 }), "1 jablko");
   assert.deepEqual(strings.getWarnings().map(pick), recordSeq);
@@ -491,7 +491,7 @@ test("the record's aggregate and its per-catalog concatenation still COINCIDE", 
     loaded.warnings.map(pick),
     "the aggregate and the per-file concatenation must remain the same sequence");
 
-  const strings = createStrings({ loaded, localeResolver: () => "pl-PL" });
+  const strings = createStrings({ loaded, localeSupplier: () => "pl-PL" });
   assert.deepEqual(seq(strings.getWarnings()), seq(loaded.warnings));
 });
 
@@ -524,7 +524,7 @@ test("THE CONTROL: the records the library itself produces are accepted, includi
     ["JSON round-trip", JSON.parse(JSON.stringify(loaded))],
     ["structuredClone", structuredClone(loaded)],
   ]))
-    assert.doesNotThrow(() => createStrings({ loaded: copy, localeResolver: () => "pl-PL" }), label);
+    assert.doesNotThrow(() => createStrings({ loaded: copy, localeSupplier: () => "pl-PL" }), label);
 });
 
 test("a record with NO warnings at all still constructs", async () => {
@@ -541,7 +541,7 @@ test("a record with NO warnings at all still constructs", async () => {
       formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
       ...BUILD_IDENTITY,
       fallbackLocale: "en", baseUrl: "https://cdn.example/quiet/",
-      files: { en: { url: "en.json", sha256: sha256Hex(utf8.encode(body)) } }, tiebreakers: {},
+      files: { en: { url: "en.json", sha256: sha256Hex(utf8.encode(body)) } }, tiebreakerLocalesByLanguageCode: {},
     };
     draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
     return /** @type {any} */ (draft);
@@ -557,7 +557,7 @@ test("a record with NO warnings at all still constructs", async () => {
 
   const loaded = await loadStrings(quiet, "en", { fetch: serve });
   assert.equal(loaded.warnings.length, 0, "a catalog with no plural placeholder warns about nothing");
-  assert.doesNotThrow(() => createStrings({ loaded, localeResolver: () => "en" }));
+  assert.doesNotThrow(() => createStrings({ loaded, localeSupplier: () => "en" }));
 });
 
 test("REORDERING THE CATALOGS IS REFUSED — the ordinary transform that used to be silent", async () => {
@@ -572,14 +572,14 @@ test("REORDERING THE CATALOGS IS REFUSED — the ordinary transform that used to
   };
   assert.notDeepEqual(Object.keys(sorted.catalogs), Object.keys(loaded.catalogs),
     "the fixture's plan order must differ from its sorted order, or this test is vacuous");
-  assert.throws(() => createStrings({ loaded: sorted, localeResolver: () => "pl-PL" }),
+  assert.throws(() => createStrings({ loaded: sorted, localeSupplier: () => "pl-PL" }),
     /`loaded.warnings` disagrees with the catalogs at index 0/);
 });
 
 test("a reordered .warnings array is refused, naming the index and both sides", async () => {
   const loaded = await fixtureP();
   assert.throws(
-    () => createStrings({ loaded: { ...loaded, warnings: [...loaded.warnings].reverse() }, localeResolver: () => "pl-PL" }),
+    () => createStrings({ loaded: { ...loaded, warnings: [...loaded.warnings].reverse() }, localeSupplier: () => "pl-PL" }),
     /at index 0: the record lists 'ru\/Apple.Count' where its own catalogs hold 'pl-PL\/Zebra.Count'/);
 });
 
@@ -588,10 +588,10 @@ test("a COUNT mismatch is refused separately, with both counts", async () => {
   // in the wrong order are different mistakes, and a single message for both would make the first
   // read as a sorting bug.
   const loaded = await fixtureP();
-  assert.throws(() => createStrings({ loaded: { ...loaded, warnings: [] }, localeResolver: () => "pl-PL" }),
+  assert.throws(() => createStrings({ loaded: { ...loaded, warnings: [] }, localeSupplier: () => "pl-PL" }),
     /lists 0 warning\(s\) while the catalogs it carries hold 4/);
   assert.throws(
-    () => createStrings({ loaded: { ...loaded, warnings: loaded.warnings.slice(0, 3) }, localeResolver: () => "pl-PL" }),
+    () => createStrings({ loaded: { ...loaded, warnings: loaded.warnings.slice(0, 3) }, localeSupplier: () => "pl-PL" }),
     /lists 3 warning\(s\) while the catalogs it carries hold 4/);
 });
 
@@ -600,7 +600,7 @@ test("a missing .warnings field is refused rather than read as zero warnings", a
   // silently accept a record that is missing the very field the clause is about.
   const loaded = await fixtureP();
   const { warnings: _dropped, ...withoutWarnings } = loaded;
-  assert.throws(() => createStrings({ loaded: withoutWarnings, localeResolver: () => "pl-PL" }),
+  assert.throws(() => createStrings({ loaded: withoutWarnings, localeSupplier: () => "pl-PL" }),
     /`loaded.warnings` must be an array/);
 });
 
@@ -615,7 +615,7 @@ test("the comparison is by VALUE, not identity", async () => {
   };
   assert.notStrictEqual(rebuilt.warnings[0], loaded.warnings[0], "the fixture must hand over NEW objects");
   assert.deepEqual(pick(rebuilt.warnings[0]), pick(loaded.warnings[0]), "…that are nonetheless equal");
-  assert.doesNotThrow(() => createStrings({ loaded: rebuilt, localeResolver: () => "pl-PL" }));
+  assert.doesNotThrow(() => createStrings({ loaded: rebuilt, localeSupplier: () => "pl-PL" }));
 });
 
 test("a disagreement at a LATER index is refused too", async () => {
@@ -624,6 +624,6 @@ test("a disagreement at a LATER index is refused too", async () => {
   const loaded = await fixtureP();
   const swapped = [...loaded.warnings];
   [swapped[2], swapped[3]] = [swapped[3], swapped[2]];
-  assert.throws(() => createStrings({ loaded: { ...loaded, warnings: swapped }, localeResolver: () => "pl-PL" }),
+  assert.throws(() => createStrings({ loaded: { ...loaded, warnings: swapped }, localeSupplier: () => "pl-PL" }),
     /at index 2/);
 });

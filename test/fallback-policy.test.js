@@ -1,7 +1,7 @@
 // @ts-check
 
 /**
- * The walk's two caller callbacks: `fallbackPolicy`, consulted between candidates, and `onFailure`,
+ * The walk's two caller callbacks: `translationFallbackPolicy`, consulted between candidates, and `translationFailureHandler`,
  * consulted once at the end.
  *
  * The corpus covers both channels heavily — 424 rows record policy consultations and 471 record the
@@ -38,18 +38,18 @@ import { RETURN_KEY, THROW_EXCEPTION, createStrings, returnString } from "../src
  */
 const FOUR_CANDIDATE = {
   fallbackLocale: "fr",
-  localeResolver: () => "fr",
-  tiebreakers: { en: ["en-GB", "en-001", "en"] },
-  strings: {
+  localeSupplier: () => "fr",
+  tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en-001", "en"] },
+  localizedStringSupplier: () => ({
     "en-GB": { InEvery: "en-GB: everywhere" },
     "en-001": { InEvery: "en-001: everywhere" },
     en: { InEvery: "en: everywhere", OnlyInEn: "en: only here" },
     fr: { InEvery: "fr: everywhere", OnlyInFallback: "fr: only here" },
-  },
+  }),
 };
 
 /** A single-element chain: only `en` is loaded, `en` is the fallback, `en` is requested. */
-const SINGLE_CANDIDATE = { fallbackLocale: "en", localeResolver: () => "en", strings: { en: { Present: "here" } } };
+const SINGLE_CANDIDATE = { fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: { Present: "here" } }) };
 
 /** Records every consultation and answers from a delegate. */
 function recordingPolicy(delegate) {
@@ -64,7 +64,7 @@ function recordingPolicy(delegate) {
   };
 }
 
-describe("createStrings({ fallbackPolicy }) — the three built-in names", () => {
+describe("createStrings({ translationFallbackPolicy }) — the three built-in names", () => {
   // THE ABLATION THAT MATTERS. Each case drives the same lookup twice against the same catalogs:
   // once naming the built-in by STRING, which only the port's own table can resolve, and once with
   // an explicit function spelling the same rule. The two must agree on the translation AND on the
@@ -72,8 +72,8 @@ describe("createStrings({ fallbackPolicy }) — the three built-in names", () =>
   // at all when it should have refused — is caught here and nowhere else.
   const CATALOGS = {
     fallbackLocale: "en",
-    localeResolver: () => "de",
-    strings: {
+    localeSupplier: () => "de",
+    localizedStringSupplier: () => ({
       // `de` holds the key but cannot render it: `absentCount` is never supplied.
       de: {
         Key: {
@@ -82,7 +82,7 @@ describe("createStrings({ fallbackPolicy }) — the three built-in names", () =>
         },
       },
       en: { Key: "en: served by the fallback" },
-    },
+    }),
   };
 
   const EQUIVALENTS = /** @type {const} */ ([
@@ -93,8 +93,8 @@ describe("createStrings({ fallbackPolicy }) — the three built-in names", () =>
 
   for (const [name, equivalent] of EQUIVALENTS) {
     it(`'${name}' resolves to the same policy as the function that spells it`, () => {
-      const byName = createStrings({ ...CATALOGS, fallbackPolicy: name }).getResult("Key");
-      const byFunction = createStrings({ ...CATALOGS, fallbackPolicy: equivalent }).getResult("Key");
+      const byName = createStrings({ ...CATALOGS, translationFallbackPolicy: name }).getResult("Key");
+      const byFunction = createStrings({ ...CATALOGS, translationFallbackPolicy: equivalent }).getResult("Key");
 
       assert.equal(byName.translation, byFunction.translation);
       assert.equal(byName.status, byFunction.status);
@@ -105,7 +105,7 @@ describe("createStrings({ fallbackPolicy }) — the three built-in names", () =>
   it("the three built-ins do not all behave alike, so the comparison above can fail", () => {
     // Without this control the suite would pass against a table that mapped all three names onto one
     // policy — and against a runner that never consulted a policy at all.
-    const of = (/** @type {any} */ policy) => createStrings({ ...CATALOGS, fallbackPolicy: policy }).getResult("Key");
+    const of = (/** @type {any} */ policy) => createStrings({ ...CATALOGS, translationFallbackPolicy: policy }).getResult("Key");
 
     assert.equal(of("any-failure").status, "translated");
     assert.equal(of("any-failure").resolvedLocale, "en");
@@ -116,7 +116,7 @@ describe("createStrings({ fallbackPolicy }) — the three built-in names", () =>
 
   it("refuses a name that is not one of the three", () => {
     assert.throws(
-      () => createStrings({ ...CATALOGS, fallbackPolicy: /** @type {any} */ ("always") }),
+      () => createStrings({ ...CATALOGS, translationFallbackPolicy: /** @type {any} */ ("always") }),
       /must be a function or one of/,
     );
   });
@@ -124,18 +124,18 @@ describe("createStrings({ fallbackPolicy }) — the three built-in names", () =>
   it("refuses an inherited Object property masquerading as a built-in name", () => {
     // The table has a null prototype precisely so `"toString"` cannot resolve to a function.
     assert.throws(
-      () => createStrings({ ...CATALOGS, fallbackPolicy: /** @type {any} */ ("toString") }),
+      () => createStrings({ ...CATALOGS, translationFallbackPolicy: /** @type {any} */ ("toString") }),
       /must be a function or one of/,
     );
   });
 });
 
 describe("the library defaults, which the conformance runner always replaces", () => {
-  it("an omitted fallbackPolicy halts on a resolution failure and forfeits a reachable donor", () => {
+  it("an omitted translationFallbackPolicy halts on a resolution failure and forfeits a reachable donor", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "de",
-      strings: {
+      localeSupplier: () => "de",
+      localizedStringSupplier: () => ({
         de: {
           Key: {
             translation: "de: {{word}}",
@@ -143,7 +143,7 @@ describe("the library defaults, which the conformance runner always replaces", (
           },
         },
         en: { Key: "en: reachable but never reached" },
-      },
+      }),
     });
     const result = strings.getResult("Key");
 
@@ -152,18 +152,18 @@ describe("the library defaults, which the conformance runner always replaces", (
     assert.deepEqual([...result.attemptedLocales], ["de"]);
   });
 
-  it("an omitted fallbackPolicy walks past a missing translation", () => {
+  it("an omitted translationFallbackPolicy walks past a missing translation", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "de",
-      strings: { de: { Other: "de: something else" }, en: { Key: "en: reached" } },
+      localeSupplier: () => "de",
+      localizedStringSupplier: () => ({ de: { Other: "de: something else" }, en: { Key: "en: reached" } }),
     });
 
     assert.equal(strings.get("Key"), "en: reached");
   });
 
-  it("an omitted onFailure returns the INTERPOLATED key", () => {
-    const strings = createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: { Other: "x" } } });
+  it("an omitted translationFailureHandler returns the INTERPOLATED key", () => {
+    const strings = createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: { Other: "x" } }) });
     const result = strings.getResult("Farewell {{name}}", { name: "Sarah" });
 
     assert.equal(result.status, "returned-key");
@@ -171,12 +171,12 @@ describe("the library defaults, which the conformance runner always replaces", (
   });
 
   it("an explicit null is the same state as an omitted option, on both", () => {
-    const options = { fallbackLocale: "en", localeResolver: () => "en", strings: { en: { Other: "x" } } };
+    const options = { fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: { Other: "x" } }) };
     const omitted = createStrings(options).getResult("Key");
     const nulled = createStrings({
       ...options,
-      fallbackPolicy: /** @type {any} */ (null),
-      onFailure: /** @type {any} */ (null),
+      translationFallbackPolicy: /** @type {any} */ (null),
+      translationFailureHandler: /** @type {any} */ (null),
     }).getResult("Key");
 
     assert.equal(nulled.status, omitted.status);
@@ -189,7 +189,7 @@ describe("the policy is never consulted for the final candidate", () => {
     // The sharpest statement of the clause: if the guard moved below the consultation this throws.
     const strings = createStrings({
       ...SINGLE_CANDIDATE,
-      fallbackPolicy: () => { throw new Error("the policy must never be consulted here"); },
+      translationFallbackPolicy: () => { throw new Error("the policy must never be consulted here"); },
     });
 
     assert.equal(strings.getResult("Absent").status, "returned-key");
@@ -201,9 +201,9 @@ describe("the policy is never consulted for the final candidate", () => {
     const consulted = recordingPolicy(() => true);
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "de",
-      strings: { en: { Present: "here" } },
-      fallbackPolicy: consulted.policy,
+      localeSupplier: () => "de",
+      localizedStringSupplier: () => ({ en: { Present: "here" } }),
+      translationFallbackPolicy: consulted.policy,
     });
 
     assert.equal(strings.getResult("Absent").status, "returned-key");
@@ -212,7 +212,7 @@ describe("the policy is never consulted for the final candidate", () => {
 
   it("four listed candidates produce exactly three consultations", () => {
     const consulted = recordingPolicy(() => true);
-    const strings = createStrings({ ...FOUR_CANDIDATE, fallbackPolicy: consulted.policy });
+    const strings = createStrings({ ...FOUR_CANDIDATE, translationFallbackPolicy: consulted.policy });
     // Per call, because the INSTANCE locale is fr — a one-element chain, which is the control this
     // very suite depends on elsewhere. The four-candidate chain only exists for an en-GB request.
     const result = strings.getResult("MissingEverywhere", undefined, { locale: "en-GB" });
@@ -225,7 +225,7 @@ describe("the policy is never consulted for the final candidate", () => {
     // `policyCalls.length === attemptedLocales.length` IFF the last decision was false. Both halves
     // are asserted, in the same file, because "always one fewer" is the wrong rule and passes here.
     const consulted = recordingPolicy((/** @type {any} */ _reason, /** @type {any} */ locale) => locale === "en-GB");
-    const strings = createStrings({ ...FOUR_CANDIDATE, fallbackPolicy: consulted.policy });
+    const strings = createStrings({ ...FOUR_CANDIDATE, translationFallbackPolicy: consulted.policy });
     const result = strings.getResult("OnlyInFallback", undefined, { locale: "en-GB" });
 
     assert.deepEqual([...result.attemptedLocales], ["en-GB", "en-001"]);
@@ -239,9 +239,9 @@ describe("what the policy is handed", () => {
     const consulted = recordingPolicy(() => true);
     const strings = createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "en-GB",
-      tiebreakers: { en: ["en-GB", "en-001", "en"] },
-      strings: {
+      localeSupplier: () => "en-GB",
+      tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en-001", "en"] },
+      localizedStringSupplier: () => ({
         "en-GB": {
           Key: {
             translation: "en-GB: {{word}}",
@@ -251,8 +251,8 @@ describe("what the policy is handed", () => {
         "en-001": { Key: { alternatives: [{ "tier == 1": { translation: "en-001: tier one" } }] } },
         en: { Other: "en: not this key" },
         fr: { Other: "fr: not this key either" },
-      },
-      fallbackPolicy: consulted.policy,
+      }),
+      translationFallbackPolicy: consulted.policy,
     });
 
     strings.getResult("Key", { tier: 7 });
@@ -277,9 +277,9 @@ describe("what the policy is handed", () => {
     });
     const strings = createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "de",
-      strings: { de: failing("de"), fr: failing("fr") },
-      fallbackPolicy: consulted.policy,
+      localeSupplier: () => "de",
+      localizedStringSupplier: () => ({ de: failing("de"), fr: failing("fr") }),
+      translationFallbackPolicy: consulted.policy,
     });
     const result = strings.getResult("Key");
 
@@ -291,12 +291,12 @@ describe("what the policy is handed", () => {
   it("refuses a policy that returns something other than a boolean", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "de",
-      strings: { en: { Present: "here" } },
-      fallbackPolicy: /** @type {any} */ (() => null),
+      localeSupplier: () => "de",
+      localizedStringSupplier: () => ({ en: { Present: "here" } }),
+      translationFallbackPolicy: /** @type {any} */ (() => null),
     });
 
-    assert.throws(() => strings.getResult("Absent"), /^TypeError: fallbackPolicy returned null$/);
+    assert.throws(() => strings.getResult("Absent"), /^TypeError: translationFallbackPolicy returned null$/);
   });
 
   // The OTHER arm of the same guard. Java's type system makes a non-boolean unreachable, so there is
@@ -305,24 +305,24 @@ describe("what the policy is handed", () => {
   it("refuses a non-null, non-boolean policy return with its own wording", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "de",
-      strings: { en: { Present: "here" } },
-      fallbackPolicy: /** @type {any} */ (() => "yes"),
+      localeSupplier: () => "de",
+      localizedStringSupplier: () => ({ en: { Present: "here" } }),
+      translationFallbackPolicy: /** @type {any} */ (() => "yes"),
     });
 
     assert.throws(() => strings.getResult("Absent"), /must return a boolean; received "yes"/);
   });
 });
 
-describe("createStrings({ onFailure })", () => {
-  const MISSING = { fallbackLocale: "en", localeResolver: () => "en", strings: { en: { Other: "x" } } };
+describe("createStrings({ translationFailureHandler })", () => {
+  const MISSING = { fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: { Other: "x" } }) };
 
   it("fires exactly once, after the walk, however many candidates failed", () => {
     /** @type {any[]} */
     const seen = [];
     const strings = createStrings({
       ...FOUR_CANDIDATE,
-      onFailure: (failure) => { seen.push(failure); return RETURN_KEY; },
+      translationFailureHandler: (failure) => { seen.push(failure); return RETURN_KEY; },
     });
     const result = strings.getResult("NowhereAtAll", undefined, { locale: "en-GB" });
 
@@ -334,14 +334,14 @@ describe("createStrings({ onFailure })", () => {
   it("is not consulted at all when a candidate serves the key", () => {
     const strings = createStrings({
       ...FOUR_CANDIDATE,
-      onFailure: () => { throw new Error("the handler must not run on a successful lookup"); },
+      translationFailureHandler: () => { throw new Error("the handler must not run on a successful lookup"); },
     });
 
     assert.equal(strings.get("OnlyInFallback", undefined, { locale: "en-GB" }), "fr: only here");
   });
 
   it("returnString is returned VERBATIM — not interpolated, not isolated", () => {
-    const strings = createStrings({ ...MISSING, onFailure: () => returnString("Fallback for {{name}}") });
+    const strings = createStrings({ ...MISSING, translationFailureHandler: () => returnString("Fallback for {{name}}") });
     const result = strings.getResult("Farewell {{name}}", { name: "Sarah" });
 
     assert.equal(result.translation, "Fallback for {{name}}");
@@ -351,13 +351,13 @@ describe("createStrings({ onFailure })", () => {
   });
 
   it("RETURN_KEY interpolates the key, which is how the two responses differ", () => {
-    const strings = createStrings({ ...MISSING, onFailure: () => RETURN_KEY });
+    const strings = createStrings({ ...MISSING, translationFailureHandler: () => RETURN_KEY });
 
     assert.equal(strings.get("Farewell {{name}}", { name: "Sarah" }), "Farewell Sarah");
   });
 
   it("a structural object literal is honored, since responses are not singletons", () => {
-    const strings = createStrings({ ...MISSING, onFailure: () => ({ action: "return-string", translation: "literal" }) });
+    const strings = createStrings({ ...MISSING, translationFailureHandler: () => ({ action: "return-string", translation: "literal" }) });
 
     assert.equal(strings.get("Absent"), "literal");
   });
@@ -366,10 +366,10 @@ describe("createStrings({ onFailure })", () => {
     const boom = new Error("the resolver said no");
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: { Key: { translation: "{{form}}", placeholders: { form: { value: "noun", translations: { PHONETIC_VOWEL: "an", PHONETIC_CONSONANT: "a" } } } } } },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: { Key: { translation: "{{form}}", placeholders: { form: { value: "noun", translations: { PHONETIC_VOWEL: "an", PHONETIC_CONSONANT: "a" } } } } } }),
       phoneticResolver: () => { throw boom; },
-      onFailure: () => THROW_EXCEPTION,
+      translationFailureHandler: () => THROW_EXCEPTION,
     });
 
     try {
@@ -387,25 +387,25 @@ describe("createStrings({ onFailure })", () => {
   });
 
   it("a throwing handler propagates rather than being turned into a result", () => {
-    const strings = createStrings({ ...MISSING, onFailure: () => { throw new Error("handler refused"); } });
+    const strings = createStrings({ ...MISSING, translationFailureHandler: () => { throw new Error("handler refused"); } });
 
     assert.throws(() => strings.getResult("Absent"), /handler refused/);
   });
 
   it("refuses a handler that returns a response with no recognized action", () => {
-    const strings = createStrings({ ...MISSING, onFailure: /** @type {any} */ (() => ({ action: "shrug" })) });
+    const strings = createStrings({ ...MISSING, translationFailureHandler: /** @type {any} */ (() => ({ action: "shrug" })) });
 
     assert.throws(() => strings.getResult("Absent"), /Unsupported failure response action/);
   });
 
   it("refuses a handler that returns nothing at all", () => {
-    const strings = createStrings({ ...MISSING, onFailure: /** @type {any} */ (() => undefined) });
+    const strings = createStrings({ ...MISSING, translationFailureHandler: /** @type {any} */ (() => undefined) });
 
-    assert.throws(() => strings.getResult("Absent"), /^TypeError: onFailure returned null$/);
+    assert.throws(() => strings.getResult("Absent"), /^TypeError: translationFailureHandler returned null$/);
   });
 
   it("refuses a non-null, non-object handler return with its own wording", () => {
-    const strings = createStrings({ ...MISSING, onFailure: /** @type {any} */ (() => 42) });
+    const strings = createStrings({ ...MISSING, translationFailureHandler: /** @type {any} */ (() => 42) });
 
     assert.throws(() => strings.getResult("Absent"), /must return a failure response object; received 42/);
   });
@@ -417,9 +417,9 @@ describe("the TranslationFailure the handler is handed", () => {
     let seen = null;
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: { Other: "x" } },
-      onFailure: (failure) => { seen = failure; return RETURN_KEY; },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: { Other: "x" } }),
+      translationFailureHandler: (failure) => { seen = failure; return RETURN_KEY; },
     });
     strings.getResult("Absent {{who}}", { who: "Ada", when: "now" });
 
@@ -438,9 +438,9 @@ describe("the TranslationFailure the handler is handed", () => {
     let seen = null;
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: { Other: "x" } },
-      onFailure: (failure) => { seen = failure; return RETURN_KEY; },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: { Other: "x" } }),
+      translationFailureHandler: (failure) => { seen = failure; return RETURN_KEY; },
     });
     strings.getResult("Absent", /** @type {any} */ (new Map([["who", "Ada"]])));
 
@@ -452,15 +452,15 @@ describe("the TranslationFailure the handler is handed", () => {
     let seen = null;
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: { Other: "x" } },
-      onFailure: (failure) => { seen = failure; return RETURN_KEY; },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: { Other: "x" } }),
+      translationFailureHandler: (failure) => { seen = failure; return RETURN_KEY; },
     });
     const result = strings.getResult("Absent");
 
     // Reference identity, which is what `matchObjectIdenticalToResult` records `true` on all 370
     // corpus rows able to compare the two.
-    assert.equal(seen.localeMatch, result.localeMatch);
+    assert.equal(seen.localeMatchResult, result.localeMatchResult);
     assert.equal(seen.attemptedLocales, result.attemptedLocales);
   });
 
@@ -469,7 +469,7 @@ describe("the TranslationFailure the handler is handed", () => {
     let seen = null;
     const strings = createStrings({
       ...FOUR_CANDIDATE,
-      onFailure: (failure) => { seen = failure; return RETURN_KEY; },
+      translationFailureHandler: (failure) => { seen = failure; return RETURN_KEY; },
     });
     strings.getResult("Nowhere", { secret: "must not appear" }, { locale: "en-GB" });
 
@@ -483,11 +483,11 @@ describe("the TranslationFailure the handler is handed", () => {
   });
 });
 
-describe("per-call fallbackPolicy and onFailure REPLACE the instance ones", () => {
+describe("per-call translationFallbackPolicy and translationFailureHandler REPLACE the instance ones", () => {
   const CATALOGS = {
     fallbackLocale: "en",
-    localeResolver: () => "de",
-    strings: {
+    localeSupplier: () => "de",
+    localizedStringSupplier: () => ({
       de: {
         Key: {
           translation: "de: {{word}}",
@@ -495,43 +495,43 @@ describe("per-call fallbackPolicy and onFailure REPLACE the instance ones", () =
         },
       },
       en: { Key: "en: served by the fallback" },
-    },
+    }),
   };
 
   it("a per-call any-failure widens an instance missing-or-no-match", () => {
-    const strings = createStrings({ ...CATALOGS, fallbackPolicy: "missing-or-no-match" });
+    const strings = createStrings({ ...CATALOGS, translationFallbackPolicy: "missing-or-no-match" });
 
     assert.equal(strings.getResult("Key").status, "returned-key");
-    assert.equal(strings.get("Key", undefined, { fallbackPolicy: "any-failure" }), "en: served by the fallback");
+    assert.equal(strings.get("Key", undefined, { translationFallbackPolicy: "any-failure" }), "en: served by the fallback");
   });
 
   it("a per-call never narrows an instance any-failure", () => {
-    const strings = createStrings({ ...CATALOGS, fallbackPolicy: "any-failure" });
+    const strings = createStrings({ ...CATALOGS, translationFallbackPolicy: "any-failure" });
 
     assert.equal(strings.get("Key"), "en: served by the fallback");
-    assert.equal(strings.getResult("Key", undefined, { fallbackPolicy: "never" }).status, "returned-key");
+    assert.equal(strings.getResult("Key", undefined, { translationFallbackPolicy: "never" }).status, "returned-key");
   });
 
   it("a per-call handler displaces the instance handler wholesale", () => {
     const strings = createStrings({
       ...CATALOGS,
-      fallbackPolicy: "never",
-      onFailure: () => returnString("INSTANCE"),
+      translationFallbackPolicy: "never",
+      translationFailureHandler: () => returnString("INSTANCE"),
     });
 
     assert.equal(strings.get("Key"), "INSTANCE");
-    assert.equal(strings.get("Key", undefined, { onFailure: () => returnString("PER-CALL") }), "PER-CALL");
+    assert.equal(strings.get("Key", undefined, { translationFailureHandler: () => returnString("PER-CALL") }), "PER-CALL");
   });
 
   it("an explicit per-call null keeps the instance callbacks", () => {
     const strings = createStrings({
       ...CATALOGS,
-      fallbackPolicy: "never",
-      onFailure: () => returnString("INSTANCE"),
+      translationFallbackPolicy: "never",
+      translationFailureHandler: () => returnString("INSTANCE"),
     });
 
     assert.equal(
-      strings.get("Key", undefined, { fallbackPolicy: null, onFailure: null }),
+      strings.get("Key", undefined, { translationFallbackPolicy: null, translationFailureHandler: null }),
       "INSTANCE",
     );
   });
@@ -540,12 +540,12 @@ describe("per-call fallbackPolicy and onFailure REPLACE the instance ones", () =
     const strings = createStrings(CATALOGS);
 
     assert.throws(
-      () => strings.getResult("Key", undefined, { fallbackPolicy: /** @type {any} */ ("sometimes") }),
-      /get\(\{ fallbackPolicy \}\)/,
+      () => strings.getResult("Key", undefined, { translationFallbackPolicy: /** @type {any} */ ("sometimes") }),
+      /get\(\{ translationFallbackPolicy \}\)/,
     );
     assert.throws(
-      () => strings.getResult("Key", undefined, { onFailure: /** @type {any} */ ("nope") }),
-      /get\(\{ onFailure \}\)/,
+      () => strings.getResult("Key", undefined, { translationFailureHandler: /** @type {any} */ ("nope") }),
+      /get\(\{ translationFailureHandler \}\)/,
     );
   });
 });

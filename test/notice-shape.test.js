@@ -316,7 +316,7 @@ test("THIRD-PARTY-NOTICES.md's own claims are the ones that ship", () => {
   // imports every table it uses and embeds nothing, which THIS FILE'S OWN comment says thirty lines
   // up; and that "every generated module carries this notice", where sixteen are generated and
   // fifteen are stamped. NOTICE was corrected in the same change and this file was not, which is the
-  // two-copies-of-one-claim shape that put `LocaleMatch` in two subpaths disagreeing.
+  // two-copies-of-one-claim shape that put `LocaleMatchResult` in two subpaths disagreeing.
   const notices = readFileSync(join(root, "THIRD-PARTY-NOTICES.md"), "utf8");
 
   const stated = /\b(fifteen|sixteen|seventeen|\d+)\s+(?:generated\s+)?modules\b/.exec(notices);

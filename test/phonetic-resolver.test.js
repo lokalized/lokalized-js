@@ -58,8 +58,8 @@ describe("phonetic resolver: what it is called with", () => {
     const resolver = recordingResolver({ apple: PHONETIC_VOWEL });
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: ARTICLE },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: ARTICLE }),
       phoneticResolver: resolver.resolve,
     });
 
@@ -75,8 +75,8 @@ describe("phonetic resolver: what it is called with", () => {
     const resolver = recordingResolver({ apple: PHONETIC_VOWEL });
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: ARTICLE },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: ARTICLE }),
       phoneticResolver: resolver.resolve,
     });
 
@@ -92,8 +92,8 @@ describe("phonetic resolver: what it is called with", () => {
     const resolver = recordingResolver({});
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: ARTICLE },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: ARTICLE }),
       phoneticResolver: resolver.resolve,
     });
 
@@ -105,8 +105,8 @@ describe("phonetic resolver: what it is called with", () => {
     const resolver = recordingResolver({});
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: ARTICLE },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: ARTICLE }),
       phoneticResolver: resolver.resolve,
     });
 
@@ -126,8 +126,8 @@ describe("phonetic resolver: what it is called with", () => {
     // there is no honest single answer and the JS-idiomatic description is the truthful one.
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: ARTICLE },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: ARTICLE }),
       phoneticResolver: () => PHONETIC_VOWEL,
     });
 
@@ -150,8 +150,8 @@ describe("phonetic resolver: what it is called with", () => {
       const resolver = recordingResolver({});
       const strings = createStrings({
         fallbackLocale: "en",
-        localeResolver: () => "en",
-        strings: { en: ARTICLE },
+        localeSupplier: () => "en",
+        localizedStringSupplier: () => ({ en: ARTICLE }),
         phoneticResolver: resolver.resolve,
       });
       const result = strings.getResult("Article", { term: value });
@@ -193,8 +193,8 @@ describe("phonetic resolver: how often it is called", () => {
   const stringsWith = (resolver) =>
     createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: ORDER_CATALOG },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: ORDER_CATALOG }),
       phoneticResolver: resolver,
     });
 
@@ -230,7 +230,7 @@ describe("phonetic resolver: how often it is called", () => {
 
 describe("phonetic resolver: absent, misbehaving, and misconfigured", () => {
   it("is a resolution failure when unconfigured and reached, not a construction error", () => {
-    const strings = createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: ARTICLE } });
+    const strings = createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: ARTICLE }) });
     const result = strings.getResult("Article", { term: "apple" });
 
     assert.equal(result.failureReason, "resolution-failure");
@@ -241,8 +241,8 @@ describe("phonetic resolver: absent, misbehaving, and misconfigured", () => {
   it("renders happily when unconfigured and never reached", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: { Plain: { translation: "hello", placeholders: { a: { value: "term", translations: ONSETS } } } } },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: { Plain: { translation: "hello", placeholders: { a: { value: "term", translations: ONSETS } } } } }),
     });
 
     assert.equal(strings.get("Plain", { term: "apple" }), "hello");
@@ -255,8 +255,8 @@ describe("phonetic resolver: absent, misbehaving, and misconfigured", () => {
     for (const bad of [null, undefined, "VOWEL", "PHONETIC_VOWEL", GENDER_FEMININE]) {
       const strings = createStrings({
         fallbackLocale: "en",
-        localeResolver: () => "en",
-        strings: { en: ARTICLE },
+        localeSupplier: () => "en",
+        localizedStringSupplier: () => ({ en: ARTICLE }),
         phoneticResolver: () => bad,
       });
 
@@ -271,8 +271,8 @@ describe("phonetic resolver: absent, misbehaving, and misconfigured", () => {
   it("lets a thrown resolver error become the candidate's resolution failure", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: ARTICLE },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: ARTICLE }),
       phoneticResolver: () => { throw new Error("resolver refuses"); },
     });
     const result = strings.getResult("Article", { term: "apple" });
@@ -292,8 +292,8 @@ describe("phonetic resolver: absent, misbehaving, and misconfigured", () => {
     assert.throws(
       () => createStrings({
         fallbackLocale: "en",
-        localeResolver: () => "en",
-        strings: { en: ARTICLE },
+        localeSupplier: () => "en",
+        localizedStringSupplier: () => ({ en: ARTICLE }),
         phoneticResolver: /** @type {any} */ ("PHONETIC_VOWEL"),
       }),
       TypeError,
@@ -345,8 +345,8 @@ describe("phonetic resolver: expression operands take the same route", () => {
     const resolver = recordingResolver({ apple: PHONETIC_VOWEL });
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: EXPRESSION_CATALOG },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: EXPRESSION_CATALOG }),
       phoneticResolver: resolver.resolve,
     });
 
@@ -357,8 +357,8 @@ describe("phonetic resolver: expression operands take the same route", () => {
   it("bypasses the resolver for a tagged operand, even with none configured", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: EXPRESSION_CATALOG },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: EXPRESSION_CATALOG }),
     });
 
     assert.equal(strings.get("Expr.One", { noun: PHONETIC_VOWEL }), "alt-vowel");
@@ -367,8 +367,8 @@ describe("phonetic resolver: expression operands take the same route", () => {
   it("makes an unconfigured resolver a resolution failure of the candidate", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: EXPRESSION_CATALOG },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: EXPRESSION_CATALOG }),
     });
 
     assert.equal(strings.getResult("Expr.One", { noun: "apple" }).failureReason, "resolution-failure");

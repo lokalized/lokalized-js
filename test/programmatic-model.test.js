@@ -19,7 +19,7 @@ import { ordinalData } from "../src/data/ordinal.js";
 import { cardinalRangeData } from "../src/data/ranges.js";
 
 const en = (/** @type {unknown} */ catalog, /** @type {object} */ extra = {}) =>
-  createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: catalog }, ...extra });
+  createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: catalog }), ...extra });
 
 // --- define* validates, copies, and freezes ------------------------------------------------------
 
@@ -223,8 +223,8 @@ test("missingLanguageForms follows declared form order, never hash order", () =>
   // supplying only ONE must name the other three in exactly that order.
   const s = createStrings({
     fallbackLocale: "ru",
-    localeResolver: () => "ru",
-    strings: { ru: { B: { translation: "{{b}}", placeholders: { b: { value: "c", translations: { CARDINALITY_ONE: "a" } } } } } },
+    localeSupplier: () => "ru",
+    localizedStringSupplier: () => ({ ru: { B: { translation: "{{b}}", placeholders: { b: { value: "c", translations: { CARDINALITY_ONE: "a" } } } } } }),
   });
 
   assert.deepEqual([...s.getWarnings()[0].missingLanguageForms],
@@ -239,7 +239,7 @@ test("ordinality warnings need the optional ordinal data, and cardinality warnin
   // Without the table this module cannot import, an ordinality gap simply goes unreported — the same
   // trade `lokalized/parse` makes, and the reason the root graph stays free of the ordinal data.
   assert.deepEqual(
-    createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: catalog }, pluralData: { ordinal: ordinalData } })
+    createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: catalog }), pluralData: { ordinal: ordinalData } })
       .getWarnings().map((w) => w.type),
     ["INCOMPLETE_ORDINALITY_TRANSLATIONS"],
   );
@@ -263,14 +263,14 @@ test("a range-driven placeholder is exempt, and a complete set is silent", () =>
   );
 });
 
-test("onWarning observes each warning, and a throwing handler aborts construction", () => {
+test("warningHandler observes each warning, and a throwing handler aborts construction", () => {
   const seen = [];
   const catalog = { B: { translation: "{{b}}", placeholders: { b: { value: "c", translations: { CARDINALITY_ONE: "a" } } } } };
 
-  en(catalog, { onWarning: (/** @type {any} */ w) => seen.push(w.key) });
+  en(catalog, { warningHandler: (/** @type {any} */ w) => seen.push(w.key) });
   assert.deepEqual(seen, ["B"]);
 
-  assert.throws(() => en(catalog, { onWarning: () => { throw new Error("nope"); } }), /nope/);
+  assert.throws(() => en(catalog, { warningHandler: () => { throw new Error("nope"); } }), /nope/);
 });
 
 test("the warning budget refuses the warning rather than delivering it and failing after", () => {
@@ -278,14 +278,14 @@ test("the warning budget refuses the warning rather than delivering it and faili
   const seen = [];
 
   assert.throws(
-    () => en(catalog, { loadingLimits: { maximumWarnings: 0 }, onWarning: (/** @type {any} */ w) => seen.push(w) }),
+    () => en(catalog, { loadingLimits: { maximumWarnings: 0 }, warningHandler: (/** @type {any} */ w) => seen.push(w) }),
     /maximum of 0 warnings/,
   );
   assert.deepEqual(seen, [], "a refused warning must never reach the handler");
 });
 
 test("a ParsedStringsFile's warnings are replayed, not recomputed", () => {
-  // Plan 3.2 tells applications that "already handled parser warnings should omit [onWarning] to
+  // Plan 3.2 tells applications that "already handled parser warnings should omit [warningHandler] to
   // avoid replay" — which is only meaningful if construction replays what the file carries. It must,
   // because the file's warnings name the sources it was parsed or merged from and this construction
   // no longer knows them.
@@ -359,41 +359,41 @@ test("magic keys are ordinary placeholder names and ordinary caller keys", () =>
 });
 
 test("an unconfigured tiebreaker map reads as an empty record, not null", () => {
-  // `LocaleConfiguration` in plan 3.2 types `tiebreakers` as a record, not a nullable one. A reader
+  // `LocaleConfiguration` in plan 3.2 types `tiebreakerLocalesByLanguageCode` as a record, not a nullable one. A reader
   // about to iterate it should not have to null-check first.
-  const { tiebreakers } = en({ K: "v" }).getLocaleConfiguration();
-  assert.deepEqual({ ...tiebreakers }, {});
-  assert.equal(Object.getPrototypeOf(tiebreakers), null);
+  const { tiebreakerLocalesByLanguageCode } = en({ K: "v" }).getLocaleConfiguration();
+  assert.deepEqual({ ...tiebreakerLocalesByLanguageCode }, {});
+  assert.equal(Object.getPrototypeOf(tiebreakerLocalesByLanguageCode), null);
 });
 
-test("tiebreakers are snapshotted into a frozen null-prototype record", () => {
+test("tiebreakerLocalesByLanguageCode are snapshotted into a frozen null-prototype record", () => {
   // Plan 4.3 names tiebreaker output among the records that must be "defensively copied, frozen
   // null-prototype". Holding the caller's object let an instance's reported configuration change
   // under it with no call into the library at all.
   const supplied = { es: ["es-MX"] };
   const s = createStrings({
     fallbackLocale: "en",
-    localeResolver: () => "en",
-    strings: { en: { K: "v" }, "es-MX": { K: "v" } },
-    tiebreakers: supplied,
+    localeSupplier: () => "en",
+    localizedStringSupplier: () => ({ en: { K: "v" }, "es-MX": { K: "v" } }),
+    tiebreakerLocalesByLanguageCode: supplied,
   });
 
-  const { tiebreakers } = s.getLocaleConfiguration();
-  assert.equal(Object.getPrototypeOf(tiebreakers), null);
-  assert.ok(Object.isFrozen(tiebreakers) && Object.isFrozen(tiebreakers.es));
+  const { tiebreakerLocalesByLanguageCode } = s.getLocaleConfiguration();
+  assert.equal(Object.getPrototypeOf(tiebreakerLocalesByLanguageCode), null);
+  assert.ok(Object.isFrozen(tiebreakerLocalesByLanguageCode) && Object.isFrozen(tiebreakerLocalesByLanguageCode.es));
 
   supplied.es.push("es-AR");
-  assert.deepEqual([...s.getLocaleConfiguration().tiebreakers.es], ["es-MX"]);
+  assert.deepEqual([...s.getLocaleConfiguration().tiebreakerLocalesByLanguageCode.es], ["es-MX"]);
 });
 
 test("a Map is accepted wherever a keyed record is, per plan 3.2", () => {
   const s = createStrings({
     fallbackLocale: "en",
-    localeResolver: () => "en",
-    strings: { en: { K: "v" }, "es-MX": { K: "v" } },
-    tiebreakers: new Map([["es", ["es-MX"]]]),
+    localeSupplier: () => "en",
+    localizedStringSupplier: () => ({ en: { K: "v" }, "es-MX": { K: "v" } }),
+    tiebreakerLocalesByLanguageCode: new Map([["es", ["es-MX"]]]),
   });
-  assert.deepEqual([...s.getLocaleConfiguration().tiebreakers.es], ["es-MX"]);
+  assert.deepEqual([...s.getLocaleConfiguration().tiebreakerLocalesByLanguageCode.es], ["es-MX"]);
 
   // ...including a placeholder map on a programmatic definition, which is what plan 4.3 recommends
   // when placeholder names come from a generated or untrusted source.

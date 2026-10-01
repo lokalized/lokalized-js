@@ -37,23 +37,23 @@
     {
       "label": "edge worker",
       "modules": 47,
-      "sourceBytes": 987584,
+      "sourceBytes": 995667,
       "nodeBuiltinEdges": 0,
       "ianaClosureBytes": 11358,
-      "importMs": 0.4408
+      "importMs": 0.6632
     },
     {
       "label": "server renderer",
       "modules": 54,
-      "sourceBytes": 1068690,
+      "sourceBytes": 1077199,
       "nodeBuiltinEdges": 10,
       "ianaClosureBytes": 11358,
-      "importMs": 16.3987
+      "importMs": 22.9333
     }
   ],
-  "negotiateMsPerHeader": 0.0611,
-  "firstRenderMs": 0.9378,
-  "retainedBytes": -8336,
+  "negotiateMsPerHeader": 0.10408,
+  "firstRenderMs": 1.0709,
+  "retainedBytes": -2864,
   "requestsPerRender": {
     "fr-CA": 4,
     "fr-CH": 4,
@@ -476,6 +476,159 @@
         "closureClasses": 369
       },
       "previousSha256": "ef1e547aba83f7fac86cec904ef229ca5ced64b4582b38f1c864f69162813302"
+    },
+    {
+      "reason": "Align shared public API names across ports before 1.0.0",
+      "growth": [
+        "edge worker: source graph grew 987584 -> 992402 bytes",
+        "server renderer: source graph grew 1068690 -> 1073790 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 992402,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1073790,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "a199efe372a87104b60f73280cead6e7258c17eb716717ff7106bfdaaefb2d09"
+    },
+    {
+      "reason": "Use localizedStringSupplier for construction-time catalogs, matching Java before 1.0.0",
+      "growth": [],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 992062,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1073450,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "cf42547454c03fc549d092e2fa0ec95fbdbaa3d253cb6b40fae79cde205ed69f"
+    },
+    {
+      "reason": "Complete the approved Java/JS API alignment with consistent match-result and loading-error names",
+      "growth": [
+        "edge worker: source graph grew 992062 -> 995609 bytes",
+        "server renderer: source graph grew 1073450 -> 1077141 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 995609,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1077141,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "32999277f6ecf44882ac9c162c2b9aa9a5af63145c9d6283ad8a1c2236267f02"
+    },
+    {
+      "reason": "Correct supplier documentation after approved cross-port API naming cleanup",
+      "growth": [
+        "edge worker: source graph grew 995609 -> 995667 bytes",
+        "server renderer: source graph grew 1077141 -> 1077199 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 995667,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1077199,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "7e450a26f175c5c957bec7e73191106bdf718aabf6da38885c06675bb74999e3"
     }
   ]
 }

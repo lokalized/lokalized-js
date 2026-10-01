@@ -163,7 +163,7 @@ function harnessFingerprint(manifest, formatVersion = 1) {
     catalogVersion: manifest.catalogVersion,
     resolvedFallbackLocale: manifest.fallbackLocale,
     localeToSha256,
-    tiebreakers: manifest.tiebreakers ?? {},
+    tiebreakerLocalesByLanguageCode: manifest.tiebreakerLocalesByLanguageCode ?? {},
   }), "utf8")).digest("hex");
 }
 
@@ -171,11 +171,11 @@ function harnessFingerprint(manifest, formatVersion = 1) {
  * A manifest fixture whose declared fingerprint comes from the HARNESS, never from the port.
  *
  * @param {readonly string[]} tags
- * @param {{ fallbackLocale?: string, baseUrl?: string, tiebreakers?: Record<string, string[]>,
+ * @param {{ fallbackLocale?: string, baseUrl?: string, tiebreakerLocalesByLanguageCode?: Record<string, string[]>,
  *   decodedBytes?: boolean, urls?: Record<string, string> }} [options]
  */
 function manifestFor(tags, options = {}) {
-  const { fallbackLocale = "en", baseUrl = "https://cdn.example/v1/", tiebreakers = {},
+  const { fallbackLocale = "en", baseUrl = "https://cdn.example/v1/", tiebreakerLocalesByLanguageCode = {},
     decodedBytes = false, urls = {} } = options;
   /** @type {any} */
   const files = {};
@@ -197,7 +197,7 @@ function manifestFor(tags, options = {}) {
     fallbackLocale,
     baseUrl,
     files,
-    tiebreakers,
+    tiebreakerLocalesByLanguageCode,
   });
   draft.catalogFingerprint = harnessFingerprint(draft);
   return draft;
@@ -307,7 +307,7 @@ test("clause 6: THE CONTROL — the same fixture at formatVersion 1 loads end to
   const loaded = await loadEntireManifest(manifestFor(["en", "fr"]), { fetch: transport.impl });
   assert.equal(loaded.complete, true);
   assert.equal(transport.calls.length, 2, "and the recorder is a live instrument, not always empty");
-  assert.equal(createStrings({ loaded, localeResolver: () => "fr" }).get("Greeting"), "hello fr");
+  assert.equal(createStrings({ loaded, localeSupplier: () => "fr" }).get("Greeting"), "hello fr");
 });
 
 // =================================================================================================
@@ -315,7 +315,7 @@ test("clause 6: THE CONTROL — the same fixture at formatVersion 1 loads end to
 // =================================================================================================
 
 test("clause 6: a manifest that misdescribes its own catalog set is refused at all three doors", async () => {
-  const base = manifestFor(["en", "fr", "fr-CA"], { tiebreakers: { fr: ["fr-CA", "fr"] } });
+  const base = manifestFor(["en", "fr", "fr-CA"], { tiebreakerLocalesByLanguageCode: { fr: ["fr-CA", "fr"] } });
 
   /** Each arm mutates a field that is INSIDE the identity projection, leaving the declaration alone. */
   const arms = /** @type {[string, any][]} */ ([
@@ -328,7 +328,7 @@ test("clause 6: a manifest that misdescribes its own catalog set is refused at a
     // A DIFFERENT LOCALE, never a respelling: `en` -> `EN` would normalize back to the same
     // `resolvedFallbackLocale` and the arm would expect a refusal that correctly never comes.
     ["the fallbackLocale", { ...base, fallbackLocale: "fr" }],
-    ["the ORDER of a tiebreaker list", { ...base, tiebreakers: { fr: ["fr", "fr-CA"] } }],
+    ["the ORDER of a tiebreaker list", { ...base, tiebreakerLocalesByLanguageCode: { fr: ["fr", "fr-CA"] } }],
   ]);
 
   for (const [label, arm] of arms) {
@@ -356,7 +356,7 @@ test("clause 6: THE CONTROL — the port's projection agrees with an OUTSIDE RFC
   // This is the assertion that makes the group above evidence rather than self-consistency: every
   // fixture in this file declares a fingerprint this harness computed, so a port whose canonicalizer
   // were wrong in a self-consistent way would refuse all of them here.
-  const base = manifestFor(["en", "fr", "fr-CA"], { tiebreakers: { fr: ["fr-CA", "fr"] } });
+  const base = manifestFor(["en", "fr", "fr-CA"], { tiebreakerLocalesByLanguageCode: { fr: ["fr-CA", "fr"] } });
   assert.equal(validateStringsManifest(base).catalogFingerprint, base.catalogFingerprint);
   assert.equal(parseStringsManifest(JSON.stringify(base)).catalogFingerprint, base.catalogFingerprint);
 
@@ -371,7 +371,7 @@ test("clause 6: THE CONTROL — the port's projection agrees with an OUTSIDE RFC
 // =================================================================================================
 
 test("clause 6: a CDN copy carries the same identity; a changed body, version or order does not", async () => {
-  const origin = manifestFor(["en", "fr", "fr-CA"], { tiebreakers: { fr: ["fr-CA", "fr"] }, decodedBytes: true });
+  const origin = manifestFor(["en", "fr", "fr-CA"], { tiebreakerLocalesByLanguageCode: { fr: ["fr-CA", "fr"] }, decodedBytes: true });
 
   // Transport changed in all three excluded ways at once: a different host, per-file urls rewritten
   // from relative to absolute at a different path depth, and `decodedBytes` dropped on half the
@@ -395,7 +395,7 @@ test("clause 6: a CDN copy carries the same identity; a changed body, version or
     ["a flipped digest character", { ...origin, files: { ...origin.files,
       fr: { ...origin.files.fr, sha256: `${origin.files.fr.sha256.slice(0, 63)}${origin.files.fr.sha256.endsWith("a") ? "b" : "a"}` } } }],
     ["a bumped catalogVersion", { ...origin, catalogVersion: "v2" }],
-    ["a swapped tiebreaker order", { ...origin, tiebreakers: { fr: ["fr", "fr-CA"] } }],
+    ["a swapped tiebreaker order", { ...origin, tiebreakerLocalesByLanguageCode: { fr: ["fr", "fr-CA"] } }],
   ])) {
     assert.notEqual(harnessFingerprint(arm), arm.catalogFingerprint, `${label}: precondition`);
     assert.throws(() => validateStringsManifest(arm),
@@ -511,7 +511,7 @@ test("clause 6: a file entry with no usable sha256 is refused at validation, nam
   // THE CONTROL: the same entry with a correct lowercase digest loads, and the catalog it names is
   // really reachable — so the arms above died at the digest shape, not in an unrelated guard.
   const loaded = await loadEntireManifest(origin, { fetch: recordingFetch().impl });
-  assert.equal(createStrings({ loaded, localeResolver: () => "fr" }).get("Greeting"), "hello fr");
+  assert.equal(createStrings({ loaded, localeSupplier: () => "fr" }).get("Greeting"), "hello fr");
 });
 
 // =================================================================================================
@@ -542,7 +542,7 @@ test("clause 6: a body whose digest does not match is refused at EVERY plan posi
 
   for (const corrupt of ["de", "fr", "ja"]) {
     const error = await rejection(loadEntireManifest(manifest, { fetch: recordingFetch({ corrupt }).impl }));
-    assert.equal(/** @type {any} */ (error)?.name, "StringsLoadingError", corrupt);
+    assert.equal(/** @type {any} */ (error)?.name, "LocalizedStringLoadingError", corrupt);
     const failures = /** @type {any[]} */ (/** @type {any} */ (error).failures);
     // Cardinality is NOT claimed: plan 6.2:2074-2077 pins ordering and representability, not a total,
     // and a runner recording abort artifacts for in-flight siblings would fail such a claim for an
@@ -558,9 +558,9 @@ test("clause 6: a body whose digest does not match is refused at EVERY plan posi
     assert.equal(partial.complete, false, corrupt);
     assert.ok(!(corrupt in partial.catalogs), `${corrupt}: an unverified catalog is not offered`);
     for (const locale of ["de", "en", "fr", "ja"])
-      assert.notEqual(createStrings({ loaded: partial, localeResolver: () => locale }).get("Greeting"), "SWAPPED!",
+      assert.notEqual(createStrings({ loaded: partial, localeSupplier: () => locale }).get("Greeting"), "SWAPPED!",
         `${corrupt}: no instance anywhere may render the unverified body`);
-    assert.equal(createStrings({ loaded: partial, localeResolver: () => corrupt }).get("Greeting"), "hello en",
+    assert.equal(createStrings({ loaded: partial, localeSupplier: () => corrupt }).get("Greeting"), "hello en",
       `${corrupt}: it falls back instead`);
   }
 
@@ -569,7 +569,7 @@ test("clause 6: a body whose digest does not match is refused at EVERY plan posi
   const clean = await loadEntireManifest(manifest, { fetch: recordingFetch().impl });
   assert.equal(clean.complete, true);
   for (const locale of ["de", "en", "fr", "ja"])
-    assert.equal(createStrings({ loaded: clean, localeResolver: () => locale }).get("Greeting"), `hello ${locale}`);
+    assert.equal(createStrings({ loaded: clean, localeSupplier: () => locale }).get("Greeting"), `hello ${locale}`);
 });
 
 test("clause 6: the SUBSET door binds bodies too — it is the one SSR and edge deployments call", async () => {
@@ -580,12 +580,12 @@ test("clause 6: the SUBSET door binds bodies too — it is the one SSR and edge 
   assert.deepEqual(fetchSet(manifest, "fr").map((entry) => entry.locale), ["fr", "en"]);
 
   const error = await rejection(loadStrings(manifest, "fr", { fetch: recordingFetch({ corrupt: "fr" }).impl }));
-  assert.equal(/** @type {any} */ (error)?.name, "StringsLoadingError");
+  assert.equal(/** @type {any} */ (error)?.name, "LocalizedStringLoadingError");
   assert.deepEqual(/** @type {any[]} */ (/** @type {any} */ (error).failures)
     .map((f) => [f.locale, f.stage]), [["fr", "digest"]]);
 
   const control = await loadStrings(manifest, "fr", { fetch: recordingFetch().impl });
-  assert.equal(createStrings({ loaded: control, localeResolver: () => "fr" }).get("Greeting"), "hello fr");
+  assert.equal(createStrings({ loaded: control, localeSupplier: () => "fr" }).get("Greeting"), "hello fr");
 });
 
 test("clause 6: two entries pointing at ONE url are bound INDEPENDENTLY, not deduplicated", async () => {
@@ -600,7 +600,7 @@ test("clause 6: two entries pointing at ONE url are bound INDEPENDENTLY, not ded
 
   const transport = recordingFetch();
   const error = await rejection(loadEntireManifest(manifest, { fetch: transport.impl }));
-  assert.equal(/** @type {any} */ (error)?.name, "StringsLoadingError");
+  assert.equal(/** @type {any} */ (error)?.name, "LocalizedStringLoadingError");
   assert.deepEqual(/** @type {any[]} */ (/** @type {any} */ (error).failures)
     .map((f) => [f.locale, f.stage]), [["de", "digest"]],
     "the `de` binding is checked even though `en` already satisfied a binding for the same bytes");
@@ -635,7 +635,7 @@ test("clause 6: decodedBytes is compared to the BODY, and an encoded Content-Len
   assert.equal(exact.files.en.decodedBytes, bytes.length);
   const loaded = await loadEntireManifest(exact, { fetch: recordingFetch({ headers }).impl });
   assert.equal(loaded.complete, true, "a content-coded response must not be refused on its header");
-  assert.equal(createStrings({ loaded, localeResolver: () => "en" }).get("Greeting"), "hello en");
+  assert.equal(createStrings({ loaded, localeSupplier: () => "en" }).get("Greeting"), "hello en");
 
   // ARM (b): the DECLARATION is wrong and the bytes are right, so the digest still matches and cannot
   // pre-empt the length check. Altering the body instead would move the digest — zh-123 again — and
@@ -643,7 +643,7 @@ test("clause 6: decodedBytes is compared to the BODY, and an encoded Content-Len
   const understated = manifestFor(["en"]);
   understated.files.en.decodedBytes = bytes.length - 1;
   const error = await rejection(loadEntireManifest(understated, { fetch: recordingFetch({ headers }).impl }));
-  assert.equal(/** @type {any} */ (error)?.name, "StringsLoadingError");
+  assert.equal(/** @type {any} */ (error)?.name, "LocalizedStringLoadingError");
   assert.deepEqual(/** @type {any[]} */ (/** @type {any} */ (error).failures)
     .map((f) => [f.locale, f.stage]), [["en", "limit"]]);
 
@@ -799,7 +799,7 @@ test("clause 6: a dev manifest points at the SCANNED SOURCES, awkward names incl
   assert.deepEqual(Object.keys(loaded.catalogs).sort(), ["de", "en-US", "fr", "pt-BR"]);
   assert.equal(loaded.complete, true);
   for (const locale of ["de", "en-US", "fr", "pt-BR"])
-    assert.equal(createStrings({ loaded, localeResolver: () => locale }).get("Greeting"), `hello ${locale}`,
+    assert.equal(createStrings({ loaded, localeSupplier: () => locale }).get("Greeting"), `hello ${locale}`,
       "each catalog's marker is distinct, so a mix-up is visible as content");
 
   // CONTROL (a): the OTHER door onto the same directory — the Java-arbitrated one — agrees. Scoped to
@@ -835,7 +835,7 @@ test("clause 6: the dev door hashes RAW FILE BYTES — a BOM'd catalog generates
 
   const loaded = await loadEntireManifestFromFiles(manifest);
   assert.equal(loaded.complete, true, "and the load half re-reads and re-hashes the same octets");
-  assert.equal(createStrings({ loaded, localeResolver: () => "en" }).get("Greeting"), "hello en");
+  assert.equal(createStrings({ loaded, localeSupplier: () => "en" }).get("Greeting"), "hello en");
 });
 
 // =================================================================================================
@@ -861,7 +861,7 @@ test("clause 6: a resolved url outside a door's scheme refuses the WHOLE load, u
     const fetchError = await rejection(
       loadEntireManifest(fetchDoor, { fetch: viaFetch.impl, partialFailure }));
     assert.equal(/** @type {any} */ (fetchError)?.name, "ConfigurationError",
-      `${partialFailure}: a StringsLoadingError here would mean the refusal had been demoted to a per-file failure`);
+      `${partialFailure}: a LocalizedStringLoadingError here would mean the refusal had been demoted to a per-file failure`);
     assert.match(String(/** @type {any} */ (fetchError)?.message), /'fr' resolves to 'file:\/\/\/srv\/catalogs\/fr\.json'/);
     assert.equal(viaFetch.calls.length, 0,
       `${partialFailure}: and 'en' is fine, so it must not be read either`);
@@ -901,7 +901,7 @@ test("clause 6: a lookup load requests a STRICT SUBSET and never warms the rest"
   // never candidates for a `fr-CA` lookup, and that the set is smaller than the manifest. Both stay
   // red under a background-warming implementation, and neither depends on the tier-3 reading.
   const manifest = manifestFor(["ar", "de", "en", "fr", "fr-CA", "ja", "pt-BR", "th"],
-    { tiebreakers: { fr: ["fr-CA", "fr"] } });
+    { tiebreakerLocalesByLanguageCode: { fr: ["fr-CA", "fr"] } });
 
   /** The recorder is ACTIVE: a request outside the plan is refused at record time, not only counted. */
   const planned = new Set(fetchSet(manifest, "fr-CA").map((entry) => entry.url));
@@ -940,8 +940,8 @@ test("clause 6: a lookup load requests a STRICT SUBSET and never warms the rest"
   } });
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(secondCalls, calls, "a second load re-requests the same set; nothing is served from a cache");
-  assert.equal(createStrings({ loaded: second, localeResolver: () => "fr-CA" }).get("Greeting"),
-    createStrings({ loaded: first, localeResolver: () => "fr-CA" }).get("Greeting"),
+  assert.equal(createStrings({ loaded: second, localeSupplier: () => "fr-CA" }).get("Greeting"),
+    createStrings({ loaded: first, localeSupplier: () => "fr-CA" }).get("Greeting"),
     "and it produced a real result, so an empty recorder could not be explained by an empty load");
 
   // THE CONTROL THAT STOPS A LOADER WHICH FETCHES NOTHING FROM PASSING: the whole-manifest door must

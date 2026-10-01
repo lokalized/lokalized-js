@@ -24,7 +24,7 @@ import { supportedCardinalCategoriesFor } from "./plural.js";
 /** @typedef {import("./catalog.js").Definition} Definition */
 
 /**
- * One parse-time warning, as `getWarnings()` and every `onWarning` callback deliver it.
+ * One parse-time warning, as `getWarnings()` and every `warningHandler` callback deliver it.
  *
  * `key` is the ROOT key, even for a warning raised inside an alternative, and
  * `missingLanguageForms` is in declared form order, never hash order.

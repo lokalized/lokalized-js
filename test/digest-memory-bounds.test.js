@@ -67,7 +67,7 @@ import { computeCatalogIdentity } from "../src/load/index.js";
 import { catalogIdentityInputFor } from "../src/load/identity.js";
 import { createStrings } from "../src/core/index.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
-import { loadEntireManifest, loadStrings, StringsLoadingError } from "../src/load/fetch-loader.js";
+import { loadEntireManifest, loadStrings, LocalizedStringLoadingError } from "../src/load/fetch-loader.js";
 import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
 const utf8 = new TextEncoder();
@@ -120,7 +120,7 @@ function manifestFor(bodies, { fallbackLocale = "en", decodedBytes } = {}) {
   const draft = {
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
     ...BUILD_IDENTITY,
-    fallbackLocale, baseUrl: "https://example.test/c/", files, tiebreakers: {},
+    fallbackLocale, baseUrl: "https://example.test/c/", files, tiebreakerLocalesByLanguageCode: {},
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return /** @type {any} */ (draft);
@@ -244,7 +244,7 @@ test("the per-file cap is charged to the RUNNING TOTAL of streamed octets, not t
       fetch: fetchOf({ en: response }), limits: { maximumInputBytes: CAP },
     }));
 
-    assert.ok(error instanceof StringsLoadingError, `${label}: expected StringsLoadingError, got ${error}`);
+    assert.ok(error instanceof LocalizedStringLoadingError, `${label}: expected LocalizedStringLoadingError, got ${error}`);
     assert.equal(error.failures.length, 1, label);
     assert.equal(error.failures[0].locale, "en", label);
     assert.equal(error.failures[0].url, "https://example.test/c/en.json", label);
@@ -278,7 +278,7 @@ test("a body of EXACTLY maximumInputBytes loads end to end", async () => {
   assert.equal(loaded.failures.length, 0);
   assert.equal(state.enqueued, 8, "65,536 octets in 8 KiB chunks is exactly 8 deliveries");
   assert.equal(loaded.loadingLimits.maximumInputBytes, CAP, "the snapshot reports the cap that was applied");
-  assert.equal(createStrings({ loaded, localeResolver: () => "en" }).get("Greeting").length, CAP - 15,
+  assert.equal(createStrings({ loaded, localeSupplier: () => "en" }).get("Greeting").length, CAP - 15,
     "the at-cap body must survive all the way to a constructed instance");
 });
 
@@ -298,7 +298,7 @@ test("with no limits given the cap is the 8 MiB default, and one octet over it i
 
   const { state, response } = chunkedResponse(over, 65536);
   const error = await rejection(loadStrings(source, "en", { fetch: fetchOf({ en: response }) }));
-  assert.ok(error instanceof StringsLoadingError, `expected StringsLoadingError, got ${error}`);
+  assert.ok(error instanceof LocalizedStringLoadingError, `expected LocalizedStringLoadingError, got ${error}`);
   assert.equal(error.failures[0].stage, "limit");
   assert.match(String(error.failures[0].cause.message), /exceeds the maximum of 8388608 bytes/);
   assert.ok(Math.max(...state.chunkSizes) < DEFAULT_CAP, "no single chunk reaches the default cap either");
@@ -315,7 +315,7 @@ test("a SINGLE over-cap chunk is still refused — the landing check for a mispl
     fetch: fetchOf({ en: response }), limits: { maximumInputBytes: CAP },
   }));
   assert.equal(state.enqueued, 1, "the fixture must deliver the whole body in one chunk");
-  assert.ok(error instanceof StringsLoadingError, `expected StringsLoadingError, got ${error}`);
+  assert.ok(error instanceof LocalizedStringLoadingError, `expected LocalizedStringLoadingError, got ${error}`);
   assert.equal(error.failures[0].stage, "limit");
 });
 
@@ -332,7 +332,7 @@ test("the cap fires for a body whose manifest ALSO declares the over-cap length"
   const error = await rejection(loadStrings(source, "en", {
     fetch: fetchOf({ en: response }), limits: { maximumInputBytes: CAP },
   }));
-  assert.ok(error instanceof StringsLoadingError, `expected StringsLoadingError, got ${error}`);
+  assert.ok(error instanceof LocalizedStringLoadingError, `expected LocalizedStringLoadingError, got ${error}`);
   assert.equal(error.failures[0].stage, "limit");
   // The CAP's wording, not the declared-length guard's — the two are different sentences in the same
   // stage, and only this distinguishes which one refused.
@@ -374,7 +374,7 @@ test("the loader stops pulling within a chunk of the cap instead of draining the
     fetch: fetchOf({ en: response }), limits: { maximumInputBytes: CAP },
   }));
 
-  assert.ok(error instanceof StringsLoadingError, `expected StringsLoadingError, got ${error}`);
+  assert.ok(error instanceof LocalizedStringLoadingError, `expected LocalizedStringLoadingError, got ${error}`);
   assert.equal(error.failures[0].stage, "limit");
   // The bound is an ORDER OF MAGNITUDE, not an exact count: 9 chunks reach the crossing byte and the
   // stream's default queuing strategy buffers one ahead, so 10 is what this engine delivers — but a
@@ -444,7 +444,7 @@ test("an over-cap body is NEVER digested, measured as a delta against a control 
     const error = await rejection(loadStrings(overManifest, "en", {
       fetch: fetchOf({ en: chunkedResponse(over, 8192).response }), limits: { maximumInputBytes: CAP },
     }));
-    assert.ok(error instanceof StringsLoadingError, `expected StringsLoadingError, got ${error}`);
+    assert.ok(error instanceof LocalizedStringLoadingError, `expected LocalizedStringLoadingError, got ${error}`);
     assert.equal(error.failures[0].stage, "limit");
     // The order, executable: a loader that assembles, hashes and THEN checks the size produces this
     // identical rejection while having materialized and hashed an over-cap body.

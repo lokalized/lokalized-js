@@ -32,7 +32,7 @@
  * mapped class, both carried the same sentence, and this tool reported agreement. **The walk is
  * observable and it was not being observed.**
  *
- * EVERY OUTCOME NOW CARRIES A SEVENTH FIELD: the `fallbackPolicy` consultations and the `onFailure`
+ * EVERY OUTCOME NOW CARRIES A SEVENTH FIELD: the `translationFallbackPolicy` consultations and the `translationFailureHandler`
  * invocation, in order, with their reasons, locales, attempted lists and cause classes. Both sides
  * install RECORDING DELEGATES of the library defaults — `fallbackOnMissingTranslationOrNoMatching
  * Alternative()` / `returnKey()` in Java, their exact port counterparts here — so the channel
@@ -155,7 +155,7 @@
  * THE CLASS. A lookup does pre-empt them; the constructor is nevertheless PUBLIC and documented as
  * public (`LocaleMatchResult.java:65-80`, "This is public so custom LocaleMatcher implementations
  * can expose the same diagnostics"), so all three are caller-facing through it — and through the
- * port's `forLocaleMatch`, `localeMatchResolver` and per-call `{ localeMatch }`. THE PORT ACCEPTED
+ * port's `forLocaleMatch`, `localeMatchSupplier` and per-call `{ localeMatchResult }`. THE PORT ACCEPTED
  * ALL THREE ILL-FORMED INPUTS until 2026-09-09.
  *
  * THIS TOOL IS STRUCTURALLY BLIND TO THEM and stays so: it has no SUPPLIED-MATCH shape, only lookup,
@@ -174,7 +174,7 @@
  * driven through the matcher door as well.
  *
  * WHAT THIS TOOL STILL DOES NOT COMPARE, stated because two of the port's four matcher doors are
- * outside it: `createStrings({ locale })` as a REFUSAL site, and `createLocaleNegotiator`'s
+ * outside it: `createStrings({ locale })` as a REFUSAL site, and `createLocaleMatcher`'s
  * `matchFor` / `bestMatchFor`. Neither has a Java counterpart reachable from a `Strings` lookup —
  * the first has no Java setter at all, the second is the same `LocaleMatcher.java:64` reached
  * through a different object. Deleting either check leaves this run GREEN, measured, so
@@ -279,7 +279,7 @@
  *
  *   | ablation (one edit to the port's walk)                | unexplained | exit | outcome-identical |
  *   |---|---:|---|---:|
- *   | one extra `fallbackPolicy` call on the FINAL candidate |   101,958   |  1   |      101,586      |
+ *   | one extra `translationFallbackPolicy` call on the FINAL candidate |   101,958   |  1   |      101,586      |
  *   | the port's per-call `Locale override` ingress deleted  |     4,641   |  1   |           0       |
  *   | the policy handed `lookupLocale`, not the candidate    |   229,396   |  1   |     229,024       |
  *
@@ -407,7 +407,7 @@ function catalogs(tags, withOnly) {
  *
  * @type {{name: string, fallback: string, instance: string, throwOnFailure?: true,
  *   refusedByJava?: true,
- *   tiebreakers: Record<string, string[]> | null, strings: Record<string, Record<string, string>>}[]}
+ *   tiebreakerLocalesByLanguageCode: Record<string, string[]> | null, localizedStringSupplier: () => Record<string, Record<string, string>>}[]}
  */
 const CATALOG_SETS = [
   {
@@ -416,8 +416,8 @@ const CATALOG_SETS = [
     name: "exhausts",
     fallback: "fr",
     instance: "fr",
-    tiebreakers: null,
-    strings: catalogs(["fr", "nb", "nn"], ["fr"]),
+    tiebreakerLocalesByLanguageCode: null,
+    localizedStringSupplier: () => (catalogs(["fr", "nb", "nn"], ["fr"])),
   },
   {
     // The measured EARLY-SERVE control, differing in nothing but which catalogs are loaded. It is
@@ -426,8 +426,8 @@ const CATALOG_SETS = [
     name: "serves-early",
     fallback: "fr",
     instance: "fr",
-    tiebreakers: null,
-    strings: catalogs(["en", "fr", "ja", "th"], ["fr", "ja"]),
+    tiebreakerLocalesByLanguageCode: null,
+    localizedStringSupplier: () => (catalogs(["en", "fr", "ja", "th"], ["fr", "ja"])),
   },
   {
     // One catalog. Every probe exhausts to the fallback, which is the shortest chain a lookup can
@@ -435,8 +435,8 @@ const CATALOG_SETS = [
     name: "fallback-only",
     fallback: "fr",
     instance: "fr",
-    tiebreakers: null,
-    strings: catalogs(["fr"], ["fr"]),
+    tiebreakerLocalesByLanguageCode: null,
+    localizedStringSupplier: () => (catalogs(["fr"], ["fr"])),
   },
   {
     // The variant/region ladder, on the language whose chain carries the measured duplicate. Loading
@@ -444,8 +444,8 @@ const CATALOG_SETS = [
     name: "en-ladder",
     fallback: "fr",
     instance: "fr",
-    tiebreakers: { en: ["en", "en-US", "en-US-POSIX"] },
-    strings: catalogs(["en", "en-US", "en-US-POSIX", "fr"], ["en", "fr"]),
+    tiebreakerLocalesByLanguageCode: { en: ["en", "en-US", "en-US-POSIX"] },
+    localizedStringSupplier: () => (catalogs(["en", "en-US", "en-US-POSIX", "fr"], ["en", "fr"])),
   },
   {
     // Script and compatibility-extension territory: the two languages whose legacy variants Java's
@@ -453,8 +453,8 @@ const CATALOG_SETS = [
     name: "cjk",
     fallback: "fr",
     instance: "fr",
-    tiebreakers: { ja: ["ja", "ja-JP"], th: ["th", "th-TH"], zh: ["zh-Hans", "zh-Hant"] },
-    strings: catalogs(["ja", "ja-JP", "th", "th-TH", "zh-Hans", "zh-Hant", "fr"], ["ja", "zh-Hant", "fr"]),
+    tiebreakerLocalesByLanguageCode: { ja: ["ja", "ja-JP"], th: ["th", "th-TH"], zh: ["zh-Hans", "zh-Hant"] },
+    localizedStringSupplier: () => (catalogs(["ja", "ja-JP", "th", "th-TH", "zh-Hans", "zh-Hant", "fr"], ["ja", "zh-Hant", "fr"])),
   },
   {
     // The exhausting set again, with a THROWING failure handler. Same catalogs, same chains, and a
@@ -465,8 +465,8 @@ const CATALOG_SETS = [
     fallback: "fr",
     instance: "fr",
     throwOnFailure: true,
-    tiebreakers: null,
-    strings: catalogs(["fr", "nb", "nn"], ["fr"]),
+    tiebreakerLocalesByLanguageCode: null,
+    localizedStringSupplier: () => (catalogs(["fr", "nb", "nn"], ["fr"])),
   },
   {
     // …and the ladder, whose chains reach the duplicate rather than the ill-formed member, so the
@@ -475,8 +475,8 @@ const CATALOG_SETS = [
     fallback: "fr",
     instance: "fr",
     throwOnFailure: true,
-    tiebreakers: { en: ["en", "en-US", "en-US-POSIX"] },
-    strings: catalogs(["en", "en-US", "en-US-POSIX", "fr"], ["en", "fr"]),
+    tiebreakerLocalesByLanguageCode: { en: ["en", "en-US", "en-US-POSIX"] },
+    localizedStringSupplier: () => (catalogs(["en", "en-US", "en-US-POSIX", "fr"], ["en", "fr"])),
   },
   {
     // `DefaultStrings.java:248` / `Strings.java:211` — the FALLBACK locale. `en-x-lvariant-NY`
@@ -487,8 +487,8 @@ const CATALOG_SETS = [
     fallback: "en-x-lvariant-NY",
     instance: "fr",
     refusedByJava: true,
-    tiebreakers: null,
-    strings: catalogs(["fr"], ["fr"]),
+    tiebreakerLocalesByLanguageCode: null,
+    localizedStringSupplier: () => (catalogs(["fr"], ["fr"])),
   },
   {
     // `DefaultStrings.java:276` — a CATALOG locale. The fallback is well-formed and matches a loaded
@@ -498,8 +498,8 @@ const CATALOG_SETS = [
     fallback: "fr",
     instance: "fr",
     refusedByJava: true,
-    tiebreakers: null,
-    strings: catalogs(["fr", "en-x-lvariant-NY"], ["fr"]),
+    tiebreakerLocalesByLanguageCode: null,
+    localizedStringSupplier: () => (catalogs(["fr", "en-x-lvariant-NY"], ["fr"])),
   },
   {
     // `DefaultStrings.java:347` — a TIEBREAKER locale, and it is a THIRD site rather than a
@@ -511,8 +511,8 @@ const CATALOG_SETS = [
     fallback: "fr",
     instance: "fr",
     refusedByJava: true,
-    tiebreakers: { en: ["en-x-lvariant-NY", "en", "en-US"] },
-    strings: catalogs(["en", "en-US", "fr"], ["en", "fr"]),
+    tiebreakerLocalesByLanguageCode: { en: ["en-x-lvariant-NY", "en", "en-US"] },
+    localizedStringSupplier: () => (catalogs(["en", "en-US", "fr"], ["en", "fr"])),
   },
   {
     // **THIS TOOL DROVE THE EXACT DOOR A LIVE DEFECT LIVED BEHIND AND WAS BLIND TO IT — not to the
@@ -541,8 +541,8 @@ const CATALOG_SETS = [
     name: "iana-equivalence-partner",
     fallback: "fr",
     instance: "fr",
-    tiebreakers: null,
-    strings: catalogs(["fr", "mrd-US", "nsl"], ["fr"]),
+    tiebreakerLocalesByLanguageCode: null,
+    localizedStringSupplier: () => (catalogs(["fr", "mrd-US", "nsl"], ["fr"])),
   },
   {
     // **A LANGUAGE EQUIVALENT COMBINED WITH A REGION OR VARIANT SUBSTITUTION, added at A30.**
@@ -559,8 +559,8 @@ const CATALOG_SETS = [
     name: "iana-equivalence-region-variant",
     fallback: "fr",
     instance: "fr",
-    tiebreakers: null,
-    strings: catalogs(["fr", "mrd-MM", "enm-alalc97", "sgn-NO-alalc97"], ["fr"]),
+    tiebreakerLocalesByLanguageCode: null,
+    localizedStringSupplier: () => (catalogs(["fr", "mrd-MM", "enm-alalc97", "sgn-NO-alalc97"], ["fr"])),
   },
 ];
 
@@ -770,8 +770,8 @@ const SHOW = 8;
  * THREE OF THE FOUR ARE IDENTITIES, and that is the maintainer's rule rather than a coincidence.
  * The rule is "Java's SHAPE with the JS name substituted"; `Locale override`, `Requested locale` and
  * `Attempted locale` contain no Java identifier to substitute, so they are reproduced verbatim. Only
- * `localeSupplier result` names one, and this port's name for that callback is `localeResolver` —
- * the same substitution that already produces `localeResolver returned null` where Java says
+ * `localeSupplier result` names one, and this port's name for that callback is `localeSupplier` —
+ * the same substitution that already produces `localeSupplier returned null` where Java says
  * `localeSupplier returned null`, which is the precedent M7-STATUS's decision 1 set.
  *
  * `Instance locale` is deliberately NOT here. It is the port's phrase for `createStrings({ locale
@@ -784,7 +784,7 @@ const SHOW = 8;
  */
 const DESCRIPTIONS = {
   "Locale override": "Locale override",
-  "localeSupplier result": "localeResolver result",
+  "localeSupplier result": "localeSupplier result",
   "Requested locale": "Requested locale",
   "Attempted locale": "Attempted locale",
   // CONSTRUCTION (`Strings.java:211` / `DefaultStrings.java:248`, `:276`, `:347`) and INSPECTION
@@ -1057,7 +1057,7 @@ const ILL_FORMED_PROBE = "de-x-lvariant-XX";
  * @param {string} key
  * @param {string} tag
  * @param {boolean} viaAmbient false for the per-call ingress; true when the caller has already armed
- *   the mutable cell this instance's `localeResolver` reads, in which case the lookup takes NO
+ *   the mutable cell this instance's `localeSupplier` reads, in which case the lookup takes NO
  *   options at all — the only way to reach the ambient validation site.
  * @returns {string[]}
  */
@@ -1068,7 +1068,7 @@ function lookupJs(strings, key, tag, viaAmbient) {
       : strings.getResult(key, undefined, { locale: tag });
     // THE SELECTION CHANNEL'S OWN COPY, carried by the result and described by none of the six
     // fields below. See `matchAgrees`.
-    jsMatch = matchEncoding(result.localeMatch);
+    jsMatch = matchEncoding(result.localeMatchResult);
     return [
       String(result.status).replace(/-/g, "_").toUpperCase(),
       flatten(result.translation),
@@ -1091,7 +1091,7 @@ function lookupJs(strings, key, tag, viaAmbient) {
  * section 3.3 names it the counterpart of `Strings#matchFor(Locale)`, `tools/conformance.mjs`'s
  * `matchForCase` drives all 301 corpus `matchFor` rows through it, and it reads THIS instance's own
  * configuration — the same one the two lookup ingresses above use — so a divergence here cannot be
- * an artifact of a differently-configured negotiator. `createLocaleNegotiator`'s two locale doors
+ * an artifact of a differently-configured negotiator. `createLocaleMatcher`'s two locale doors
  * carry the identical check on the identical helper and are pinned by
  * `test/requested-locale-refusal.test.js` instead, because reaching them from here would need a
  * second configuration and would compare a different object.
@@ -1102,7 +1102,7 @@ function lookupJs(strings, key, tag, viaAmbient) {
  */
 function matcherJs(strings, tag) {
   try {
-    const match = strings.getDirectLocaleContext(tag).localeMatch;
+    const match = strings.getDirectLocaleContext(tag).localeMatchResult;
     // Through the SAME encoder the lookup door uses — which is what brings this shape's
     // `consideredLocales` and `fallbackLocale` along; the six fields below drop both.
     jsMatch = matchEncoding(match);
@@ -1110,7 +1110,7 @@ function matcherJs(strings, tag) {
       "MATCH",
       match.locale ?? "-",
       // The winning range travels as a `{ range, weight }` PAIR in this port and as a bare string
-      // from a caller — `LocaleMatch#languageRange` accepts both — while Java's field is a
+      // from a caller — `LocaleMatchResult#languageRange` accepts both — while Java's field is a
       // `LanguageRange` whose `getRange()` is the string. Only the range is compared here; the
       // weight it carries is `effectiveWeight`, deliberately outside these six fields (see
       // `LookupDiff.java`'s `matcher`).
@@ -1165,8 +1165,8 @@ const flatten = (value) =>
   String(value).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
 
 /**
- * THE PORT'S CALL TRACE for the probe currently running — the `fallbackPolicy` consultations and
- * the `onFailure` invocation, in order, in `LookupDiff.java`'s `TRACE` encoding.
+ * THE PORT'S CALL TRACE for the probe currently running — the `translationFallbackPolicy` consultations and
+ * the `translationFailureHandler` invocation, in order, in `LookupDiff.java`'s `TRACE` encoding.
  *
  * One array for the whole run rather than one per set, cleared immediately before each probe by the
  * loop. The clear is what makes an EMPTY trace an observation rather than an accident: `calls=[]` is
@@ -1191,7 +1191,7 @@ const jsTrace = [];
 let jsMatch = "-";
 
 /**
- * A port `FailureReason` in the spelling Java's `TranslationFailureReason` enum prints.
+ * A port `TranslationFailureReason` in the spelling Java's `TranslationFailureReason` enum prints.
  *
  * The SAME adaptation `lookupJs` already makes for `status` and `failureReason` — `-` to `_`,
  * uppercased — and not a second dialect. `missing-translation` is `MISSING_TRANSLATION`.
@@ -1273,7 +1273,7 @@ const MATCH_FIELD = 7;
  *     nothing there and must not be read as if it did.
  *
  * `lookupMatchesCompared` below counts the first bucket and GATES on it, so a probe space that lost
- * its lookup rows — or a port whose `result.localeMatch` went `undefined` while
+ * its lookup rows — or a port whose `result.localeMatchResult` went `undefined` while
  * `getDirectLocaleContext` kept answering — can never leave this channel green on the strength of
  * the matcher shape alone, where it is mostly a restatement of fields already compared.
  */
@@ -1283,7 +1283,7 @@ const LOOKUP_INGRESSES = new Set(["per-call", "ambient"]);
  * The port's side of a `LocaleMatchResult`, in the encoding `LookupDiff.java`'s `match` defines.
  *
  * ONE ENCODER for both doors here too, mirroring the oracle: the lookup door reads
- * `result.localeMatch` and the matcher door reads `getDirectLocaleContext(tag).localeMatch`, and
+ * `result.localeMatchResult` and the matcher door reads `getDirectLocaleContext(tag).localeMatchResult`, and
  * they must produce the identical spelling or a real divergence would be indistinguishable from a
  * formatting one.
  *
@@ -1296,7 +1296,7 @@ const LOOKUP_INGRESSES = new Set(["per-call", "ambient"]);
  * `LookupDiff.java`'s `match` for the measurement that says comparing them would red every matched
  * row on `1.0` vs `1` rather than on behaviour.
  *
- * @param {any} match the port's `LocaleMatch`, or null/undefined when the outcome carries none
+ * @param {any} match the port's `LocaleMatchResult`, or null/undefined when the outcome carries none
  * @returns {string}
  */
 function matchEncoding(match) {
@@ -1325,7 +1325,7 @@ function matchEncoding(match) {
  * asks the SELECTION door a question of its own; neither one reads the copy of the selection that
  * `TranslationResult#getLocaleMatchResult()` hands a lookup's caller. Two libraries can agree on all
  * six outcome fields, on the whole call trace, and on the matcher shape, and still put a different
- * `localeMatch` on the result object — and until 2026-09-15 nothing here could see it.
+ * `localeMatchResult` on the result object — and until 2026-09-15 nothing here could see it.
  *
  * ROUTED EXACTLY WHERE THE TRACE IS, BEFORE `KNOWN_DIVERGENCES`, on the same argument that channel
  * already carries: every rule in that table argues about a DIAGNOSTIC's wording or an error class,
@@ -1352,7 +1352,7 @@ function matchAgrees(javaField, jsField) {
 }
 
 /**
- * Do the two CALL TRACES agree — the `fallbackPolicy` consultations and the `onFailure` invocation,
+ * Do the two CALL TRACES agree — the `translationFallbackPolicy` consultations and the `translationFailureHandler` invocation,
  * in order, with their reasons, locales, attempted lists and causes?
  *
  * WHY THIS FUNCTION EXISTS, and it is not a refinement of `agreeOnOutcome`. Six outcome fields are
@@ -1437,12 +1437,12 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
   /** @type {string[]} */
   const request = [];
   for (const set of CATALOG_SETS) {
-    const catalogSpec = Object.entries(set.strings)
+    const catalogSpec = Object.entries(set.localizedStringSupplier())
       .map(([tag, catalog]) => `${tag}::${base64(JSON.stringify(catalog))}`)
       .join(";;");
-    const tiebreakerSpec = set.tiebreakers === null
+    const tiebreakerSpec = set.tiebreakerLocalesByLanguageCode === null
       ? "-"
-      : Object.entries(set.tiebreakers).map(([code, list]) => `${code}=${list.join("|")}`).join(",,");
+      : Object.entries(set.tiebreakerLocalesByLanguageCode).map(([code, list]) => `${code}=${list.join("|")}`).join(",,");
     request.push([
       "S", set.name, set.fallback, set.instance, tiebreakerSpec,
       set.throwOnFailure === true ? "throw" : "-", catalogSpec,
@@ -1517,7 +1517,7 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
     }
     const tag = Buffer.from(fields[2], "base64").toString("utf8");
     const wellFormed = fields[3] === "true";
-    // EIGHT fields per outcome, not six: the seventh is the `fallbackPolicy` / `onFailure` CALL
+    // EIGHT fields per outcome, not six: the seventh is the `translationFallbackPolicy` / `translationFailureHandler` CALL
     // TRACE and the eighth is the SELECTION-CHANNEL MATCH the outcome carries. See `traceAgrees`
     // and `matchAgrees`, and `LookupDiff.java`'s `TRACE` and `MATCH`.
     const outcomes = PROBE_SHAPES.map((_, index) => ({
@@ -1582,7 +1582,7 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
   let matchOnlyDisagreed = 0;
   // The channel's own staleness gate, on the trace channel's reasoning. A comparison in which
   // NEITHER side ever emitted a match is not a green comparison, it is a dead one: an oracle that
-  // stopped calling `getLocaleMatchResult`, or a port whose `result.localeMatch` went `undefined`,
+  // stopped calling `getLocaleMatchResult`, or a port whose `result.localeMatchResult` went `undefined`,
   // would compare `-` against `-` on every row and report an agreement it has not earned. Counted
   // per side so a channel that died on ONE side is reported as the asymmetry it is.
   let javaMatchesRecorded = 0;
@@ -1667,8 +1667,8 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
     try {
       const shared = {
         fallbackLocale: set.fallback,
-        strings: set.strings,
-        ...(set.tiebreakers === null ? {} : { tiebreakers: set.tiebreakers }),
+        localizedStringSupplier: set.localizedStringSupplier,
+        ...(set.tiebreakerLocalesByLanguageCode === null ? {} : { tiebreakerLocalesByLanguageCode: set.tiebreakerLocalesByLanguageCode }),
         // THE RECORDING CALLBACKS — the port's half of the CALL TRACE, and the counterparts of the
         // two `LookupDiff.java` installs. Both DELEGATE rather than decide: the policy answers
         // `reason !== "resolution-failure"`, which is `BUILTIN_FALLBACK_POLICIES["missing-or-no-
@@ -1680,12 +1680,12 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
         // `TranslationFailureResponse.throwException()`'s JS counterpart is that `throw` action:
         // the port's `throwForFailure` is the analogue of Java's `throwExceptionFor`, and it is the
         // path that reaches `MissingTranslationException`'s copy of the attempted-locale validation.
-        fallbackPolicy: (/** @type {string} */ reason, /** @type {string} */ locale,
+        translationFallbackPolicy: (/** @type {string} */ reason, /** @type {string} */ locale,
             /** @type {unknown} */ cause) => {
           jsTrace.push(`P|${javaReason(reason)}|${locale}|${causeClass(cause)}`);
           return reason !== "resolution-failure";
         },
-        onFailure: (/** @type {any} */ failure) => {
+        translationFailureHandler: (/** @type {any} */ failure) => {
           jsTrace.push(
             `H|${javaReason(failure.reason)}|${failure.lookupLocale}` +
               `|${failure.attemptedLocales.length === 0 ? "-" : failure.attemptedLocales.join("~")}` +
@@ -1694,8 +1694,8 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
           return { action: /** @type {const} */ (set.throwOnFailure === true ? "throw" : "return-key") };
         },
       };
-      perCall = createStrings({ ...shared, localeResolver: () => set.instance });
-      viaAmbient = createStrings({ ...shared, localeResolver: () => armed });
+      perCall = createStrings({ ...shared, localeSupplier: () => set.instance });
+      viaAmbient = createStrings({ ...shared, localeSupplier: () => armed });
     } catch (error) {
       const raised = /** @type {Error} */ (error);
       jsRefusal = { name: raised?.name ?? "?", message: flatten(raised?.message ?? String(error)) };
@@ -1844,7 +1844,7 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
   );
 
   console.log(
-    `the CALL TRACE channel (fallbackPolicy consultations + the onFailure invocation, in order): ` +
+    `the CALL TRACE channel (translationFallbackPolicy consultations + the translationFailureHandler invocation, in order): ` +
       `${traceDisagreed} row(s) whose WALKS differ, of which ${traceOnlyDisagreed} agree on all six ` +
       `OUTCOME fields — those are the rows only this channel can see. A trace divergence is always ` +
       `unexplained: no KNOWN_DIVERGENCES rule is consulted for a row whose walks differ. ` +
@@ -1923,19 +1923,19 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
   // recorded compares "-" against "-" on every row and reports agreement it has not earned.
   if (javaTracesRecorded === 0)
     console.log(
-      "STALE: the oracle recorded no fallbackPolicy or onFailure call on any row — LookupDiff's " +
+      "STALE: the oracle recorded no translationFallbackPolicy or translationFailureHandler call on any row — LookupDiff's " +
         "recording callbacks are no longer installed, or no probe reaches a failing walk",
     );
   if (jsTracesRecorded === 0)
     console.log(
-      "STALE: the port recorded no fallbackPolicy or onFailure call on any row — the recording " +
+      "STALE: the port recorded no translationFallbackPolicy or translationFailureHandler call on any row — the recording " +
         "callbacks in `shared` are no longer installed, or no probe reaches a failing walk",
     );
 
   // The SELECTION channel's own staleness gate, one per side, on the identical reasoning: a side
   // that stopped emitting the field compares "-" against "-" on every row and reports an agreement
   // it has not earned. An oracle that dropped `getLocaleMatchResult`, or a port whose
-  // `result.localeMatch` went `undefined`, is exactly that.
+  // `result.localeMatchResult` went `undefined`, is exactly that.
   if (javaMatchesRecorded === 0)
     console.log(
       "STALE: the oracle carried no LocaleMatchResult on any row — LookupDiff's `MATCH` is no " +
@@ -1943,8 +1943,8 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
     );
   if (jsMatchesRecorded === 0)
     console.log(
-      "STALE: the port carried no localeMatch on any row — `result.localeMatch` / " +
-        "`getDirectLocaleContext(tag).localeMatch` is no longer read, or no probe reaches an " +
+      "STALE: the port carried no localeMatchResult on any row — `result.localeMatchResult` / " +
+        "`getDirectLocaleContext(tag).localeMatchResult` is no longer read, or no probe reaches an " +
         "outcome that carries a match",
     );
   // The third term, and the one the two above cannot express. See `LOOKUP_INGRESSES`: with only

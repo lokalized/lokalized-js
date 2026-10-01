@@ -33,15 +33,15 @@ export function parentChain(tag)                        // -> string[]
 export function maximize(tag)                           // -> string
 /**
  * Java's strict single-locale match kernel.
- * `supported` is the loaded locale set; `tiebreakers` maps language code -> ordered tags.
+ * `supported` is the loaded locale set; `tiebreakerLocalesByLanguageCode` maps language code -> ordered tags.
  */
-export function matchFor(requested, supported, fallbackLocale, tiebreakers)
+export function matchFor(requested, supported, fallbackLocale, tiebreakerLocalesByLanguageCode)
 // -> { matchType, locale, isMatch, fallbackLocale, consideredLocales, effectiveWeight, languageRange, requestedLanguageRanges }
 /**
  * The per-key candidate walk, first-wins deduplicated, in the order resolution must attempt them.
  * This is NOT the matcher: selection and resolution are separate channels that legitimately differ.
  */
-export function candidateChain(lookupTag, supported, fallbackLocale, tiebreakers) // -> string[]
+export function candidateChain(lookupTag, supported, fallbackLocale, tiebreakerLocalesByLanguageCode) // -> string[]
 ```
 
 `matchType` values are the JS spellings: `none`, `exact`, `canonical`, `cldr-fallback`,

@@ -66,8 +66,8 @@ const rangeCatalog = {
 const build = (strings, pluralData) =>
   createStrings({
     fallbackLocale: "en",
-    localeResolver: () => "en",
-    strings,
+    localeSupplier: () => "en",
+    localizedStringSupplier: () => (strings),
     ...(pluralData ? { pluralData } : {}),
   });
 

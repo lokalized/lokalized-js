@@ -42,11 +42,11 @@
 // error classes and the build-identity constants among them, all outside 3.1's named list). Both
 // modules resolve to the same files, so this costs the graph nothing, but an application that
 // imports only `lokalized` cannot name the option helpers and must hand-write `{ locale }` /
-// `{ localeMatch }` instead.
+// `{ localeMatchResult }` instead.
 import { GENDER_FEMININE } from "lokalized";
 import { createStrings, forLocale } from "lokalized/core";
 import { loadStrings, localeConfigurationForManifest, parseStringsManifest } from "lokalized/load";
-import { createLocaleNegotiator, forAcceptLanguage } from "lokalized/negotiate";
+import { createLocaleMatcher, forAcceptLanguage } from "lokalized/negotiate";
 
 import {
   MATCH_PRESERVING_VARY, directLocaleCacheKey, matchPreservingCacheKey,
@@ -54,7 +54,7 @@ import {
 import { renderPage } from "../app/render.js";
 
 /**
- * @typedef {import("lokalized/core").LocaleMatch} LocaleMatch
+ * @typedef {import("lokalized/core").LocaleMatchResult} LocaleMatchResult
  * @typedef {import("lokalized/load").StringsManifestV1} StringsManifestV1
  */
 
@@ -102,7 +102,7 @@ export async function handleRequest(request, env) {
 
   const header = request.headers.get("accept-language");
   const strategy = env.LOCALE_STRATEGY ?? "preserve";
-  const negotiator = createLocaleNegotiator(configuration);
+  const negotiator = createLocaleMatcher(configuration);
 
   if (strategy === "redirect") {
     // FAIL-SOFT BY CONTRACT: every unusable header answers the configured fallback here, so this arm
@@ -188,7 +188,7 @@ function localeFromPath(url, supportedLocales) {
  */
 async function directLocaleResponse(manifest, locale, transport, signal) {
   const loaded = await loadStrings(manifest, locale, { fetch: transport, signal });
-  const strings = createStrings({ loaded, localeResolver: () => locale });
+  const strings = createStrings({ loaded, localeSupplier: () => locale });
   const body = renderPage(strings, {
     callOptions: forLocale(locale),
     // DIRECT MODE HAS NO REQUESTED RANGES TO SHOW, and saying so in the view is the honest rendering
@@ -219,16 +219,16 @@ async function directLocaleResponse(manifest, locale, transport, signal) {
  * declared, resolution sees only the catalogs that arrived.
  *
  * @param {StringsManifestV1} manifest
- * @param {Readonly<{ localeMatch: LocaleMatch }>} callOptions what `forAcceptLanguage` negotiated
+ * @param {Readonly<{ localeMatchResult: LocaleMatchResult }>} callOptions what `forAcceptLanguage` negotiated
  * @param {typeof fetch} transport
  * @param {AbortSignal} signal
  * @returns {Promise<Response>}
  */
 async function matchPreservingResponse(manifest, callOptions, transport, signal) {
-  const match = callOptions.localeMatch;
+  const match = callOptions.localeMatchResult;
   const lookupLocale = match.isMatch && match.locale !== null ? match.locale : match.fallbackLocale;
   const loaded = await loadStrings(manifest, lookupLocale, { fetch: transport, signal });
-  const strings = createStrings({ loaded, localeResolver: () => lookupLocale });
+  const strings = createStrings({ loaded, localeSupplier: () => lookupLocale });
   const body = renderPage(strings, {
     callOptions,
     requestedRanges: match.requestedLanguageRanges.map((range) => range.range),

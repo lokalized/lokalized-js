@@ -107,8 +107,8 @@ const ENUM = {
   PRIMARY_LANGUAGE: "primary-language",
   WILDCARD: "wildcard",
   // `BidiIsolation`. `NONE` is shared with the match types above, which is safe because the two
-  // vocabularies agree on it; `ALWAYS` is the one member the JS contract renames, to `"all"`.
-  ALWAYS: "all",
+  // vocabularies agree on it; `ALWAYS` uses the matching string name, `"always"`.
+  ALWAYS: "always",
   RTL_LOCALES: "rtl-locales",
 };
 
@@ -144,8 +144,8 @@ const ERROR_NAME = {
   // IT COST FIVE RED ROWS WHEN IT WAS ADDED, AND NO LONGER DOES; this comment said so in the present
   // tense for a batch after the reason had gone. The remaining difference from Java is the
   // IDENTIFIER alone — Java names `translationFallbackPolicy` / `TranslationFailureHandler`, the JS
-  // options are `fallbackPolicy` / `onFailure` — and the maintainer's decision 1 settled the wording
-  // (Java's SHAPE with the JS name, matching `localeResolver` at `core/index.js:900/:914`). Those
+  // options are `translationFallbackPolicy` / `translationFailureHandler` — and the maintainer's decision 1 settled the wording
+  // (Java's SHAPE with the JS name, matching `localeSupplier` at `core/index.js:900/:914`). Those
   // two strings are pinned EXACTLY in `DECLARED_MESSAGE_DIVERGENCES`, which fails the run STALE if
   // the port ever reproduces Java verbatim.
   "java.lang.NullPointerException": ["TypeError"],
@@ -250,7 +250,7 @@ const REQUIRED_PARTITIONS = new Set(["requiredPortableIds", "requiredImplementat
  * specific capability each one still needs.
  */
 const OWNER_MILESTONE = {
-  // Plan v7 section 3.5 puts bestMatchForAcceptLanguage on LocaleNegotiator with Java's fail-soft
+  // Plan v7 section 3.5 puts bestMatchForAcceptLanguage on LocaleMatcher with Java's fail-soft
   // contract, returning a LocaleTag -- so the oracle's emitted tag IS the JS return value and this
   // switch needs one new arm, not an adaptation layer. Naming the owner here is the difference
   // between 21 cases reporting a reason and 21 reporting a bare "not implemented".
@@ -316,7 +316,7 @@ function assertStillNonportable(specDirectory) {
  * than by argument.
  *
  * `callOptionsFor` reports the both-present per-call state as nonportable because plan 3.3 declares
- * `locale` and `localeMatch` mutually exclusive AT RUNTIME. That is a claim about the PORT, not about
+ * `locale` and `localeMatchResult` mutually exclusive AT RUNTIME. That is a claim about the PORT, not about
  * the JVM, so it can go stale in a way the allowlist cannot see: a future edit that made the port
  * resolve the pair by precedence would leave those six rows silently parked in a bucket labelled
  * "these can never move" while the port had quietly started answering them.
@@ -337,10 +337,10 @@ function bothPerCallSourcesStillRefused() {
 
   const strings = core.createStrings({
     fallbackLocale: "en",
-    localeResolver: () => "en",
-    strings: { en: { "K": "v" }, fr: { "K": "v" } },
+    localeSupplier: () => "en",
+    localizedStringSupplier: () => ({ en: { "K": "v" }, fr: { "K": "v" } }),
   });
-  const localeMatch = strings.getDirectLocaleContext("fr").localeMatch;
+  const localeMatchResult = strings.getDirectLocaleContext("fr").localeMatchResult;
 
   // THE CONTROL, expected to pass: one per-call source alone must still answer. Without it a wholly
   // broken instance — every lookup throwing for any reason — reads as a passing guard below.
@@ -353,7 +353,7 @@ function bothPerCallSourcesStillRefused() {
   }
 
   try {
-    strings.getResult("K", undefined, { locale: "en", localeMatch });
+    strings.getResult("K", undefined, { locale: "en", localeMatchResult });
   } catch (error) {
     // The refusal, by type AND by the phrase `localeLookupFor` raises it with. Anything else is a
     // different failure wearing the refusal's clothes, and is reported rather than accepted.
@@ -366,7 +366,7 @@ function bothPerCallSourcesStillRefused() {
   }
 
   return ["the port no longer refuses a per-call options object carrying both 'locale' and " +
-    "'localeMatch', so the six per-call-override-order rows may have a JS counterpart: delete the " +
+    "'localeMatchResult', so the six per-call-override-order rows may have a JS counterpart: delete the " +
     "noCounterpart in callOptionsFor and let them run"];
 }
 
@@ -734,7 +734,7 @@ function failureHandlerFor(spec) {
  * functions this runner can wrap in a recorder.
  *
  * A KNOWN HOLE, stated rather than hidden. The port accepts these three by NAME — the option is
- * typed `BuiltinFallbackPolicy | FallbackPolicy` — and a policy handed to it as a string cannot be
+ * typed `BuiltinTranslationFallbackPolicy | TranslationFallbackPolicy` — and a policy handed to it as a string cannot be
  * wrapped, because there is only one policy slot and the recorder has to occupy it. So every corpus
  * case that names a built-in exercises THIS table and not the port's, exactly as `VectorOracle`
  * wraps Java's built-in singletons rather than the library resolving them itself. The equivalence
@@ -898,7 +898,7 @@ const rangeMemberFrom = (element) =>
   typeof element === "string" ? { range: element, weight: 1 } : { range: element.range, weight: element.weight };
 
 /**
- * The ambient locale ingress a fixture names, as the port's `localeResolver`/`localeMatchResolver`.
+ * The ambient locale ingress a fixture names, as the port's `localeSupplier`/`localeMatchSupplier`.
  *
  * TWO RULES, both taken from `VectorOracle` rather than invented here.
  *
@@ -932,8 +932,8 @@ function localeSourceFor(fixture, instanceBox) {
   // before the parser existed. The module guard stays where the other three ingresses have it --
   // decided on the subpath's existence, before any range is matched.
   if (spec.behavior === "match-ranges" &&
-    (!negotiateApi?.createLocaleNegotiator || !negotiateApi?.parseLanguageRanges))
-    unsupported("createLocaleNegotiator is not implemented");
+    (!negotiateApi?.createLocaleMatcher || !negotiateApi?.parseLanguageRanges))
+    unsupported("createLocaleMatcher is not implemented");
 
   /**
    * `matcher.matchFor(languageRangesFrom(config.get("ranges")))` (`VectorOracle:1046`, `:1075`),
@@ -941,7 +941,7 @@ function localeSourceFor(fixture, instanceBox) {
    * instance does not exist until `createStrings` returns, and its `getLocaleConfiguration()` is the
    * fallback Java has already resolved to a loaded catalog.
    */
-  const rangeMatch = () => negotiateApi.createLocaleNegotiator(instanceBox.strings.getLocaleConfiguration())
+  const rangeMatch = () => negotiateApi.createLocaleMatcher(instanceBox.strings.getLocaleConfiguration())
     .matchForLanguageRanges(
       typeof spec.ranges === "string" ? negotiateApi.parseLanguageRanges(spec.ranges) : (spec.ranges ?? []).map(rangeMemberFrom));
 
@@ -951,7 +951,7 @@ function localeSourceFor(fixture, instanceBox) {
 
     if (spec.behavior === "match-ranges")
       return {
-        localeResolver: () => {
+        localeSupplier: () => {
           // `.getLocale().orElse(...getFallbackLocale())` -- the oracle negotiates twice and takes the
           // fallback from the second result; one call answers the same thing, because the matcher is
           // pure and both results carry the same `fallbackLocale`.
@@ -963,7 +963,7 @@ function localeSourceFor(fixture, instanceBox) {
       };
 
     return {
-      localeResolver: () => {
+      localeSupplier: () => {
         // Normalized at the site that spelled it, which is what `forLocale` exists for, and recorded
         // in the same spelling Java records — `Locale#toLanguageTag`. Re-probed rather than assumed:
         // `normalizeTag` reproduces `forLanguageTag(x).toLanguageTag()` on every alias, extlang and
@@ -976,7 +976,7 @@ function localeSourceFor(fixture, instanceBox) {
   }
 
   return {
-    localeMatchResolver: () => {
+    localeMatchSupplier: () => {
       let match;
 
       if (spec.behavior === "match-ranges") {
@@ -989,7 +989,7 @@ function localeSourceFor(fixture, instanceBox) {
         // `matcher.matchFor(Locale)` on the instance itself. `getDirectLocaleContext` is the plan's
         // declared counterpart and is the SAME kernel `getResult` computes its own diagnostic from,
         // so this cannot supply a match the translation path would disagree with.
-        match = instanceBox.strings.getDirectLocaleContext(spec.locale).localeMatch;
+        match = instanceBox.strings.getDirectLocaleContext(spec.locale).localeMatchResult;
       } else if (spec.behavior === "fabricated") {
         // `new LocaleMatchResult(...)`, argument for argument. `range` becomes a bare range string
         // because the oracle builds it with the ONE-argument `Locale.LanguageRange` constructor,
@@ -1004,7 +1004,7 @@ function localeSourceFor(fixture, instanceBox) {
           fallbackLocale: spec.fallbackLocale ?? "en",
           consideredLocales: spec.consideredLocales ?? [],
           isMatch: (spec.locale ?? null) !== null,
-        }).localeMatch;
+        }).localeMatchResult;
       } else {
         unsupported(`unknown locale match supplier behavior: ${spec.behavior}`);
       }
@@ -1081,19 +1081,19 @@ function degenerateCatalogFor(catalogSource, fixture) {
     // :262 -- a supplier that answers null. `createStrings` takes the map itself, so an explicit
     // null map is the state Java's null-returning supplier produces.
     case "returnsNull":
-      return { strings: null };
+      return { localizedStringSupplier: () => (null) };
     // :273 -- a null locale key, which needs a Map: a record cannot carry one.
     case "nullLocaleKey":
-      return { strings: new Map([[null, firstCatalog]]) };
+      return { localizedStringSupplier: () => (new Map([[null, firstCatalog]])) };
     // :280 -- two DISTINCT keys whose tags collide once lowercased. Measured on the pinned Corretto
     // 21: new Locale("en","US","POSIX").toLanguageTag() is "en-US-POSIX" and the "posix" one is
     // "en-US-posix", so these two tags ARE the oracle's two Locale keys. A record holds both — JS
     // object keys are case-sensitive — so unlike the null key this needs no Map.
     case "duplicateNormalizedTag":
-      return { strings: { "en-US-POSIX": firstCatalog, "en-US-posix": firstCatalog } };
+      return { localizedStringSupplier: () => ({ "en-US-POSIX": firstCatalog, "en-US-posix": firstCatalog }) };
     // :286 -- a null catalog for one locale.
     case "nullCatalogValue":
-      return { strings: { en: null } };
+      return { localizedStringSupplier: () => ({ en: null }) };
     // :293 -- a null entry INSIDE an otherwise valid catalog. The oracle takes the first
     // LocalizedString of the loaded catalog and appends null; the JS counterpart of
     // `Iterable<LocalizedString>` is plan 3.2's `LocalizedStringInput[]`, so the first definition is
@@ -1103,7 +1103,7 @@ function degenerateCatalogFor(catalogSource, fixture) {
       if (definitions.length === 0)
         throw new AuthoringError(`the first catalog of a nullEntry fixture must hold a definition`);
       const [key, definition] = definitions[0];
-      return { strings: { en: [{ key, ...definition }, null] } };
+      return { localizedStringSupplier: () => ({ en: [{ key, ...definition }, null] }) };
     }
     // :500 -- the SAME key twice inside one locale's iterable. The oracle appends the first loaded
     // `LocalizedString` to the list twice; the JS counterpart is the same definition object twice in
@@ -1114,7 +1114,7 @@ function degenerateCatalogFor(catalogSource, fixture) {
       if (definitions.length === 0)
         throw new AuthoringError(`the first catalog of a duplicateKey fixture must hold a definition`);
       const [key, definition] = definitions[0];
-      return { strings: { en: [{ key, ...definition }, { key, ...definition }] } };
+      return { localizedStringSupplier: () => ({ en: [{ key, ...definition }, { key, ...definition }] }) };
     }
     // A PROGRAMMATIC catalog, and the only arm whose outcome the VALUE does not decide: what
     // `createStrings` does with it depends on the model the fixture wrote. The oracle hands
@@ -1132,7 +1132,7 @@ function degenerateCatalogFor(catalogSource, fixture) {
       const model = fixture.constructionOverrides?.definedCatalog;
       if (!Array.isArray(model) || model.length === 0)
         throw new AuthoringError(`catalogSource 'defined' needs a non-empty definedCatalog`);
-      return { strings: { [fixture.fallbackLocale]: model.map((node) => definedNode(node, true)) } };
+      return { localizedStringSupplier: () => ({ [fixture.fallbackLocale]: model.map((node) => definedNode(node, true)) }) };
     }
     default:
       throw new AuthoringError(`unknown constructionOverrides.catalogSource '${catalogSource}'`);
@@ -1257,25 +1257,25 @@ function definedPlaceholder(name, definition) {
 /**
  * The degenerate tiebreaker map a `constructionOverrides.tiebreakerSource` names.
  *
- * Three shapes a JSON `tiebreakers` object cannot spell and a JS caller can, because plan 3.1 types
+ * Three shapes a JSON `tiebreakerLocalesByLanguageCode` object cannot spell and a JS caller can, because plan 3.1 types
  * the construction input as a `TiebreakerMap` — a record OR a `ReadonlyMap` — and only the Map half
  * can carry a null key. Closed set, mirroring `VectorOracle.buildStrings` value for value; an
  * unknown value THROWS rather than quietly handing `createStrings` a valid map.
  *
  * @param {string} tiebreakerSource
- * @returns {{ tiebreakers: unknown }}
+ * @returns {{ tiebreakerLocalesByLanguageCode: unknown }}
  */
 function degenerateTiebreakersFor(tiebreakerSource) {
   switch (tiebreakerSource) {
     // :335 -- a null locale LIST for a language code.
     case "nullList":
-      return { tiebreakers: { en: null } };
+      return { tiebreakerLocalesByLanguageCode: { en: null } };
     // :343 -- a null entry INSIDE a list.
     case "nullEntry":
-      return { tiebreakers: { en: [null] } };
+      return { tiebreakerLocalesByLanguageCode: { en: [null] } };
     // :2650 -- a NULL language code, which needs the Map form on both sides.
     case "nullLanguageCode":
-      return { tiebreakers: new Map([[null, ["en"]]]) };
+      return { tiebreakerLocalesByLanguageCode: new Map([[null, ["en"]]]) };
     default:
       throw new AuthoringError(`unknown constructionOverrides.tiebreakerSource '${tiebreakerSource}'`);
   }
@@ -1312,7 +1312,7 @@ function degenerateTiebreakersFor(tiebreakerSource) {
  * 2,150 passed / 0 FAILED / 0 unsupported through the loader. Nothing moved except the eleven.
  *
  * Two deliberate non-changes, both because Java does the same:
- *  - warnings are DROPPED (`onWarning` is a sink). `buildStrings` calls the two-argument
+ *  - warnings are DROPPED (`warningHandler` is a sink). `buildStrings` calls the two-argument
  *    `loadFromFilesystem`, which has no handler, and no operation here reads `getWarnings()` off a
  *    constructed instance — `parse` and `load` compare warnings, and both collect their own.
  *  - `loadingLimits` is still passed to `createStrings` below. The limits now apply at LOAD as well,
@@ -1333,7 +1333,7 @@ function loadedCatalogsFor(fixture, fixtureId) {
   const directory = materializeFixtureDirectory(fixture, fixtureId);
   const loaded = nodeApi.readStringsFromDirectory(directory, {
     ...directoryLoadOptionsFor(fixture.loadingOptions),
-    onWarning: () => {},
+    warningHandler: () => {},
     // Java's loader has `Ordinality` on its classpath unconditionally, exactly as the `parse` and
     // `load` arms supply it for the same reason.
     ...(ordinalApi?.ordinalData ? { pluralData: { ordinal: ordinalApi.ordinalData } } : {}),
@@ -1375,9 +1375,9 @@ function createStringsOptionsFor(fixture, instanceBox, overrides, fixtureId) {
   let localeOption;
   if (overrides?.localeSource === undefined)
     // Java's both-absent arm IS a supplier — `localeSupplier(matcher -> instanceLocale)` — so the port
-    // side is a resolver answering the same constant, and a refusal names `localeResolver result`
+    // side is a resolver answering the same constant, and a refusal names `localeSupplier result`
     // exactly where Java names `localeSupplier result`.
-    localeOption = localeSource ?? { localeResolver: () => fixture.instanceLocale ?? fixture.fallbackLocale };
+    localeOption = localeSource ?? { localeSupplier: () => fixture.instanceLocale ?? fixture.fallbackLocale };
   else if (overrides.localeSource === "omit") localeOption = {};
   // Strings.java:288 / :310 — a NULL setter argument does not clear the sibling supplier, so the
   // surviving source decides and the instance BUILDS. The JS analogue of "the caller wrote the key
@@ -1388,14 +1388,14 @@ function createStringsOptionsFor(fixture, instanceBox, overrides, fixtureId) {
   // handed nothing at all, and it is the constructor's "exactly one" rule that these rows are read
   // against.
   else if (overrides.localeSource === "explicitNullLocaleSupplier")
-    localeOption = { ...localeSource, localeResolver: undefined };
+    localeOption = { ...localeSource, localeSupplier: undefined };
   else if (overrides.localeSource === "explicitNullMatchSupplier")
-    localeOption = { ...localeSource, localeMatchResolver: undefined };
+    localeOption = { ...localeSource, localeMatchSupplier: undefined };
   else throw new AuthoringError(`unknown constructionOverrides.localeSource '${overrides.localeSource}'`);
 
   const catalogOption =
     overrides?.catalogSource === undefined
-      ? { strings: loadedCatalogsFor(fixture, fixtureId) }
+      ? { localizedStringSupplier: () => loadedCatalogsFor(fixture, fixtureId) }
       // The degenerate arms stay on the DECLARED map, and that is not an inconsistency: each builds a
       // catalog no loader could produce, from a fixture with no raw files at all (measured — the 82
       // raw-file fixtures and the 21 `constructionOverrides` fixtures do not intersect), so the
@@ -1413,7 +1413,7 @@ function createStringsOptionsFor(fixture, instanceBox, overrides, fixtureId) {
   const tiebreakerOption =
     overrides?.tiebreakerSource === undefined
       ? fixture.tiebreakers
-        ? { tiebreakers: fixture.tiebreakers }
+        ? { tiebreakerLocalesByLanguageCode: fixture.tiebreakers }
         : {}
       : degenerateTiebreakersFor(overrides.tiebreakerSource);
 
@@ -1445,8 +1445,8 @@ function createStringsOptionsFor(fixture, instanceBox, overrides, fixtureId) {
     ...(libraryDefaults
       ? {}
       : {
-          onFailure: failureHandlerFor(fixture.translationFailureHandler),
-          fallbackPolicy: fallbackPolicyFor(fixture.translationFallbackPolicy),
+          translationFailureHandler: failureHandlerFor(fixture.translationFailureHandler),
+          translationFallbackPolicy: fallbackPolicyFor(fixture.translationFallbackPolicy),
         }),
   };
 }
@@ -1696,7 +1696,7 @@ const HOST_ENUMERATION_ORDER_DEPENDENT = new Map([
  * tables rather than one table with an exception in a comment.
  *
  * CORRECTED when the loader landed, which is why the previous note said the table was unexercised.
- * It seeded `StringsLoadingError` from the plan's load-stage error family; the corpus says otherwise.
+ * It seeded `LocalizedStringLoadingError` from the plan's load-stage error family; the corpus says otherwise.
  * Java raises ONE type for both doors, and the port's `StringsParseError` already composes the exact
  * `<source>: ` prefixed wording these 145 cases record — a prototype routing through the internal
  * `parseError` factory scored 140/145 where one raising a bare `Error` scored 114/145 with 20
@@ -2086,7 +2086,7 @@ function projectResult(result) {
     // loaded catalog, and no comparison could see it. Widening a projection is only honest when both
     // sides widen together; a field added here alone, or an `?? expected.x` default, would restore
     // green without restoring correctness.
-    localeMatchResult: projectMatch(result.localeMatch ?? null),
+    localeMatchResult: projectMatch(result.localeMatchResult ?? null),
   };
 }
 
@@ -2172,8 +2172,8 @@ function projectFailures(resultMatch, expected = null) {
       const names = causeNamesFor((expected.failures ?? [])[index] ?? null, expected);
       return names !== null && names.includes(actual) ? names.join(" or ") : actual;
     })(),
-    localeMatchResult: projectMatch(failure.localeMatch ?? null),
-    matchObjectIdenticalToResult: resultMatch === null ? null : failure.localeMatch === resultMatch,
+    localeMatchResult: projectMatch(failure.localeMatchResult ?? null),
+    matchObjectIdenticalToResult: resultMatch === null ? null : failure.localeMatchResult === resultMatch,
   }));
 }
 
@@ -2415,7 +2415,7 @@ function caughtIdentity(caught) {
  * Arm 3 below compares `thrown.message` exactly, on the premise that the message is "the library's
  * own composed string on both sides". That premise fails for Java's `requireNonNull` strings, which
  * name a JAVA identifier: `translationFallbackPolicy` and `TranslationFailureHandler` are Java option
- * names, and the JS options are `fallbackPolicy` and `onFailure`. Reproducing them verbatim would
+ * names, and the JS options are `translationFallbackPolicy` and `translationFailureHandler`. Reproducing them verbatim would
  * point a JS consumer at identifiers this API does not have, which is worse than diverging.
  *
  * This is NOT a relaxation of the comparison. The Java message still selects the row, the JS message
@@ -2426,12 +2426,12 @@ function caughtIdentity(caught) {
  */
 const DECLARED_MESSAGE_DIVERGENCES = {
   "TranslationFailureHandler returned null": {
-    js: "onFailure returned null",
-    why: "Java's SHAPE with the JS option name, matching localeResolver/localeMatchResolver at src/core/index.js:900/:914. Java names its own `TranslationFailureHandler`; the JS option is `onFailure`, so the identifier is the only remaining difference.",
+    js: "translationFailureHandler returned null",
+    why: "Java's SHAPE with the JS option name, matching localeSupplier/localeMatchSupplier at src/core/index.js:900/:914. Java names its own `TranslationFailureHandler`; the JS option is `translationFailureHandler`, so the identifier is the only remaining difference.",
   },
   "translationFallbackPolicy returned null": {
-    js: "fallbackPolicy returned null",
-    why: "Java's SHAPE with the JS option name, matching localeResolver/localeMatchResolver at src/core/index.js:900/:914. Java names its own `translationFallbackPolicy`; the JS option is `fallbackPolicy`, so the identifier is the only remaining difference.",
+    js: "translationFallbackPolicy returned null",
+    why: "Java's SHAPE with the JS option name, matching localeSupplier/localeMatchSupplier at src/core/index.js:900/:914. Java names its own `translationFallbackPolicy`; the JS option is `translationFallbackPolicy`, so the identifier is the only remaining difference.",
   },
   // THE SAME SPELLING, OF A LOCALE THIS PORT HAS NO SPELLING FOR. `LocaleUtils.requireWellFormed`
   // interpolates `Locale#toString` — an underscore-and-hash form (`ja_JP_jp_#u-ca-japanese`) that is
@@ -2868,7 +2868,7 @@ function thrownCase(expected, run) {
  *
  * The table maps the CORPUS key to the port's option name, because the two callback options are
  * spelled differently on the two sides — Java's `translationFallbackPolicy` / `translationFailure
- * Handler` against plan 3.3's `fallbackPolicy` / `onFailure`. `IMPLEMENTED_CALL_OPTIONS` stays the
+ * Handler` against plan 3.3's `translationFallbackPolicy` / `translationFailureHandler`. `IMPLEMENTED_CALL_OPTIONS` stays the
  * corpus keys, since that is what `classifyFailure` scans.
  *
  * An explicit JSON `null` is passed THROUGH rather than skipped, and that is the point of the
@@ -2879,11 +2879,11 @@ function thrownCase(expected, run) {
 const CALL_OPTION_ADAPTERS = {
   bidiIsolation: { option: "bidiIsolation", adapt: adaptEnum },
   translationFallbackPolicy: {
-    option: "fallbackPolicy",
+    option: "translationFallbackPolicy",
     adapt: (spec) => (spec === null ? null : fallbackPolicyFor(spec)),
   },
   translationFailureHandler: {
-    option: "onFailure",
+    option: "translationFailureHandler",
     adapt: (spec) => (spec === null ? null : failureHandlerFor(spec)),
   },
 };
@@ -2891,7 +2891,7 @@ const CALL_OPTION_ADAPTERS = {
  * The corpus keys `callOptionsFor` actually applies to the port, which is what `classifyFailure`
  * scans. `languageRanges` is listed EXPLICITLY rather than through `CALL_OPTION_ADAPTERS` because it
  * is not a per-call option of the JS surface at all: plan 3.3 has no such key, so the runner
- * negotiates it into a `localeMatch` first. It still belongs here, and the reason is the rule
+ * negotiates it into a `localeMatchResult` first. It still belongs here, and the reason is the rule
  * `classifyFailure` states in its own comment — an option the runner PASSES to the port may never
  * also be excused there. Leaving it out would relabel every future per-call selection defect as
  * "not implemented", inside the function whose contract says it cannot.
@@ -2930,7 +2930,7 @@ function callOptionsFor(input, strings) {
   // setters ran last (`TranslationOptions.java:309-313`, `:330-333`) — the reverse order gives the
   // opposite answer, and the corpus now records both orders because the oracle was taught to state
   // one. A JavaScript object literal has no "last setter"; plan 3.3 declares `locale` and
-  // `localeMatch` mutually exclusive "in declarations and runtime validation", and B3 makes the port
+  // `localeMatchResult` mutually exclusive "in declarations and runtime validation", and B3 makes the port
   // refuse the pair. Reproducing Java here would mean electing one setter order and calling it a
   // specification.
   //
@@ -2963,18 +2963,18 @@ function callOptionsFor(input, strings) {
     // attributing it to the port: the parser applies the pinned IANA registry's equivalences, so
     // `"iw"` is `[iw, he]` and `"sgn-BE-FR"` is four members, and it refuses shapes a split would
     // happily accept.
-    if (!negotiateApi?.createLocaleNegotiator || !negotiateApi?.parseLanguageRanges)
-      unsupported("createLocaleNegotiator is not implemented");
+    if (!negotiateApi?.createLocaleMatcher || !negotiateApi?.parseLanguageRanges)
+      unsupported("createLocaleMatcher is not implemented");
 
     // Java's per-call arm negotiates INSIDE the library (`DefaultStrings:2442`) and uses the
     // selection as the lookup locale. The JS surface has no per-call `languageRanges`: plan 3.3
-    // keeps the size-heavy solver in `lokalized/negotiate` and takes its RESULT as `localeMatch`.
+    // keeps the size-heavy solver in `lokalized/negotiate` and takes its RESULT as `localeMatchResult`.
     // So the caller negotiates first and hands the match over — which is the same two steps in the
     // same order, with the seam moved out of the root graph. The match is then held to BOTH
     // validation layers by the port, which a Java-built one never is; it passes because it was built
     // from this instance's own `getLocaleConfiguration()`.
-    const negotiator = negotiateApi.createLocaleNegotiator(strings.getLocaleConfiguration());
-    options.localeMatch = negotiator.matchForLanguageRanges(
+    const negotiator = negotiateApi.createLocaleMatcher(strings.getLocaleConfiguration());
+    options.localeMatchResult = negotiator.matchForLanguageRanges(
       typeof ranges === "string"
         ? negotiateApi.parseLanguageRanges(ranges)
         : [...ranges].map(rangeMemberFrom));
@@ -3130,7 +3130,7 @@ function runCase(testCase, fixture) {
       try {
         const loaded = nodeApi.readStringsFromDirectory(directory, {
           ...options,
-          onWarning: (warning) => delivered.push(warning),
+          warningHandler: (warning) => delivered.push(warning),
           // Java's loader has `Ordinality` on its classpath unconditionally and warns about
           // incomplete ordinal form sets, exactly as the `parse` arm supplies it for the same reason.
           ...(ordinalApi?.ordinalData ? { pluralData: { ordinal: ordinalApi.ordinalData } } : {}),
@@ -3221,7 +3221,7 @@ function runCase(testCase, fixture) {
       const actual = {
         ...projectResult(result),
         resolverCalls: [...resolverCalls],
-        failures: projectFailures(result.localeMatch ?? null),
+        failures: projectFailures(result.localeMatchResult ?? null),
         policyCalls: projectPolicyCalls(),
         supplierCalls: projectSupplierCalls(),
       };
@@ -3416,7 +3416,7 @@ function runCase(testCase, fixture) {
       // Checked through the PUBLIC surface — a one-slot catalog rendered by `createStrings` — rather
       // than by reaching into the renderer, so what this compares is what an application would get.
       // The `en` locale means the library default leaves it un-isolated.
-      const slots = core.createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: { en: { Slot: "{{slot}}" } } });
+      const slots = core.createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => ({ en: { Slot: "{{slot}}" } }) });
       const actual = expected.tuples.map((t) => {
         const constant = rootApi[t.name];
         if (!constant) unsupported(`language-form constant ${t.name} is not exported`);
@@ -3707,12 +3707,12 @@ function runCase(testCase, fixture) {
       // existence rather than on anything the port did with a header.
       const strings = stringsFor(fixture, testCase.fixture);
 
-      if (!negotiateApi?.createLocaleNegotiator) unsupported("createLocaleNegotiator is not implemented");
+      if (!negotiateApi?.createLocaleMatcher) unsupported("createLocaleMatcher is not implemented");
 
       // The instance's OWN configuration, exactly as `matchForCase` does it: `bestMatchForAcceptLanguage`
       // returns the CONFIGURED FALLBACK on six of its exits, so a negotiator built from anything else
       // would report a locale this `Strings` never resolved.
-      const negotiator = negotiateApi.createLocaleNegotiator(strings.getLocaleConfiguration());
+      const negotiator = negotiateApi.createLocaleMatcher(strings.getLocaleConfiguration());
       const actual = { bestMatch: negotiator.bestMatchForAcceptLanguage(input.header) };
       const wanted = { bestMatch: expected.acceptLanguage.bestMatch };
 
@@ -3886,7 +3886,7 @@ function runCase(testCase, fixture) {
 function matchForCase(fixture, input, ranges, fixtureId) {
   const strings = stringsFor(fixture, fixtureId);
 
-  if (input.locale !== undefined) return strings.getDirectLocaleContext(input.locale).localeMatch;
+  if (input.locale !== undefined) return strings.getDirectLocaleContext(input.locale).localeMatchResult;
 
   // The same MODULE-AVAILABILITY guard `parseStrings`, `cardinalityForRange` and the ordinal probes
   // already carry, and the only `unsupported(` on this path. It fires when the subpath does not
@@ -3895,13 +3895,13 @@ function matchForCase(fixture, input, ranges, fixtureId) {
   // here disguised as an unimplemented one.
   // It names BOTH exports A4 needs, under the ONE reason string: they ship from the same module, so
   // two strings would split one bucket in the report and read as a second capability appearing.
-  if (!negotiateApi?.createLocaleNegotiator || !negotiateApi?.parseLanguageRanges)
-    unsupported("createLocaleNegotiator is not implemented");
+  if (!negotiateApi?.createLocaleMatcher || !negotiateApi?.parseLanguageRanges)
+    unsupported("createLocaleMatcher is not implemented");
 
   // The instance's OWN applicable configuration, read back through the public accessor rather than
   // rebuilt from the fixture: its `fallbackLocale` is the one `createStrings` resolved to a loaded
   // catalog, so the negotiator matches against exactly what the `Strings` would.
-  const negotiator = negotiateApi.createLocaleNegotiator(strings.getLocaleConfiguration());
+  const negotiator = negotiateApi.createLocaleMatcher(strings.getLocaleConfiguration());
 
   // A HEADER STRING is parsed OUTSIDE the library, which is where Java parses it too:
   // `VectorOracle:1022` calls `Locale.LanguageRange.parse(spec.asString())` and hands the resulting

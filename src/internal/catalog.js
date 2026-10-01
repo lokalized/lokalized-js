@@ -362,11 +362,11 @@ export function resolveLimits(limits) {
   // `limits: null`, `[]`, `"nonsense"`, `() => {}` and — the one that matters —
   // `new Map([["maximumLocalizedStringsFiles", 1]])` were ALL silently accepted as the defaults.
   //
-  // The Map case is not hypothetical. `createStringsManifestFromDirectory` takes `tiebreakers` as a
+  // The Map case is not hypothetical. `createStringsManifestFromDirectory` takes `tiebreakerLocalesByLanguageCode` as a
   // plain record OR a `ReadonlyMap` (plan 3.2's TiebreakerMap), so a publisher who learned that from
   // the sibling option and wrote `limits: new Map(...)` got a clean four-file manifest with their
   // budget dropped, while the identical budget as an object REFUSED. One door, two opposite answers.
-  // That is S11b's finding verbatim — "a ReadonlyMap of tiebreakers was SILENTLY DROPPED, because a
+  // That is S11b's finding verbatim — "a ReadonlyMap of tiebreakerLocalesByLanguageCode was SILENTLY DROPPED, because a
   // Map passes an object test and then meets `Object.entries`" — in the record declared closed.
   if (limits !== undefined) {
     // **`Object.prototype.toString`, NOT a prototype comparison, and the reason is measured.** The
@@ -486,10 +486,10 @@ export class LoadingSession {
 
   /**
    * @param {{ source: string }} warning
-   * @param {(warning: any) => void} [onWarning]
+   * @param {(warning: any) => void} [warningHandler]
    * @returns {void}
    */
-  warn(warning, onWarning) {
+  warn(warning, warningHandler) {
     if (this.warnings >= this.limits.maximumWarnings)
       throw new Error(
         `${warning.source}: localized strings load exceeds the aggregate maximum of ` +
@@ -497,7 +497,7 @@ export class LoadingSession {
       );
 
     ++this.warnings;
-    if (onWarning) onWarning(warning);
+    if (warningHandler) warningHandler(warning);
   }
 
   /**

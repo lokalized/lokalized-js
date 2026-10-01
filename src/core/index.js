@@ -82,9 +82,9 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * modifier for a `@property`, so the object type is written inline and the notes move up here, where
  * the emitted declaration still carries every word of them.
  *
- * - `strings` — a `CatalogMap`: each locale tag mapped to one `CatalogInput`. A `Map` is accepted
- *   alongside a record, as it is wherever a keyed record is taken, because the keys can come from a
- *   generated or untrusted source — see `catalogEntries`.
+ * - `localizedStringSupplier` — returns a `CatalogMap`: each locale tag mapped to one `CatalogInput`.
+ *   A `Map` is accepted alongside a record because the keys can come from a generated or untrusted
+ *   source — see `catalogEntries`. The supplier runs once during synchronous construction.
  *
  * - THERE IS NO CONSTANT INSTANCE LOCALE. An instance is given exactly one RESOLVER, asked on
  *   every lookup that does not name its own language (`get(key, values, { locale })`) — Java's
@@ -95,7 +95,7 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  *   the declaration too, so a TypeScript caller who names neither, or both, is refused at compile time
  *   rather than by the runtime check below.
  *
- * - `tiebreakers` — a `TiebreakerMap`. Snapshotted and frozen at construction —
+ * - `tiebreakerLocalesByLanguageCode` — a `TiebreakerMap`. Snapshotted and frozen at construction —
  *   see `safeTiebreakers`.
  *
  * - `loadingLimits` — per-load bounds, a `Partial<StringsLoadingLimits>`. The RAW boundaries —
@@ -108,15 +108,15 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  *
  * - `loaded` — `never` on this arm. WITHOUT THIS THE UNION DOES NOT DISCRIMINATE, which the control
  *   caught: TypeScript relaxes excess-property checking against a union, so a call naming BOTH
- *   `loaded` and `strings` matched this arm with `loaded` waved through. Both arms have to spell
- *   the other's members `never` for the pair to be mutually exclusive to a caller.
+ *   `loaded` and the direct catalog source matched this arm with `loaded` waved through. Both arms
+ *   have to spell the other's members `never` for the pair to be mutually exclusive to a caller.
  *
  * - `catalogIdentity` — a build-produced identity for a DIRECT construction. Core validates its
  *   shape, not its truth, and reports it from `getCatalogIdentity()`; it does not make the instance
  *   stampable, because an SSR stamp requires a verified `LoadedStrings` and a shape-valid identity
  *   is exactly what that rule exists to refuse.
  *
- * - `onWarning` — observer for the incomplete language-form warnings this construction raises,
+ * - `warningHandler` — observer for the incomplete language-form warnings this construction raises,
  *   called as each is admitted by the warning budget. A throwing handler aborts construction.
  *
  * - `pluralData` — the OPTIONAL plural modules' exported data objects. The root graph cannot
@@ -132,50 +132,52 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  *   DEFAULTS TO `"rtl-locales"`, so isolation is on for RTL evaluation locales with nothing
  *   configured; it is not opt-in behavior.
  *
- * - `fallbackPolicy` — the per-candidate continuation decision. `== null` means
+ * - `translationFallbackPolicy` — the per-candidate continuation decision. `== null` means
  *   unset and selects `"missing-or-no-match"`, the same defaulting `bidiIsolation` uses and for
  *   the same reason (`DefaultStrings.java:473` substitutes the built-in when handed null, so an
  *   explicit null and an omitted option are one state in Java and must be one state here).
  *
- * - `onFailure` — the final-failure handler, consulted EXACTLY ONCE and only
+ * - `translationFailureHandler` — the final-failure handler, consulted EXACTLY ONCE and only
  *   after the walk has ended with nothing. `== null` selects the library default, which returns
  *   the interpolated key (`DefaultStrings.java:472`).
  *
- * - `onFallback` — the fallback OBSERVER, called at most once per lookup —
+ * - `translationFallbackObserver` — the fallback OBSERVER, called at most once per lookup —
  *   after a LATER candidate has produced a translation and before that translation is returned. It
  *   has NO Java counterpart: `DefaultStrings` discards each candidate's failure the moment a later
  *   one succeeds, so nothing in the corpus can check this and the tests in
  *   `test/fallback-observer.test.js` are the specification's only enforcement. `== null` means "no
  *   observer" rather than a library default, because there is no sensible default observation.
  *
- * - `localeResolver` — the ambient locale ingress, Java's `localeSupplier`
+ * - `localeSupplier` — the ambient locale ingress, Java's `localeSupplier`
  *   (`DefaultStrings.java:2456`). Consulted per lookup, never at construction. The value it
  *   returns is the REQUESTED tag and stays the `lookupLocale`; the diagnostic match is computed
  *   from it. Takes no matcher argument: callers that need negotiation close over a
- *   `LocaleNegotiator` from `lokalized/negotiate`.
+ *   `LocaleMatcher` from `lokalized/negotiate`.
  *
- * - `localeMatchResolver` — the negotiation ingress, Java's `localeMatchSupplier`
+ * - `localeMatchSupplier` — the negotiation ingress, Java's `localeMatchSupplier`
  *   (`DefaultStrings.java:2447`). Consulted per lookup. Its SELECTION, or the match's own fallback
- *   when unmatched, REPLACES the lookup locale — the asymmetry against `localeResolver` that the
+ *   when unmatched, REPLACES the lookup locale — the asymmetry against `localeSupplier` that the
  *   one-fixture six-ingress table exists to pin.
+ *
+ * `localizedStringSupplier` supplies catalogs once during synchronous construction, matching Java
  *
  * @typedef {Readonly<{
  *   fallbackLocale: string,
- *   strings: Readonly<Record<string, unknown>> | ReadonlyMap<string, unknown>,
- *   tiebreakers?: Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]> | null,
+ *   localizedStringSupplier: () => Readonly<Record<string, unknown>> | ReadonlyMap<string, unknown>,
+ *   tiebreakerLocalesByLanguageCode?: Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]> | null,
  *   loadingLimits?: import("../internal/catalog.js").ParseLimits,
  *   runtimeLimits?: undefined,
  *   loaded?: never,
  *   catalogIdentity?: CatalogIdentity | null,
- *   onWarning?: (warning: LocalizedStringWarning) => void,
+ *   warningHandler?: LocalizedStringWarningHandler,
  *   pluralData?: Readonly<{ ordinal?: unknown, ranges?: unknown }>,
- *   phoneticResolver?: (term: string, locale: string) => unknown,
- *   bidiIsolation?: import("../internal/bidi.js").BidiIsolation,
- *   fallbackPolicy?: BuiltinFallbackPolicy | FallbackPolicy,
- *   onFailure?: FailureHandler,
- *   onFallback?: FallbackObserver,
- * }> & (Readonly<{ localeResolver: () => string, localeMatchResolver?: null }>
- *   | Readonly<{ localeMatchResolver: () => LocaleMatch, localeResolver?: null }>)} DirectCreateStringsOptions
+ *   phoneticResolver?: PhoneticResolver,
+ *   bidiIsolation?: BidiIsolation,
+ *   translationFallbackPolicy?: BuiltinTranslationFallbackPolicy | TranslationFallbackPolicy,
+ *   translationFailureHandler?: TranslationFailureHandler,
+ *   translationFallbackObserver?: TranslationFallbackObserver,
+ * }> & (Readonly<{ localeSupplier: () => string, localeMatchSupplier?: null }>
+ *   | Readonly<{ localeMatchSupplier: () => LocaleMatchResult, localeSupplier?: null }>)} DirectCreateStringsOptions
  */
 
 /**
@@ -187,27 +189,27 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * `readonly` throughout, per BOOT-M0-0344 and the behaviour members this arm shares with the direct
  * one; see that type for the measurement behind the wrap.
  *
- * - `loaded` — the record a loader returned, passed as `createStrings({ loaded, localeResolver })`
+ * - `loaded` — the record a loader returned, passed as `createStrings({ loaded, localeSupplier })`
  *   with the language named per lookup; see the direct arm.
  *
- * - `localeMatchResolver` — returns a `LocaleMatch`, the shape Java calls a `LocaleMatchResult`.
+ * - `localeMatchSupplier` — returns a `LocaleMatchResult` for the negotiated request.
  *
  * @typedef {Readonly<{
  *   loaded: import("../load/index.js").LoadedStrings,
  *   fallbackLocale?: never,
- *   strings?: never,
- *   tiebreakers?: never,
+ *   localizedStringSupplier?: never,
+ *   tiebreakerLocalesByLanguageCode?: never,
  *   catalogIdentity?: never,
  *   runtimeLimits?: undefined,
- *   onWarning?: (warning: LocalizedStringWarning) => void,
+ *   warningHandler?: LocalizedStringWarningHandler,
  *   pluralData?: Readonly<{ ordinal?: unknown, ranges?: unknown }>,
- *   phoneticResolver?: (term: string, locale: string) => unknown,
- *   bidiIsolation?: import("../internal/bidi.js").BidiIsolation,
- *   fallbackPolicy?: BuiltinFallbackPolicy | FallbackPolicy,
- *   onFallback?: (event: FallbackEvent) => void,
- *   onFailure?: FailureHandler,
- * }> & (Readonly<{ localeResolver: () => string, localeMatchResolver?: null }>
- *   | Readonly<{ localeMatchResolver: () => import("../internal/locale.js").LocaleMatch, localeResolver?: null }>)} LoadedCreateStringsOptions
+ *   phoneticResolver?: PhoneticResolver,
+ *   bidiIsolation?: BidiIsolation,
+ *   translationFallbackPolicy?: BuiltinTranslationFallbackPolicy | TranslationFallbackPolicy,
+ *   translationFallbackObserver?: (event: TranslationFallbackEvent) => void,
+ *   translationFailureHandler?: TranslationFailureHandler,
+ * }> & (Readonly<{ localeSupplier: () => string, localeMatchSupplier?: null }>
+ *   | Readonly<{ localeMatchSupplier: () => import("../internal/locale.js").LocaleMatchResult, localeSupplier?: null }>)} LoadedCreateStringsOptions
  */
 
 /**
@@ -218,16 +220,16 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
 
 
 /**
- * @typedef {"missing-translation" | "no-matching-alternative" | "resolution-failure"} FailureReason
- * @typedef {"missing-or-no-match" | "any-failure" | "never"} BuiltinFallbackPolicy
- * @typedef {(reason: FailureReason, attemptedLocale: string, cause: unknown) => boolean} FallbackPolicy
- * @typedef {{ action: "return-key" } | { action: "return-string", translation: string } | { action: "throw" }} FailureResponse
- * @typedef {(failure: TranslationFailure) => FailureResponse} FailureHandler
- * **`TranslationFailure.localeMatch` AND `FallbackEvent.localeMatch` WERE `unknown` UNTIL M-R S3.**
- * Both records are handed to CONSUMER CALLBACKS — `onFailure` and `onFallback` — so anyone writing a
+ * @typedef {"missing-translation" | "no-matching-alternative" | "resolution-failure"} TranslationFailureReason
+ * @typedef {"missing-or-no-match" | "any-failure" | "never"} BuiltinTranslationFallbackPolicy
+ * @typedef {(reason: TranslationFailureReason, attemptedLocale: string, cause: unknown) => boolean} TranslationFallbackPolicy
+ * @typedef {{ action: "return-key" } | { action: "return-string", translation: string } | { action: "throw" }} TranslationFailureResponse
+ * @typedef {(failure: TranslationFailure) => TranslationFailureResponse} TranslationFailureHandler
+ * **`TranslationFailure.localeMatchResult` AND `TranslationFallbackEvent.localeMatchResult` WERE `unknown` UNTIL M-R S3.**
+ * Both records are handed to CONSUMER CALLBACKS — `translationFailureHandler` and `translationFallbackObserver` — so anyone writing a
  * failure handler received `unknown` and had to cast before reading the match that caused the
  * failure. The requirement registry states both as the match result (`BOOT-M0-0484`, `BOOT-M0-0499`),
- * and the sibling field on the lookup result has carried `Readonly<LocaleMatch>` all along; these two
+ * and the sibling field on the lookup result has carried `Readonly<LocaleMatchResult>` all along; these two
  * simply never got it. Found by reading 1,338 registered release requirements nobody had opened.
  *
  * **NOT `| null`, and that is measured rather than assumed.** `translationFailureFor`'s own parameter
@@ -237,10 +239,13 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * record with `matchType: "none"` rather than nothing. Typing it nullable would have made every
  * consumer write a branch that can never be taken.
  * @typedef {import("../internal/locale.js").WeightedLanguageRange} WeightedLanguageRange
+ * @typedef {import("../internal/bidi.js").BidiIsolation} BidiIsolation
+ * @typedef {(term: string, locale: string) => Phonetic} PhoneticResolver
+ * @typedef {(warning: LocalizedStringWarning) => void} LocalizedStringWarningHandler
  */
 
 /**
- * `LocaleMatchType`, the `matchType` a `LocaleMatch` carries. It is owned by core, which is why it
+ * `LocaleMatchType`, the `matchType` a `LocaleMatchResult` carries. It is owned by core, which is why it
  * is declared here.
  *
  * DERIVED FROM `internal/locale.js`'s typedef RATHER THAN SPELLED OUT, and that is deliberate: the
@@ -250,12 +255,12 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * step. `test/readme-enumerations.test.js` compares every copy that remains.
  *
  * The field was `string` until this landed, which is why `test/plan-surface.test.js` carried a
- * STRUCTURAL disposition reading "a string union, inlined on the delivered LocaleMatch" — measured
+ * STRUCTURAL disposition reading "a string union, inlined on the delivered LocaleMatchResult" — measured
  * false: `types/core/index.d.ts` said `matchType: string`, so nothing was inlined and no consumer of
  * `lokalized/core` could branch on the set. `lokalized/negotiate` has shipped the real union all
  * along through `types/internal/locale.d.ts`, so the two subpaths disagreed about one field's type.
  *
- * @typedef {import("../internal/locale.js").LocaleMatch["matchType"]} LocaleMatchType
+ * @typedef {import("../internal/locale.js").LocaleMatchResult["matchType"]} LocaleMatchType
  */
 
 /**
@@ -266,20 +271,20 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * way they had disagreed about `matchType` alone, and a `lokalized/core` consumer was told it could
  * write to a frozen object. Deriving it is what stops them drifting apart again.
  *
- * @typedef {import("../internal/locale.js").LocaleMatch} LocaleMatch
- * @typedef {Readonly<{ key: string, lookupLocale: string, localeMatch: Readonly<LocaleMatch>,
+ * @typedef {import("../internal/locale.js").LocaleMatchResult} LocaleMatchResult
+ * @typedef {Readonly<{ key: string, lookupLocale: string, localeMatchResult: Readonly<LocaleMatchResult>,
  *   attemptedLocales: readonly string[], placeholders: Readonly<Record<string, unknown>>,
- *   reason: FailureReason, cause: unknown, message: string }>} TranslationFailure
- * @typedef {Readonly<{ locale: string, reason: FailureReason, cause: unknown }>} PrecedingFailure
- * @typedef {Readonly<{ key: string, lookupLocale: string, localeMatch: Readonly<LocaleMatch>,
+ *   reason: TranslationFailureReason, cause: unknown, message: string }>} TranslationFailure
+ * @typedef {Readonly<{ locale: string, reason: TranslationFailureReason, cause: unknown }>} PrecedingFailure
+ * @typedef {Readonly<{ key: string, lookupLocale: string, localeMatchResult: Readonly<LocaleMatchResult>,
  *   attemptedLocales: readonly string[], resolvedLocale: string,
- *   precedingFailures: readonly PrecedingFailure[] }>} FallbackEvent
- * @typedef {(event: FallbackEvent) => void} FallbackObserver
- * @typedef {Readonly<{ locale?: string, localeMatch?: LocaleMatch,
- *   bidiIsolation?: import("../internal/bidi.js").BidiIsolation,
- *   fallbackPolicy?: BuiltinFallbackPolicy | FallbackPolicy | null,
- *   onFailure?: FailureHandler | null,
- *   onFallback?: FallbackObserver | null }>} TranslationCallOptions
+ *   precedingFailures: readonly PrecedingFailure[] }>} TranslationFallbackEvent
+ * @typedef {(event: TranslationFallbackEvent) => void} TranslationFallbackObserver
+ * @typedef {Readonly<{ locale?: string, localeMatchResult?: LocaleMatchResult,
+ *   bidiIsolation?: BidiIsolation,
+ *   translationFallbackPolicy?: BuiltinTranslationFallbackPolicy | TranslationFallbackPolicy | null,
+ *   translationFailureHandler?: TranslationFailureHandler | null,
+ *   translationFallbackObserver?: TranslationFallbackObserver | null }>} TranslationOptions
  */
 
 /**
@@ -296,7 +301,7 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * @typedef {Readonly<{ kind: "lookup", lookupLocale: string }>
  *   | Readonly<{ kind: "entire-manifest" }>} StringsLoadCoverage
  * @typedef {Readonly<{ fallbackLocale: string, supportedLocales: readonly string[],
- *   tiebreakers: Readonly<Record<string, readonly string[]>> }>} LocaleConfiguration
+ *   tiebreakerLocalesByLanguageCode: Readonly<Record<string, readonly string[]>> }>} LocaleConfiguration
  * @typedef {Readonly<{ source: "verified-manifest-v1" | "unverified-loaded-v1", producerImplementation: "lokalized-js",
  *   producerVersion: string, manifestLocaleConfiguration: LocaleConfiguration,
  *   catalogIdentity: CatalogIdentity, cldrVersion: string, dataFingerprint: string,
@@ -319,6 +324,8 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * of the code beside it.
  *
  * @typedef {ReturnType<typeof createStrings>} Strings
+ * @typedef {ReturnType<Strings["getResult"]>} TranslationResult
+ * @typedef {TranslationResult["status"]} TranslationResultStatus
  * @typedef {ReturnType<Strings["getDirectLocaleContext"]>} DirectLocaleContext
  * @typedef {Readonly<{ range: string, weight: number }>} LanguageRange
  */
@@ -361,12 +368,12 @@ const NEGOTIATION_FALLBACK_TYPES = new Set(["none", "cldr-fallback", "likely-sub
  * equivalent. And a lookup that resolves NOTHING still reports a fallback when the match type says
  * negotiation fell back, even though there is no resolved locale to compare.
  *
- * @param {{ matchType: string } | null} localeMatch
+ * @param {{ matchType: string } | null} localeMatchResult
  * @param {string} lookupLocale
  * @param {string | null} resolvedLocale
  */
-function isFallbackFor(localeMatch, lookupLocale, resolvedLocale) {
-  if (localeMatch !== null && NEGOTIATION_FALLBACK_TYPES.has(localeMatch.matchType)) return true;
+function isFallbackFor(localeMatchResult, lookupLocale, resolvedLocale) {
+  if (localeMatchResult !== null && NEGOTIATION_FALLBACK_TYPES.has(localeMatchResult.matchType)) return true;
   return resolvedLocale !== null && !equivalentTags(lookupLocale, resolvedLocale);
 }
 
@@ -384,10 +391,10 @@ function isFallbackFor(localeMatch, lookupLocale, resolvedLocale) {
  *
  * JAVA'S SHAPE, WITH BOTH IDENTIFIERS SUBSTITUTED AND NOTHING ELSE ADDED. Java's default resolver
  * raises `No PhoneticResolver was configured. Provide one via Strings.Builder#phoneticResolver(...)`
- * (`DefaultStrings.java:76-79`). `PhoneticResolver` is a Java INTERFACE this port does not have —
+ * (`DefaultStrings.java:76-79`). Java's `PhoneticResolver` interface is a JS function type —
  * the JS surface is the `phoneticResolver` option — and `Strings.Builder` is a fluent builder the JS
  * API replaced with an object literal, so both slots must be respelled; advice a JS caller cannot
- * follow is worse than a divergence, which is the rule `createStrings({ tiebreakers })` follows too.
+ * follow is worse than a divergence, which is the rule `createStrings({ tiebreakerLocalesByLanguageCode })` follows too.
  *
  * NEITHER RESPELLING LICENSED THE TRAILING CLAUSE this used to append — `to classify the term
  * supplied for locale '...'`. Java composes this message from a STATIC string with no locale in it
@@ -448,29 +455,29 @@ export function returnString(translation) {
  * exists precisely to show the same lookup succeeding once the policy is widened to `any-failure`.
  *
  * A null prototype so `Object.hasOwn` is not the only thing standing between a caller writing
- * `fallbackPolicy: "toString"` and a policy that is the Function prototype's method.
+ * `translationFallbackPolicy: "toString"` and a policy that is the Function prototype's method.
  */
 const BUILTIN_FALLBACK_POLICIES = freeze(
   Object.assign(Object.create(null), {
-    "missing-or-no-match": (/** @type {FailureReason} */ reason) => reason !== "resolution-failure",
+    "missing-or-no-match": (/** @type {TranslationFailureReason} */ reason) => reason !== "resolution-failure",
     "any-failure": () => true,
     never: () => false,
   }),
 );
 
-/** @type {FallbackPolicy} */
+/** @type {TranslationFallbackPolicy} */
 const DEFAULT_FALLBACK_POLICY = BUILTIN_FALLBACK_POLICIES["missing-or-no-match"];
 
-/** `TranslationFailureHandler.returnKey()` (DefaultStrings.java:472). @type {FailureHandler} */
+/** `TranslationFailureHandler.returnKey()` (DefaultStrings.java:472). @type {TranslationFailureHandler} */
 const DEFAULT_FAILURE_HANDLER = () => RETURN_KEY;
 
 /**
  * @param {unknown} policy
  * @param {string} where
- * @returns {FallbackPolicy}
+ * @returns {TranslationFallbackPolicy}
  */
 function validateFallbackPolicy(policy, where) {
-  if (typeof policy === "function") return /** @type {FallbackPolicy} */ (policy);
+  if (typeof policy === "function") return /** @type {TranslationFallbackPolicy} */ (policy);
   if (typeof policy === "string" && Object.hasOwn(BUILTIN_FALLBACK_POLICIES, policy))
     return BUILTIN_FALLBACK_POLICIES[policy];
 
@@ -483,11 +490,11 @@ function validateFallbackPolicy(policy, where) {
 /**
  * @param {unknown} handler
  * @param {string} where
- * @returns {FailureHandler}
+ * @returns {TranslationFailureHandler}
  */
 function validateFailureHandler(handler, where) {
   if (typeof handler !== "function") throw new TypeError(`${where} must be a function`);
-  return /** @type {FailureHandler} */ (handler);
+  return /** @type {TranslationFailureHandler} */ (handler);
 }
 
 /**
@@ -495,11 +502,11 @@ function validateFailureHandler(handler, where) {
  *
  * @param {unknown} observer
  * @param {string} where
- * @returns {FallbackObserver}
+ * @returns {TranslationFallbackObserver}
  */
 function validateFallbackObserver(observer, where) {
   if (typeof observer !== "function") throw new TypeError(`${where} must be a function`);
-  return /** @type {FallbackObserver} */ (observer);
+  return /** @type {TranslationFallbackObserver} */ (observer);
 }
 
 /**
@@ -507,8 +514,8 @@ function validateFallbackObserver(observer, where) {
  * return value is ignored, a thenable is rejected as asynchronous".
  *
  * The distinction is the whole reason this is not a bare call. Ignoring an ordinary return is what
- * makes `onFallback: (event) => log(event)` legal no matter what `log` answers; REJECTING a thenable
- * is what stops `onFallback: async (event) => …` from being accepted, running its synchronous prefix
+ * makes `translationFallbackObserver: (event) => log(event)` legal no matter what `log` answers; REJECTING a thenable
+ * is what stops `translationFallbackObserver: async (event) => …` from being accepted, running its synchronous prefix
  * only, and abandoning the rest of the observation after the translation has already been returned.
  * A promise here cannot be awaited — every callback in this library is synchronous by plan 3.5 —
  * so the honest answer is to refuse it at the call site rather than to drop it silently.
@@ -516,8 +523,8 @@ function validateFallbackObserver(observer, where) {
  * An exception the observer THROWS is not caught: plan 3.5's callback table says it "propagates
  * immediately", which is also why this helper does no try/finally of its own.
  *
- * @param {FallbackObserver} observer
- * @param {FallbackEvent} event
+ * @param {TranslationFallbackObserver} observer
+ * @param {TranslationFallbackEvent} event
  * @param {string} where
  */
 function notifyFallbackObserver(observer, event, where) {
@@ -594,7 +601,7 @@ function placeholderRecord(placeholders) {
  * carries on; the port's `try` deliberately covers the render and nothing else (see the comment
  * there), so routing the refusal by hand is what keeps both properties. On the failure path the
  * construction is outside every `try` and the exception escapes to the caller — which is why a
- * refusing lookup reports its failure to `onFailure` AND then throws, and why the escaping error is
+ * refusing lookup reports its failure to `translationFailureHandler` AND then throws, and why the escaping error is
  * a SECOND object rather than the retained cause.
  *
  * `TypeError` on both, for want of a plan sentence: plan 2.2 scopes malformed-input refusal to the
@@ -672,19 +679,19 @@ function attemptedLocaleRefusal(attemptedLocales) {
  *
  * @param {string} key
  * @param {string} lookupLocale
- * @param {unknown} localeMatch
+ * @param {unknown} localeMatchResult
  * @param {readonly string[]} attemptedLocales the FROZEN list handed to the result as well
- * @param {FailureReason} reason
+ * @param {TranslationFailureReason} reason
  * @param {unknown} cause
  * @param {Readonly<Record<string, unknown>> | ReadonlyMap<string, unknown> | undefined} placeholders
  * @returns {TranslationFailure}
  */
-function translationFailureFor(key, lookupLocale, localeMatch, attemptedLocales, reason, cause,
+function translationFailureFor(key, lookupLocale, localeMatchResult, attemptedLocales, reason, cause,
     placeholders) {
   const failure = Object.create(null);
   failure.key = key;
   failure.lookupLocale = lookupLocale;
-  failure.localeMatch = localeMatch;
+  failure.localeMatchResult = localeMatchResult;
   failure.attemptedLocales = attemptedLocales;
   failure.placeholders = placeholderRecord(placeholders);
   failure.reason = reason;
@@ -842,11 +849,20 @@ export { ResolutionError };
  * @typedef {"gender" | "grammatical-case" | "definiteness" | "classifier" | "formality" | "clusivity"
  *   | "animacy" | "cardinality" | "ordinality" | "phonetic"} LanguageFormAxis
  *
- * @typedef {TaggedLanguageFormValue<LanguageFormAxis, LanguageFormName, string>} LanguageFormValue
- *   Any of the 61, when a consumer does not care which axis.
+ * @typedef {TaggedLanguageFormValue<"gender", GenderFormName, string>} Gender
+ * @typedef {TaggedLanguageFormValue<"grammatical-case", GrammaticalCaseFormName, string>} GrammaticalCase
+ * @typedef {TaggedLanguageFormValue<"definiteness", DefinitenessFormName, string>} Definiteness
+ * @typedef {TaggedLanguageFormValue<"classifier", ClassifierFormName, string>} Classifier
+ * @typedef {TaggedLanguageFormValue<"formality", FormalityFormName, string>} Formality
+ * @typedef {TaggedLanguageFormValue<"clusivity", ClusivityFormName, string>} Clusivity
+ * @typedef {TaggedLanguageFormValue<"animacy", AnimacyFormName, string>} Animacy
+ * @typedef {TaggedLanguageFormValue<"cardinality", CardinalityFormName, string>} Cardinality
+ * @typedef {TaggedLanguageFormValue<"ordinality", OrdinalityFormName, string>} Ordinality
+ * @typedef {TaggedLanguageFormValue<"phonetic", PhoneticFormName, string>} Phonetic
  *
- * @typedef {TaggedLanguageFormValue<"phonetic", PhoneticFormName, string>} PhoneticValue
- *   What a `PhoneticResolver` returns.
+ * @typedef {Gender | GrammaticalCase | Definiteness | Classifier | Formality | Clusivity
+ *   | Animacy | Cardinality | Ordinality | Phonetic} LanguageForm
+ *   Any of the 61 language forms
  */
 
 /**
@@ -902,7 +918,7 @@ export class MissingTranslationError extends LokalizedError {
   constructor(token, message, failure) {
     if (token !== MISSING_TRANSLATION_TOKEN)
       throw new TypeError(
-        "MissingTranslationError is not constructible; it is thrown by a throwing onFailure handler",
+        "MissingTranslationError is not constructible; it is thrown by a throwing translationFailureHandler handler",
       );
 
     super(LOKALIZED_ERROR_TOKEN, "MISSING_TRANSLATION", message);
@@ -934,7 +950,7 @@ const MISSING_TRANSLATION_TOKEN = Symbol("lokalized.missing-translation-error");
  * A source scan for `options.<name>` reports twelve and misses five, because this door reaches its
  * options through five spellings: plain `options.x`; an aliased `direct.x` after a cast; a
  * cast-parenthesised `(options).x`, whose `)` breaks the anchor; a computed `(options)[name]` in the
- * locale-source filter; and a symbol index. `onWarning` and `pluralData` are read in
+ * locale-source filter; and a symbol index. `warningHandler` and `pluralData` are read in
  * `parseCatalogInput`, which this door hands its whole options object to — an option a helper reads
  * is still this door's option. Measured with a recording Proxy on a real successful call: 17 string
  * names and one symbol.
@@ -945,24 +961,24 @@ const MISSING_TRANSLATION_TOKEN = Symbol("lokalized.missing-translation-error");
  * is strictly less useful to the caller.
  */
 const CREATE_STRINGS_OPTIONS = /** @type {const} */ ([
-  "strings", "fallbackLocale", "tiebreakers", "loadingLimits", "runtimeLimits",
-  "loaded", "catalogIdentity", "onWarning", "pluralData", "phoneticResolver", "bidiIsolation",
-  "fallbackPolicy", "onFailure", "onFallback", "localeResolver", "localeMatchResolver",
+  "localizedStringSupplier", "fallbackLocale", "tiebreakerLocalesByLanguageCode", "loadingLimits", "runtimeLimits",
+  "loaded", "catalogIdentity", "warningHandler", "pluralData", "phoneticResolver", "bidiIsolation",
+  "translationFallbackPolicy", "translationFailureHandler", "translationFallbackObserver", "localeSupplier", "localeMatchSupplier",
 ]);
 
 /**
  * Every member `get`, `t` and `getResult` read from their per-call options — plan 3.3's
- * `TranslationOptions`, which is the `TranslationCallOptions` typedef above, member for member.
+ * `TranslationOptions`, which is the `TranslationOptions` typedef above, member for member.
  *
  * **THIS WAS THE WIDEST SILENT DOOR LEFT AFTER M-D S33**, because it is the one a caller reaches
  * every time they render. Measured before the refusal: `get("B", {}, { locale: "fr", onFalback })`
  * over a French catalog missing `B` served the English fallback and called the misspelled observer
- * ZERO times, where `onFallback` is called once. The refusal also catches the slot mix-up M-D S26
+ * ZERO times, where `translationFallbackObserver` is called once. The refusal also catches the slot mix-up M-D S26
  * found readers making — placeholder values handed in the OPTIONS position:
  * `get("K", undefined, { count: 3 })` returned the KEY `"K"` with no error, and now names `count`.
  */
 const TRANSLATION_CALL_OPTIONS = /** @type {const} */ ([
-  "locale", "localeMatch", "bidiIsolation", "fallbackPolicy", "onFailure", "onFallback",
+  "locale", "localeMatchResult", "bidiIsolation", "translationFallbackPolicy", "translationFailureHandler", "translationFallbackObserver",
 ]);
 
 /**
@@ -971,7 +987,7 @@ const TRANSLATION_CALL_OPTIONS = /** @type {const} */ ([
  * `test/option-surface.test.js` holds both copies to every real `LocaleConfiguration` the library
  * produces, so neither can drift from what `getLocaleConfiguration()` hands back unnoticed.
  */
-const LOCALE_CONFIGURATION_MEMBERS = /** @type {const} */ (["fallbackLocale", "supportedLocales", "tiebreakers"]);
+const LOCALE_CONFIGURATION_MEMBERS = /** @type {const} */ (["fallbackLocale", "supportedLocales", "tiebreakerLocalesByLanguageCode"]);
 
 /**
  * Build a `Strings` from raw catalogs.
@@ -998,11 +1014,12 @@ export function createStrings(options) {
   if (options !== null && typeof options === "object" && Object.hasOwn(options, "locale"))
     throw configurationError(
       "createStrings does not take 'locale': a Strings instance has no fixed language. Give it a " +
-        "localeResolver, a function asked for the language on every lookup (for example, reading the " +
+        "localeSupplier, a function asked for the language on every lookup (for example, reading the " +
         "current request), and name a language on any single call with " +
         "strings.get(key, values, { locale: \"fr\" }).",
     );
-  options = refuseUnknownOptions("createStrings", options, CREATE_STRINGS_OPTIONS, { limits: "loadingLimits" });
+  options = refuseUnknownOptions("createStrings", options, CREATE_STRINGS_OPTIONS,
+    { limits: "loadingLimits", strings: "localizedStringSupplier" });
 
   // The `loaded` branch is NORMALIZED into the direct branch's inputs rather than given a second
   // construction path, so locale validation, duplicate rejection, model validation and expression
@@ -1085,21 +1102,13 @@ export function createStrings(options) {
   // the same `agree`/`KNOWN_DIVERGENCES` machinery a lookup's uses.
   requireJdkWellFormedLocale(configuredFallbackLocale, LOCALE_INGRESS_DESCRIPTION.fallbackLocale);
 
-  // `DefaultStrings.java:250` — the catalog SOURCE is absent. Java's counterpart is a null
-  // `localizedStringSupplier`; the JS analogue is an absent `strings`, because `createStrings` takes
-  // the catalog map itself rather than a supplier of one.
-  //
-  // Refused HERE, before the locale-source rule below, because Java refuses in that order (`:250`
-  // precedes `:254`) — and separately from the `strings === null` refusal in `catalogEntries`, which
-  // is Java's `:262` "the supplier returned null". Those are two states in Java and they are two
-  // states here: an omitted option is a caller who forgot, an explicit null is a caller whose own
-  // lookup came back empty. Collapsing them into the one message this used to raise would make
-  // `owed-construct.refusal.catalog-omitted` and `.catalog-null` indistinguishable, which is the
-  // whole property those two rows are read against each other for.
-  if (direct.strings === undefined)
+  // Java checks the supplier before the locale-source rule and calls it once during construction
+  if (direct.localizedStringSupplier == null)
     throw new TypeError(
-      "createStrings({ strings }) is required: supply a record or a Map of locale tag to catalog",
+      "createStrings({ localizedStringSupplier }) is required: supply a function returning a record or a Map of locale tag to catalog",
     );
+  if (typeof direct.localizedStringSupplier !== "function")
+    throw new TypeError("createStrings({ localizedStringSupplier }) must be a function");
 
   // `DefaultStrings.java:254` — `(localeSupplier == null) == (localeMatchSupplier == null)` — which
   // refuses BOTH degenerate arms with one proposition: "exactly one of". The BOTH-PRESENT arm is
@@ -1111,27 +1120,31 @@ export function createStrings(options) {
   // behaviour depend on spread order.
   //
   // `locale` USED TO JOIN THIS EXCLUSION, on plan 3.2's `LocaleSourceOptions` union ("Exactly one of
-  // `locale`, `localeResolver`, and `localeMatchResolver` is required"). The constant tag was removed
+  // `locale`, `localeSupplier`, and `localeMatchSupplier` is required"). The constant tag was removed
   // before 1.0.0 (the maintainer, 2026-09-27: a language fixed at construction is not acceptable), so
   // the rule is now Java's own, member for member — and `owed-construct.refusal.locale-source-absent`
   // is still what records Java refusing the AT-LEAST-ONE half.
-  const localeSources = ["localeResolver", "localeMatchResolver"]
+  const localeSources = ["localeSupplier", "localeMatchSupplier"]
     .filter((name) => /** @type {Record<string, unknown>} */ (options)[name] != null);
 
   if (localeSources.length !== 1)
     throw new RangeError(
-      `createStrings requires exactly one of 'localeResolver' or 'localeMatchResolver'; ` +
+      `createStrings requires exactly one of 'localeSupplier' or 'localeMatchSupplier'; ` +
         `received ${localeSources.length === 0 ? "none" : javaList(localeSources)}`,
     );
 
-  const localeResolver =
-    options.localeResolver == null
+  const suppliedLocalizedStrings = direct.localizedStringSupplier();
+  if (suppliedLocalizedStrings != null && typeof (/** @type {any} */ (suppliedLocalizedStrings)).then === "function")
+    throw new TypeError("localizedStringSupplier must be synchronous; await loading before creating Strings");
+
+  const localeSupplier =
+    options.localeSupplier == null
       ? null
-      : validateResolver(options.localeResolver, "createStrings({ localeResolver })");
-  const localeMatchResolver =
-    options.localeMatchResolver == null
+      : validateResolver(options.localeSupplier, "createStrings({ localeSupplier })");
+  const localeMatchSupplier =
+    options.localeMatchSupplier == null
       ? null
-      : validateResolver(options.localeMatchResolver, "createStrings({ localeMatchResolver })");
+      : validateResolver(options.localeMatchSupplier, "createStrings({ localeMatchSupplier })");
 
 
   // A callback of the wrong SHAPE is a configuration mistake and is refused here; a callback that
@@ -1174,13 +1187,13 @@ export function createStrings(options) {
   // both are validated at CONSTRUCTION rather than at first failure, because a policy of the wrong
   // shape would otherwise surface only on the unlucky lookup that first missed.
   const instanceFallbackPolicy =
-    options.fallbackPolicy == null
+    options.translationFallbackPolicy == null
       ? DEFAULT_FALLBACK_POLICY
-      : validateFallbackPolicy(options.fallbackPolicy, "createStrings({ fallbackPolicy })");
+      : validateFallbackPolicy(options.translationFallbackPolicy, "createStrings({ translationFallbackPolicy })");
   const instanceFailureHandler =
-    options.onFailure == null
+    options.translationFailureHandler == null
       ? DEFAULT_FAILURE_HANDLER
-      : validateFailureHandler(options.onFailure, "createStrings({ onFailure })");
+      : validateFailureHandler(options.translationFailureHandler, "createStrings({ translationFailureHandler })");
 
   // NOT defaulted to a no-op function, deliberately: `null` is the state the walk reads to decide
   // whether to accumulate `precedingFailures` at all, and a no-op default would make every lookup
@@ -1188,9 +1201,9 @@ export function createStrings(options) {
   // is — a non-function would otherwise surface only on the unlucky lookup that first fell back,
   // which is precisely the lookup a caller installed an observer to hear about.
   const instanceFallbackObserver =
-    options.onFallback == null
+    options.translationFallbackObserver == null
       ? null
-      : validateFallbackObserver(options.onFallback, "createStrings({ onFallback })");
+      : validateFallbackObserver(options.translationFallbackObserver, "createStrings({ translationFallbackObserver })");
 
   /** @type {Map<string, Map<string, Definition>>} */
   const catalogs = new Map();
@@ -1217,7 +1230,7 @@ export function createStrings(options) {
    */
   const localesByLanguageTag = new Map();
 
-  for (const [tag, raw] of catalogEntries(direct.strings)) {
+  for (const [tag, raw] of catalogEntries(suppliedLocalizedStrings)) {
     // `DefaultStrings.java:273`. A `Map` catalog can carry a null key where a record cannot, and a
     // nullish key reaching `normalizeTag` used to be reported as "a locale tag must be a non-empty
     // string" — true, but it names the wrong mistake and does not distinguish a null KEY from a
@@ -1289,7 +1302,7 @@ export function createStrings(options) {
   }
 
   const supported = [...catalogs.keys()];
-  const tiebreakers = safeTiebreakers(direct.tiebreakers);
+  const tiebreakerLocalesByLanguageCode = safeTiebreakers(direct.tiebreakerLocalesByLanguageCode);
 
 
   // `DefaultStrings.java:304-314`, and it runs BEFORE the tiebreaker rules below, exactly as Java
@@ -1311,8 +1324,8 @@ export function createStrings(options) {
 
   // Refused at CONSTRUCTION, before the first lookup can hide the ambiguity behind an arbitrary
   // winner. `DefaultStrings` runs this check (DefaultStrings.java:395-430) and the port did not, so
-  // `{ strings: { en, "en-US" } }` with no tiebreakers built an instance Java refuses outright.
-  validateTiebreakers(supported, tiebreakers);
+  // `{ strings: { en, "en-US" } }` with no tiebreakerLocalesByLanguageCode built an instance Java refuses outright.
+  validateTiebreakers(supported, tiebreakerLocalesByLanguageCode);
 
   // `DefaultStrings.java:446-470`. THE CALLER'S SPELLING IS NOT A CATALOG NAME, and until this
   // landed the port simply passed the normalized configured tag on to the kernel — whose `matchFor`
@@ -1322,7 +1335,7 @@ export function createStrings(options) {
     configuredFallbackLocale,
     supported,
     equivalentFallbackLocales,
-    tiebreakers,
+    tiebreakerLocalesByLanguageCode,
   );
 
   /**
@@ -1352,7 +1365,7 @@ export function createStrings(options) {
    * `test/cache-bounds.test.js`'s last test exists to catch.
    */
   const chainMemo = candidateChainMemo(
-    supported, fallbackLocale, tiebreakers,
+    supported, fallbackLocale, tiebreakerLocalesByLanguageCode,
     /** @type {any} */ (options)[CANDIDATE_CHAIN_MEMO_DISABLED] !== true);
 
   // THE APPLICABLE CONFIGURATION — the selection channel's world, which for a manifest-backed
@@ -1364,7 +1377,7 @@ export function createStrings(options) {
   // a manifest-backed instance or the operational loaded set for direct construction. Automatic
   // direct-locale diagnostics use that same rule, INCLUDING declared manifest locales whose catalog
   // failed under an explicitly partial whole-manifest load." Plan 6.2:2106-2110 states the other
-  // half: "candidate resolution uses only successful catalogs and filtered runtime tiebreakers".
+  // half: "candidate resolution uses only successful catalogs and filtered runtime tiebreakerLocalesByLanguageCode".
   //
   // So a partial whole-manifest load can SELECT `de` — a locale it declared and failed to fetch —
   // while per-key fallback never visits it, because the diagnostic never redirects the lookup
@@ -1382,8 +1395,8 @@ export function createStrings(options) {
     ? supported
     : [...manifestConfiguration.supportedLocales];
   const applicableTiebreakers = manifestConfiguration === null
-    ? tiebreakers
-    : safeTiebreakers(/** @type {any} */ (manifestConfiguration.tiebreakers));
+    ? tiebreakerLocalesByLanguageCode
+    : safeTiebreakers(/** @type {any} */ (manifestConfiguration.tiebreakerLocalesByLanguageCode));
 
   /**
    * Plan 3.4:619-623's lookup-coverage rule, applied to the tag that ACTUALLY STARTS per-key
@@ -1525,22 +1538,22 @@ export function createStrings(options) {
    * `THROWING_PHONETIC_RESOLVER` apply, and the difference is measured rather than stylistic: no
    * corpus fixture reaches those two, while FIVE rows reach this one and the conformance runner
    * compares the message EXACTLY (`thrownProjection` arm 3). Reproducing it is what keeps that
-   * comparison free of an adaptation rule. The per-call `localeMatch` ingress has no Java
+   * comparison free of an adaptation rule. The per-call `localeMatchResult` ingress has no Java
    * counterpart at all — Java's per-call arm is `languageRanges` and builds its own match — so it
    * names the JS option it actually has.
    *
-   * @param {LocaleMatch} match
+   * @param {LocaleMatchResult} match
    * @param {string} source the option that produced it, for the JS-only per-call arm
-   * @returns {LocaleMatch}
+   * @returns {LocaleMatchResult}
    */
   function validateSuppliedLocaleMatch(match, source) {
-    const javaSource = source === "localeMatchResolver";
+    const javaSource = source === "localeMatchSupplier";
 
     if (normalizeTag(match.fallbackLocale) !== fallbackLocale)
       throw new RangeError(
         javaSource
           ? "localeMatchSupplier returned a result for a different fallback locale"
-          : `get({ localeMatch }) supplied a result for a different fallback locale`,
+          : `get({ localeMatchResult }) supplied a result for a different fallback locale`,
       );
 
     // AGAINST THE APPLICABLE CONFIGURATION, not the loaded catalogs. Plan 3.4:845-847: "Every
@@ -1555,7 +1568,7 @@ export function createStrings(options) {
       throw new RangeError(
         javaSource
           ? "localeMatchSupplier returned a result for different supported locales"
-          : `get({ localeMatch }) supplied a result for different supported locales`,
+          : `get({ localeMatchResult }) supplied a result for different supported locales`,
       );
 
     return match;
@@ -1567,9 +1580,9 @@ export function createStrings(options) {
    * whole subject.
    *
    *   per-call `locale`      → the REQUESTED tag stays the lookup locale; the match is computed
-   *   per-call `localeMatch` → the SELECTION replaces it (Java's per-call `languageRanges` arm)
-   *   `localeMatchResolver`  → the SELECTION replaces it
-   *   `localeResolver`       → the REQUESTED tag stays
+   *   per-call `localeMatchResult` → the SELECTION replaces it (Java's per-call `languageRanges` arm)
+   *   `localeMatchSupplier`  → the SELECTION replaces it
+   *   `localeSupplier`       → the REQUESTED tag stays
    *
    * `ingress-matrix-java.zh-tw.*` is the acceptance test and it is one fixture across six ingresses:
    * instance-locale, per-call locale and `localeSupplier` all attempt `[zh-TW, zh-Hant, en]`, while
@@ -1582,14 +1595,14 @@ export function createStrings(options) {
    * — but it is Java's line, and `supplied-match.unmatched.lookup-uses-supplied-fallback-locale`
    * is the row that observes it.
    *
-   * @param {{ locale?: string, localeMatch?: LocaleMatch } | undefined} callOptions
-   * @returns {{ lookupLocale: string, localeMatch: LocaleMatch }}
+   * @param {{ locale?: string, localeMatchResult?: LocaleMatchResult } | undefined} callOptions
+   * @returns {{ lookupLocale: string, localeMatchResult: LocaleMatchResult }}
    */
   function localeLookupFor(callOptions) {
     const perCallLocale = callOptions?.locale;
-    const perCallMatch = callOptions?.localeMatch;
+    const perCallMatch = callOptions?.localeMatchResult;
 
-    // Plan 3.3: "A per-call `locale` and `localeMatch` are mutually exclusive in declarations and
+    // Plan 3.3: "A per-call `locale` and `localeMatchResult` are mutually exclusive in declarations and
     // runtime validation." REFUSED, never resolved by precedence — the same reasoning that refuses
     // two locale sources at construction, and the reason three `per-call-override-order` corpus rows
     // that pass today must stop passing: Java's `TranslationOptions.Builder` setters clear each other
@@ -1598,8 +1611,8 @@ export function createStrings(options) {
     // Java answer would mean picking one arbitrarily and calling it a specification.
     if (perCallLocale != null && perCallMatch != null)
       throw new RangeError(
-        "get({ locale, localeMatch }) names two locale sources; supply exactly one of 'locale' or " +
-          "'localeMatch'",
+        "get({ locale, localeMatchResult }) names two locale sources; supply exactly one of 'locale' or " +
+          "'localeMatchResult'",
       );
 
     if (perCallLocale != null) {
@@ -1608,11 +1621,11 @@ export function createStrings(options) {
       // one site to a JS caller because an options OBJECT has no separate builder.
       //
       // BEFORE THE WALK, and that is the observable half. Java refuses here, so `calls=[]`: no
-      // candidate is attempted, the `fallbackPolicy` is never consulted and `onFailure` never
+      // candidate is attempted, the `translationFallbackPolicy` is never consulted and `translationFailureHandler` never
       // fires. Measured on the pinned JDK with catalogs {fr} and both callbacks installed,
       // `en-x-lvariant-NY` gave Java `calls=[]` and this port
       // `[policy:en-x-lvariant-NY, policy:en-x-lvariant, policy:en, policy:en-x-lvariant-ny,
-      // onFailure:en-x-lvariant-NY]` — a whole walk Java never starts. `attemptedLocaleRefusal`
+      // translationFailureHandler:en-x-lvariant-NY]` — a whole walk Java never starts. `attemptedLocaleRefusal`
       // eventually refused the same input, so the OUTCOME agreed and the TRACE did not.
       const lookupLocale = requireJdkWellFormedLocale(
         normalizeTag(perCallLocale), LOCALE_INGRESS_DESCRIPTION.perCallLocale);
@@ -1626,28 +1639,28 @@ export function createStrings(options) {
       // `lookupLocale` is unaffected and stays the normalized tag the corpus records.
       return {
         lookupLocale,
-        localeMatch: matchFor(perCallLocale, applicableSupported, fallbackLocale, applicableTiebreakers),
+        localeMatchResult: matchFor(perCallLocale, applicableSupported, fallbackLocale, applicableTiebreakers),
       };
     }
 
     if (perCallMatch != null) {
       const match = validateSuppliedLocaleMatch(
-        validateLocaleMatchStructure(perCallMatch, "get({ localeMatch })"), "localeMatch");
-      return { lookupLocale: normalizeTag(match.locale ?? match.fallbackLocale), localeMatch: match };
+        validateLocaleMatchStructure(perCallMatch, "get({ localeMatchResult })"), "localeMatchResult");
+      return { lookupLocale: normalizeTag(match.locale ?? match.fallbackLocale), localeMatchResult: match };
     }
 
-    if (localeMatchResolver !== null) {
+    if (localeMatchSupplier !== null) {
       // `requireNonNull(localeMatchSupplier.apply(this), "localeMatchSupplier returned null")`
       // (`:2447`). Refused rather than defaulted: a resolver that answers nothing has failed, and
       // silently substituting the instance fallback would serve every lookup from it.
-      const supplied = localeMatchResolver();
+      const supplied = localeMatchSupplier();
 
-      if (supplied == null) throw new TypeError("localeMatchResolver returned null");
+      if (supplied == null) throw new TypeError("localeMatchSupplier returned null");
 
       const match = validateSuppliedLocaleMatch(
-        validateLocaleMatchStructure(supplied, "createStrings({ localeMatchResolver })"),
-        "localeMatchResolver");
-      return { lookupLocale: normalizeTag(match.locale ?? match.fallbackLocale), localeMatch: match };
+        validateLocaleMatchStructure(supplied, "createStrings({ localeMatchSupplier })"),
+        "localeMatchSupplier");
+      return { lookupLocale: normalizeTag(match.locale ?? match.fallbackLocale), localeMatchResult: match };
     }
 
     // `LocaleUtils.requireWellFormed(suppliedLocale, "localeSupplier result")` (`:2456`), which
@@ -1655,22 +1668,22 @@ export function createStrings(options) {
     // answers `zh-TW` against catalogs holding only `zh`, `zh-Hant` and `en` still attempts `zh-TW`
     // first, which is exactly what separates this arm from the two match arms above.
     // Exactly one resolver is installed and the match arm has returned, so this one is not null.
-    const requested = /** @type {() => string} */ (localeResolver)();
+    const requested = /** @type {() => string} */ (localeSupplier)();
 
-    if (requested == null) throw new TypeError("localeResolver returned null");
+    if (requested == null) throw new TypeError("localeSupplier returned null");
 
     // The refusal `:2457` names, at the point `:2457` runs: after the resolver has answered and
     // before `matchFor` or any candidate sees the tag.
     //
     const lookupLocale = requireJdkWellFormedLocale(
       normalizeTag(requested),
-      LOCALE_INGRESS_DESCRIPTION.localeResolverResult,
+      LOCALE_INGRESS_DESCRIPTION.localeSupplierResult,
     );
     // `matchFor(suppliedLocale)` on the RAW value (`:2458`), for the reason recorded on the per-call
     // arm above: the kernel normalizes what it is given, and Java normalizes exactly once.
     return {
       lookupLocale,
-      localeMatch: matchFor(requested, applicableSupported, fallbackLocale, applicableTiebreakers),
+      localeMatchResult: matchFor(requested, applicableSupported, fallbackLocale, applicableTiebreakers),
     };
   }
 
@@ -1683,7 +1696,7 @@ export function createStrings(options) {
    *
    * @param {string} key
    * @param {Readonly<Record<string, unknown>>} [placeholders]
-   * @param {TranslationCallOptions} [callOptions]
+   * @param {TranslationOptions} [callOptions]
    */
   function getResult(key, placeholders, callOptions) {
     // FIRST, so a misspelled member cannot be masked by a validation of a correctly spelled one, and
@@ -1692,8 +1705,8 @@ export function createStrings(options) {
     // `callOptions` returns before any work, so the common call pays one `typeof`.
     refuseUnknownOptions("get", callOptions, TRANSLATION_CALL_OPTIONS);
 
-    // REPLACES the instance policy rather than narrowing it, in both directions: per-call `"all"`
-    // over an instance `"none"` isolates, and per-call `"none"` over an instance `"all"` does not.
+    // REPLACES the instance policy rather than narrowing it, in both directions: per-call `"always"`
+    // over an instance `"none"` isolates, and per-call `"none"` over an instance `"always"` does not.
     // `TranslationOptions.getBidiIsolation().orElse(getBidiIsolation())` (DefaultStrings.java:683).
     const bidiIsolation =
       callOptions?.bidiIsolation == null
@@ -1702,26 +1715,26 @@ export function createStrings(options) {
     // The same REPLACEMENT rule, from the same two lines of Java (`DefaultStrings.java:684-686`).
     // A per-call `never` over an instance `any-failure` halts at the first candidate; a per-call
     // handler displaces the instance one wholesale rather than running after it.
-    const fallbackPolicy =
-      callOptions?.fallbackPolicy == null
+    const translationFallbackPolicy =
+      callOptions?.translationFallbackPolicy == null
         ? instanceFallbackPolicy
-        : validateFallbackPolicy(callOptions.fallbackPolicy, "get({ fallbackPolicy })");
-    const onFailure =
-      callOptions?.onFailure == null
+        : validateFallbackPolicy(callOptions.translationFallbackPolicy, "get({ translationFallbackPolicy })");
+    const translationFailureHandler =
+      callOptions?.translationFailureHandler == null
         ? instanceFailureHandler
-        : validateFailureHandler(callOptions.onFailure, "get({ onFailure })");
-    // The same REPLACEMENT rule again (plan 3.3 lists `onFallback` in `TranslationBehaviorOptions`
-    // beside `onFailure`), and the same `== null` reading of an explicit null: a per-call observer
+        : validateFailureHandler(callOptions.translationFailureHandler, "get({ translationFailureHandler })");
+    // The same REPLACEMENT rule again (plan 3.3 lists `translationFallbackObserver` in `TranslationBehaviorOptions`
+    // beside `translationFailureHandler`), and the same `== null` reading of an explicit null: a per-call observer
     // displaces the instance one wholesale rather than running after it. There is no way to say
     // "no observer for this one call" while an instance observer is installed, exactly as there is
     // no way to say "no failure handler" — an explicit null selects the instance value in both.
-    const onFallbackWhere = callOptions?.onFallback == null
-      ? "createStrings({ onFallback })"
-      : "get({ onFallback })";
-    const onFallback =
-      callOptions?.onFallback == null
+    const onFallbackWhere = callOptions?.translationFallbackObserver == null
+      ? "createStrings({ translationFallbackObserver })"
+      : "get({ translationFallbackObserver })";
+    const translationFallbackObserver =
+      callOptions?.translationFallbackObserver == null
         ? instanceFallbackObserver
-        : validateFallbackObserver(callOptions.onFallback, "get({ onFallback })");
+        : validateFallbackObserver(callOptions.translationFallbackObserver, "get({ translationFallbackObserver })");
 
     // THE INGRESS, and it runs before anything else this lookup does. Every refusal it raises —
     // the mutually-exclusive per-call sources, both supplied-match layers, a resolver answering
@@ -1739,7 +1752,7 @@ export function createStrings(options) {
     // observes it.
     const lookup = localeLookupFor(callOptions);
     const lookupLocale = lookup.lookupLocale;
-    const localeMatch = freeze(lookup.localeMatch);
+    const localeMatchResult = freeze(lookup.localeMatchResult);
 
     // COVERAGE, CHECKED HERE AND ON EVERY CALL. This is the one place all four locale ingresses have
     // already collapsed into the single tag per-key fallback starts from, which is exactly what plan
@@ -1775,13 +1788,13 @@ export function createStrings(options) {
     // the selected node has no translation of its own. That is a different outcome from the key
     // being absent, and the default policy treats them differently, so it is tracked separately.
     let noMatchingAlternative = false;
-    // Plan 3.5's `FallbackEvent.precedingFailures`, and it is NOT a parallel channel: each record
+    // Plan 3.5's `TranslationFallbackEvent.precedingFailures`, and it is NOT a parallel channel: each record
     // is exactly the `(reason, locale, cause)` triple the walk already computes and already hands
-    // to `fallbackPolicy` one line later, captured instead of discarded. Java discards it — a
+    // to `translationFallbackPolicy` one line later, captured instead of discarded. Java discards it — a
     // candidate's failure is dead the moment a later candidate answers — which is why this list has
     // no counterpart to compare against and why it is accumulated only when someone is listening.
     //
-    // ONLY when `onFallback !== null`. An always-on accumulator would allocate one frozen record
+    // ONLY when `translationFallbackObserver !== null`. An always-on accumulator would allocate one frozen record
     // per failed candidate on every lookup in the library, for a value that is unreachable unless
     // an observer is installed; the `!== null` gate is what keeps the no-observer walk allocating
     // exactly what it allocated before this option existed.
@@ -1805,7 +1818,7 @@ export function createStrings(options) {
       // that fails more than once. `custom-policy.cause.truncated-walk-still-reports-the-first-cause`
       // is the row that separates them: the policy is handed the SECOND candidate's cause while the
       // result still carries the first.
-      /** @type {FailureReason} */
+      /** @type {TranslationFailureReason} */
       let attemptFailureReason = "missing-translation";
       /** @type {unknown} */
       let attemptCause = null;
@@ -1823,7 +1836,7 @@ export function createStrings(options) {
       if (definition !== undefined) {
         // THE TRY COVERS THE RENDER AND NOTHING ELSE, and that scope is load-bearing rather than
         // stylistic. The success path used to be built and returned from inside this block; when
-        // `onFallback` was first wired there, a THROWING observer was caught by this very `catch`,
+        // `translationFallbackObserver` was first wired there, a THROWING observer was caught by this very `catch`,
         // relabelled as the candidate's own `resolution-failure`, and the walk carried on to the
         // next candidate — turning plan `:1032`'s "an exception propagates immediately" into
         // "an exception demotes the translation that had already succeeded". The port then crashed
@@ -1896,10 +1909,10 @@ export function createStrings(options) {
           translation,
           status: /** @type {const} */ ("translated"),
           lookupLocale,
-          localeMatch,
+          localeMatchResult,
           resolvedLocale: candidate,
           attemptedLocales,
-          isFallback: isFallbackFor(localeMatch, lookupLocale, candidate),
+          isFallback: isFallbackFor(localeMatchResult, lookupLocale, candidate),
           failureReason: null,
           cause: null,
         });
@@ -1923,18 +1936,18 @@ export function createStrings(options) {
         //     caller's, so a throwing observer means the caller gets the exception and no
         //     translation, and there is no window in which both happen.
         //
-        // `localeMatch` goes in BY REFERENCE, not rebuilt: plan 3.3's identity clause requires the
+        // `localeMatchResult` goes in BY REFERENCE, not rebuilt: plan 3.3's identity clause requires the
         // same frozen object on the result, the failure, every event and any final
         // `MissingTranslationError`, and a structural copy would satisfy every field while
         // violating it. `test/fallback-observer.test.js` asserts it with `assert.equal`, which is
         // reference equality, for exactly that reason.
-        if (onFallback !== null && precedingFailures.length > 0)
+        if (translationFallbackObserver !== null && precedingFailures.length > 0)
           notifyFallbackObserver(
-            onFallback,
+            translationFallbackObserver,
             freeze({
               key,
               lookupLocale,
-              localeMatch,
+              localeMatchResult,
               attemptedLocales,
               resolvedLocale: candidate,
               precedingFailures: freeze(precedingFailures),
@@ -1950,7 +1963,7 @@ export function createStrings(options) {
       // by exhausting its chain records its last failure like every other. Nothing reads the list on
       // that path (no event fires when nothing succeeded), but a list whose contents depended on how
       // the loop happened to exit would be a trap for the next change to this function.
-      if (onFallback !== null)
+      if (translationFallbackObserver !== null)
         precedingFailures.push(
           freeze({ locale: candidate, reason: attemptFailureReason, cause: attemptCause }),
         );
@@ -1961,7 +1974,7 @@ export function createStrings(options) {
       // last recorded decision was `false` rather than "always one fewer".
       if (candidateIndex + 1 >= chain.length) break;
 
-      const shouldTryNextLocale = fallbackPolicy(attemptFailureReason, candidate, attemptCause);
+      const shouldTryNextLocale = translationFallbackPolicy(attemptFailureReason, candidate, attemptCause);
 
       // `requireNonNull(..., "translationFallbackPolicy returned null")` (DefaultStrings.java:735).
       // Refused rather than coerced: a policy returning `undefined` is a caller mistake, and reading
@@ -1970,17 +1983,17 @@ export function createStrings(options) {
       //
       // Java's guard is `requireNonNull(..., "translationFallbackPolicy returned null")`
       // (`DefaultStrings.java:735`), recorded by the oracle's return-null behavior. We reproduce its
-      // SHAPE with the JS option name, which is what `localeResolver`/`localeMatchResolver` already
+      // SHAPE with the JS option name, which is what `localeSupplier`/`localeMatchSupplier` already
       // do at `:900`/`:914` — the port speaking one dialect rather than three. The remaining
       // difference from Java is the identifier alone, declared in conformance.mjs's
       // DECLARED_MESSAGE_DIVERGENCES and gated STALE if it ever stops differing.
-      if (shouldTryNextLocale == null) throw new TypeError("fallbackPolicy returned null");
+      if (shouldTryNextLocale == null) throw new TypeError("translationFallbackPolicy returned null");
 
       // Java's type system makes a non-boolean unreachable, so there is no Java wording to match and
       // nothing to declare: this arm is the port's own, and it stays informative.
       if (typeof shouldTryNextLocale !== "boolean")
         throw new TypeError(
-          "The configured fallbackPolicy must return a boolean; received " +
+          "The configured translationFallbackPolicy must return a boolean; received " +
             `${JSON.stringify(shouldTryNextLocale) ?? String(shouldTryNextLocale)}`,
         );
 
@@ -1996,25 +2009,25 @@ export function createStrings(options) {
         : /** @type {const} */ ("missing-translation");
 
     // ONE frozen list, shared by the failure the handler sees and the result it produces, the same
-    // way `localeMatch` is shared. `matchObjectIdenticalToResult` is a recorded observable on the
+    // way `localeMatchResult` is shared. `matchObjectIdenticalToResult` is a recorded observable on the
     // Java side and the corpus asserts it `true` on all 370 rows that can compare the two.
     const attemptedLocales = freeze([...attempted]);
-    const translationFailure = translationFailureFor(key, lookupLocale, localeMatch,
+    const translationFailure = translationFailureFor(key, lookupLocale, localeMatchResult,
         attemptedLocales, failureReason, firstFailureCause, placeholders);
 
     // EXACTLY ONCE, and only here — after the walk, never per candidate. All 471 corpus rows that
     // observe the handler record exactly one failure, including the walks that failed at four
     // separate candidates for three distinct reasons.
-    const response = onFailure(translationFailure);
+    const response = translationFailureHandler(translationFailure);
 
-    // Two arms, for the reason given at the fallbackPolicy guard above: Java's
+    // Two arms, for the reason given at the translationFallbackPolicy guard above: Java's
     // `requireNonNull(..., "TranslationFailureHandler returned null")` speaks only to the null case,
     // so that arm reproduces its shape with the JS option name and the rest stays the port's own.
-    if (response == null) throw new TypeError("onFailure returned null");
+    if (response == null) throw new TypeError("translationFailureHandler returned null");
 
     if (typeof response !== "object")
       throw new TypeError(
-        "The configured onFailure handler must return a failure response object; received " +
+        "The configured translationFailureHandler handler must return a failure response object; received " +
           `${JSON.stringify(response) ?? String(response)}`,
       );
 
@@ -2057,7 +2070,7 @@ export function createStrings(options) {
   function failureResult(translationFailure, status, translation) {
     // The SECOND run of `TranslationResult`'s constructor validation, and the one that escapes.
     // `DefaultStrings.java:754/759` build the handler's result OUTSIDE every `try`, so a refusal the
-    // walk already reported to `onFailure` as a `RESOLUTION_FAILURE` cause now reaches the caller —
+    // walk already reported to `translationFailureHandler` as a `RESOLUTION_FAILURE` cause now reaches the caller —
     // and reaches it as a NEW error, because Java re-enters the constructor rather than rethrowing
     // what it caught. `THROW_EXCEPTION` is deliberately not covered: `throwExceptionFor`
     // (`DefaultStrings.java:3196-3213`) builds no result, so it rethrows the retained cause by
@@ -2070,10 +2083,10 @@ export function createStrings(options) {
       translation,
       status,
       lookupLocale: translationFailure.lookupLocale,
-      localeMatch: translationFailure.localeMatch,
+      localeMatchResult: translationFailure.localeMatchResult,
       resolvedLocale: null,
       attemptedLocales: translationFailure.attemptedLocales,
-      isFallback: isFallbackFor(/** @type {any} */ (translationFailure.localeMatch),
+      isFallback: isFallbackFor(/** @type {any} */ (translationFailure.localeMatchResult),
           translationFailure.lookupLocale, null),
       failureReason: translationFailure.reason,
       cause: translationFailure.cause,
@@ -2083,11 +2096,11 @@ export function createStrings(options) {
   /**
    * @param {string} key
    * @param {Readonly<Record<string, unknown>>} [placeholders]
-   * @param {TranslationCallOptions} [callOptions] plan 3.3's full `TranslationOptions`, not a subset.
+   * @param {TranslationOptions} [callOptions] plan 3.3's full `TranslationOptions`, not a subset.
    *   This declaration used to name only `locale` and `bidiIsolation` while forwarding VERBATIM to
-   *   `getResult`, so `localeMatch`, `fallbackPolicy` and `onFailure` all worked at runtime and were
+   *   `getResult`, so `localeMatchResult`, `translationFallbackPolicy` and `translationFailureHandler` all worked at runtime and were
    *   type errors — a TypeScript caller could reach them only through `getResult`. Widened here
-   *   rather than adding `onFallback` alone to a shape that was already three options short.
+   *   rather than adding `translationFallbackObserver` alone to a shape that was already three options short.
    */
   const get = (key, placeholders, callOptions) => getResult(key, placeholders, callOptions).translation;
 
@@ -2210,7 +2223,7 @@ export function createStrings(options) {
       return freeze(source.filter((key) => !target.has(key)));
     },
     getLocaleConfiguration: () =>
-      // `tiebreakers` is a RECORD here even when none were configured, per the `LocaleConfiguration`
+      // `tiebreakerLocalesByLanguageCode` is a RECORD here even when none were configured, per the `LocaleConfiguration`
       // declaration in plan 3.2, which types it `Readonly<Record<...>>` rather than nullable. Null
       // travels on internally because the matcher distinguishes "none" from "empty" in its own
       // bookkeeping; a reader of the configuration does not, and should not have to null-check a
@@ -2228,7 +2241,7 @@ export function createStrings(options) {
         // Sorted for the same reason `getSupportedLocales` above is: :759 sorts supported locales,
         // and the two accessors were the only places the port reported raw insertion order.
         supportedLocales: freeze([...applicableSupported].sort(compareTags)),
-        tiebreakers: applicableTiebreakers ?? EMPTY_TIEBREAKERS,
+        tiebreakerLocalesByLanguageCode: applicableTiebreakers ?? EMPTY_TIEBREAKERS,
       }),
     /**
      * The three loading seams, and all three answer for the DIRECT branch too.
@@ -2274,7 +2287,7 @@ export function createStrings(options) {
       // the two lookup ingresses the tool already drove.
       return freeze({
         lookupLocale,
-        localeMatch: freeze(matchFor(locale, applicableSupported, fallbackLocale, applicableTiebreakers)),
+        localeMatchResult: freeze(matchFor(locale, applicableSupported, fallbackLocale, applicableTiebreakers)),
       });
     },
   });
@@ -2352,7 +2365,7 @@ const MAXIMUM_PREFERRED_LANGUAGES = 32;
  * configuration, and this is the door a hand-built one comes through.
  *
  * @param {{ fallbackLocale: string, supportedLocales: readonly string[],
- *   tiebreakers?: Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]> | null }} configuration
+ *   tiebreakerLocalesByLanguageCode?: Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]> | null }} configuration
  * @param {Iterable<string>} languages the caller's preference list, most-preferred first.
  *   BOOT-M0-0467 states `readonly string[]`; an iterable of strings accepts one, and the guard
  *   below already refuses a bare string, which is the mistake this element type now catches first
@@ -2362,7 +2375,7 @@ export function chooseLocaleForPreferredLanguages(configuration, languages) {
   if (typeof configuration !== "object" || configuration === null)
     throw new RangeError("A locale configuration is required");
 
-  // The same `LocaleConfiguration` `createLocaleNegotiator` refuses unknown members of, arriving
+  // The same `LocaleConfiguration` `createLocaleMatcher` refuses unknown members of, arriving
   // through the root. Refusing at one of the three doors a single type reaches and not the others
   // is S28's asymmetry: which door a caller used would decide whether their typo was reported.
   refuseUnknownOptions("chooseLocaleForPreferredLanguages", configuration, LOCALE_CONFIGURATION_MEMBERS);
@@ -2376,7 +2389,7 @@ export function chooseLocaleForPreferredLanguages(configuration, languages) {
 
   const supported = [...configuration.supportedLocales].map((tag) => normalizeTag(tag));
   const configuredFallbackLocale = normalizeTag(configuration.fallbackLocale);
-  const tiebreakers = safeTiebreakers(configuration.tiebreakers);
+  const tiebreakerLocalesByLanguageCode = safeTiebreakers(configuration.tiebreakerLocalesByLanguageCode);
   const equivalentFallbackLocales = supported
     .filter((tag) => equivalentTags(tag, configuredFallbackLocale))
     .sort(compareTags);
@@ -2391,7 +2404,7 @@ export function chooseLocaleForPreferredLanguages(configuration, languages) {
     configuredFallbackLocale,
     supported,
     equivalentFallbackLocales,
-    tiebreakers,
+    tiebreakerLocalesByLanguageCode,
   );
 
   let examined = 0;
@@ -2418,7 +2431,7 @@ export function chooseLocaleForPreferredLanguages(configuration, languages) {
     // its throw. The chooser has no Java counterpart to diverge from, and it is aligned here anyway
     // so that "which locale does this range select" has ONE answer across every matcher ingress in
     // the port rather than an answer per door.
-    const match = matchFor(preference, supported, fallbackLocale, tiebreakers);
+    const match = matchFor(preference, supported, fallbackLocale, tiebreakerLocalesByLanguageCode);
 
     // `locale` is non-null for every matched result the kernel can produce, and the guard is here so
     // the return type is a tag rather than a tag-or-null: reading `isMatch` alone and returning
@@ -2498,13 +2511,13 @@ const MAXIMUM_LANGUAGE_RANGES = 32;
  *
  * @param {unknown} supplied
  * @param {string} where the option that carried it, for the JS-facing shape errors only
- * @returns {LocaleMatch} the same object, unchanged
+ * @returns {LocaleMatchResult} the same object, unchanged
  */
 function validateLocaleMatchStructure(supplied, where) {
   if (typeof supplied !== "object" || supplied === null)
     throw new TypeError(`${where} must be a LocaleMatchResult object; received ${JSON.stringify(supplied) ?? String(supplied)}`);
 
-  const match = /** @type {LocaleMatch} */ (supplied);
+  const match = /** @type {LocaleMatchResult} */ (supplied);
   const requested = match.requestedLanguageRanges ?? [];
 
   if (!Array.isArray(requested))
@@ -2528,13 +2541,13 @@ function validateLocaleMatchStructure(supplied, where) {
   // which is in the considered loop below. These are CALLER-FACING: `LocaleMatchResult`'s
   // constructor is public on purpose (`:65-80`, "This is public so custom LocaleMatcher
   // implementations can expose the same diagnostics"), and the port's counterpart surfaces are
-  // `forLocaleMatch`, per-call `{ localeMatch }` and `localeMatchResolver`.
+  // `forLocaleMatch`, per-call `{ localeMatchResult }` and `localeMatchSupplier`.
   //
   // UNTIL 2026-09-09 THIS COMMENT CLAIMED THE CHECK AND THE CODE CALLED `normalizeTag` ALONE — the
   // tag-level guard, which ACCEPTS `en-x-lvariant-NY`. That is the one shape a reader is actively
   // told exists, so it is worth naming: the port accepted all three of Java's refusals, and
-  // `createLocaleNegotiator({ fallbackLocale: "fr", supportedLocales: ["fr",
-  // "en-x-lvariant-NY"] }).matchFor("fr").consideredLocales` answered with a `LocaleMatch` value
+  // `createLocaleMatcher({ fallbackLocale: "fr", supportedLocales: ["fr",
+  // "en-x-lvariant-NY"] }).matchFor("fr").consideredLocales` answered with a `LocaleMatchResult` value
   // Java's type system cannot construct.
   //
   // MEASURED on pinned Corretto 21 against `lokalized-3.0.0.jar`, both controls constructing:
@@ -2631,14 +2644,14 @@ function validateLocaleMatchStructure(supplied, where) {
  * lookup later consumed it. The instance-dependent half — the fallback and considered-set
  * comparison — stays at consumption, so one options object remains reusable across instances.
  *
- * A caller writing `{ localeMatch: … }` by hand is equally valid and is validated inside
+ * A caller writing `{ localeMatchResult: … }` by hand is equally valid and is validated inside
  * `getResult`, exactly as `{ locale: "fr-ca" }` is.
  *
- * @param {LocaleMatch} localeMatch
- * @returns {Readonly<{ localeMatch: LocaleMatch }>}
+ * @param {LocaleMatchResult} localeMatchResult
+ * @returns {Readonly<{ localeMatchResult: LocaleMatchResult }>}
  */
-export function forLocaleMatch(localeMatch) {
-  return freeze({ localeMatch: validateLocaleMatchStructure(localeMatch, "forLocaleMatch(localeMatch)") });
+export function forLocaleMatch(localeMatchResult) {
+  return freeze({ localeMatchResult: validateLocaleMatchStructure(localeMatchResult, "forLocaleMatch(localeMatchResult)") });
 }
 
 /**
@@ -2704,7 +2717,7 @@ function safeTiebreakers(supplied) {
 
     if (!Array.isArray(locales))
       throw new TypeError(
-        `createStrings({ tiebreakers }) must map a language code to an array of locale tags; ` +
+        `createStrings({ tiebreakerLocalesByLanguageCode }) must map a language code to an array of locale tags; ` +
           `'${languageCode}' maps to something else`,
       );
 
@@ -2753,9 +2766,9 @@ const javaList = (/** @type {readonly string[]} */ tags) => `[${tags.join(", ")}
  * list naming one locale twice was silently deduplicated and ACCEPTED, where Java refuses).
  *
  * @param {readonly string[]} supported the loaded catalogs' normalized tags, in supplied order
- * @param {Readonly<Record<string, readonly string[]>> | null} tiebreakers the frozen snapshot
+ * @param {Readonly<Record<string, readonly string[]>> | null} tiebreakerLocalesByLanguageCode the frozen snapshot
  */
-function validateTiebreakers(supported, tiebreakers) {
+function validateTiebreakers(supported, tiebreakerLocalesByLanguageCode) {
   /** @type {Map<string, string[]>} */
   const loadedByLanguageCode = new Map();
 
@@ -2787,7 +2800,7 @@ function validateTiebreakers(supported, tiebreakers) {
   // reports whichever rule the FIRST offending entry trips, so a map that both collides and
   // mis-permutes answers the permutation refusal where Java answers the collision — measured, and it
   // is exactly how `{ ro: ["ro"], mo: ["mo"] }` used to be diagnosed here.
-  for (const [suppliedLanguageCode, locales] of Object.entries(tiebreakers ?? {})) {
+  for (const [suppliedLanguageCode, locales] of Object.entries(tiebreakerLocalesByLanguageCode ?? {})) {
     // The SAME key normalization `resolveTiebreakers` applies when it reads this map, so a code
     // that validates here is a code that matching will actually find. `mo` and `ro` are one entry
     // to both.
@@ -2795,7 +2808,7 @@ function validateTiebreakers(supported, tiebreakers) {
 
     // `DefaultStrings.java:329`. Two keys that CANONICALIZE alike are two names for one entry, and a
     // record cannot hold both: whichever `resolveTiebreakers` reached last would silently win, so
-    // the ORDER a caller wrote their tiebreakers in would decide which catalog answers. Java names
+    // the ORDER a caller wrote their tiebreakerLocalesByLanguageCode in would decide which catalog answers. Java names
     // both of the caller's own spellings and the code they collapsed to; so does this.
     const existingSuppliedLanguageCode = suppliedByNormalizedCode.get(languageCode);
 
@@ -2888,7 +2901,7 @@ function validateTiebreakers(supported, tiebreakers) {
     // `THROWING_PHONETIC_RESOLVER` from pointing at `Strings.Builder`; the diagnosis the message
     // carries — which language code, and which locales collided under it — is Java's verbatim.
     throw new RangeError(
-      `You must specify tiebreaker locales via createStrings({ tiebreakers }) to resolve ambiguity ` +
+      `You must specify tiebreaker locales via createStrings({ tiebreakerLocalesByLanguageCode }) to resolve ambiguity ` +
         `for language code '${languageCode}' because localized strings exist for the following ` +
         `locale[s]: ${javaList([...loaded].sort())}`,
     );
@@ -2926,11 +2939,11 @@ function validateTiebreakers(supported, tiebreakers) {
  * @param {readonly string[]} supported the loaded catalogs' normalized tags
  * @param {readonly string[]} equivalentFallbackLocales loaded catalogs equivalent to `configured`,
  *   tag-sorted, non-empty by the refusal in `createStrings`
- * @param {Readonly<Record<string, readonly string[]>> | null} tiebreakers
+ * @param {Readonly<Record<string, readonly string[]>> | null} tiebreakerLocalesByLanguageCode
  * @returns {string}
  */
-function resolveFallbackLocale(configured, supported, equivalentFallbackLocales, tiebreakers) {
-  const elected = electFallbackLocale(configured, supported, tiebreakers);
+function resolveFallbackLocale(configured, supported, equivalentFallbackLocales, tiebreakerLocalesByLanguageCode) {
+  const elected = electFallbackLocale(configured, supported, tiebreakerLocalesByLanguageCode);
   if (elected !== null) return elected;
 
   // Java's message names `tiebreakerLocalesByLanguageCode`, its constructor parameter; only that
@@ -2938,7 +2951,7 @@ function resolveFallbackLocale(configured, supported, equivalentFallbackLocales,
   // follows. The diagnosis — which locales collided — is Java's.
   throw new RangeError(
     `Fallback locale '${configured}' is canonically equivalent to multiple loaded locales ` +
-      `${javaList(equivalentFallbackLocales)}; configure createStrings({ tiebreakers }) to choose one`,
+      `${javaList(equivalentFallbackLocales)}; configure createStrings({ tiebreakerLocalesByLanguageCode }) to choose one`,
   );
 }
 
@@ -2956,9 +2969,9 @@ const EMPTY_TIEBREAKERS = freeze(Object.create(null));
  * the ignored-input-produces-a-plausible-answer failure with nothing to debug from.
  *
  * A value that is neither spelling is REFUSED rather than coerced. `Object.entries` on a string or
- * an array yields index keys, so `strings: [...]` — the shape of one catalog rather than of a map of
- * them, and an easy slip now that a catalog may itself be an array — otherwise fails much later as
- * an unrelated complaint that the locale tag `'0'` is malformed.
+ * an array yields index keys, so `localizedStringSupplier: () => [...]` — one catalog rather than
+ * a map of them, and an easy slip now that a catalog may itself be an array — otherwise fails much
+ * later as an unrelated complaint that the locale tag `'0'` is malformed.
  *
  * @param {Record<string, unknown> | ReadonlyMap<string, unknown>} strings
  * @returns {[string, unknown][]}
@@ -2970,12 +2983,12 @@ function catalogEntries(strings) {
   // absent-option refusal in `createStrings` for the reason recorded there.
   if (strings === null)
     throw new TypeError(
-      "createStrings({ strings }) was null: supply a record or a Map of locale tag to catalog",
+      "localizedStringSupplier returned null: supply a record or a Map of locale tag to catalog",
     );
 
   if (typeof strings !== "object" || Array.isArray(strings))
     throw new TypeError(
-      "createStrings({ strings }) must be a record or a Map of locale tag to catalog; a single " +
+      "localizedStringSupplier must return a record or a Map of locale tag to catalog; a single " +
         "catalog must be supplied under the locale tag it is written for",
     );
 
@@ -3020,7 +3033,7 @@ function parseCatalogInput(raw, locale, source, session, options, warnings) {
     // and failing afterwards.
     session.warn(warning, (admitted) => {
       warnings.push(/** @type {LocalizedStringWarning} */ (admitted));
-      options.onWarning?.(/** @type {LocalizedStringWarning} */ (admitted));
+      options.warningHandler?.(/** @type {LocalizedStringWarning} */ (admitted));
     });
   };
 

@@ -49,7 +49,7 @@
  *   "the set is bounded".
  * - *TRUE CONCURRENCY* ("concurrent locales have no cross-talk", plan :2924) is not testable in this
  *   runtime: `get` is synchronous end to end and there is no yield point inside a lookup. The
- *   reentrant cross-instance call from inside a `fallbackPolicy` callback is the STRONGEST AVAILABLE
+ *   reentrant cross-instance call from inside a `translationFallbackPolicy` callback is the STRONGEST AVAILABLE
  *   SUBSTITUTE and the only window in which a set-and-restore global would be observable at all. It
  *   is reentrancy under one thread and is written up as nothing more.
  * - *`ConfigurationError` for a missing optional data module* (plan 3.7:1435-1437) is the same
@@ -58,8 +58,8 @@
  *   re-asserting it here would inflate clause 72's row count with a row that stays green if
  *   `createStrings` compiled expressions lazily.
  *
- * The reentrancy callback is `fallbackPolicy` DELIBERATELY: this project's own measured invariants
- * record that the failure handler fires exactly ONCE, AFTER the walk — so `onFailure` is outside the
+ * The reentrancy callback is `translationFallbackPolicy` DELIBERATELY: this project's own measured invariants
+ * record that the failure handler fires exactly ONCE, AFTER the walk — so `translationFailureHandler` is outside the
  * lookup window and a reentrancy probe built on it would be silently vacuous.
  */
 import assert from "node:assert/strict";
@@ -173,9 +173,9 @@ const unreachedCatalog = (/** @type {string} */ expression) => [
 
 const build = (/** @type {unknown} */ frCatalog) =>
   createStrings({
-    localeResolver: () => "fr",
+    localeSupplier: () => "fr",
     fallbackLocale: "en",
-    strings: { fr: /** @type {any} */ (frCatalog), en: EN_CATALOG },
+    localizedStringSupplier: () => ({ fr: /** @type {any} */ (frCatalog), en: EN_CATALOG }),
   });
 
 /**
@@ -334,7 +334,7 @@ test("the three catalogs are loaded and answer distinguishably", () => {
   // CONTROLS A, B and C for every row in this section, asserted by name and never used as a guard.
   // Without A, a stale `fr` answer on a second lookup cannot be told apart from "`de` lacks K and
   // fell back"; without B, a silent fallback could masquerade as either catalog's text.
-  const strings = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: localeCatalogs() });
+  const strings = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (localeCatalogs()) });
   assert.equal(strings.get("K", undefined, forLocale("fr")), FR_TEXT);
   assert.equal(strings.get("K", undefined, forLocale("de")), DE_TEXT);
   assert.equal(strings.get("K", undefined, forLocale("es")), EN_TEXT, "an unloaded tag falls back to en");
@@ -343,14 +343,14 @@ test("the three catalogs are loaded and answer distinguishably", () => {
   assert.notEqual(DE_TEXT, EN_TEXT);
 });
 
-test("localeResolver is NOT consulted at construction and IS consulted on every lookup", () => {
+test("localeSupplier is NOT consulted at construction and IS consulted on every lookup", () => {
   let current = "fr";
   /** @type {string[]} */
   const calls = [];
   const strings = createStrings({
-    localeResolver: () => { calls.push(current); return current; },
+    localeSupplier: () => { calls.push(current); return current; },
     fallbackLocale: "en",
-    strings: localeCatalogs(),
+    localizedStringSupplier: () => (localeCatalogs()),
   });
 
   // (1) The port's own `.d.ts` says "consulted per lookup, NEVER AT CONSTRUCTION"; a declaration is
@@ -374,7 +374,7 @@ test("localeResolver is NOT consulted at construction and IS consulted on every 
   assert.notEqual(first, second);
 });
 
-test("a localeResolver answering NON-CANONICAL tags is normalized on every use", () => {
+test("a localeSupplier answering NON-CANONICAL tags is normalized on every use", () => {
   // **THE ROW THE FIRST DRAFT DID NOT HAVE, and this project's signature blind spot.** Plan 3.4:864
   // says resolver values are "normalized and recomputed on every use"; a build that recomputes
   // faithfully but compares the resolver's RAW answer against normalized supported tags passes every
@@ -397,9 +397,9 @@ test("a localeResolver answering NON-CANONICAL tags is normalized on every use",
   // the defect this project shipped once in the tiebreaker path.
   let current = "FR";
   const strings = createStrings({
-    localeResolver: () => current,
+    localeSupplier: () => current,
     fallbackLocale: "en",
-    strings: localeCatalogs(),
+    localizedStringSupplier: () => (localeCatalogs()),
   });
 
   const first = strings.get("K");
@@ -415,12 +415,12 @@ test("a NON-CANONICAL per-call locale answers exactly as its canonical spelling 
   // The mirrored half for the per-call door (plan 3.3:749-750: a direct per-call `locale` "need only
   // normalize to a well-formed tag"). `forLocale` normalizes syntactically at the point it is
   // spelled, so this pins the two doors to one answer rather than two.
-  const strings = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: localeCatalogs() });
+  const strings = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (localeCatalogs()) });
   assert.equal(strings.get("K", undefined, forLocale("DE-de")), strings.get("K", undefined, forLocale("de")));
   assert.equal(strings.get("K", undefined, forLocale("DE-de")), DE_TEXT);
 });
 
-test("localeMatchResolver is consulted on every lookup too, and its answer reaches the catalogs", () => {
+test("localeMatchSupplier is consulted on every lookup too, and its answer reaches the catalogs", () => {
   // The second ingress plan 3.4:874 covers — "revalidated on every use". Same two-observation shape.
   const matchFor = (/** @type {string} */ locale) => ({
     matchType: "exact",
@@ -437,9 +437,9 @@ test("localeMatchResolver is consulted on every lookup too, and its answer reach
   /** @type {string[]} */
   const calls = [];
   const strings = createStrings({
-    localeMatchResolver: () => { calls.push(current); return /** @type {any} */ (matchFor(current)); },
+    localeMatchSupplier: () => { calls.push(current); return /** @type {any} */ (matchFor(current)); },
     fallbackLocale: "en",
-    strings: localeCatalogs(),
+    localizedStringSupplier: () => (localeCatalogs()),
   });
 
   assert.equal(calls.length, 0, "the match resolver ran during construction");
@@ -456,7 +456,7 @@ test("a CONSTANT instance locale answers the same on every call — the boundary
   // match, so no ablation in this file's table may redden this and it adds nothing to clause 72's
   // count. It is here to pin the boundary of the permission — the rows above withhold a cache for
   // the two resolver doors, and this says where the cache is allowed to exist.
-  const strings = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: localeCatalogs() });
+  const strings = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (localeCatalogs()) });
   assert.equal(strings.get("K"), FR_TEXT);
   assert.equal(strings.get("K"), FR_TEXT);
   assert.equal(strings.get("K"), FR_TEXT);
@@ -484,8 +484,8 @@ test("two instances over one catalog object do not interfere, and the THIRD read
   // Both instances are built from the SAME catalog object on purpose, so a shared-internal-state
   // defect is in range rather than excluded by the fixture.
   const catalogs = crossTalkCatalogs();
-  const A = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: catalogs });
-  const B = createStrings({ localeResolver: () => "de", fallbackLocale: "en", strings: catalogs });
+  const A = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (catalogs) });
+  const B = createStrings({ localeSupplier: () => "de", fallbackLocale: "en", localizedStringSupplier: () => (catalogs) });
 
   const a1 = A.get("K");
   const b1 = B.get("K");
@@ -497,7 +497,7 @@ test("two instances over one catalog object do not interfere, and the THIRD read
   assert.equal(a2, a1);
 
   // The single-instance baseline, so the correct `a1` is not an artifact of the fallback chain.
-  const only = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: crossTalkCatalogs() });
+  const only = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (crossTalkCatalogs()) });
   assert.equal(only.get("K"), FR_TEXT);
 });
 
@@ -507,8 +507,8 @@ test("the same holds with the construction order REVERSED", () => {
   // asserting more than it measured. `de` is constructed first here, and the mirrored sequence is
   // read: B, A, B.
   const catalogs = crossTalkCatalogs();
-  const B = createStrings({ localeResolver: () => "de", fallbackLocale: "en", strings: catalogs });
-  const A = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: catalogs });
+  const B = createStrings({ localeSupplier: () => "de", fallbackLocale: "en", localizedStringSupplier: () => (catalogs) });
+  const A = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (catalogs) });
 
   const b1 = B.get("K");
   const a1 = A.get("K");
@@ -531,12 +531,12 @@ test("an instance built from catalog version N keeps answering N after N+1 exist
   // forbids. Core validates an identity's SHAPE and not its truth, so this is a legal input.
   const identity = { catalogVersion: "clause72.v", catalogFingerprint: "clause72.f" };
   const v1 = createStrings({
-    localeResolver: () => "en", fallbackLocale: "en", catalogIdentity: identity,
-    strings: { en: [{ key: "K", translation: "V1" }] },
+    localeSupplier: () => "en", fallbackLocale: "en", catalogIdentity: identity,
+    localizedStringSupplier: () => ({ en: [{ key: "K", translation: "V1" }] }),
   });
   const v2 = createStrings({
-    localeResolver: () => "en", fallbackLocale: "en", catalogIdentity: identity,
-    strings: { en: [{ key: "K", translation: "V2" }] },
+    localeSupplier: () => "en", fallbackLocale: "en", catalogIdentity: identity,
+    localizedStringSupplier: () => ({ en: [{ key: "K", translation: "V2" }] }),
   });
 
   assert.equal(v1.getCatalogIdentity()?.catalogVersion, v2.getCatalogIdentity()?.catalogVersion,
@@ -554,29 +554,29 @@ test("a per-call locale does not STICK: the next bare lookup returns to the inst
   // convenience an implementer writes for it (`if (options?.locale) this.currentLocale = ...`). The
   // discriminating observation is again the THIRD read — the first two are green under a sticky
   // build.
-  const strings = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: localeCatalogs() });
+  const strings = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (localeCatalogs()) });
   assert.equal(strings.get("K"), FR_TEXT);
   assert.equal(strings.get("K", undefined, forLocale("de")), DE_TEXT);
   assert.equal(strings.get("K"), FR_TEXT, "the explicit per-call locale stuck to the instance");
 });
 
-test("a lookup on another instance from inside a fallbackPolicy does not perturb the outer walk", () => {
+test("a lookup on another instance from inside a translationFallbackPolicy does not perturb the outer walk", () => {
   // REENTRANCY — the only interleaving a single-threaded synchronous runtime admits, and the only
   // window in which a set-and-restore process-global is observable at all: a global assigned at the
   // top of `get` and restored in a `finally` is correct for every row above and wrong only here,
   // because the inner lookup overwrites it and the outer walk resumes reading the inner locale.
   //
-  // `fallbackPolicy` is the callback DELIBERATELY. The failure handler fires exactly once AFTER the
-  // walk, so a probe built on `onFailure` would fire outside the window and prove nothing.
+  // `translationFallbackPolicy` is the callback DELIBERATELY. The failure handler fires exactly once AFTER the
+  // walk, so a probe built on `translationFailureHandler` would fire outside the window and prove nothing.
   const catalogs = crossTalkCatalogs();
-  const B = createStrings({ localeResolver: () => "de", fallbackLocale: "en", strings: catalogs });
+  const B = createStrings({ localeSupplier: () => "de", fallbackLocale: "en", localizedStringSupplier: () => (catalogs) });
 
   /** @type {string[]} */
   const policyCalls = [];
   let inner = null;
   const A = createStrings({
-    localeResolver: () => "fr", fallbackLocale: "en", strings: catalogs,
-    fallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attemptedLocale) => {
+    localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (catalogs),
+    translationFallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attemptedLocale) => {
       policyCalls.push(attemptedLocale);
       inner = B.get("K");
       return true;
@@ -597,8 +597,8 @@ test("a lookup on another instance from inside a fallbackPolicy does not perturb
   /** @type {string[]} */
   const plainCalls = [];
   const control = createStrings({
-    localeResolver: () => "fr", fallbackLocale: "en", strings: crossTalkCatalogs(),
-    fallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attemptedLocale) => {
+    localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (crossTalkCatalogs()),
+    translationFallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attemptedLocale) => {
       plainCalls.push(attemptedLocale);
       return true;
     },
@@ -700,7 +700,7 @@ test("importing the library registers no listener, and constructing an instance 
   // registration a packaging lie as well.
   assert.deepEqual(REGISTRATIONS_AFTER_IMPORT, []);
 
-  createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: localeCatalogs() });
+  createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (localeCatalogs()) });
 
   // (2) And construction adds none either.
   assert.deepEqual(registrations, []);
@@ -713,7 +713,7 @@ test("mutating navigator.languages does not change what an existing instance ans
   // reports a false pass.
   assert.deepEqual([.../** @type {any} */ (globalThis).navigator.languages], ["de-DE", "de"]);
 
-  const strings = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: localeCatalogs() });
+  const strings = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (localeCatalogs()) });
   const before = strings.get("K");
   assert.equal(before, FR_TEXT);
 
@@ -733,8 +733,8 @@ test("the browser chooser reads navigator.languages ONLY WHEN CALLED, and reads 
   // would report zero red while looking exactly like a clean bill of health.
   setNavigatorLanguages(["de-DE", "de"]);
   const strings = createStrings({
-    localeResolver: () => "en", fallbackLocale: "en",
-    strings: { ...localeCatalogs(), it: [{ key: "K", translation: "IT_TEXT" }] },
+    localeSupplier: () => "en", fallbackLocale: "en",
+    localizedStringSupplier: () => ({ ...localeCatalogs(), it: [{ key: "K", translation: "IT_TEXT" }] }),
   });
   const configuration = strings.getLocaleConfiguration();
   assert.equal(chooseBrowserLocale(configuration), "de");
@@ -755,7 +755,7 @@ test("calling every locale-adjacent root export leaves a live instance byte-iden
   // The measurable half of "no exported API mutates shared locale state". What this supports is "no
   // exported call was OBSERVED to perturb a live instance" — the unbounded form is not probeable.
   setNavigatorLanguages(["de-DE", "de"]);
-  const strings = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: localeCatalogs() });
+  const strings = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (localeCatalogs()) });
   const before = strings.get("K");
   const lookupBefore = strings.getResult("K").lookupLocale;
   const configuration = strings.getLocaleConfiguration();
@@ -793,7 +793,7 @@ const mutableCatalogs = () => ({
 
 test("mutating the caller's catalog container after construction changes nothing the instance answers", () => {
   const catalogs = /** @type {any} */ (mutableCatalogs());
-  const strings = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: catalogs });
+  const strings = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (catalogs) });
 
   // The instance reads THAT catalog at all, before anything is mutated.
   const v0 = strings.get("K");
@@ -825,7 +825,7 @@ test("mutating the caller's catalog container after construction changes nothing
   // every mutation. Without it, "unchanged" is equally explained by a mutation that missed its
   // target — wrong nesting, wrong key, a frozen literal — and this row would certify a snapshot that
   // does not exist. A red control means the FIXTURE broke, not the library.
-  const after = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: catalogs });
+  const after = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (catalogs) });
   assert.equal(after.get("K"), "TAMPERED");
   assert.equal(after.get("K2"), "ADDED");
   assert.deepEqual(after.getSupportedLocales(), ["en", "fr", "it"]);
@@ -833,10 +833,10 @@ test("mutating the caller's catalog container after construction changes nothing
 
 test("the Map catalog door snapshots too — the seam this project has already shipped a defect on", () => {
   // Both doors are run because a copy path written for records and extended to `Map` by a truthiness
-  // check is the exact seam that shipped here before: a `ReadonlyMap` of tiebreakers passed an object
+  // check is the exact seam that shipped here before: a `ReadonlyMap` of tiebreakerLocalesByLanguageCode passed an object
   // test, met `Object.entries`, and was silently answered `[]`.
   const catalogs = new Map(Object.entries(mutableCatalogs()));
-  const strings = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: /** @type {any} */ (catalogs) });
+  const strings = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => ((catalogs)) });
   assert.equal(strings.get("K"), FR_TEXT, "the Map door must be functional, or the row is passing on a refusal");
 
   catalogs.set("fr", [{ key: "K", translation: "TAMPERED" }]);
@@ -847,7 +847,7 @@ test("the Map catalog door snapshots too — the seam this project has already s
   assert.deepEqual(strings.getSupportedLocales(), ["de", "en", "fr"]);
   assert.equal(strings.get("K", undefined, forLocale("de")), DE_TEXT);
 
-  const after = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: /** @type {any} */ (catalogs) });
+  const after = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => ((catalogs)) });
   assert.equal(after.get("K"), "TAMPERED", "the Map mutations must land, or 'unchanged' proves nothing");
   assert.deepEqual(after.getSupportedLocales(), ["en", "fr", "it"]);
 });
@@ -862,7 +862,7 @@ test("the RAW-TEXT catalog door: only the container mutations can carry this row
     de: JSON.stringify({ K: DE_TEXT }),
     en: JSON.stringify({ K: EN_TEXT }),
   });
-  const strings = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: catalogs });
+  const strings = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (catalogs) });
   assert.equal(strings.get("K"), FR_TEXT, "the text door must be functional, or the row proves nothing");
 
   catalogs.it = JSON.stringify({ K: "IT_TEXT" });
@@ -872,43 +872,43 @@ test("the RAW-TEXT catalog door: only the container mutations can carry this row
   assert.equal(strings.get("K", undefined, forLocale("de")), DE_TEXT);
 
   // Control A again: a fresh instance from the mutated source sees both changes.
-  const after = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: catalogs });
+  const after = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (catalogs) });
   assert.deepEqual(after.getSupportedLocales(), ["en", "fr", "it"]);
 });
 
-test("tiebreakers are snapshotted at construction, container AND list", () => {
+test("tiebreakerLocalesByLanguageCode are snapshotted at construction, container AND list", () => {
   // The `.d.ts` says "snapshotted and frozen at construction"; this is the measurement. The fixture
   // is chosen so the ORDER is observable end to end — `en-GB` first answers "GB", `en-US` first
   // answers "US" — because a snapshot test over an input whose mutation changes no output would be
   // green under an aliasing build too.
   const order = ["en-GB", "en-US"];
-  const tiebreakers = new Map([["en", order]]);
+  const tiebreakerLocalesByLanguageCode = new Map([["en", order]]);
   const strings = createStrings({
-    localeResolver: () => "en", fallbackLocale: "en-US",
-    strings: { "en-US": [{ key: "K", translation: "US" }], "en-GB": [{ key: "K", translation: "GB" }] },
-    tiebreakers: /** @type {any} */ (tiebreakers),
+    localeSupplier: () => "en", fallbackLocale: "en-US",
+    localizedStringSupplier: () => ({ "en-US": [{ key: "K", translation: "US" }], "en-GB": [{ key: "K", translation: "GB" }] }),
+    tiebreakerLocalesByLanguageCode: /** @type {any} */ (tiebreakerLocalesByLanguageCode),
   });
 
   assert.equal(strings.get("K"), "GB", "the tiebreaker order must be observable, or the row probes nothing");
 
   // The CONTROL that the order is what decides it: the reversed order gives the other catalog.
   const reversed = createStrings({
-    localeResolver: () => "en", fallbackLocale: "en-US",
-    strings: { "en-US": [{ key: "K", translation: "US" }], "en-GB": [{ key: "K", translation: "GB" }] },
-    tiebreakers: { en: ["en-US", "en-GB"] },
+    localeSupplier: () => "en", fallbackLocale: "en-US",
+    localizedStringSupplier: () => ({ "en-US": [{ key: "K", translation: "US" }], "en-GB": [{ key: "K", translation: "GB" }] }),
+    tiebreakerLocalesByLanguageCode: { en: ["en-US", "en-GB"] },
   });
   assert.equal(reversed.get("K"), "US");
 
   // Now mutate BOTH levels of the caller's structure: the Map entry, and the array inside it.
-  tiebreakers.set("en", ["en-US", "en-GB"]);
+  tiebreakerLocalesByLanguageCode.set("en", ["en-US", "en-GB"]);
   order.reverse();
 
   assert.equal(strings.get("K"), "GB", "a post-construction tiebreaker edit changed resolution");
-  assert.deepEqual({ ...strings.getLocaleConfiguration().tiebreakers }, { en: ["en-GB", "en-US"] });
+  assert.deepEqual({ ...strings.getLocaleConfiguration().tiebreakerLocalesByLanguageCode }, { en: ["en-GB", "en-US"] });
 });
 
 test("returned records and arrays are frozen, null-prototype where the plan says so", () => {
-  const strings = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: mutableCatalogs() });
+  const strings = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (mutableCatalogs()) });
 
   const supported = strings.getSupportedLocales();
   assert.equal(Object.isFrozen(supported), true);
@@ -919,11 +919,11 @@ test("returned records and arrays are frozen, null-prototype where the plan says
   const configuration = strings.getLocaleConfiguration();
   assert.equal(Object.isFrozen(configuration), true);
   assert.equal(Object.isFrozen(configuration.supportedLocales), true);
-  assert.equal(Object.isFrozen(configuration.tiebreakers), true);
+  assert.equal(Object.isFrozen(configuration.tiebreakerLocalesByLanguageCode), true);
   // Plan 4.3:1536-1538: a keyed record whose property names originate in catalogs or locales is a
   // NULL-PROTOTYPE record. A frozen ordinary object would pass the freeze assertion and still carry
   // an inherited `constructor`, which is a different value from the one specified.
-  assert.equal(Object.getPrototypeOf(configuration.tiebreakers), null);
+  assert.equal(Object.getPrototypeOf(configuration.tiebreakerLocalesByLanguageCode), null);
 
   const result = strings.getResult("K");
   assert.equal(Object.isFrozen(result), true);
@@ -935,7 +935,7 @@ test("get and t are the same bound function, and survive being destructured off 
   // stable functions; `strings.t === strings.get`." This is the property an atomic-reference-
   // replacement server actually depends on: `const { t } = current` held across a swap of `current`
   // must keep answering from the instance it came from, which is exactly the lifecycle clause.
-  const strings = createStrings({ localeResolver: () => "fr", fallbackLocale: "en", strings: localeCatalogs() });
+  const strings = createStrings({ localeSupplier: () => "fr", fallbackLocale: "en", localizedStringSupplier: () => (localeCatalogs()) });
   assert.equal(strings.t, strings.get);
   assert.equal(strings.get, strings.get, "the accessor must be referentially stable across reads");
   assert.equal(strings.getResult, strings.getResult);
@@ -946,7 +946,7 @@ test("get and t are the same bound function, and survive being destructured off 
 
   // A second instance's detached `t` still answers from ITS instance after the first has been read —
   // the reference-swap shape, one call deep.
-  const other = createStrings({ localeResolver: () => "de", fallbackLocale: "en", strings: localeCatalogs() });
+  const other = createStrings({ localeSupplier: () => "de", fallbackLocale: "en", localizedStringSupplier: () => (localeCatalogs()) });
   const otherT = other.t;
   assert.equal(otherT("K"), DE_TEXT);
   assert.equal(t("K"), FR_TEXT);

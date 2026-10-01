@@ -16,7 +16,7 @@ import { test } from "node:test";
 import { computeCatalogIdentity } from "../src/load/index.js";
 import { catalogIdentityInputFor } from "../src/load/identity.js";
 import { decode as pinnedProvenance } from "../src/data/provenance.js";
-import { loadEntireManifest, loadStrings, StringsLoadingError } from "../src/load/fetch-loader.js";
+import { loadEntireManifest, loadStrings, LocalizedStringLoadingError } from "../src/load/fetch-loader.js";
 import { sha256Hex } from "../src/internal/sha256.js";
 import { BUILD_IDENTITY } from "../tools/test-support/build-identity.js";
 
@@ -31,7 +31,7 @@ function manifest(tags, { fallbackLocale = "en", decoded = false } = {}) {
   const draft = {
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
     ...BUILD_IDENTITY,
-    fallbackLocale, baseUrl: "https://cdn.example/v1/", files, tiebreakers: {},
+    fallbackLocale, baseUrl: "https://cdn.example/v1/", files, tiebreakerLocalesByLanguageCode: {},
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return /** @type {any} */ (draft);
@@ -110,7 +110,7 @@ test("failures are in FETCH-PLAN order even when responses arrive backwards", as
     respond: () => ({ ok: false, status: 503 }),
   });
   const error = await loadStrings(m, "fr", { fetch: fetchImpl.impl }).then(() => null, (e) => e);
-  assert.ok(error instanceof StringsLoadingError, `expected StringsLoadingError, got ${error}`);
+  assert.ok(error instanceof LocalizedStringLoadingError, `expected LocalizedStringLoadingError, got ${error}`);
   assert.deepEqual(error.failures.map((f) => f.locale), ["fr", "en"],
     "plan order is fr then en; completion order was the reverse");
   assert.deepEqual(error.failures.map((f) => f.stage), ["fetch", "fetch"]);
@@ -125,7 +125,7 @@ test("a body that never ends fails on the byte LIMIT rather than exhausting memo
     fetch: fetchImpl.impl,
     limits: { maximumInputBytes: 256 * 1024 },
   }).then(() => null, (e) => e);
-  assert.ok(error instanceof StringsLoadingError);
+  assert.ok(error instanceof LocalizedStringLoadingError);
   assert.equal(error.failures[0].stage, "limit");
   // AND THE READER IS RELEASED. Without this the test passes over a loader that abandoned an
   // infinite stream still open, which on a real connection is a socket that is never returned.
@@ -142,7 +142,7 @@ test("a wrong digest fails at DIGEST, before the body is parsed", async () => {
   const m = manifest(["en"]);
   const fetchImpl = injectedFetch({ respond: () => streamed([utf8.encode('{"Other.Key":"different"}')]) });
   const error = await loadStrings(m, "en", { fetch: fetchImpl.impl }).then(() => null, (e) => e);
-  assert.ok(error instanceof StringsLoadingError);
+  assert.ok(error instanceof LocalizedStringLoadingError);
   assert.equal(error.failures[0].stage, "digest");
   assert.match(String(error.failures[0].cause.message), /does not match the manifest's/);
 });
@@ -174,7 +174,7 @@ test("allow-partial returns successes ONLY when the fallback file loaded", async
     fetch: injectedFetch({ respond: failEn }).impl,
     partialFailure: "allow-partial",
   }).then(() => null, (e) => e);
-  assert.ok(error instanceof StringsLoadingError);
+  assert.ok(error instanceof LocalizedStringLoadingError);
   assert.match(error.message, /fallback-locale file is among them/);
 });
 

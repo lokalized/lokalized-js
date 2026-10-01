@@ -22,7 +22,7 @@
  */
 
 /**
- * @typedef {import("lokalized/core").TranslationCallOptions} TranslationCallOptions
+ * @typedef {import("lokalized/core").TranslationOptions} TranslationOptions
  * @typedef {ReturnType<typeof import("lokalized/core").createStrings>} Strings
  */
 
@@ -32,7 +32,7 @@
  * is the same defect one layer out.
  *
  * @typedef {Readonly<{
- *   callOptions: TranslationCallOptions,
+ *   callOptions: TranslationOptions,
  *   requestedRanges: readonly string[],
  *   servedLocale: string,
  *   cartCount: number,

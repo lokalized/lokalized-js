@@ -129,9 +129,9 @@ const bodyFor = (/** @type {string} */ tag, /** @type {number} */ index) =>
  * and `computeCatalogIdentity` canonicalizes key order, so insertion order cannot reach it either.
  *
  * @param {readonly string[]} tags
- * @param {{ baseUrl: string, fallbackLocale?: string, tiebreakers?: Record<string, readonly string[]> }} options
+ * @param {{ baseUrl: string, fallbackLocale?: string, tiebreakerLocalesByLanguageCode?: Record<string, readonly string[]> }} options
  */
-function fixture(tags, { baseUrl, fallbackLocale = "en", tiebreakers = {} }) {
+function fixture(tags, { baseUrl, fallbackLocale = "en", tiebreakerLocalesByLanguageCode = {} }) {
   const count = tags.length;
   /** @type {Map<string, Uint8Array>} */
   const bytesByTag = new Map();
@@ -164,7 +164,7 @@ function fixture(tags, { baseUrl, fallbackLocale = "en", tiebreakers = {} }) {
     fallbackLocale,
     baseUrl,
     files,
-    tiebreakers,
+    tiebreakerLocalesByLanguageCode,
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return { manifest: /** @type {any} */ (draft), bytesByTag };
@@ -757,7 +757,7 @@ test("clause 20: the cap and the admission order hold on a fetchSet-derived plan
     const { manifest, bytesByTag } = fixture(SUBSET_TAGS, {
       baseUrl: door.baseUrl,
       fallbackLocale: "en",
-      tiebreakers: { en: [...SUBSET_REGIONS, "en"] },
+      tiebreakerLocalesByLanguageCode: { en: [...SUBSET_REGIONS, "en"] },
     });
 
     // The preconditions, each as its own named assertion. Without a plan longer than the cap there

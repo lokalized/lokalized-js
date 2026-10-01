@@ -65,7 +65,7 @@ const UNDETERMINED_TAG = "und";
  */
 const ORDINALITY_ORDER = /** @type {const} */ (["zero", "one", "two", "few", "many", "other"]);
 
-/** @typedef {Readonly<{ $lokalized: "language-form", axis: "ordinality", name: string, renderName: string }>} OrdinalityValue */
+/** @typedef {import("../core/index.js").Ordinality} Ordinality */
 
 /**
  * One of the root's six `ORDINALITY_*` constants, checked to be exactly that.
@@ -78,17 +78,17 @@ const ORDINALITY_ORDER = /** @type {const} */ (["zero", "one", "two", "few", "ma
  *
  * @param {unknown} form
  * @param {string} name
- * @returns {OrdinalityValue}
+ * @returns {Ordinality}
  */
 function requireOrdinality(form, name) {
-  const tagged = /** @type {Partial<OrdinalityValue> | null} */ (
+  const tagged = /** @type {Partial<Ordinality> | null} */ (
     form !== null && typeof form === "object" ? form : null
   );
 
   if (tagged === null || tagged.$lokalized !== "language-form" || tagged.axis !== "ordinality" || tagged.name !== name)
     throw configurationError(`lokalized/data/ordinal: the root did not supply the ${name} language form`);
 
-  return /** @type {OrdinalityValue} */ (tagged);
+  return /** @type {Ordinality} */ (tagged);
 }
 
 /** CLDR count keyword to the root's own frozen constant. */
@@ -101,7 +101,7 @@ const ORDINALITY_BY_COUNT = freeze({
   other: requireOrdinality(ORDINALITY_OTHER, "ORDINALITY_OTHER"),
 });
 
-/** @type {readonly OrdinalityValue[]} */
+/** @type {readonly Ordinality[]} */
 const NO_ORDINALITIES = freeze([]);
 
 
@@ -258,10 +258,10 @@ function ordinalGroupIndexFor(localeTag) {
 
 /**
  * @param {string} count
- * @returns {OrdinalityValue}
+ * @returns {Ordinality}
  */
 function ordinalityForCount(count) {
-  const ordinality = /** @type {Record<string, OrdinalityValue | undefined>} */ (ORDINALITY_BY_COUNT)[count];
+  const ordinality = /** @type {Record<string, Ordinality | undefined>} */ (ORDINALITY_BY_COUNT)[count];
   if (ordinality === undefined) throw new RangeError(`Unsupported CLDR ordinal category '${count}'`);
   return ordinality;
 }
@@ -275,7 +275,7 @@ function ordinalityForCount(count) {
  *
  * @param {number | bigint | Readonly<{ $lokalized: string, value: string }>} value
  * @param {string} locale
- * @returns {OrdinalityValue}
+ * @returns {Ordinality}
  */
 export function ordinalityForNumber(value, locale) {
   // The VALUE is converted first, and deliberately: `Ordinality.forNumber` is
@@ -300,7 +300,7 @@ export function ordinalityForNumber(value, locale) {
  *
  * @param {Readonly<{ $lokalized: string, value: string }>} value
  * @param {string} locale
- * @returns {OrdinalityValue}
+ * @returns {Ordinality}
  */
 export function ordinalityForOperands(value, locale) {
   return ordinalityForNumber(value, locale);
@@ -314,7 +314,7 @@ export function ordinalityForOperands(value, locale) {
  * throws for that same locale, and the difference is Java's.
  *
  * @param {string} locale
- * @returns {readonly OrdinalityValue[]}
+ * @returns {readonly Ordinality[]}
  */
 export function supportedOrdinalitiesForLocale(locale) {
   const index = ordinalGroupIndexFor(locale);

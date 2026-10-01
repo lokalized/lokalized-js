@@ -54,8 +54,8 @@ const PDI = "⁩";
 function renderedFor(tag) {
   const strings = createStrings({
     fallbackLocale: tag,
-    localeResolver: () => tag,
-    strings: { [tag]: { "Greeting.Named": "Hello, {{name}}" } },
+    localeSupplier: () => tag,
+    localizedStringSupplier: () => ({ [tag]: { "Greeting.Named": "Hello, {{name}}" } }),
   });
   return strings.get("Greeting.Named", { name: "Sarah" });
 }

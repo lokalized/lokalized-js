@@ -16,7 +16,7 @@ import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-err
  * swap stays invisible to a consumer who checks it". It was a plain `Error` with `name` and `code`
  * assigned afterwards, so **119 call sites across `src/` produced a failure no `instanceof` could
  * recognise** — a consumer could only match it by string. That is the THIRD instance of exactly the
- * shape S22 fixed for `StringsLoadingError` and `DigestUnavailableError`, and the largest: it reaches
+ * shape S22 fixed for `LocalizedStringLoadingError` and `DigestUnavailableError`, and the largest: it reaches
  * a caller from `core`, `load`, `ssr` and `node` alike.
  *
  * It is a package export, and its runtime constructor takes an unexported token so plain-JavaScript

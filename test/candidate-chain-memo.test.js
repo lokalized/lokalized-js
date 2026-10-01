@@ -47,7 +47,7 @@ const TIEBREAKERS = { fr: ["fr", "fr-CA"] };
 /** @param {boolean} [disabled] */
 function instance(disabled) {
   return createStrings(/** @type {any} */ ({
-    strings: CATALOGS, fallbackLocale: "en", tiebreakers: TIEBREAKERS, localeResolver: () => "en",
+    localizedStringSupplier: () => (CATALOGS), fallbackLocale: "en", tiebreakerLocalesByLanguageCode: TIEBREAKERS, localeSupplier: () => "en",
     ...(disabled ? { [CANDIDATE_CHAIN_MEMO_DISABLED]: true } : {}),
   }));
 }
@@ -97,7 +97,7 @@ describe("the enabled branch is bounded at 256 and evicts deterministically", ()
     // own door (`freeze({ locale: normalizeTag(locale) })`), so a probe built from it hands the memo
     // a tag that was already canonical and tests that helper rather than this key: keying on the
     // caller's raw spelling turned ZERO tests red until this call changed. `get` takes a plain
-    // `TranslationCallOptions`, which is the door a raw spelling actually arrives through — and the
+    // `TranslationOptions`, which is the door a raw spelling actually arrives through — and the
     // same shape as M9 S3's E5, where `parseStrings` normalized upstream of the merge.
     const strings = instance();
     strings.get("K", undefined, { locale: "fr-ca" });
@@ -128,16 +128,16 @@ describe("the enabled branch is bounded at 256 and evicts deterministically", ()
 
 describe("the memo is per INSTANCE, which is the only thing that makes the key safe", () => {
   test("two instances with different catalogs do not share a chain", () => {
-    // `candidateChain(tag, supported, fallbackLocale, tiebreakers)` takes four arguments and this
+    // `candidateChain(tag, supported, fallbackLocale, tiebreakerLocalesByLanguageCode)` takes four arguments and this
     // caches on one. The other three are instance constants — `supported` is `[...catalogs.keys()]`,
     // computed once in `createStrings` — so keying on the tag alone is safe PER INSTANCE and wrong
     // across instances. A module-scope map would answer the second instance from the first.
     const withCanadian = createStrings({
-      strings: { en: { K: "en" }, fr: { K: "fr" }, "fr-CA": { K: "fr-CA" } },
-      fallbackLocale: "en", tiebreakers: { fr: ["fr", "fr-CA"] }, localeResolver: () => "en",
+      localizedStringSupplier: () => ({ en: { K: "en" }, fr: { K: "fr" }, "fr-CA": { K: "fr-CA" } }),
+      fallbackLocale: "en", tiebreakerLocalesByLanguageCode: { fr: ["fr", "fr-CA"] }, localeSupplier: () => "en",
     });
     const withoutCanadian = createStrings({
-      strings: { en: { K: "en" }, fr: { K: "fr" } }, fallbackLocale: "en", localeResolver: () => "en",
+      localizedStringSupplier: () => ({ en: { K: "en" }, fr: { K: "fr" } }), fallbackLocale: "en", localeSupplier: () => "en",
     });
 
     assert.equal(withCanadian.get("K", undefined, forLocale("fr-CA")), "fr-CA");
@@ -192,8 +192,8 @@ describe("neither branch grows retained memory from 4,096 to 40,960 tags", () =>
       import { createStrings, forLocale } from ${JSON.stringify(new URL("src/core/index.js", root).href)};
       import { CANDIDATE_CHAIN_MEMO_DISABLED } from ${JSON.stringify(new URL("src/internal/locale.js", root).href)};
       const gc = globalThis.gc;
-      const make = (off) => createStrings({ strings: ${JSON.stringify(CATALOGS)},
-        fallbackLocale: "en", tiebreakers: ${JSON.stringify(TIEBREAKERS)}, localeResolver: () => "en",
+      const make = (off) => createStrings({ localizedStringSupplier: () => (${JSON.stringify(CATALOGS)}),
+        fallbackLocale: "en", tiebreakerLocalesByLanguageCode: ${JSON.stringify(TIEBREAKERS)}, localeSupplier: () => "en",
         ...(off ? { [CANDIDATE_CHAIN_MEMO_DISABLED]: true } : {}) });
       const measure = (fn) => { gc(); gc(); const before = process.memoryUsage().heapUsed; fn();
         gc(); gc(); return process.memoryUsage().heapUsed - before; };

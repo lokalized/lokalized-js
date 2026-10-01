@@ -174,14 +174,14 @@ describe("the stamp crosses from a file:-loaded server to an https:-loaded clien
 
       const manifest = parseStringsManifest(await (await fetch(shop.manifestUrl)).text());
       const loaded = await loadStrings(manifest, stamp.lookupLocale);
-      const client = createStrings({ loaded, localeResolver: () => stamp.lookupLocale });
+      const client = createStrings({ loaded, localeSupplier: () => stamp.lookupLocale });
 
       // The client holds only the NARROW projection — selected locale and match type — which is all
       // the stamp is allowed to carry. Plan 6.4:2267-2270: it "never leaks requested ranges,
       // q-values, fallback configuration, or the supported/considered locale inventory".
-      const context = stamp.localeMatch.matchType === "exact" && stamp.localeMatch.locale === null
+      const context = stamp.localeMatchResult.matchType === "exact" && stamp.localeMatchResult.locale === null
         ? { kind: /** @type {const} */ ("locale"), locale: stamp.lookupLocale }
-        : { kind: /** @type {const} */ ("locale-match"), localeMatch: stamp.localeMatch };
+        : { kind: /** @type {const} */ ("locale-match"), localeMatchResult: stamp.localeMatchResult };
       validateSsrStamp(stamp, client, context);
 
       // ANTI-VACUITY: a validation that accepts anything proves nothing about the one above.

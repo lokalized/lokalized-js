@@ -63,7 +63,7 @@ export function chain(manifest, lookupLocale, options = {}) {
   // recorded — plan 6.1: "both functions use and record the normalized serialized value".
   const lookup = normalizeTag(lookupLocale);
   return Object.freeze(
-    candidateChain(lookup, Object.keys(validated.files), validated.fallbackLocale, validated.tiebreakers),
+    candidateChain(lookup, Object.keys(validated.files), validated.fallbackLocale, validated.tiebreakerLocalesByLanguageCode),
   );
 }
 

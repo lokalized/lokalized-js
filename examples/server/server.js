@@ -44,7 +44,7 @@ import { createServer } from "node:http";
 import { createStrings, forLocale, forLocaleMatch } from "lokalized/core";
 import { fetchSet } from "lokalized/load";
 import { loadEntireManifestFromFiles } from "lokalized/node";
-import { createLocaleNegotiator, parseLanguageRanges } from "lokalized/negotiate";
+import { createLocaleMatcher, parseLanguageRanges } from "lokalized/negotiate";
 import { createSsrStamp } from "lokalized/ssr";
 import { GENDER_FEMININE } from "lokalized";
 
@@ -52,7 +52,7 @@ import { localCatalogManifest, publishCatalogs } from "./publish.js";
 import { MATCH_PRESERVING_VARY } from "../app/cache-policy.js";
 import { renderPage } from "../app/render.js";
 
-/** @typedef {import("lokalized/core").LocaleMatch} LocaleMatch */
+/** @typedef {import("lokalized/core").LocaleMatchResult} LocaleMatchResult */
 /** @typedef {import("lokalized/load").StringsManifestV1} StringsManifestV1 */
 
 /** The same view model the edge example renders, so the two are comparable. */
@@ -83,8 +83,8 @@ export async function startBookshop(options = {}) {
   const loaded = await loadEntireManifestFromFiles(local);
   // ONE instance for every request, so the resolver cannot know a request's language: each render
   // names it per call, from the negotiated match. The resolver answers only a lookup that forgot to.
-  const strings = createStrings({ loaded, localeResolver: () => loaded.fallbackLocale });
-  const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
+  const strings = createStrings({ loaded, localeSupplier: () => loaded.fallbackLocale });
+  const negotiator = createLocaleMatcher(strings.getLocaleConfiguration());
 
   const server = createServer();
   await new Promise((resolve, reject) => {
@@ -182,7 +182,7 @@ export async function startBookshop(options = {}) {
     const callOptions = match === null ? forLocale(lookupLocale) : forLocaleMatch(match);
     const stamp = createSsrStamp(strings, match === null
       ? { kind: "locale", locale: lookupLocale }
-      : { kind: "locale-match", localeMatch: match });
+      : { kind: "locale-match", localeMatchResult: match });
 
     const document = renderPage(strings, {
       callOptions,
@@ -207,9 +207,9 @@ export async function startBookshop(options = {}) {
 /**
  * The strict negotiation door behind the fail-soft guard the edge worker also uses.
  *
- * @param {ReturnType<typeof createLocaleNegotiator>} negotiator
+ * @param {ReturnType<typeof createLocaleMatcher>} negotiator
  * @param {string | null} header
- * @returns {LocaleMatch | null}
+ * @returns {LocaleMatchResult | null}
  */
 function matchOrNull(negotiator, header) {
   if (header === null || header.trim() === "") return null;

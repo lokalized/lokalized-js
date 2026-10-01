@@ -68,9 +68,9 @@ export async function measureVariant(root, variant) {
   const construct = (/** @type {any} */ mod) =>
     mod.createStrings(handed = {
       fallbackLocale: RECIPE.construction.fallbackLocale,
-      localeResolver: () => RECIPE.construction.localeResolverAnswers,
-      strings: catalogsFor(variant),
-      tiebreakers: TIEBREAKERS,
+      localeSupplier: () => RECIPE.construction.localeSupplierAnswers,
+      localizedStringSupplier: () => (catalogsFor(variant)),
+      tiebreakerLocalesByLanguageCode: TIEBREAKERS,
     });
   const render = (/** @type {any} */ strings) => strings.get(RECIPE.render.key, { ...RECIPE.render.values });
 

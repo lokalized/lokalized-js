@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * Manifest tiebreakers across the loader seam — plan 6.2:2103-2107, M8 acceptance clause 30.
+ * Manifest tiebreakerLocalesByLanguageCode across the loader seam — plan 6.2:2103-2107, M8 acceptance clause 30.
  *
  * **THE CLAUSE WAS UNIMPLEMENTED IN BOTH HALVES AND THE FLAGSHIP DOOR WAS BROKEN BY IT.** Plan
- * 6.2:2103 says manifest tiebreakers are "validated against the full manifest, then filtered to
+ * 6.2:2103 says manifest tiebreakerLocalesByLanguageCode are "validated against the full manifest, then filtered to
  * successfully loaded tags while preserving each declared tiebreaker-list order", and that "a
  * language entry with zero successful catalogs is omitted rather than retained as an invalid empty
  * order". Neither sentence had any code. What that cost:
@@ -15,11 +15,11 @@
  *     `complete: true` record that its own `createStrings` refused.
  *   - A directory holding `en.json` beside `en-GB.json` — the most ordinary multi-catalog layout
  *     there is — generated a manifest, loaded it with `complete: true`, and then refused to
- *     construct, advising the caller to pass `createStrings({ tiebreakers })`, which the loaded
+ *     construct, advising the caller to pass `createStrings({ tiebreakerLocalesByLanguageCode })`, which the loaded
  *     branch explicitly forbids (`loaded-input.js:49`). Unfollowable advice on an ordinary input.
  *
  * **WHY 1,069 TESTS MISSED IT, which is the part worth keeping:** every fixture in
- * `fetch-loader.test.js` and `node-file-loader.test.js` declares `tiebreakers: {}`. The seam was
+ * `fetch-loader.test.js` and `node-file-loader.test.js` declares `tiebreakerLocalesByLanguageCode: {}`. The seam was
  * covered in both directions and the one input that discriminates never appeared — the `Zzzz` shape
  * again, this time spelled as an empty object.
  */
@@ -39,13 +39,13 @@ const utf8 = new TextEncoder();
 const bodyFor = (/** @type {string} */ tag) => JSON.stringify({ [`Key.${tag}`]: `hello ${tag}` });
 
 /** A manifest whose fingerprint matches its contents. */
-function manifest(tags, { fallbackLocale = "en", tiebreakers = {} } = {}) {
+function manifest(tags, { fallbackLocale = "en", tiebreakerLocalesByLanguageCode = {} } = {}) {
   const files = Object.fromEntries(tags.map((/** @type {string} */ tag) =>
     [tag, { url: `${tag}.json`, sha256: sha256Hex(utf8.encode(bodyFor(tag))) }]));
   const draft = {
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
     ...BUILD_IDENTITY,
-    fallbackLocale, baseUrl: "https://cdn.example/v1/", files, tiebreakers,
+    fallbackLocale, baseUrl: "https://cdn.example/v1/", files, tiebreakerLocalesByLanguageCode,
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return /** @type {any} */ (draft);
@@ -77,12 +77,12 @@ test("a lookup-subset load produces a record its OWN core accepts", async () => 
   // fetches `fr` and the fallback `en` and nothing else. Handing the core all three names is a
   // permutation of catalogs that did not arrive, and it refuses.
   const m = manifest(["en", "en-GB", "en-US", "fr"],
-    { fallbackLocale: "en", tiebreakers: { en: ["en-GB", "en-US", "en"] } });
+    { fallbackLocale: "en", tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en-US", "en"] } });
   const loaded = await loadStrings(m, "fr", { fetch: async (/** @type {string} */ u) => okBody(u) });
 
   assert.equal(loaded.complete, true, "nothing failed; this is a complete SUBSET load");
-  assert.deepEqual({ ...loaded.tiebreakers }, { en: ["en"] });
-  assert.doesNotThrow(() => createStrings({ loaded, localeResolver: () => "fr" }));
+  assert.deepEqual({ ...loaded.tiebreakerLocalesByLanguageCode }, { en: ["en"] });
+  assert.doesNotThrow(() => createStrings({ loaded, localeSupplier: () => "fr" }));
 });
 
 test("the DECLARED ORDER survives filtering rather than being re-derived", async () => {
@@ -90,26 +90,26 @@ test("the DECLARED ORDER survives filtering rather than being re-derived", async
   // would produce `["en", "en-GB"]` here and look entirely correct. This list IS the resolution
   // order for an ambiguous language code, so its order is the whole content.
   const m = manifest(["en", "en-GB", "en-US", "fr"],
-    { fallbackLocale: "en", tiebreakers: { en: ["en-GB", "en-US", "en"] } });
+    { fallbackLocale: "en", tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en-US", "en"] } });
   const loaded = await loadEntireManifest(m, {
     fetch: failing(["en-US"]), partialFailure: "allow-partial",
   });
 
-  assert.deepEqual({ ...loaded.tiebreakers }, { en: ["en-GB", "en"] });
-  assert.notDeepEqual(loaded.tiebreakers.en, ["en", "en-GB"], "sorted, not declared, would pass everything else here");
+  assert.deepEqual({ ...loaded.tiebreakerLocalesByLanguageCode }, { en: ["en-GB", "en"] });
+  assert.notDeepEqual(loaded.tiebreakerLocalesByLanguageCode.en, ["en", "en-GB"], "sorted, not declared, would pass everything else here");
 });
 
 test("a language with ZERO surviving catalogs is OMITTED, not kept as an empty order", async () => {
   // Plan 6.2:2105 names this separately because the two values are not the same thing: an empty
   // array is a declared order that resolves nothing, and the core validates it strictly.
   const m = manifest(["en", "fr", "fr-CA"],
-    { fallbackLocale: "en", tiebreakers: { fr: ["fr", "fr-CA"] } });
+    { fallbackLocale: "en", tiebreakerLocalesByLanguageCode: { fr: ["fr", "fr-CA"] } });
   const loaded = await loadStrings(m, "en", { fetch: async (/** @type {string} */ u) => okBody(u) });
 
   assert.deepEqual(Object.keys(loaded.catalogs), ["en"]);
-  assert.equal(Object.prototype.hasOwnProperty.call(loaded.tiebreakers, "fr"), false,
+  assert.equal(Object.prototype.hasOwnProperty.call(loaded.tiebreakerLocalesByLanguageCode, "fr"), false,
     "an omitted language must be ABSENT, not present with an empty list");
-  assert.doesNotThrow(() => createStrings({ loaded, localeResolver: () => "en" }));
+  assert.doesNotThrow(() => createStrings({ loaded, localeSupplier: () => "en" }));
 });
 
 test("SELECTION keeps the full manifest while RESOLUTION keeps what loaded", async () => {
@@ -117,18 +117,18 @@ test("SELECTION keeps the full manifest while RESOLUTION keeps what loaded", asy
   // `manifestLocaleConfiguration` as well would make a partial load unable to SELECT a locale the
   // manifest declares, which is the S9-owed half's entire subject.
   const m = manifest(["en", "en-GB", "en-US", "fr"],
-    { fallbackLocale: "en", tiebreakers: { en: ["en-GB", "en-US", "en"] } });
+    { fallbackLocale: "en", tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en-US", "en"] } });
   const loaded = await loadEntireManifest(m, {
     fetch: failing(["en-GB", "en-US"]), partialFailure: "allow-partial",
   });
 
   assert.equal(loaded.complete, false);
-  assert.deepEqual({ ...loaded.tiebreakers }, { en: ["en"] }, "resolution: only what loaded");
-  assert.deepEqual({ ...loaded.manifestLocaleConfiguration.tiebreakers }, { en: ["en-GB", "en-US", "en"] },
+  assert.deepEqual({ ...loaded.tiebreakerLocalesByLanguageCode }, { en: ["en"] }, "resolution: only what loaded");
+  assert.deepEqual({ ...loaded.manifestLocaleConfiguration.tiebreakerLocalesByLanguageCode }, { en: ["en-GB", "en-US", "en"] },
     "selection: the full manifest, unfiltered");
 
-  const strings = createStrings({ loaded, localeResolver: () => "en" });
-  assert.deepEqual({ ...strings.getLocaleConfiguration().tiebreakers }, { en: ["en-GB", "en-US", "en"] });
+  const strings = createStrings({ loaded, localeSupplier: () => "en" });
+  assert.deepEqual({ ...strings.getLocaleConfiguration().tiebreakerLocalesByLanguageCode }, { en: ["en-GB", "en-US", "en"] });
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -142,21 +142,21 @@ test("a tiebreaker naming a file the manifest does not declare is REFUSED", () =
   // and silently resolved by a two-name order where three were intended.
   assert.throws(
     () => validateStringsManifest(manifest(["en", "en-GB", "fr"],
-      { tiebreakers: { en: ["en-GB", "en-UK", "en"] } })),
+      { tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en-UK", "en"] } })),
     /must be an exact permutation of the files the manifest declares[\s\S]*unrelated: \[en-UK\]/);
 });
 
 test("a tiebreaker that OMITS a declared sibling is REFUSED", () => {
   assert.throws(
     () => validateStringsManifest(manifest(["en", "en-GB", "en-US", "fr"],
-      { tiebreakers: { en: ["en-GB", "en"] } })),
+      { tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en"] } })),
     /missing: \[en-US\]/);
 });
 
 test("a tiebreaker for a language the manifest publishes nothing for is REFUSED", () => {
   assert.throws(
-    () => validateStringsManifest(manifest(["en", "fr"], { tiebreakers: { de: ["de"] } })),
-    /declares tiebreakers for 'de' but no file for that language/);
+    () => validateStringsManifest(manifest(["en", "fr"], { tiebreakerLocalesByLanguageCode: { de: ["de"] } })),
+    /declares tiebreakerLocalesByLanguageCode for 'de' but no file for that language/);
 });
 
 test("an AMBIGUOUS language with no tiebreaker at all is REFUSED, at publication", () => {
@@ -164,24 +164,24 @@ test("an AMBIGUOUS language with no tiebreaker at all is REFUSED, at publication
   // outright (`DefaultStrings.<init>:388`), so a manifest that omits the tiebreaker describes
   // coverage nothing can load. Refusing it here is the difference between the publisher learning it
   // at build time and a browser learning it at run time — with advice it cannot follow, because
-  // `createStrings({ loaded, tiebreakers })` is itself refused.
+  // `createStrings({ loaded, tiebreakerLocalesByLanguageCode })` is itself refused.
   assert.throws(
     () => validateStringsManifest(manifest(["en", "en-GB", "fr"])),
-    /declares 2 files for 'en' \[en, en-GB\] and no tiebreakers for it/);
+    /declares 2 files for 'en' \[en, en-GB\] and no tiebreakerLocalesByLanguageCode for it/);
 });
 
 test("THE CONTROLS: a legal manifest validates, and one file per language needs no tiebreaker", () => {
   // Without these every refusal above could be firing for an unrelated reason — the `zh-123` shape,
   // which this project has now hit inside its own probe spaces four times.
   assert.doesNotThrow(() => validateStringsManifest(manifest(["en", "en-GB", "fr"],
-    { tiebreakers: { en: ["en-GB", "en"] } })));
+    { tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en"] } })));
   assert.doesNotThrow(() => validateStringsManifest(manifest(["en", "fr", "de"])));
 });
 
 test("a repeated tiebreaker entry is refused rather than silently deduplicated", () => {
   assert.throws(
     () => validateStringsManifest(manifest(["en", "en-GB", "fr"],
-      { tiebreakers: { en: ["en-GB", "en-GB", "en"] } })),
+      { tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en-GB", "en"] } })),
     /name 'en-GB' twice/);
 });
 

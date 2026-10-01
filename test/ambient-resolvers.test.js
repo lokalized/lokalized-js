@@ -1,8 +1,8 @@
 // @ts-check
 
 /**
- * The locale INGRESS: `localeResolver` / `localeMatchResolver` on the instance, `locale` /
- * `localeMatch` per call, and the two-layer validation of a caller-supplied `LocaleMatchResult`.
+ * The locale INGRESS: `localeSupplier` / `localeMatchSupplier` on the instance, `locale` /
+ * `localeMatchResult` per call, and the two-layer validation of a caller-supplied `LocaleMatchResult`.
  *
  * The corpus covers this ingress heavily — 131 rows install a supplier and 51 of those exist purely
  * to refuse a fabricated match — so most of what is asserted here is deliberately NOT a restatement
@@ -20,7 +20,7 @@
  *   - THE CONSTRUCTION-TIME EXCLUSION of two locale sources. `DefaultStrings:254`'s both-present arm
  *     is DEAD in Java — `Strings.Builder`'s setters each null the other — so no oracle run can
  *     corroborate the JS refusal and no corpus row will ever reach it. It is a recorded decision.
- *   - THE PER-CALL EXCLUSION of `locale` and `localeMatch`, for the same reason: Java's counterpart
+ *   - THE PER-CALL EXCLUSION of `locale` and `localeMatchResult`, for the same reason: Java's counterpart
  *     state is decided by builder setter order, and the six corpus rows that record it are
  *     classified as having no JS counterpart precisely so that nothing here can be inferred from
  *     them.
@@ -33,7 +33,7 @@
  *     the recorded `requestedLanguageRanges` — Java's constructor guarantees it is there — so 14
  *     runnable rows now DO compare the weight the port produces. What no row can see is the round
  *     trip itself: that the match `matchForLanguageRanges` returns survives being handed straight
- *     back through `{ localeMatch }`. Nothing in the corpus feeds a produced match into a lookup,
+ *     back through `{ localeMatchResult }`. Nothing in the corpus feeds a produced match into a lookup,
  *     and the port failed exactly that for every weighted range until the producer began emitting
  *     the pair. The test below is the whole guard.
  */
@@ -42,15 +42,15 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { createStrings, forLocaleMatch } from "../src/core/index.js";
-import { createLocaleNegotiator } from "../src/negotiate/index.js";
+import { createLocaleMatcher } from "../src/negotiate/index.js";
 
 /** Two catalogs, one key each, and a fallback that names a loaded one. */
 const EN_FR = {
   fallbackLocale: "en",
-  strings: {
+  localizedStringSupplier: () => ({
     en: { "Greeting.Hello": "Hello", "Only.En": "en-only" },
     fr: { "Greeting.Hello": "Bonjour", "Only.Fr": "fr-only" },
-  },
+  }),
 };
 
 /** A structurally valid match selecting `fr` over the `EN_FR` configuration. */
@@ -80,15 +80,15 @@ describe("createStrings — exactly one locale source", () => {
     // state through its builder, so nothing measures it; the argument is that an object literal is
     // the analogue of the CONSTRUCTOR, and last-key-wins would make behaviour depend on spread order.
     assert.throws(
-      () => createStrings({ ...EN_FR, localeResolver: () => "en", localeMatchResolver: frMatch }),
-      /exactly one of 'localeResolver' or 'localeMatchResolver'; received \[localeResolver, localeMatchResolver\]/,
+      () => createStrings({ ...EN_FR, localeSupplier: () => "en", localeMatchSupplier: frMatch }),
+      /exactly one of 'localeSupplier' or 'localeMatchSupplier'; received \[localeSupplier, localeMatchSupplier\]/,
     );
   });
 
   it("refuses neither — Java's own at-least-one half, and what makes an instance say how it finds a language", () => {
     assert.throws(
       () => createStrings({ ...EN_FR }),
-      { name: "RangeError", message: "createStrings requires exactly one of 'localeResolver' or 'localeMatchResolver'; received none" },
+      { name: "RangeError", message: "createStrings requires exactly one of 'localeSupplier' or 'localeMatchSupplier'; received none" },
     );
   });
 
@@ -96,37 +96,37 @@ describe("createStrings — exactly one locale source", () => {
     // `locale` was an option through 1.0.0-rc.2 (a language fixed at construction), removed by the
     // maintainer's decision of 2026-09-27. The generic unknown-option message would leave a caller of
     // either release candidate guessing, so the refusal names the resolver and the per-call option.
-    for (const options of [{ locale: "fr" }, { locale: "fr", localeResolver: () => "fr" }]) {
+    for (const options of [{ locale: "fr" }, { locale: "fr", localeSupplier: () => "fr" }]) {
       assert.throws(
         () => createStrings(/** @type {any} */ ({ ...EN_FR, ...options })),
         (/** @type {any} */ error) =>
           error.name === "ConfigurationError" && error.code === "CONFIGURATION" &&
-          /does not take 'locale'/.test(error.message) && /localeResolver/.test(error.message) &&
+          /does not take 'locale'/.test(error.message) && /localeSupplier/.test(error.message) &&
           /\{ locale: "fr" \}/.test(error.message),
       );
     }
   });
 
   it("accepts each source on its own — the control", () => {
-    assert.equal(createStrings({ ...EN_FR, localeResolver: () => "fr" }).get("Greeting.Hello"), "Bonjour");
-    assert.equal(createStrings({ ...EN_FR, localeMatchResolver: frMatch }).get("Greeting.Hello"), "Bonjour");
+    assert.equal(createStrings({ ...EN_FR, localeSupplier: () => "fr" }).get("Greeting.Hello"), "Bonjour");
+    assert.equal(createStrings({ ...EN_FR, localeMatchSupplier: frMatch }).get("Greeting.Hello"), "Bonjour");
   });
 
   it("refuses a resolver that is not a function", () => {
     assert.throws(
-      () => createStrings({ ...EN_FR, localeResolver: /** @type {any} */ ("fr") }),
-      /localeResolver.*must be a function/s,
+      () => createStrings({ ...EN_FR, localeSupplier: /** @type {any} */ ("fr") }),
+      /localeSupplier.*must be a function/s,
     );
     assert.throws(
-      () => createStrings({ ...EN_FR, localeMatchResolver: /** @type {any} */ ({}) }),
-      /localeMatchResolver.*must be a function/s,
+      () => createStrings({ ...EN_FR, localeMatchSupplier: /** @type {any} */ ({}) }),
+      /localeMatchSupplier.*must be a function/s,
     );
   });
 
   it("treats an explicitly null resolver as an omitted one", () => {
     // The `== null` rule every other option follows. Two sources are refused; a null one is not a
     // source at all, so the match resolver beside it still applies.
-    const strings = createStrings({ ...EN_FR, localeMatchResolver: frMatch, localeResolver: /** @type {any} */ (null) });
+    const strings = createStrings({ ...EN_FR, localeMatchSupplier: frMatch, localeSupplier: /** @type {any} */ (null) });
     assert.equal(strings.get("Greeting.Hello"), "Bonjour");
   });
 });
@@ -137,22 +137,22 @@ describe("the ingress arms, and the asymmetry between them", () => {
   // `zh-TW` step is simply not there. A port that picks one convention passes half of this.
   const ZH = {
     fallbackLocale: "en",
-    tiebreakers: { zh: ["zh", "zh-Hant"] },
-    strings: {
+    tiebreakerLocalesByLanguageCode: { zh: ["zh", "zh-Hant"] },
+    localizedStringSupplier: () => ({
       zh: { "Checkout.Title": "结账" },
       "zh-Hant": { "Unrelated.Key": "無關" },
       en: { "Checkout.Title": "Checkout" },
-    },
+    }),
   };
   const zhHantMatch = (/** @type {ReturnType<typeof createStrings>} */ probe) =>
-    probe.getDirectLocaleContext("zh-TW").localeMatch;
+    probe.getDirectLocaleContext("zh-TW").localeMatchResult;
 
   it("a locale source keeps the REQUESTED tag as the lookup locale", () => {
     // The resolver, and the per-call `locale` over a resolver answering something else: the two arms
     // that name a TAG. (The constant `createStrings({ locale })` arm was removed before 1.0.0.)
-    const perCall = createStrings({ ...ZH, localeResolver: () => "en" });
+    const perCall = createStrings({ ...ZH, localeSupplier: () => "en" });
     for (const result of [
-      createStrings({ ...ZH, localeResolver: () => "zh-TW" }).getResult("Checkout.Title"),
+      createStrings({ ...ZH, localeSupplier: () => "zh-TW" }).getResult("Checkout.Title"),
       perCall.getResult("Checkout.Title", undefined, { locale: "zh-TW" }),
     ]) {
       assert.equal(result.lookupLocale, "zh-TW");
@@ -161,16 +161,16 @@ describe("the ingress arms, and the asymmetry between them", () => {
   });
 
   it("a match source replaces it with the SELECTION", () => {
-    const probe = createStrings({ ...ZH, localeResolver: () => "en" });
+    const probe = createStrings({ ...ZH, localeSupplier: () => "en" });
     const match = zhHantMatch(probe);
     assert.equal(match.locale, "zh-Hant");
 
-    const viaResolver = createStrings({ ...ZH, localeMatchResolver: () => match })
+    const viaResolver = createStrings({ ...ZH, localeMatchSupplier: () => match })
       .getResult("Checkout.Title");
     assert.equal(viaResolver.lookupLocale, "zh-Hant");
     assert.deepEqual([...viaResolver.attemptedLocales], ["zh-Hant", "en"]);
 
-    const perCall = probe.getResult("Checkout.Title", undefined, { localeMatch: match });
+    const perCall = probe.getResult("Checkout.Title", undefined, { localeMatchResult: match });
     assert.equal(perCall.lookupLocale, "zh-Hant");
     assert.deepEqual([...perCall.attemptedLocales], ["zh-Hant", "en"]);
   });
@@ -178,7 +178,7 @@ describe("the ingress arms, and the asymmetry between them", () => {
   it("an unmatched supplied match looks up through its own fallback locale", () => {
     const strings = createStrings({
       ...EN_FR,
-      localeMatchResolver: () => ({
+      localeMatchSupplier: () => ({
         requestedLanguageRanges: [{ range: "de", weight: 1 }],
         locale: null,
         languageRange: null,
@@ -199,7 +199,7 @@ describe("the ingress arms, and the asymmetry between them", () => {
 
   it("consults the resolver once per lookup and not at construction", () => {
     let calls = 0;
-    const strings = createStrings({ ...EN_FR, localeResolver: () => { ++calls; return "fr"; } });
+    const strings = createStrings({ ...EN_FR, localeSupplier: () => { ++calls; return "fr"; } });
     assert.equal(calls, 0);
     strings.get("Greeting.Hello");
     strings.get("Greeting.Hello");
@@ -210,28 +210,28 @@ describe("the ingress arms, and the asymmetry between them", () => {
     // The absence IS the assertion: the resolver would throw if it ran.
     const strings = createStrings({
       ...EN_FR,
-      localeMatchResolver: () => { throw new Error("the resolver must not be consulted"); },
+      localeMatchSupplier: () => { throw new Error("the resolver must not be consulted"); },
     });
     assert.equal(strings.get("Greeting.Hello", undefined, { locale: "fr" }), "Bonjour");
     // Nor for the standalone diagnostic, which touches no callback at all.
-    assert.equal(strings.getDirectLocaleContext("fr").localeMatch.locale, "fr");
+    assert.equal(strings.getDirectLocaleContext("fr").localeMatchResult.locale, "fr");
   });
 
   it("refuses a resolver that answers null", () => {
     assert.throws(
-      () => createStrings({ ...EN_FR, localeResolver: () => /** @type {any} */ (null) }).get("Greeting.Hello"),
-      /localeResolver returned null/,
+      () => createStrings({ ...EN_FR, localeSupplier: () => /** @type {any} */ (null) }).get("Greeting.Hello"),
+      /localeSupplier returned null/,
     );
     assert.throws(
-      () => createStrings({ ...EN_FR, localeMatchResolver: () => /** @type {any} */ (null) }).get("Greeting.Hello"),
-      /localeMatchResolver returned null/,
+      () => createStrings({ ...EN_FR, localeMatchSupplier: () => /** @type {any} */ (null) }).get("Greeting.Hello"),
+      /localeMatchSupplier returned null/,
     );
   });
 
-  it("refuses a per-call object naming both a locale and a localeMatch", () => {
-    const strings = createStrings({ ...EN_FR, localeResolver: () => "en" });
+  it("refuses a per-call object naming both a locale and a localeMatchResult", () => {
+    const strings = createStrings({ ...EN_FR, localeSupplier: () => "en" });
     assert.throws(
-      () => strings.getResult("Greeting.Hello", undefined, { locale: "fr", localeMatch: frMatch() }),
+      () => strings.getResult("Greeting.Hello", undefined, { locale: "fr", localeMatchResult: frMatch() }),
       /names two locale sources/,
     );
   });
@@ -308,15 +308,15 @@ describe("layer one — LocaleMatchResult's own rules, and their order", () => {
     // not be tried: `supplied-match.range.identity-includes-weight` is a recorded row whose
     // effective weight is 0.5 against a range weight of 1.0, and Java REFUSES it. The range carries
     // its own weight or the two are conflated.
-    const strings = createStrings({ ...EN_FR, localeResolver: () => "en" });
-    const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
+    const strings = createStrings({ ...EN_FR, localeSupplier: () => "en" });
+    const negotiator = createLocaleMatcher(strings.getLocaleConfiguration());
 
     for (const weight of [0.5, 0.7, 1]) {
       const match = negotiator.matchForLanguageRanges([{ range: "fr", weight }]);
 
       assert.deepEqual(match.languageRange, { range: "fr", weight },
         `the produced match must carry the governing range's OWN weight (q=${weight})`);
-      assert.equal(strings.get("Greeting.Hello", undefined, { localeMatch: match }), "Bonjour",
+      assert.equal(strings.get("Greeting.Hello", undefined, { localeMatchResult: match }), "Bonjour",
         `a match won at q=${weight} must survive being handed straight back`);
       assert.equal(strings.get("Greeting.Hello", undefined, forLocaleMatch(match)), "Bonjour",
         `and must survive the forLocaleMatch door too (q=${weight})`);
@@ -377,15 +377,15 @@ describe("layer one — LocaleMatchResult's own rules, and their order", () => {
   it("refuses an isMatch that contradicts the selection", () => {
     assert.equal(
       refuse({ isMatch: false }),
-      "forLocaleMatch(localeMatch) isMatch must be true exactly when a locale was selected",
+      "forLocaleMatch(localeMatchResult) isMatch must be true exactly when a locale was selected",
     );
   });
 
-  it("validates a hand-written per-call localeMatch the same way", () => {
-    const strings = createStrings({ ...EN_FR, localeResolver: () => "en" });
+  it("validates a hand-written per-call localeMatchResult the same way", () => {
+    const strings = createStrings({ ...EN_FR, localeSupplier: () => "en" });
     assert.throws(
       () => strings.getResult("Greeting.Hello", undefined,
-        { localeMatch: /** @type {any} */ ({ ...frMatch(), effectiveWeight: 0 }) }),
+        { localeMatchResult: /** @type {any} */ ({ ...frMatch(), effectiveWeight: 0 }) }),
       /finite effective weight greater than 0/,
     );
   });
@@ -394,7 +394,7 @@ describe("layer one — LocaleMatchResult's own rules, and their order", () => {
 describe("layer two — the instance's own check", () => {
   const refuse = (/** @type {Record<string, unknown>} */ overrides, /** @type {any} */ config = EN_FR) =>
     message(() =>
-      createStrings({ ...config, localeMatchResolver: () => /** @type {any} */ ({ ...frMatch(), ...overrides }) })
+      createStrings({ ...config, localeMatchSupplier: () => /** @type {any} */ ({ ...frMatch(), ...overrides }) })
         .get("Greeting.Hello"));
 
   it("accepts the valid control", () => {
@@ -430,11 +430,11 @@ describe("layer two — the instance's own check", () => {
   describe("compares JDK-normalized tags, not CLDR equivalence", () => {
     const HE = {
       fallbackLocale: "en",
-      strings: { en: { "Greeting.Hello": "Hello" }, he: { "Greeting.Hello": "שלום" } },
+      localizedStringSupplier: () => ({ en: { "Greeting.Hello": "Hello" }, he: { "Greeting.Hello": "שלום" } }),
     };
     const RO = {
       fallbackLocale: "en",
-      strings: { en: { "Greeting.Hello": "Hello" }, ro: { "Greeting.Hello": "Salut" } },
+      localizedStringSupplier: () => ({ en: { "Greeting.Hello": "Hello" }, ro: { "Greeting.Hello": "Salut" } }),
     };
     const heMatch = (/** @type {string[]} */ considered) => ({
       requestedLanguageRanges: [{ range: "he", weight: 1 }],
@@ -451,7 +451,7 @@ describe("layer two — the instance's own check", () => {
       fallbackLocale: "en", consideredLocales: considered, isMatch: true,
     });
     const run = (/** @type {any} */ config, /** @type {any} */ match) =>
-      message(() => createStrings({ ...config, localeMatchResolver: () => match }).get("Greeting.Hello"));
+      message(() => createStrings({ ...config, localeMatchSupplier: () => match }).get("Greeting.Hello"));
 
     it("ACCEPTS a legacy spelling the JDK canonicalizes — iw is he", () => {
       // `Locale.forLanguageTag("iw").toLanguageTag()` is `he` on the pinned Corretto 21.
@@ -472,7 +472,7 @@ describe("layer two — the instance's own check", () => {
     it("applies the same rule to the fallback locale", () => {
       const FIL = {
         fallbackLocale: "fil",
-        strings: { fil: { "Greeting.Hello": "Kamusta" }, en: { "Greeting.Hello": "Hello" } },
+        localizedStringSupplier: () => ({ fil: { "Greeting.Hello": "Kamusta" }, en: { "Greeting.Hello": "Hello" } }),
       };
       // The fallback must be among the considered locales or layer ONE refuses it first, so the two
       // travel together — which is also what makes the control meaningful.
@@ -495,8 +495,8 @@ describe("forLocaleMatch", () => {
   it("returns a frozen per-call options object carrying the validated match", () => {
     const options = forLocaleMatch(frMatch());
     assert.equal(Object.isFrozen(options), true);
-    assert.equal(options.localeMatch.locale, "fr");
-    assert.equal(createStrings({ ...EN_FR, localeResolver: () => "en" }).get("Greeting.Hello", undefined, options), "Bonjour");
+    assert.equal(options.localeMatchResult.locale, "fr");
+    assert.equal(createStrings({ ...EN_FR, localeSupplier: () => "en" }).get("Greeting.Hello", undefined, options), "Bonjour");
   });
 
   it("validates at the site that spelled it, not at consumption", () => {
@@ -513,9 +513,9 @@ describe("forLocaleMatch", () => {
       locale: "de", languageRange: "de", effectiveWeight: 1, matchType: "exact",
       fallbackLocale: "de", consideredLocales: ["de"], isMatch: true,
     });
-    assert.equal(options.localeMatch.locale, "de");
+    assert.equal(options.localeMatchResult.locale, "de");
     assert.throws(
-      () => createStrings({ ...EN_FR, localeResolver: () => "en" }).get("Greeting.Hello", undefined, options),
+      () => createStrings({ ...EN_FR, localeSupplier: () => "en" }).get("Greeting.Hello", undefined, options),
       /different fallback locale/,
     );
   });

@@ -32,9 +32,9 @@ import { pluralOperands } from "../src/index.js";
 const throwing = (extra = {}) =>
   createStrings({
     fallbackLocale: "en",
-    localeResolver: () => "en",
-    strings: { en: { Present: "here" } },
-    onFailure: () => THROW_EXCEPTION,
+    localeSupplier: () => "en",
+    localizedStringSupplier: () => ({ en: { Present: "here" } }),
+    translationFailureHandler: () => THROW_EXCEPTION,
     ...extra,
   });
 
@@ -57,14 +57,14 @@ describe("MissingTranslationError — the cause-less throw", () => {
 
   it("quotes the RAW key and the lookup locale, uninterpolated and never isolated", () => {
     // `DefaultStrings.java:741` composes the message before the handler runs and hands it straight
-    // to the constructor: no interpolator, no `BidiUtils`. Under `all` isolation on an RTL locale a
+    // to the constructor: no interpolator, no `BidiUtils`. Under `always` isolation on an RTL locale a
     // port that isolated eagerly would put directional controls inside an exception message.
     const strings = createStrings({
       fallbackLocale: "he",
-      localeResolver: () => "he",
-      strings: { he: { Present: "כאן" } },
-      bidiIsolation: "all",
-      onFailure: () => THROW_EXCEPTION,
+      localeSupplier: () => "he",
+      localizedStringSupplier: () => ({ he: { Present: "כאן" } }),
+      bidiIsolation: "always",
+      translationFailureHandler: () => THROW_EXCEPTION,
     });
 
     assert.throws(() => strings.get("Farewell {{name}}", { name: "Sarah" }), (/** @type {any} */ e) => {
@@ -77,7 +77,7 @@ describe("MissingTranslationError — the cause-less throw", () => {
   it("carries the SAME frozen failure object the handler was handed, by reference", () => {
     /** @type {any} */
     let seen = null;
-    const strings = throwing({ onFailure: (/** @type {any} */ f) => { seen = f; return THROW_EXCEPTION; } });
+    const strings = throwing({ translationFailureHandler: (/** @type {any} */ f) => { seen = f; return THROW_EXCEPTION; } });
 
     assert.throws(() => strings.getResult("Absent.Key", { who: "x" }), (/** @type {any} */ e) => {
       assert.ok(seen !== null);
@@ -116,13 +116,13 @@ describe("the retained cause is rethrown by identity", () => {
     },
   };
 
-  const throwingResolverStrings = (/** @type {any} */ onFailure) =>
+  const throwingResolverStrings = (/** @type {any} */ translationFailureHandler) =>
     createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: ARTICLE },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: ARTICLE }),
       phoneticResolver: () => { throw resolverThrew; },
-      onFailure,
+      translationFailureHandler,
     });
 
   it("rethrows the CONTEXTUALIZED error the handler was handed, not a rebuild of it", () => {
@@ -218,15 +218,15 @@ describe("pluralOperands refuses out-of-range options at VALUE CONSTRUCTION", ()
   it("refuses before a lookup can turn the refusal into a translation failure", () => {
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: {
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({
         en: {
           Counted: {
             translation: "{{word}}",
             placeholders: { word: { value: "n", translations: { CARDINALITY_ONE: "one", CARDINALITY_OTHER: "other" } } },
           },
         },
-      },
+      }),
     });
     // The value never gets built, so the lookup never runs. Asserted by building the value first and
     // showing the throw happens there — a port that validated inside `get` would reach this line.

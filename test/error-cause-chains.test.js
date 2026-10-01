@@ -160,7 +160,7 @@ async function rejection(promise, what) {
   } catch (error) {
     return /** @type {any} */ (error);
   }
-  return assert.fail(`${what}: the load RESOLVED; expected a StringsLoadingError`);
+  return assert.fail(`${what}: the load RESOLVED; expected a LocalizedStringLoadingError`);
 }
 
 /** Every assertion that follows a rejection first proves the rejection is the LOADER's, by name. */

@@ -1,3 +1,4 @@
+import { currentApiVocabulary } from "../tools/api-vocabulary.mjs";
 // @ts-check
 /**
  * Checks the package against the machine-readable symbol allowlist that lokalized-spec generates
@@ -23,7 +24,7 @@ const allowlistPath = process.env.LOKALIZED_SPEC_DIR
 /** @type {any} */
 let allowlist = null;
 try {
-  allowlist = JSON.parse(await readFile(allowlistPath, "utf8"));
+  allowlist = currentApiVocabulary(JSON.parse(await readFile(allowlistPath, "utf8")));
 } catch {
   // Sibling spec checkout not present.
 }
@@ -76,7 +77,7 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
   const CATEGORIZED = /** @type {[string, string, string][]} */ ([
     // Plan 3.5 declares all three by name — `const RETURN_KEY`, `const THROW_EXCEPTION`,
     // `function returnString(translation)` — under core's "failure policy/observer/handler types
-    // and helpers" category. They are the caller-facing half of `onFailure`: a handler must be able
+    // and helpers" category. They are the caller-facing half of `translationFailureHandler`: a handler must be able
     // to say "throw" as well as "return the key", and the plan's own note that responses are
     // discriminated STRUCTURALLY is why they are helpers rather than tokens the library recognizes.
     ["core", "RETURN_KEY", "failure policy/observer/handler types and helpers"],
@@ -124,7 +125,7 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     ["data/ordinal", "ordinalityForOperands", "number/operand ordinal classifiers and support probes"],
     ["data/ordinal", "supportedOrdinalitiesForLocale", "number/operand ordinal classifiers and support probes"],
     ["data/ordinal", "getSupportedOrdinalityLocaleTags", "number/operand ordinal classifiers and support probes"],
-    ["negotiate", "createLocaleNegotiator", "range parser/factory/option helpers"],
+    ["negotiate", "createLocaleMatcher", "range parser/factory/option helpers"],
     // `Locale.LanguageRange.parse`, ported in M7 A4. It is exported rather than kept private for the
     // reason plan 3.1's category names it a "range PARSER": the JDK's own parse is a public static
     // that callers use OUTSIDE the matcher, and the corpus records that separation directly --
@@ -136,7 +137,7 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     ["negotiate", "parseLanguageRanges", "range parser/factory/option helpers"],
     // PLAN 3.4:904-913's TWO OPTION HELPERS — the third word of the category, delivered in M9 S2.
     // They are on this subpath and not on core for a graph reason plan 3.4:933 states outright:
-    // they "negotiate immediately and return core `localeMatch` options, so the browser/root graph
+    // they "negotiate immediately and return core `localeMatchResult` options, so the browser/root graph
     // does not contain the whole-list solver". `test/pinned-data-only.test.js` names
     // `negotiate/index.js` among the modules the root may not reach, which is what makes that
     // sentence enforceable rather than advisory.
@@ -176,7 +177,7 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     ["node", "loadStringsFromDirectory", "file/whole-manifest loaders"],
     // Plan 6.1 names this function in words — "`computeCatalogIdentity` applies the JCS rules from
     // `5.1` to exactly {formatVersion, catalogVersion, resolvedFallbackLocale, localeToSha256,
-    // tiebreakers}" — and gives it a signature in the same block as `validateStringsManifest` and
+    // tiebreakerLocalesByLanguageCode}" — and gives it a signature in the same block as `validateStringsManifest` and
     // `parseStringsManifest`, which is the category `load` declares. It is exported rather than kept
     // internal because a publisher needs to compute the identity of a catalog it is about to ship,
     // using the same projection a consumer will verify it with; two implementations of one
@@ -201,7 +202,7 @@ test("every exported symbol is on its OWN subpath's allowlist", { skip }, async 
     // The declared failure those loaders raise once a valid plan exists, under "loading errors". It
     // is exported because CATCHING it is the point: its `failures` are the per-file diagnosis, in
     // fetch-plan order, and a consumer that cannot name the class can only match on a message.
-    ["load", "StringsLoadingError", "loading errors"],
+    ["load", "LocalizedStringLoadingError", "loading errors"],
     // Its sibling under the same category, and the half M8 clause 75 was held on. Plan 3.5:1099
     // declares it; S22 gave it the token; nothing had ever exported it.
     ["load", "DigestUnavailableError", "loading errors"],

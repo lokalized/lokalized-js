@@ -61,7 +61,7 @@ const ERROR_CLASSES = /** @type {{ name: string, subpath: string, extendsRefused
   { name: "UnsupportedLocaleError", subpath: "core", extendsRefused: true },
   { name: "ResolutionError", subpath: "core", extendsRefused: true },
   { name: "StringsParseError", subpath: "parse", extendsRefused: true },
-  { name: "StringsLoadingError", subpath: "load", extendsRefused: true },
+  { name: "LocalizedStringLoadingError", subpath: "load", extendsRefused: true },
   { name: "DigestUnavailableError", subpath: "load", extendsRefused: true },
 ]);
 
@@ -88,8 +88,8 @@ const PROBES = [
       "next one went red in NONE. It is also the only gate in `verify` that can see any of them: " +
       "`npm run check`, `npm run types` and all 1,633 JavaScript tests stay green under every one",
     source: `import { forLocaleMatch } from ${core};
-import type { LocaleMatch, LocaleMatchType } from ${core};
-declare const match: LocaleMatch;
+import type { LocaleMatchResult, LocaleMatchType } from ${core};
+declare const match: LocaleMatchResult;
 const exhaust = (value: never): never => value;
 export function describe(type: LocaleMatchType): string {
   switch (type) {
@@ -133,7 +133,7 @@ export function describe(type: LocaleMatchType): string {
     source: `import { createStrings } from ${core};
 import type { LoadedStrings } from ${load};
 declare const record: LoadedStrings;
-export const s = createStrings({ loaded: record, localeResolver: () => "fr-BE" });`,
+export const s = createStrings({ loaded: record, localeSupplier: () => "fr-BE" });`,
   },
   {
     name: "a record FROM THE LOADER flows into construction",
@@ -145,7 +145,7 @@ export const s = createStrings({ loaded: record, localeResolver: () => "fr-BE" }
     source: `import { createStrings } from ${core};
 import { loadStrings } from ${load};
 declare const loaded: Awaited<ReturnType<typeof loadStrings>>;
-export const s = createStrings({ loaded, localeResolver: () => "fr" });`,
+export const s = createStrings({ loaded, localeSupplier: () => "fr" });`,
   },
   {
     name: "a record from the NODE whole-manifest loader flows into construction",
@@ -154,36 +154,36 @@ export const s = createStrings({ loaded, localeResolver: () => "fr" });`,
     source: `import { createStrings } from ${core};
 import { loadEntireManifestFromFiles } from ${nodeDoor};
 declare const loaded: Awaited<ReturnType<typeof loadEntireManifestFromFiles>>;
-export const s = createStrings({ loaded, localeResolver: () => "fr" });`,
+export const s = createStrings({ loaded, localeSupplier: () => "fr" });`,
   },
   {
     name: "the direct door is callable",
     compiles: true,
     why: "THE CONTROL. Without it a declaration that rejected everything would satisfy the probe above",
     source: `import { createStrings } from ${core};
-export const s = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en" });`,
+export const s = createStrings({ localizedStringSupplier: () => ({ en: { K: "v" } }), fallbackLocale: "en", localeSupplier: () => "en" });`,
   },
   {
     name: "an instance must say how it finds a language: no resolver is refused",
     compiles: false,
     why: "Java's `exactly one of 'localeSupplier' or 'localeMatchSupplier'`; the runtime refuses it too, and the declaration now says so before the code runs",
     source: `import { createStrings } from ${core};
-export const s = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en" });`,
+export const s = createStrings({ localizedStringSupplier: () => ({ en: { K: "v" } }), fallbackLocale: "en" });`,
   },
   {
     name: "both resolvers at once are refused",
     compiles: false,
     why: "the exactly-one union's other half — last-key-wins would make behaviour depend on spread order",
     source: `import { createStrings } from ${core};
-export const s = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en",
-  localeResolver: () => "en", localeMatchResolver: () => { throw new Error(); } });`,
+export const s = createStrings({ localizedStringSupplier: () => ({ en: { K: "v" } }), fallbackLocale: "en",
+  localeSupplier: () => "en", localeMatchSupplier: () => { throw new Error(); } });`,
   },
   {
     name: "the removed constant `locale` option is refused",
     compiles: false,
     why: "removed before 1.0.0 (a language fixed at construction); a 1.0.0-rc caller must be told at compile time, not by a runtime refusal",
     source: `import { createStrings } from ${core};
-export const s = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", locale: "en" });`,
+export const s = createStrings({ localizedStringSupplier: () => ({ en: { K: "v" } }), fallbackLocale: "en", locale: "en" });`,
   },
   {
     name: "the two doors do not mix",
@@ -192,7 +192,7 @@ export const s = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "e
     source: `import { createStrings } from ${core};
 import type { LoadedStrings } from ${load};
 declare const record: LoadedStrings;
-export const s = createStrings({ loaded: record, strings: { en: {} }, fallbackLocale: "en", localeResolver: () => "en" });`,
+export const s = createStrings({ loaded: record, localizedStringSupplier: () => ({ en: {} }), fallbackLocale: "en", localeSupplier: () => "en" });`,
   },
   {
     name: "a library error is catchable",
@@ -268,7 +268,7 @@ export const f = (error: unknown) => error instanceof ConfigurationError ? error
   // THE DECLARATION HALF OF THE DEEP FREEZE, and it needs its own channel because the two halves
   // are INDEPENDENT: measured by ablation, reverting the runtime freeze leaves `npm run check` and
   // `npm run types` at exit 0, and narrowing the type would not have frozen anything. Before this,
-  // `LocaleMatch` was authored TWICE — mutable in `src/core/index.js`, which is what a
+  // `LocaleMatchResult` was authored TWICE — mutable in `src/core/index.js`, which is what a
   // `lokalized/core` consumer read — so the compiler told a consumer it could write to an object
   // the runtime had frozen, i.e. it turned a caught mistake into a `TypeError` in production.
   //
@@ -276,25 +276,25 @@ export const f = (error: unknown) => error instanceof ConfigurationError ? error
   // consumer resolves through `exports`, not the source. That is the distinction that produced the
   // last slice's findings.
   {
-    name: "a returned LocaleMatch refuses a member write",
+    name: "a returned LocaleMatchResult refuses a member write",
     compiles: false,
     why: "plan 3.4:788-796 declares every `LocaleMatchResult` member `readonly`; the runtime freezes it. " +
       "WHAT IT DOES NOT PROVE, said here so nobody credits it with more: `matchFor` is emitted with " +
       "its OWN inline `Readonly<{...}>` (tsc expands the negotiator's frozen literal), so this arm " +
-      "is green even over a mutable `LocaleMatch` typedef — measured. It pins the consumer-visible " +
+      "is green even over a mutable `LocaleMatchResult` typedef — measured. It pins the consumer-visible " +
       "fact at this door; the arm that discriminates the TYPE is the `lokalized/core` one below.",
     throughPackage: true,
-    source: `import { createLocaleNegotiator } from "lokalized/negotiate";
-const n = createLocaleNegotiator({ fallbackLocale: "en", supportedLocales: ["en", "fr"] });
+    source: `import { createLocaleMatcher } from "lokalized/negotiate";
+const n = createLocaleMatcher({ fallbackLocale: "en", supportedLocales: ["en", "fr"] });
 export function poison() { n.matchFor("fr").locale = "hijacked"; }`,
   },
   {
-    name: "a returned LocaleMatch refuses a write INSIDE consideredLocales",
+    name: "a returned LocaleMatchResult refuses a write INSIDE consideredLocales",
     compiles: false,
     why: "the defect was one level down — the record was frozen and its arrays were not",
     throughPackage: true,
-    source: `import { createLocaleNegotiator } from "lokalized/negotiate";
-const n = createLocaleNegotiator({ fallbackLocale: "en", supportedLocales: ["en", "fr"] });
+    source: `import { createLocaleMatcher } from "lokalized/negotiate";
+const n = createLocaleMatcher({ fallbackLocale: "en", supportedLocales: ["en", "fr"] });
 export function poison() { n.matchFor("fr").consideredLocales.push("zz"); }`,
   },
   {
@@ -307,22 +307,22 @@ export const r = parseLanguageRanges("fr;q=0.9, en").sort();`,
   },
   {
     // THROUGH `lokalized/core`, DELIBERATELY, and an ablation is why. The three probes above reach
-    // `LocaleMatch` through `lokalized/negotiate`, which resolves it from `types/internal/`; core
+    // `LocaleMatchResult` through `lokalized/negotiate`, which resolves it from `types/internal/`; core
     // authored its OWN mutable copy of the same eight fields, so restoring that copy left all
     // three GREEN — measured. Two subpaths can disagree about one public type and a probe set that
     // enters through one of them cannot see it. That is S28's asymmetry, reproduced by my own
     // probes before this arm existed.
-    name: "the LocaleMatch type lokalized/core exports refuses a write",
+    name: "the LocaleMatchResult type lokalized/core exports refuses a write",
     compiles: false,
-    why: "core published a second, mutable copy of `LocaleMatch`; it derives the one type now",
+    why: "core published a second, mutable copy of `LocaleMatchResult`; it derives the one type now",
     throughPackage: true,
     // NAMING THE EXPORTED TYPE, not a call site, and the first draft of this probe taught me the
-    // difference. Written as `s.getDirectLocaleContext("fr").localeMatch.locale = "x"` it stayed
+    // difference. Written as `s.getDirectLocaleContext("fr").localeMatchResult.locale = "x"` it stayed
     // GREEN with core's mutable copy restored, because that method's emitted signature wraps the
     // match in its own `Readonly<...>` — the call site masked the type. A consumer reaches the type
     // by ANNOTATING with it, which is the only position where the two copies differ.
-    source: `import type { LocaleMatch } from "lokalized/core";
-declare const m: LocaleMatch;
+    source: `import type { LocaleMatchResult } from "lokalized/core";
+declare const m: LocaleMatchResult;
 export function poison() { m.locale = "hijacked"; }`,
   },
   {
@@ -336,9 +336,9 @@ const r = parseLanguageRanges("fr;q=0.9, en");
 export function poison() { r[0]!.weight = 0; }`,
   },
   {
-    name: "a consumer can still BUILD a LocaleMatch and supply it",
+    name: "a consumer can still BUILD a LocaleMatchResult and supply it",
     compiles: true,
-    why: "THE CONTROL FOR THE THREE ABOVE. `LocaleMatch` is an INPUT type as well as an output, so " +
+    why: "THE CONTROL FOR THE THREE ABOVE. `LocaleMatchResult` is an INPUT type as well as an output, so " +
       "`readonly` members must stay assignable FROM a caller's own mutable object — without this " +
       "arm the narrowing could have been over-tightened into refusing every supplied match and all " +
       "three refusals above would still read as successes.",
@@ -347,37 +347,37 @@ export function poison() { r[0]!.weight = 0; }`,
 const mine = { matchType: "exact" as const, locale: "fr", isMatch: true, fallbackLocale: "en",
   consideredLocales: ["en", "fr"], effectiveWeight: 1,
   languageRange: { range: "fr", weight: 1 }, requestedLanguageRanges: [{ range: "fr", weight: 1 }] };
-const s = createStrings({ strings: { en: { K: "v" }, fr: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en" });
+const s = createStrings({ localizedStringSupplier: () => ({ en: { K: "v" }, fr: { K: "v" } }), fallbackLocale: "en", localeSupplier: () => "en" });
 export const out = s.get("K", {}, forLocaleMatch(mine));`,
   },
   {
     name: "a failure handler can read the match that caused the failure",
     compiles: true,
     throughPackage: true,
-    why: "`TranslationFailure.localeMatch` was typed `unknown` until M-R S3, so every consumer writing " +
-      "an `onFailure` handler had to cast before reading the match — on a record the library hands " +
+    why: "`TranslationFailure.localeMatchResult` was typed `unknown` until M-R S3, so every consumer writing " +
+      "an `translationFailureHandler` handler had to cast before reading the match — on a record the library hands " +
       "THEM. Found by reading the requirement registry (BOOT-M0-0484), not by any gate",
     source: `import type { TranslationFailure } from "lokalized/core";
-export const f = (x: TranslationFailure) => x.localeMatch.matchType;`,
+export const f = (x: TranslationFailure) => x.localeMatchResult.matchType;`,
   },
   {
     name: "a fallback observer can read the match",
     compiles: true,
     throughPackage: true,
-    why: "the same defect on `FallbackEvent` (BOOT-M0-0499), and the sibling field on the lookup " +
+    why: "the same defect on `TranslationFallbackEvent` (BOOT-M0-0499), and the sibling field on the lookup " +
       "result carried the real type all along — these two simply never got it",
-    source: `import type { FallbackEvent } from "lokalized/core";
-export const f = (e: FallbackEvent) => e.localeMatch.consideredLocales.length;`,
+    source: `import type { TranslationFallbackEvent } from "lokalized/core";
+export const f = (e: TranslationFallbackEvent) => e.localeMatchResult.consideredLocales.length;`,
   },
   {
     name: "a failure handler cannot WRITE to the match it was handed",
     compiles: false,
     throughPackage: true,
-    why: "the anti-vacuity half: typing the field `LocaleMatch` would be satisfied by a MUTABLE one, " +
+    why: "the anti-vacuity half: typing the field `LocaleMatchResult` would be satisfied by a MUTABLE one, " +
       "and the record is frozen at runtime, so a consumer writing to it fails at run time with no " +
       "compile-time warning. Without this arm the two probes above pass over `any`",
     source: `import type { TranslationFailure } from "lokalized/core";
-export const f = (x: TranslationFailure) => { x.localeMatch.matchType = "exact"; };`,
+export const f = (x: TranslationFailure) => { x.localeMatchResult.matchType = "exact"; };`,
   },
   {
     name: "the Fetch doors take every option plan 6.2 declares",
@@ -494,7 +494,7 @@ export const subset = loadStringsFromFiles(manifest, "fr", { partialFailure: "al
     why: "plan 4.6 — a non-undefined `runtimeLimits` is a construction-time error, and the DECLARATION says so",
     source: `import { createStrings } from ${core};
 export const s = createStrings({
-  strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en",
+  localizedStringSupplier: () => ({ en: { K: "v" } }), fallbackLocale: "en", localeSupplier: () => "en",
   runtimeLimits: { maximumExpressionTokens: 8 },
 });`,
   },
@@ -505,7 +505,7 @@ export const s = createStrings({
     why: "the SSR API promises a TranslationResult context and must type it through both methods",
     source: `import { createStrings } from "lokalized/core";
 import { createSsrStamp, validateSsrStamp } from "lokalized/ssr";
-const strings = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en" });
+const strings = createStrings({ localizedStringSupplier: () => ({ en: { K: "v" } }), fallbackLocale: "en", localeSupplier: () => "en" });
 const result = strings.getResult("K");
 export function use() { const stamp = createSsrStamp(strings, result); validateSsrStamp(stamp, strings, result); }`,
   },
@@ -526,8 +526,8 @@ export const stamp = createSsrStamp({}, { kind: "locale", locale: "en" });`,
     why: "the rendering-context match arm must expose the eight valid match types, not any",
     source: `import { createStrings } from "lokalized/core";
 import { createSsrStamp } from "lokalized/ssr";
-const strings = createStrings({ strings: { en: { K: "v" } }, fallbackLocale: "en", localeResolver: () => "en" });
-export const stamp = createSsrStamp(strings, { kind: "locale-match", localeMatch: { locale: "en", matchType: "excat" } });`,
+const strings = createStrings({ localizedStringSupplier: () => ({ en: { K: "v" } }), fallbackLocale: "en", localeSupplier: () => "en" });
+export const stamp = createSsrStamp(strings, { kind: "locale-match", localeMatchResult: { locale: "en", matchType: "excat" } });`,
   },
 ];
 

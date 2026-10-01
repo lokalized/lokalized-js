@@ -60,6 +60,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import { currentApiVocabulary } from "./api-vocabulary.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const specDir = process.env.LOKALIZED_SPEC_DIR
@@ -69,7 +70,7 @@ const registryPath = join(specDir, "pre-m0/bootstrap.requirements.candidate.json
 
 let registry;
 try {
-  registry = JSON.parse(readFileSync(registryPath, "utf8"));
+  registry = currentApiVocabulary(JSON.parse(readFileSync(registryPath, "utf8")));
 } catch {
   console.error(`readonly-surface: cannot read the requirement registry at ${registryPath}.`);
   console.error(`This tool compares the registry's \`readonly\` statements against the package's own`);
@@ -110,7 +111,7 @@ const MEMBER_RE =
  *
  * `types` is a LIST because two subpaths may publish the same public name and disagree about it —
  * S28 measured exactly that asymmetry, and M-R S3's own probe set was green over a mutable copy of
- * `LocaleMatch` in core until an arm entered through the other subpath. Every listed reach must
+ * `LocaleMatchResult` in core until an arm entered through the other subpath. Every listed reach must
  * satisfy the statement.
  */
 const REACH = {
@@ -152,7 +153,7 @@ const REACH = {
       "by its own discriminant so the probe reaches that arm and not the other",
     types: [{ from: "lokalized/parse", imports: ["PlaceholderDefinitionInput"], type: `Extract<PlaceholderDefinitionInput, { kind: "expression" }>` }],
   },
-  FallbackEvent: { disposition: "DELIVERED", types: [{ from: "lokalized/core", imports: ["FallbackEvent"], type: "FallbackEvent" }] },
+  TranslationFallbackEvent: { disposition: "DELIVERED", types: [{ from: "lokalized/core", imports: ["TranslationFallbackEvent"], type: "TranslationFallbackEvent" }] },
   LanguageFormTranslationInput: {
     disposition: "RENAMED",
     portName: "PlaceholderDefinitionInput",
@@ -174,13 +175,10 @@ const REACH = {
     ],
   },
   LocaleMatchResult: {
-    disposition: "RENAMED",
-    portName: "LocaleMatch",
-    why: "plan 3.4 calls the record `LocaleMatchResult`; the port publishes it as `LocaleMatch`, which " +
-      "S30's plan-surface table records as a RENAMED disposition whose port spelling must exist",
+    disposition: "DELIVERED",
     types: [
-      { from: "lokalized/core", imports: ["LocaleMatch"], type: "LocaleMatch" },
-      { from: "lokalized/negotiate", valueImports: ["createLocaleNegotiator"], type: `ReturnType<typeof createLocaleNegotiator>["matchFor"] extends (...a: never[]) => infer R ? R : never` },
+      { from: "lokalized/core", imports: ["LocaleMatchResult"], type: "LocaleMatchResult" },
+      { from: "lokalized/negotiate", imports: ["LocaleMatchResult"], type: "LocaleMatchResult" },
     ],
   },
   LocalizedStringInput: { disposition: "DELIVERED", types: [{ from: "lokalized/parse", imports: ["LocalizedStringInput"], type: "LocalizedStringInput" }] },
@@ -213,7 +211,7 @@ const REACH = {
   ResolutionError: { disposition: "DELIVERED", types: [{ from: "lokalized/core", imports: ["ResolutionError"], type: "ResolutionError" }] },
   ReturnKeyResponse: {
     disposition: "STRUCTURAL",
-    why: "an arm of the published `FailureResponse` union, reached through the constant the library " +
+    why: "an arm of the published `TranslationFailureResponse` union, reached through the constant the library " +
       "exports for it",
     types: [{ from: "lokalized/core", valueImports: ["RETURN_KEY"], type: "typeof RETURN_KEY" }],
   },
@@ -223,7 +221,7 @@ const REACH = {
     types: [{ from: "lokalized/core", valueImports: ["returnString"], type: "ReturnType<typeof returnString>" }],
   },
   StringsLoadVerification: { disposition: "DELIVERED", types: [{ from: "lokalized/core", imports: ["StringsLoadVerification"], type: "StringsLoadVerification" }] },
-  StringsLoadingError: { disposition: "DELIVERED", types: [{ from: "lokalized/load", imports: ["StringsLoadingError"], type: "StringsLoadingError" }] },
+  LocalizedStringLoadingError: { disposition: "DELIVERED", types: [{ from: "lokalized/load", imports: ["LocalizedStringLoadingError"], type: "LocalizedStringLoadingError" }] },
   StringsLoadingLimits: {
     disposition: "DELIVERED",
     types: [
@@ -246,9 +244,9 @@ const REACH = {
   },
   TranslationBehaviorOptions: {
     disposition: "STRUCTURAL",
-    why: "flattened into the published `TranslationCallOptions`, exactly as the construction-time " +
+    why: "flattened into the published `TranslationOptions`, exactly as the construction-time " +
       "behaviour options are flattened into `CreateStringsOptions`",
-    types: [{ from: "lokalized/core", imports: ["TranslationCallOptions"], type: "TranslationCallOptions" }],
+    types: [{ from: "lokalized/core", imports: ["TranslationOptions"], type: "TranslationOptions" }],
   },
   TranslationFailure: { disposition: "DELIVERED", types: [{ from: "lokalized/core", imports: ["TranslationFailure"], type: "TranslationFailure" }] },
   TranslationResultBase: {
@@ -367,31 +365,31 @@ const OBLIGATIONS = {
   "BOOT-M0-0310": acceptsReadonly(
     "a catalog supplied as a readonly array of inputs",
     [IMPORTS.core, IMPORTS.parse],
-    `((c: import("lokalized/core").DirectCreateStringsOptions["strings"]) => c)(null! as Readonly<Record<string, readonly import("lokalized/parse").LocalizedStringInput[]>>)`,
-    `((c: import("lokalized/core").DirectCreateStringsOptions["strings"]) => c)(null! as readonly string[])`,
-    `const r = null! as Extract<import("lokalized/core").DirectCreateStringsOptions["strings"], Record<string, unknown>>; r["en"] = [];`),
+    `((c: ReturnType<import("lokalized/core").DirectCreateStringsOptions["localizedStringSupplier"]>) => c)(null! as Readonly<Record<string, readonly import("lokalized/parse").LocalizedStringInput[]>>)`,
+    `((c: ReturnType<import("lokalized/core").DirectCreateStringsOptions["localizedStringSupplier"]>) => c)(null! as readonly string[])`,
+    `const r = null! as Extract<ReturnType<import("lokalized/core").DirectCreateStringsOptions["localizedStringSupplier"]>, Record<string, unknown>>; r["en"] = [];`),
   "BOOT-M0-0311": acceptsReadonly(
     "`CatalogMap` as a readonly record keyed by tag",
     [IMPORTS.core],
-    `((c: import("lokalized/core").DirectCreateStringsOptions["strings"]) => c)(null! as Readonly<Record<string, unknown>>)`,
-    `((c: import("lokalized/core").DirectCreateStringsOptions["strings"]) => c)(null! as number)`,
-    `const r = null! as Extract<import("lokalized/core").DirectCreateStringsOptions["strings"], Record<string, unknown>>; r["en"] = {};`),
+    `((c: ReturnType<import("lokalized/core").DirectCreateStringsOptions["localizedStringSupplier"]>) => c)(null! as Readonly<Record<string, unknown>>)`,
+    `((c: ReturnType<import("lokalized/core").DirectCreateStringsOptions["localizedStringSupplier"]>) => c)(null! as number)`,
+    `const r = null! as Extract<ReturnType<import("lokalized/core").DirectCreateStringsOptions["localizedStringSupplier"]>, Record<string, unknown>>; r["en"] = {};`),
   "BOOT-M0-0312": acceptsReadonly(
     "`CatalogMap` as a `ReadonlyMap`",
     [IMPORTS.core],
-    `((c: import("lokalized/core").DirectCreateStringsOptions["strings"]) => c)(null! as ReadonlyMap<string, unknown>)`,
-    `((c: import("lokalized/core").DirectCreateStringsOptions["strings"]) => c)(null! as ReadonlySet<string>)`),
+    `((c: ReturnType<import("lokalized/core").DirectCreateStringsOptions["localizedStringSupplier"]>) => c)(null! as ReadonlyMap<string, unknown>)`,
+    `((c: ReturnType<import("lokalized/core").DirectCreateStringsOptions["localizedStringSupplier"]>) => c)(null! as ReadonlySet<string>)`),
   "BOOT-M0-0313": acceptsReadonly(
     "`TiebreakerMap` as a readonly record of readonly tag arrays",
     [IMPORTS.core],
-    `((t: import("lokalized/core").DirectCreateStringsOptions["tiebreakers"]) => t)(null! as Readonly<Record<string, readonly string[]>>)`,
-    `((t: import("lokalized/core").DirectCreateStringsOptions["tiebreakers"]) => t)(null! as readonly string[])`,
-    `const r = null! as Extract<NonNullable<import("lokalized/core").DirectCreateStringsOptions["tiebreakers"]>, Record<string, readonly string[]>>; r["fr"] = [];`),
+    `((t: import("lokalized/core").DirectCreateStringsOptions["tiebreakerLocalesByLanguageCode"]) => t)(null! as Readonly<Record<string, readonly string[]>>)`,
+    `((t: import("lokalized/core").DirectCreateStringsOptions["tiebreakerLocalesByLanguageCode"]) => t)(null! as readonly string[])`,
+    `const r = null! as Extract<NonNullable<import("lokalized/core").DirectCreateStringsOptions["tiebreakerLocalesByLanguageCode"]>, Record<string, readonly string[]>>; r["fr"] = [];`),
   "BOOT-M0-0314": acceptsReadonly(
     "`TiebreakerMap` as a `ReadonlyMap`",
     [IMPORTS.core],
-    `((t: import("lokalized/core").DirectCreateStringsOptions["tiebreakers"]) => t)(null! as ReadonlyMap<string, readonly string[]>)`,
-    `((t: import("lokalized/core").DirectCreateStringsOptions["tiebreakers"]) => t)(null! as ReadonlyMap<string, number>)`),
+    `((t: import("lokalized/core").DirectCreateStringsOptions["tiebreakerLocalesByLanguageCode"]) => t)(null! as ReadonlyMap<string, readonly string[]>)`,
+    `((t: import("lokalized/core").DirectCreateStringsOptions["tiebreakerLocalesByLanguageCode"]) => t)(null! as ReadonlyMap<string, number>)`),
   // HELD THE OTHER WAY, by decision. The statement asks for a `readonly locale` on the constant-locale
   // variant of plan 3.2's `LocaleSourceOptions`; that variant was REMOVED before 1.0.0 (the maintainer,
   // 2026-09-27: an instance needs a resolver, as a Java instance needs a supplier), so there is no
@@ -401,19 +399,19 @@ const OBLIGATIONS = {
     why: "the constant-locale variant of `LocaleSourceOptions` was removed before 1.0.0; the member must be ABSENT from both option arms",
     imports: [IMPORTS.core],
     lines: [
-      { text: `export const resolver = (null! as import("lokalized/core").DirectCreateStringsOptions).localeResolver;`, expect: "compiles" },
+      { text: `export const resolver = (null! as import("lokalized/core").DirectCreateStringsOptions).localeSupplier;`, expect: "compiles" },
       { text: `export const direct = (null! as import("lokalized/core").DirectCreateStringsOptions).locale;`, expect: "refused", codes: [2339] },
       { text: `export const loaded = (null! as import("lokalized/core").LoadedCreateStringsOptions).locale;`, expect: "refused", codes: [2339] },
     ],
   },
   "BOOT-M0-0330": readonlyMemberOf(
     "the resolver variant of the same union",
-    [IMPORTS.core], `null! as import("lokalized/core").DirectCreateStringsOptions`, "localeResolver"),
+    [IMPORTS.core], `null! as import("lokalized/core").DirectCreateStringsOptions`, "localeSupplier"),
   "BOOT-M0-0334": readonlyMemberOf(
     "the match-resolver variant of the same union",
-    [IMPORTS.core], `null! as import("lokalized/core").DirectCreateStringsOptions`, "localeMatchResolver"),
+    [IMPORTS.core], `null! as import("lokalized/core").DirectCreateStringsOptions`, "localeMatchSupplier"),
   "BOOT-M0-0375": readonlyMemberOf("`forLocale` returns `Readonly<TranslationOptions>`", [IMPORTS.core], `forLocale("fr")`, "locale"),
-  "BOOT-M0-0376": readonlyMemberOf("`forLocaleMatch` returns `Readonly<TranslationOptions>`", [IMPORTS.core], `forLocaleMatch(null! as import("lokalized/core").LocaleMatch)`, "localeMatch"),
+  "BOOT-M0-0376": readonlyMemberOf("`forLocaleMatch` returns `Readonly<TranslationOptions>`", [IMPORTS.core], `forLocaleMatch(null! as import("lokalized/core").LocaleMatchResult)`, "localeMatchResult"),
   "BOOT-M0-0390": readonlyReturn("`getSupportedLocales` returns a readonly array", [IMPORTS.core], `(null! as import("lokalized/core").Strings).getSupportedLocales()`),
   "BOOT-M0-0391": readonlyReturn("`getKeysForLocale` returns a readonly array", [IMPORTS.core], `(null! as import("lokalized/core").Strings).getKeysForLocale("en")`),
   "BOOT-M0-0394": readonlyReturn("`getMissingKeys` returns a readonly array", [IMPORTS.core], `(null! as import("lokalized/core").Strings).getMissingKeys("en", "fr")`),
@@ -421,23 +419,23 @@ const OBLIGATIONS = {
   "BOOT-M0-0447": acceptsReadonly(
     "`matchForLanguageRanges` takes a readonly array of ranges",
     [IMPORTS.negotiate],
-    `(null! as import("lokalized/negotiate").LocaleNegotiator).matchForLanguageRanges(null! as readonly import("lokalized/negotiate").LanguageRange[])`,
-    `(null! as import("lokalized/negotiate").LocaleNegotiator).matchForLanguageRanges(null! as readonly number[])`),
+    `(null! as import("lokalized/negotiate").LocaleMatcher).matchForLanguageRanges(null! as readonly import("lokalized/negotiate").LanguageRange[])`,
+    `(null! as import("lokalized/negotiate").LocaleMatcher).matchForLanguageRanges(null! as readonly number[])`),
   "BOOT-M0-0449": acceptsReadonly(
     "`bestMatchForLanguageRanges` takes a readonly array of ranges",
     [IMPORTS.negotiate],
-    `(null! as import("lokalized/negotiate").LocaleNegotiator).bestMatchForLanguageRanges(null! as readonly import("lokalized/negotiate").LanguageRange[])`,
-    `(null! as import("lokalized/negotiate").LocaleNegotiator).bestMatchForLanguageRanges(null! as readonly number[])`),
+    `(null! as import("lokalized/negotiate").LocaleMatcher).bestMatchForLanguageRanges(null! as readonly import("lokalized/negotiate").LanguageRange[])`,
+    `(null! as import("lokalized/negotiate").LocaleMatcher).bestMatchForLanguageRanges(null! as readonly number[])`),
   "BOOT-M0-0453": readonlyReturn("`parseLanguageRanges` returns `readonly LanguageRange[]`", [IMPORTS.negotiate], `parseLanguageRanges("fr;q=0.9, en")`),
   "BOOT-M0-0457": acceptsReadonly(
     "`forLanguageRanges` takes a `readonly LanguageRange[]` second parameter",
     [IMPORTS.negotiate, IMPORTS.core],
-    `forLanguageRanges(null! as import("lokalized/negotiate").LocaleNegotiator, null! as readonly import("lokalized/negotiate").LanguageRange[])`,
-    `forLanguageRanges(null! as import("lokalized/negotiate").LocaleNegotiator, null! as readonly number[])`),
+    `forLanguageRanges(null! as import("lokalized/negotiate").LocaleMatcher, null! as readonly import("lokalized/negotiate").LanguageRange[])`,
+    `forLanguageRanges(null! as import("lokalized/negotiate").LocaleMatcher, null! as readonly number[])`),
   "BOOT-M0-0458": readonlyMemberOf("`forLanguageRanges` returns `Readonly<TranslationOptions>`", [IMPORTS.negotiate, IMPORTS.core],
-    `forLanguageRanges(null! as import("lokalized/negotiate").LocaleNegotiator, [])`, "localeMatch"),
+    `forLanguageRanges(null! as import("lokalized/negotiate").LocaleMatcher, [])`, "localeMatchResult"),
   "BOOT-M0-0461": readonlyMemberOf("`forAcceptLanguage` returns `Readonly<TranslationOptions>`", [IMPORTS.negotiate, IMPORTS.core],
-    `forAcceptLanguage(null! as import("lokalized/negotiate").LocaleNegotiator, "fr")`, "localeMatch"),
+    `forAcceptLanguage(null! as import("lokalized/negotiate").LocaleMatcher, "fr")`, "localeMatchResult"),
   "BOOT-M0-0467": acceptsReadonly(
     "`chooseLocaleForPreferredLanguages` takes a `readonly string[]`",
     [IMPORTS.core],
@@ -505,7 +503,7 @@ const VALUE_IMPORTS = {
   "lokalized/core": ["forLocale", "forLocaleMatch", "RETURN_KEY", "THROW_EXCEPTION", "returnString",
     "chooseLocaleForPreferredLanguages"],
   "lokalized/parse": ["defineLocalizedString", "defineCatalog", "mergeParsedStringsFiles"],
-  "lokalized/negotiate": ["parseLanguageRanges", "forLanguageRanges", "forAcceptLanguage", "createLocaleNegotiator"],
+  "lokalized/negotiate": ["parseLanguageRanges", "forLanguageRanges", "forAcceptLanguage", "createLocaleMatcher"],
   "lokalized/data/ordinal": ["supportedOrdinalitiesForLocale", "getSupportedOrdinalityLocaleTags"],
 };
 
@@ -666,15 +664,15 @@ for (const owner of Object.keys(REACH)) {
  * would be proved by nothing.
  */
 const PRESENT_ON = {
-  lokalized: "LanguageFormValue",
-  "lokalized/core": "LocaleMatch",
+  lokalized: "LanguageForm",
+  "lokalized/core": "LocaleMatchResult",
   "lokalized/parse": "ParsedStringsFile",
   "lokalized/load": "LoadedStrings",
-  "lokalized/negotiate": "LocaleNegotiator",
+  "lokalized/negotiate": "LocaleMatcher",
   "lokalized/ssr": "SsrLocaleContext",
   "lokalized/node": "DirectoryManifestOptions",
-  "lokalized/data/ordinal": "OrdinalityValue",
-  "lokalized/data/ranges": "CardinalityValue",
+  "lokalized/data/ordinal": "Ordinality",
+  "lokalized/data/ranges": "Cardinality",
 };
 for (const entry of unreachable) {
   const lines = [];

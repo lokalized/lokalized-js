@@ -503,7 +503,7 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
         // Java's loader has `Ordinality` on its classpath unconditionally; the JS parser cannot
         // import the table, so the runner supplies it or every ordinality warning would be missing.
         pluralData: { ordinal: ordinalData },
-        onWarning: (warning) => warnings.push(warning.message),
+        warningHandler: (warning) => warnings.push(warning.message),
       });
       outcome = "OK";
       payload = parsed.strings.map((s) => escape(s.key)).sort().join(",");
@@ -576,7 +576,7 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
       //   conformance    exit 0, 2,117 passed, 0 FAILED, report BYTE-IDENTICAL to the baseline
       // `error.constructor.name`, not `error.name`, is what makes C2 visible: the two are the same
       // string on a healthy class and come apart on exactly the defect this project has now fixed
-      // three times (`ConfigurationError`, `DigestUnavailableError`, `StringsLoadingError`).
+      // three times (`ConfigurationError`, `DigestUnavailableError`, `LocalizedStringLoadingError`).
       errorClass = error instanceof Error ? error.constructor.name : "not an Error";
       // Java produced nothing, so there is no content to project.
       values = "V[]";

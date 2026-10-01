@@ -6,7 +6,7 @@
  *   | Java                                    | description             | JS surface                        |
  *   |---|---|---|
  *   | `TranslationOptions.java:73` and `:310` | `Locale override`       | the per-call `{ locale }` option   |
- *   | `DefaultStrings.java:2457`              | `localeSupplier result` | `createStrings({ localeResolver })`|
+ *   | `DefaultStrings.java:2457`              | `localeSupplier result` | `createStrings({ localeSupplier })`|
  *   | `LocaleMatcher.java:64`                 | `Requested locale`      | `matchFor` / `bestMatchFor` / `getDirectLocaleContext` |
  *
  * There was a FOURTH surface, `createStrings({ locale })`, with its own phrase `Instance locale`. The
@@ -18,12 +18,12 @@
  * every one of these inputs anyway — later, from inside the walk, as `attemptedLocaleRefusal`'s
  * `Attempted locale` refusal, because the lookup locale is also the chain's first member. The
  * OUTCOME agreed with Java and the BEHAVIOUR did not. Measured on the pinned Corretto 21 against
- * `lokalized-3.0.0.jar`, catalogs {fr}, with a `fallbackPolicy` and an `onFailure` installed and
+ * `lokalized-3.0.0.jar`, catalogs {fr}, with a `translationFallbackPolicy` and an `translationFailureHandler` installed and
  * key `Absent`:
  *
  *   `en-x-lvariant-NY`   java  calls=[]
  *                        port  calls=[policy:en-x-lvariant-NY, policy:en-x-lvariant, policy:en,
- *                                     policy:en-x-lvariant-ny, onFailure:en-x-lvariant-NY]
+ *                                     policy:en-x-lvariant-ny, translationFailureHandler:en-x-lvariant-NY]
  *
  * The port ran a whole walk Java never starts. Every refusal assertion below therefore asserts an
  * EMPTY call trace as well as the message, because a port that reached the same message from inside
@@ -31,7 +31,7 @@
  * this slice.
  *
  * THAT MEASUREMENT IS NO LONGER HAND-MADE, as of 2026-09-09. `npm run diff:lookup` now records the
- * `fallbackPolicy` / `onFailure` call trace on BOTH sides and compares it as a seventh outcome
+ * `translationFallbackPolicy` / `translationFailureHandler` call trace on BOTH sides and compares it as a seventh outcome
  * field, so the table above is reproduced by a gate rather than by a session: deleting the per-call
  * ingress check in `src/core/index.js` makes that tool report 4,641 rows whose WALKS differ —
  * `java trace -` against the port's five calls — and exit 1. This file is still the JS-side
@@ -64,7 +64,7 @@
  *   |---|---|---|
  *   | CONTROL, unmodified                                   | 0 red     | exit 0, 0 unexplained |
  *   | delete the `Locale override` check                     | 1 — `refuses BEFORE the walk…`      | exit 1, 4,641 unexplained |
- *   | delete the `localeResolver result` check               | 1 — `names \`localeResolver\`…`      | exit 1, 4,641 unexplained |
+ *   | delete the `localeSupplier result` check               | 1 — `names \`localeSupplier\`…`      | exit 1, 4,641 unexplained |
  *   | delete the `Instance locale` check                     | (site removed with the `locale` option, 2026-09-27) | — |
  *   | delete `Requested locale` at `getDirectLocaleContext`   | 1 — `getDirectLocaleContext refuses…` | exit 1, 1,547 unexplained |
  *   | delete `Requested locale` at the negotiator's two doors | 2 — both negotiator doors           | **GREEN — no signal** |
@@ -77,7 +77,7 @@
  * FIVE ROWS SAY "GREEN", and they are why this file exists rather than being folded into the
  * differential: `Instance locale`, the negotiator's two doors, and both lookup DIAGNOSTIC channels
  * are surfaces `diff:lookup` does not drive or does not compare — it drives six OUTCOME fields and
- * the `localeMatch` is not among them. Fixing only what the differential could see would have been
+ * the `localeMatchResult` is not among them. Fixing only what the differential could see would have been
  * a probe space deciding the scope of its own fix, which is the trap `CLAUDE.md` records costing a
  * milestone.
  *
@@ -90,7 +90,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { createStrings } from "../src/core/index.js";
-import { createLocaleNegotiator } from "../src/negotiate/index.js";
+import { createLocaleMatcher } from "../src/negotiate/index.js";
 
 /** Catalogs that cannot serve an `en`/`ja`/`th` request, so a lookup runs the whole chain. */
 const EXHAUSTS = { fr: { Hello: "bonjour" }, nb: { Hello: "BOKMAAL" }, nn: { Hello: "NYNORSK" } };
@@ -122,13 +122,13 @@ function instrumented(extra) {
   const calls = [];
   const strings = createStrings({
     fallbackLocale: "fr",
-    strings: EXHAUSTS,
-    fallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attemptedLocale) => {
+    localizedStringSupplier: () => (EXHAUSTS),
+    translationFallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attemptedLocale) => {
       calls.push(`policy:${attemptedLocale}`);
       return true;
     },
-    onFailure: (/** @type {{lookupLocale: string}} */ failure) => {
-      calls.push(`onFailure:${failure.lookupLocale}`);
+    translationFailureHandler: (/** @type {{lookupLocale: string}} */ failure) => {
+      calls.push(`translationFailureHandler:${failure.lookupLocale}`);
       return { action: /** @type {const} */ ("return-key") };
     },
     .../** @type {any} */ (extra),
@@ -151,7 +151,7 @@ function assertRefusal(run, description, name) {
 
 describe("requireWellFormed at the per-call `{ locale }` ingress — Java's `Locale override`", () => {
   it("refuses BEFORE the walk: the exact sentence, and no callback consulted", () => {
-    const { strings, calls } = instrumented({ localeResolver: () => "fr" });
+    const { strings, calls } = instrumented({ localeSupplier: () => "fr" });
     assertRefusal(() => strings.getResult("Absent", undefined, { locale: REFUSED }),
       "Locale override", REFUSED);
     assert.deepEqual(calls, [],
@@ -159,7 +159,7 @@ describe("requireWellFormed at the per-call `{ locale }` ingress — Java's `Loc
   });
 
   it("CONTROL — the three locales `Locale.Builder` accepts still serve", () => {
-    const strings = createStrings({ fallbackLocale: "fr", localeResolver: () => "fr", strings: SERVES_EARLY });
+    const strings = createStrings({ fallbackLocale: "fr", localeSupplier: () => "fr", localizedStringSupplier: () => (SERVES_EARLY) });
     assert.deepEqual(
       ACCEPTED.map((locale) => strings.get("Hello", undefined, { locale })),
       ["hello-en", "konnichiwa", "sawatdee"],
@@ -170,7 +170,7 @@ describe("requireWellFormed at the per-call `{ locale }` ingress — Java's `Loc
     // `ja-JP-x-lvariant-JP` passes the ingress and is refused four candidates later, on the
     // variant-LOWERCASED twin the chain synthesizes. A port that moved the check to the tag layer
     // would refuse it here instead, with the wrong description and an empty trace.
-    const { strings, calls } = instrumented({ localeResolver: () => "fr" });
+    const { strings, calls } = instrumented({ localeSupplier: () => "fr" });
     assert.throws(
       () => strings.getResult("Hello", undefined, { locale: "ja-JP-x-lvariant-JP" }),
       /^TypeError: Attempted locale 'ja-JP-u-ca-japanese-x-lvariant-jp' is not a well-formed/,
@@ -180,17 +180,17 @@ describe("requireWellFormed at the per-call `{ locale }` ingress — Java's `Loc
 });
 
 describe("requireWellFormed at the ambient ingress — Java's `localeSupplier result`", () => {
-  it("names `localeResolver`, Java's shape with the JS name substituted", () => {
-    const { strings, calls } = instrumented({ localeResolver: () => REFUSED });
-    assertRefusal(() => strings.getResult("Absent"), "localeResolver result", REFUSED);
+  it("names `localeSupplier`, Java's shape with the JS name substituted", () => {
+    const { strings, calls } = instrumented({ localeSupplier: () => REFUSED });
+    assertRefusal(() => strings.getResult("Absent"), "localeSupplier result", REFUSED);
     assert.deepEqual(calls, []);
   });
 
   it("CONTROL — a resolver answering an accepted locale still serves", () => {
     const strings = createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "ja-JP-x-lvariant-JP",
-      strings: SERVES_EARLY,
+      localeSupplier: () => "ja-JP-x-lvariant-JP",
+      localizedStringSupplier: () => (SERVES_EARLY),
     });
     assert.equal(strings.get("Hello"), "konnichiwa");
   });
@@ -198,8 +198,8 @@ describe("requireWellFormed at the ambient ingress — Java's `localeSupplier re
   it("CONTROL — construction itself is unmoved: an accepted instance locale builds AND serves", () => {
     const strings = createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "th-TH-x-lvariant-TH",
-      strings: SERVES_EARLY,
+      localeSupplier: () => "th-TH-x-lvariant-TH",
+      localizedStringSupplier: () => (SERVES_EARLY),
     });
     assert.equal(strings.get("Hello"), "sawatdee");
   });
@@ -208,8 +208,8 @@ describe("requireWellFormed at the ambient ingress — Java's `localeSupplier re
 describe("requireWellFormed at the selection ingress — Java's `Requested locale`", () => {
   const configuration = createStrings({
     fallbackLocale: "fr",
-    localeResolver: () => "fr",
-    strings: EXHAUSTS,
+    localeSupplier: () => "fr",
+    localizedStringSupplier: () => (EXHAUSTS),
   }).getLocaleConfiguration();
 
   // ONE TEST PER DOOR, not one loop over three. `getDirectLocaleContext` lives in `src/core` and the
@@ -217,35 +217,35 @@ describe("requireWellFormed at the selection ingress — Java's `Requested local
   // ablation of EITHER module and would report the same "1 failing" either way — a test that cannot
   // tell two independent checks apart is not discriminating them.
   it("`getDirectLocaleContext` refuses — the counterpart plan 3.3 names, and the corpus drives", () => {
-    const strings = createStrings({ fallbackLocale: "fr", localeResolver: () => "fr", strings: EXHAUSTS });
+    const strings = createStrings({ fallbackLocale: "fr", localeSupplier: () => "fr", localizedStringSupplier: () => (EXHAUSTS) });
     assertRefusal(() => strings.getDirectLocaleContext(REFUSED), "Requested locale", REFUSED);
   });
 
   it("the negotiator's `matchFor` refuses", () => {
-    const negotiator = createLocaleNegotiator(configuration);
+    const negotiator = createLocaleMatcher(configuration);
     assertRefusal(() => negotiator.matchFor(REFUSED), "Requested locale", REFUSED);
   });
 
   it("the negotiator's `bestMatchFor` refuses — Java reaches :64 through `matchFor` at :1532", () => {
-    const negotiator = createLocaleNegotiator(configuration);
+    const negotiator = createLocaleMatcher(configuration);
     assertRefusal(() => negotiator.bestMatchFor(REFUSED), "Requested locale", REFUSED);
   });
 
   it("CONTROL — the three the corpus keeps as `selection-channel-does-not-refuse` all ANSWER", () => {
-    const negotiator = createLocaleNegotiator(configuration);
-    const strings = createStrings({ fallbackLocale: "fr", localeResolver: () => "fr", strings: EXHAUSTS });
+    const negotiator = createLocaleMatcher(configuration);
+    const strings = createStrings({ fallbackLocale: "fr", localeSupplier: () => "fr", localizedStringSupplier: () => (EXHAUSTS) });
 
     for (const locale of ACCEPTED) {
       assert.equal(negotiator.matchFor(locale).isMatch, false, `${locale} must answer, not throw`);
       assert.equal(negotiator.bestMatchFor(locale), "fr");
-      assert.equal(strings.getDirectLocaleContext(locale).localeMatch.isMatch, false);
+      assert.equal(strings.getDirectLocaleContext(locale).localeMatchResult.isMatch, false);
     }
   });
 
   it("CONTROL — the RANGE doors are untouched, because Java's take no `Locale`", () => {
     // `matchFor(List<LanguageRange>)` validates a member COUNT and nothing else, so a range that
     // spells a locale `Locale.Builder` would refuse is still a legal range.
-    const negotiator = createLocaleNegotiator(configuration);
+    const negotiator = createLocaleMatcher(configuration);
     const member = [{ range: REFUSED, weight: 1 }];
     assert.equal(negotiator.matchForLanguageRanges(member).isMatch, false);
     assert.equal(negotiator.bestMatchForLanguageRanges(member), "fr");
@@ -260,7 +260,7 @@ describe("the selection channel normalizes the requested locale exactly ONCE", (
   // already-normalized tag reports the wrong range. Found by `diff:lookup`'s matcher ingress on the
   // day it was added, in 42 rows no lookup ingress could reach.
   const UND = "UND-x-a";
-  const configuration = { fallbackLocale: "fr", supportedLocales: ["fr", "nb", "nn"], tiebreakers: {} };
+  const configuration = { fallbackLocale: "fr", supportedLocales: ["fr", "nb", "nn"], tiebreakerLocalesByLanguageCode: {} };
 
   /** @param {{requestedLanguageRanges: {range: string}[]}} match */
   const ranges = (match) => match.requestedLanguageRanges.map((member) => member.range);
@@ -269,21 +269,21 @@ describe("the selection channel normalizes the requested locale exactly ONCE", (
   // all of them would report "1 red" for an ablation of any single one — indistinguishable, which is
   // the same discrimination failure the split above avoids.
   it("the negotiator's `matchFor` — the door that was already correct, kept as the reference", () => {
-    assert.deepEqual(ranges(createLocaleNegotiator(configuration).matchFor(UND)), ["und-x-a"]);
+    assert.deepEqual(ranges(createLocaleMatcher(configuration).matchFor(UND)), ["und-x-a"]);
   });
 
   it("`getDirectLocaleContext` — the door `diff:lookup`'s matcher ingress caught", () => {
-    const strings = createStrings({ fallbackLocale: "fr", localeResolver: () => "fr", strings: EXHAUSTS });
-    assert.deepEqual(ranges(strings.getDirectLocaleContext(UND).localeMatch), ["und-x-a"]);
+    const strings = createStrings({ fallbackLocale: "fr", localeSupplier: () => "fr", localizedStringSupplier: () => (EXHAUSTS) });
+    assert.deepEqual(ranges(strings.getDirectLocaleContext(UND).localeMatchResult), ["und-x-a"]);
   });
 
   it("the per-call lookup's own diagnostic channel, which NO differential field compares", () => {
     // `diff:lookup` compares six OUTCOME fields and the match is not among them, so this site's
     // ablation shows up here and nowhere else. It is the reason the fix was applied to all four
     // doors rather than to the one the probe happened to see.
-    const strings = createStrings({ fallbackLocale: "fr", localeResolver: () => "fr", strings: EXHAUSTS });
+    const strings = createStrings({ fallbackLocale: "fr", localeSupplier: () => "fr", localizedStringSupplier: () => (EXHAUSTS) });
     assert.deepEqual(
-      ranges(/** @type {any} */ (strings.getResult("Absent", undefined, { locale: UND })).localeMatch),
+      ranges(/** @type {any} */ (strings.getResult("Absent", undefined, { locale: UND })).localeMatchResult),
       ["und-x-a"],
     );
   });
@@ -292,15 +292,15 @@ describe("the selection channel normalizes the requested locale exactly ONCE", (
     assert.deepEqual(
       ranges(/** @type {any} */ (createStrings({
         fallbackLocale: "fr",
-        localeResolver: () => UND,
-        strings: EXHAUSTS,
-      }).getResult("Absent")).localeMatch),
+        localeSupplier: () => UND,
+        localizedStringSupplier: () => (EXHAUSTS),
+      }).getResult("Absent")).localeMatchResult),
       ["und-x-a"],
     );
   });
 
   it("CONTROL — `lookupLocale` is still the NORMALIZED tag, which is a different question", () => {
-    const strings = createStrings({ fallbackLocale: "fr", localeResolver: () => "fr", strings: EXHAUSTS });
+    const strings = createStrings({ fallbackLocale: "fr", localeSupplier: () => "fr", localizedStringSupplier: () => (EXHAUSTS) });
     assert.equal(strings.getDirectLocaleContext(UND).lookupLocale, "und-x-a");
     assert.equal(strings.getDirectLocaleContext("EN-latn-us").lookupLocale, "en-Latn-US");
   });

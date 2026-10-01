@@ -269,7 +269,7 @@ const PURPOSE = {
   "src/internal/expression.js": ["expression tokenizer consumer: eager compiler + tree-walking evaluator (M6)", "conditional: catalogs with no alternatives never evaluate one"],
   "src/internal/expression-tokenizer.js": ["expression lexer (M6)", "conditional: catalogs with no alternatives never evaluate one"],
   "src/internal/plural.js": ["exact numeric conversion, CLDR operands, cardinal rule engine (M4)", "always: cardinal classification is a root export"],
-  "src/internal/locale.js": ["tag parsing/canonicalization, fallback chain, matcher, tiebreakers", "always"],
+  "src/internal/locale.js": ["tag parsing/canonicalization, fallback chain, matcher, tiebreakerLocalesByLanguageCode", "always"],
   // M8 S9. All three arrive with `createStrings({ loaded })` and none is reachable from a direct
   // construction, so a consumer that never loads from a manifest carries 8.8 KB it does not execute.
   // Splitting them out would mean a second construction entry point, which is the drift this branch
@@ -362,7 +362,7 @@ process.on("exit", () => rmSync(work, { recursive: true, force: true }));
   const build = async (base) => {
     const mod = await import(`file://${join(base, relative(root, graph.entry))}`);
     const api = mod.createStrings ? mod : await import(`file://${join(base, "src/core/index.js")}`);
-    const strings = api.createStrings({ fallbackLocale: "en", localeResolver: () => "en-AU", strings: CATALOG, tiebreakers: { en: ["en", "en-001"] } });
+    const strings = api.createStrings({ fallbackLocale: "en", localeSupplier: () => "en-AU", localizedStringSupplier: () => (CATALOG), tiebreakerLocalesByLanguageCode: { en: ["en", "en-001"] } });
     return strings.get("I read {{bookCount}} books", { bookCount: 3 });
   };
   const real = await build(root);

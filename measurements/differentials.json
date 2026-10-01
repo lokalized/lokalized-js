@@ -1,11 +1,11 @@
 {
-  "recordedAt": "2026-09-29T02:38:08.583Z",
-  "sourceSha256": "bf8e820cc42def03abe3058b65cb92993fc7f347b1656c5ff2caf10468f03818",
+  "recordedAt": "2026-10-01T02:06:30.553Z",
+  "sourceSha256": "e385463cfec6fa3bf1f754613ab610bcbfb2e0b3a5fa53bc8a153e599d74a703",
   "differentials": {
     "load": {
       "exit": 0,
       "headline": "41 identical — every probe's locales, keys, PARSED CONTENT, failure",
-      "toolSha256": "ec2071a3641a89eb90737affdc1e21d30ce6b62bbc2f8f2e2b07c9ee52fc6837",
+      "toolSha256": "e0e6aec437c66a946e5cf494449558b3c3e75816dd5ef280acf77f6485733dea",
       "temporaryEntriesLeft": 0,
       "facts": {
         "exercised": {
@@ -28,13 +28,13 @@
     "lookup": {
       "exit": 0,
       "headline": "end-to-end lookup differential against lokalized-3.1.0 on the pinned JDK: 414161/673200 well-formed lookups identical over 6828 tag(s) x 12 catalog set(s) x 11 shape(s) (3 keys x 2 lookup ingresses, p",
-      "toolSha256": "6be8767fa630585c5facfd5f454916de105ea015d304c4619647ea079ac17eb2",
+      "toolSha256": "77aebeb037da282fbbbe0cdbd8be76670debde3da3d486c099dee1ce43405ef5",
       "temporaryEntriesLeft": 0
     },
     "direct-tag": {
       "exit": 0,
       "headline": "Locale.forLanguageTag differential against Java on the pinned JDK: 46418/46418 well-formed tags identical, 0 declared divergence(s), 0 open port defect(s) over 0 probe(s), 0 unexplained; 83 ill-formed",
-      "toolSha256": "9ab5f68a0a008a645f020cb434baded20cc4b45ff7c3a14b95dd27d1acf029a6",
+      "toolSha256": "3f8963b8ea05b3d78e46cc35ece4a6b2ad40aff7e83c3229f16c0b5335a8e4a5",
       "temporaryEntriesLeft": 0
     },
     "language-range": {
@@ -66,7 +66,7 @@
     "parse": {
       "exit": 0,
       "headline": "parse differential against Java on the pinned JDK: 136/136 identical",
-      "toolSha256": "9c4510e884aecc9fa94ad4e86937bc0a7a9d25c6827be620073012967c006084",
+      "toolSha256": "a213a44d6924ff7e74d7fc59139e1be65c58337e6c271899295abb728d858447",
       "temporaryEntriesLeft": 0
     },
     "interpolate": {
@@ -78,7 +78,7 @@
     "phonetic": {
       "exit": 0,
       "headline": "69/77 identical, 8 known divergence(s), 0 unexplained",
-      "toolSha256": "211ede3abd4c5aa88fa8e18318e3822434bdd9b36af235d50b2bee3e7450b5a5",
+      "toolSha256": "d58f1a4d53009f6b6bec291d5ee327d08806dc8f37dc78c5eaa8ff626082e0a8",
       "temporaryEntriesLeft": 0
     }
   }

@@ -110,8 +110,8 @@ describe("`und` is dropped case-SENSITIVELY, and only as a primary language subt
     // the first field and diverge on the third.
     const strings = createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "fr",
-      strings: { fr: { Hello: "bonjour" }, nb: { Hello: "B" }, nn: { Hello: "N" } },
+      localeSupplier: () => "fr",
+      localizedStringSupplier: () => ({ fr: { Hello: "bonjour" }, nb: { Hello: "B" }, nn: { Hello: "N" } }),
     });
 
     const upper = strings.getResult("Hello", undefined, { locale: "UND-X-A" });
@@ -142,9 +142,9 @@ describe("`throwExceptionFor` validates the attempted locales when it has no cau
   const throwing = (extra = {}) =>
     createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "fr",
-      strings: EXHAUSTS,
-      onFailure: () => ({ action: "throw" }),
+      localeSupplier: () => "fr",
+      localizedStringSupplier: () => (EXHAUSTS),
+      translationFailureHandler: () => ({ action: "throw" }),
       ...extra,
     });
 
@@ -187,8 +187,8 @@ describe("`throwExceptionFor` validates the attempted locales when it has no cau
     const sentinel = new Error("resolver refuses");
     const strings = createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "fr",
-      strings: {
+      localeSupplier: () => "fr",
+      localizedStringSupplier: () => ({
         fr: {
           Hello: {
             translation: "[{{a}}]",
@@ -197,8 +197,8 @@ describe("`throwExceptionFor` validates the attempted locales when it has no cau
         },
         nb: { Hello: "B" },
         nn: { Hello: "N" },
-      },
-      onFailure: () => ({ action: "throw" }),
+      }),
+      translationFailureHandler: () => ({ action: "throw" }),
       phoneticResolver: () => {
         throw sentinel;
       },

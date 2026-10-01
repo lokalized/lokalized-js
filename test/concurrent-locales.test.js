@@ -171,7 +171,7 @@ voices = createStrings({
   // A SEVENTH distinct value. The instance constant is deliberately a locale no handler requests, so
   // "the per-call locale was ignored and the instance constant used" is a self-identifying red
   // rather than an answer that happens to look like one of the siblings'.
-  localeResolver: () => "es",
+  localeSupplier: () => "es",
   // SET EXPLICITLY, never inherited from the default. An isolate expectation resting on an unstated
   // default goes quietly vacuous the day the default moves, instead of going red.
   bidiIsolation: "rtl-locales",
@@ -180,14 +180,14 @@ voices = createStrings({
     phoneticReentry?.(term, locale);
     return term === "apple" ? PHONETIC_VOWEL : PHONETIC_CONSONANT;
   },
-  strings: {
+  localizedStringSupplier: () => ({
     en: voiceCatalog("EN"),
     fr: voiceCatalog("FR"),
     de: voiceCatalog("DE", { promo: false }),
     ar: voiceCatalog("AR"),
     he: voiceCatalog("HE"),
     es: voiceCatalog("ES"),
-  },
+  }),
 });
 
 /** MEASURED against unmodified source, not predicted. `count: 0` for every row. */
@@ -228,8 +228,8 @@ function snapshotOf(/** @type {string} */ tag) {
     lookupLocale: result.lookupLocale,
     resolvedLocale: result.resolvedLocale,
     attemptedLocales: [...result.attemptedLocales],
-    matchLocale: result.localeMatch.locale,
-    matchType: result.localeMatch.matchType,
+    matchLocale: result.localeMatchResult.locale,
+    matchType: result.localeMatchResult.matchType,
   };
 }
 
@@ -311,8 +311,8 @@ describe("K1 — one translation call is atomic with respect to the event loop",
 
     const result = voices.getResult("Cart.Promo", { name: "Amira", count: 1, tier: "silver" }, {
       locale: "de-AT",
-      fallbackPolicy: () => { atPolicy = ranMicrotask; return true; },
-      onFallback: (/** @type {any} */ event) => { atObserver = ranMicrotask; events.push(event); },
+      translationFallbackPolicy: () => { atPolicy = ranMicrotask; return true; },
+      translationFallbackObserver: (/** @type {any} */ event) => { atObserver = ranMicrotask; events.push(event); },
     });
 
     assert.equal(atPolicy, false, "the fallback policy ran before a microtask queued before the call");
@@ -327,7 +327,7 @@ describe("K1 — one translation call is atomic with respect to the event loop",
     // and `null == false` is false — but `events.length` would then be 0 and the reason would be
     // invisible. Naming the walk is what makes the previous test's zeroes meaningful.
     const result = voices.getResult("Cart.Promo", { name: "Amira", count: 1, tier: "silver" },
-      { locale: "de-AT", fallbackPolicy: () => true });
+      { locale: "de-AT", translationFallbackPolicy: () => true });
     assert.equal(result.status, "translated");
     assert.equal(result.lookupLocale, "de-AT");
     assert.equal(result.resolvedLocale, "en", "de holds Cart.Items but not Cart.Promo");
@@ -475,7 +475,7 @@ describe("K3 — a `get` re-entered from library-invoked application code", () =
     log.push("outer-enter");
     const outer = voices.getResult("Cart.Article", { term: "apple", count: 2 }, {
       locale: "ar-EG",
-      fallbackPolicy: () => {
+      translationFallbackPolicy: () => {
         log.push("inner-enter");
         inner = voices.getResult("Cart.Article", { term: "apple", count: 2 }, { locale: "de" });
         log.push("inner-exit");
@@ -537,7 +537,7 @@ describe("K3 — a `get` re-entered from library-invoked application code", () =
     // re-entrant run, and it proves the outer walk really reaches `ar` rather than dying at the
     // catalog-less `ar-EG`.
     const outer = voices.getResult("Cart.Article", { term: "apple", count: 2 },
-      { locale: "ar-EG", fallbackPolicy: () => true });
+      { locale: "ar-EG", translationFallbackPolicy: () => true });
     assert.equal(outer.translation, ARTICLE_AR_2);
     assert.equal(outer.resolvedLocale, "ar");
 
@@ -586,7 +586,7 @@ describe("K4 — a placeholder getter that re-enters `get`", () => {
       get name() {
         calls.name += 1;
         inner = voices.getResult("Cart.Promo", { name: "Bruno", count: 7, tier: "gold" },
-          { locale: "de-AT", fallbackPolicy: () => true });
+          { locale: "de-AT", translationFallbackPolicy: () => true });
         return "Amira";
       },
       get tier() { calls.tier += 1; return "silver"; },
@@ -620,14 +620,14 @@ describe("K4 — a placeholder getter that re-enters `get`", () => {
       PROMO_OUTER);
     assert.equal(
       voices.getResult("Cart.Promo", { name: "Bruno", count: 7, tier: "gold" },
-        { locale: "de-AT", fallbackPolicy: () => true }).translation,
+        { locale: "de-AT", translationFallbackPolicy: () => true }).translation,
       PROMO_INNER);
   });
 });
 
 // ---------------------------------------------------------------------------------------------
 // K5 — PER-CALL CALLBACK OVERRIDES. Cross-talk in its most literal form: a callback belonging to
-// request A invoked with request B's data. Invisible to every existing instrument — `onFallback`
+// request A invoked with request B's data. Invisible to every existing instrument — `translationFallbackObserver`
 // has no Java counterpart at all, so no corpus case can see it, and no differential re-enters.
 // ---------------------------------------------------------------------------------------------
 
@@ -636,15 +636,15 @@ const instanceEvents = [];
 /** A second instance, identical except that it installs an INSTANCE-level observer. */
 const observed = createStrings({
   fallbackLocale: "en",
-  localeResolver: () => "es",
+  localeSupplier: () => "es",
   bidiIsolation: "rtl-locales",
-  onFallback: (/** @type {any} */ event) => { instanceEvents.push(event); },
-  strings: {
+  translationFallbackObserver: (/** @type {any} */ event) => { instanceEvents.push(event); },
+  localizedStringSupplier: () => ({
     en: voiceCatalog("EN"),
     fr: voiceCatalog("FR"),
     de: voiceCatalog("DE", { promo: false }),
     es: voiceCatalog("ES"),
-  },
+  }),
 });
 
 describe("K5 — per-call callbacks belong to their own call", () => {
@@ -661,18 +661,18 @@ describe("K5 — per-call callbacks belong to their own call", () => {
       // (de-AT holds no catalog; de holds one without this key), and an unguarded seam would nest
       // twice — which is not wrong, but it makes the nesting witness ambiguous about WHICH inner
       // call any later assertion is about.
-      fallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attempted) => {
+      translationFallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attempted) => {
         if (attempted !== "de-AT") return true;
         log.push("inner-enter");
         inner = observed.getResult("Cart.Promo", { name: "Bruno", count: 1, tier: "gold" }, {
           locale: "fr-CH",
-          fallbackPolicy: () => true,
-          onFallback: (/** @type {any} */ event) => { eventsB.push(event); },
+          translationFallbackPolicy: () => true,
+          translationFallbackObserver: (/** @type {any} */ event) => { eventsB.push(event); },
         });
         log.push("inner-exit");
         return true;
       },
-      onFallback: (/** @type {any} */ event) => { eventsA.push(event); },
+      translationFallbackObserver: (/** @type {any} */ event) => { eventsA.push(event); },
     });
     log.push("outer-exit");
 
@@ -697,9 +697,9 @@ describe("K5 — per-call callbacks belong to their own call", () => {
     // `MissingTranslationError`. A merged-state defect that happened to reconstruct an equal-LOOKING
     // event still fails here, where `deepEqual` would pass on exactly the implementation the clause
     // forbids.
-    assert.equal(eventsA[0].localeMatch, outer.localeMatch);
-    assert.equal(eventsB[0].localeMatch, inner.localeMatch);
-    assert.notEqual(eventsA[0].localeMatch, eventsB[0].localeMatch);
+    assert.equal(eventsA[0].localeMatchResult, outer.localeMatchResult);
+    assert.equal(eventsB[0].localeMatchResult, inner.localeMatchResult);
+    assert.notEqual(eventsA[0].localeMatchResult, eventsB[0].localeMatchResult);
   });
 
   it("the INHERITANCE direction — a nested call that omits an observer reaches the instance one", () => {
@@ -712,22 +712,22 @@ describe("K5 — per-call callbacks belong to their own call", () => {
 
     const outer = observed.getResult("Cart.Promo", { name: "Amira", count: 1, tier: "silver" }, {
       locale: "de-AT",
-      fallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attempted) => {
+      translationFallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attempted) => {
         if (attempted !== "de-AT") return true;
-        // NO onFallback: this call inherits the instance observer.
+        // NO translationFallbackObserver: this call inherits the instance observer.
         inner = observed.getResult("Cart.Promo", { name: "Bruno", count: 1, tier: "gold" },
-          { locale: "fr-CH", fallbackPolicy: () => true });
+          { locale: "fr-CH", translationFallbackPolicy: () => true });
         return true;
       },
-      onFallback: (/** @type {any} */ event) => { eventsA.push(event); },
+      translationFallbackObserver: (/** @type {any} */ event) => { eventsA.push(event); },
     });
 
     assert.equal(instanceEvents.length, 1, "the instance observer received exactly the inner event");
     assert.equal(instanceEvents[0].lookupLocale, "fr-CH");
-    assert.equal(instanceEvents[0].localeMatch, inner.localeMatch);
+    assert.equal(instanceEvents[0].localeMatchResult, inner.localeMatchResult);
     assert.equal(eventsA.length, 1, "and the per-call observer exactly the outer event");
     assert.equal(eventsA[0].lookupLocale, "de-AT");
-    assert.equal(eventsA[0].localeMatch, outer.localeMatch);
+    assert.equal(eventsA[0].localeMatchResult, outer.localeMatchResult);
   });
 
   it("THE THROWING DOOR — a MissingTranslationError carries its own call's failure by reference", () => {
@@ -742,13 +742,13 @@ describe("K5 — per-call callbacks belong to their own call", () => {
     try {
       observed.get("Cart.Missing", { name: "Amira" }, {
         locale: "de-AT",
-        fallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attempted) => {
+        translationFallbackPolicy: (/** @type {string} */ _reason, /** @type {string} */ attempted) => {
           if (attempted !== "de-AT") return true;
           inner = observed.getResult("Cart.Promo", { name: "Bruno", count: 1, tier: "gold" },
-            { locale: "fr-CH", fallbackPolicy: () => true });
+            { locale: "fr-CH", translationFallbackPolicy: () => true });
           return true;
         },
-        onFailure: (/** @type {any} */ failure) => { handlerSaw = failure; return THROW_EXCEPTION; },
+        translationFailureHandler: (/** @type {any} */ failure) => { handlerSaw = failure; return THROW_EXCEPTION; },
       });
     } catch (error) { thrown = error; }
 
@@ -761,8 +761,8 @@ describe("K5 — per-call callbacks belong to their own call", () => {
     assert.equal(error.failure, handlerSaw, "the error carries the handler's failure BY REFERENCE");
     assert.equal(error.failure.lookupLocale, "de-AT", "…the outer's lookup, not the inner's");
     assert.deepEqual([...error.failure.attemptedLocales], ["de-AT", "de", "en"]);
-    assert.equal(error.failure.localeMatch.locale, "de");
-    assert.notEqual(error.failure.localeMatch, inner.localeMatch);
+    assert.equal(error.failure.localeMatchResult.locale, "de");
+    assert.notEqual(error.failure.localeMatchResult, inner.localeMatchResult);
   });
 
   it("CONTROL — without re-entrancy each observer receives a byte-identical event", () => {
@@ -771,23 +771,23 @@ describe("K5 — per-call callbacks belong to their own call", () => {
     // direction.
     /** @type {any[]} */ const eventsA = [];
     const outer = observed.getResult("Cart.Promo", { name: "Amira", count: 1, tier: "silver" },
-      { locale: "de-AT", fallbackPolicy: () => true,
-        onFallback: (/** @type {any} */ e) => { eventsA.push(e); } });
+      { locale: "de-AT", translationFallbackPolicy: () => true,
+        translationFallbackObserver: (/** @type {any} */ e) => { eventsA.push(e); } });
     assert.equal(eventsA.length, 1);
     assert.equal(eventsA[0].lookupLocale, "de-AT");
     assert.equal(eventsA[0].resolvedLocale, "en");
     assert.deepEqual(eventsA[0].precedingFailures.map((/** @type {any} */ f) => f.locale),
       ["de-AT", "de"]);
-    assert.equal(eventsA[0].localeMatch, outer.localeMatch);
+    assert.equal(eventsA[0].localeMatchResult, outer.localeMatchResult);
 
     /** @type {any[]} */ const eventsB = [];
     const alone = observed.getResult("Cart.Promo", { name: "Bruno", count: 1, tier: "gold" },
-      { locale: "fr-CH", fallbackPolicy: () => true,
-        onFallback: (/** @type {any} */ e) => { eventsB.push(e); } });
+      { locale: "fr-CH", translationFallbackPolicy: () => true,
+        translationFallbackObserver: (/** @type {any} */ e) => { eventsB.push(e); } });
     assert.equal(eventsB.length, 1);
     assert.equal(eventsB[0].lookupLocale, "fr-CH");
     assert.equal(eventsB[0].resolvedLocale, "fr");
-    assert.equal(eventsB[0].localeMatch, alone.localeMatch);
+    assert.equal(eventsB[0].localeMatchResult, alone.localeMatchResult);
   });
 });
 
@@ -808,7 +808,7 @@ const TIEBREAKERS_B = { fr: ["fr-CA"] };
  * `fr-BE` is loaded by NEITHER tenant, on purpose. Asking for `fr-FR` directly would let both
  * instances agree by accident on the tags they share and would reach a cache without discriminating
  * it; `fr-BE` makes the chain's resolution genuinely depend on each instance's own catalogs and
- * tiebreakers. `en-AU` is the second axis — the same chain on both sides, different catalog CONTENT.
+ * tiebreakerLocalesByLanguageCode. `en-AU` is the second axis — the same chain on both sides, different catalog CONTENT.
  */
 const TENANT_REQUESTS = /** @type {const} */ (["fr-BE", "en-AU"]);
 
@@ -825,10 +825,10 @@ const TENANT_EXPECTED = {
 };
 
 const tenantA = createStrings({
-  fallbackLocale: "en", localeResolver: () => "en", strings: TENANT_A, tiebreakers: TIEBREAKERS_A,
+  fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (TENANT_A), tiebreakerLocalesByLanguageCode: TIEBREAKERS_A,
 });
 const tenantB = createStrings({
-  fallbackLocale: "en", localeResolver: () => "en", strings: TENANT_B, tiebreakers: TIEBREAKERS_B,
+  fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (TENANT_B), tiebreakerLocalesByLanguageCode: TIEBREAKERS_B,
 });
 
 function tenantRows(/** @type {any} */ instance) {
@@ -858,7 +858,7 @@ describe("K6 — two Strings instances with different loaded sets share no state
       "…and `en-AU` is deliberately the SAME chain on both sides, so only catalog CONTENT differs");
   });
 
-  it("interleaved, each instance answers from its own catalogs and tiebreakers", async () => {
+  it("interleaved, each instance answers from its own catalogs and tiebreakerLocalesByLanguageCode", async () => {
     /** @type {string[]} */ const log = [];
     /** @type {Record<string, any[]>} */ const seen = { A: [], B: [] };
     const gates = barrier();
@@ -901,13 +901,13 @@ describe("K6 — two Strings instances with different loaded sets share no state
     // present and prove nothing about single-instance behaviour. The child's fixture is SERIALIZED
     // from the same constants, so the two cannot drift apart.
     const coreUrl = new URL("../src/core/index.js", import.meta.url).href;
-    for (const [name, catalogs, tiebreakers] of /** @type {const} */ ([
+    for (const [name, catalogs, tiebreakerLocalesByLanguageCode] of /** @type {const} */ ([
       ["A", TENANT_A, TIEBREAKERS_A], ["B", TENANT_B, TIEBREAKERS_B],
     ])) {
       const source = `
         import { createStrings } from ${JSON.stringify(coreUrl)};
-        const instance = createStrings({ fallbackLocale: "en", localeResolver: () => "en",
-          strings: ${JSON.stringify(catalogs)}, tiebreakers: ${JSON.stringify(tiebreakers)} });
+        const instance = createStrings({ fallbackLocale: "en", localeSupplier: () => "en",
+          localizedStringSupplier: () => (${JSON.stringify(catalogs)}), tiebreakerLocalesByLanguageCode: ${JSON.stringify(tiebreakerLocalesByLanguageCode)} });
         const rows = ${JSON.stringify(TENANT_REQUESTS)}.map((locale) => {
           const r = instance.getResult(${JSON.stringify(TENANT_KEY)}, undefined, { locale });
           return { locale, translation: r.translation, resolved: r.resolvedLocale,
@@ -928,7 +928,7 @@ describe("K6 — two Strings instances with different loaded sets share no state
 
 // ---------------------------------------------------------------------------------------------
 // K7 — THE INSTANCE RESOLVER, which is the shape a Node server actually uses. Plan 3.2:551-562
-// declares `localeResolver`, plan 3.3:743-745 puts it third in the locale-source order, and plan
+// declares `localeSupplier`, plan 3.3:743-745 puts it third in the locale-source order, and plan
 // 3.4:864-866 is the sentence that exists because of this clause: "Resolver and per-call locale
 // values are normalized and recomputed ON EVERY USE."
 // ---------------------------------------------------------------------------------------------
@@ -945,15 +945,15 @@ let ambient;
 ambient = createStrings({
   fallbackLocale: "en",
   bidiIsolation: "rtl-locales",
-  localeResolver: () => {
+  localeSupplier: () => {
     resolverCalls.push(requestSlot.locale);
     resolverReentry?.(ambient);
     return requestSlot.locale;
   },
-  strings: {
+  localizedStringSupplier: () => ({
     en: voiceCatalog("EN"), fr: voiceCatalog("FR"), de: voiceCatalog("DE", { promo: false }),
     ar: voiceCatalog("AR"), he: voiceCatalog("HE"), es: voiceCatalog("ES"),
-  },
+  }),
 });
 
 describe("K7 — the instance resolver is consulted on every call, never memoized", () => {
@@ -1104,7 +1104,7 @@ function manifestOf(label, bodies, options) {
     fallbackLocale: options.fallbackLocale,
     baseUrl: pathToFileURL(`${directory}/`).href,
     files,
-    tiebreakers: {},
+    tiebreakerLocalesByLanguageCode: {},
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return /** @type {any} */ (draft);
@@ -1236,7 +1236,7 @@ describe("L1 — concurrent loads produce independent LoadedStrings", () => {
       loadEntireManifestFromFiles(MANIFEST_B_BAD_FALLBACK, { partialFailure: "allow-partial" }),
       "the bad-fallback load");
     assert.equal(outcome.ok, false, "a fallback-file failure is never a partial success");
-    assert.equal(/** @type {any} */ (outcome).error?.name, "StringsLoadingError");
+    assert.equal(/** @type {any} */ (outcome).error?.name, "LocalizedStringLoadingError");
     assert.match(String(/** @type {any} */ (outcome).error?.message),
       /fallback-locale file is among them/);
   });
@@ -1485,7 +1485,7 @@ describe("L3 — one load's byte budget never governs a concurrent load's files"
     const crossed = await settledWithin(
       loadEntireManifestFromFiles(BUDGET_A, { limits: BUDGET_LIMITS_B }), "A under B's limit");
     assert.equal(crossed.ok, false);
-    assert.equal(/** @type {any} */ (crossed).error?.name, "StringsLoadingError");
+    assert.equal(/** @type {any} */ (crossed).error?.name, "LocalizedStringLoadingError");
     assert.deepEqual(failureKeysOf(/** @type {any} */ (crossed).error.failures),
       ["de:limit", "en:limit", "fr:limit"]);
   });
@@ -1701,7 +1701,7 @@ describe("S1 — two rendering contexts from one manifest-backed instance", () =
     // refuses `complete: false`, so a fixture that quietly failed verification would make every
     // assertion below unreachable rather than red.
     assert.equal(loaded.complete, true);
-    const strings = /** @type {any} */ (createStrings({ loaded, localeResolver: () => "en" }));
+    const strings = /** @type {any} */ (createStrings({ loaded, localeSupplier: () => "en" }));
     assert.deepEqual(strings.getSupportedLocales(), ["de", "en", "fr-FR"]);
     assert.deepEqual({ ...strings.getLoadVerification().coverage }, { kind: "entire-manifest" });
 
@@ -1712,10 +1712,10 @@ describe("S1 — two rendering contexts from one manifest-backed instance", () =
     // wrong.
     const contextFr = strings.getDirectLocaleContext("fr-BE");
     const contextDe = strings.getDirectLocaleContext("de-AT");
-    assert.equal(contextFr.localeMatch.matchType, "likely-subtag");
-    assert.equal(contextFr.localeMatch.locale, "fr-FR");
-    assert.equal(contextDe.localeMatch.matchType, "cldr-fallback");
-    assert.equal(contextDe.localeMatch.locale, "de");
+    assert.equal(contextFr.localeMatchResult.matchType, "likely-subtag");
+    assert.equal(contextFr.localeMatchResult.locale, "fr-FR");
+    assert.equal(contextDe.localeMatchResult.matchType, "cldr-fallback");
+    assert.equal(contextDe.localeMatchResult.locale, "de");
 
     // Interleaved: build one stamp, yield, build the other, yield, then validate.
     /** @type {string[]} */ const log = [];
@@ -1738,25 +1738,25 @@ describe("S1 — two rendering contexts from one manifest-backed instance", () =
 
     assert.equal(stampFr.lookupLocale, "fr-BE");
     assert.equal(stampDe.lookupLocale, "de-AT");
-    assert.deepEqual({ ...stampFr.localeMatch }, { locale: "fr-FR", matchType: "likely-subtag" });
-    assert.deepEqual({ ...stampDe.localeMatch }, { locale: "de", matchType: "cldr-fallback" });
+    assert.deepEqual({ ...stampFr.localeMatchResult }, { locale: "fr-FR", matchType: "likely-subtag" });
+    assert.deepEqual({ ...stampDe.localeMatchResult }, { locale: "de", matchType: "cldr-fallback" });
     // "Different" is not enough — two equally WRONG stamps are different too — so the literals above
     // carry the row and this only records that they are not the same object's fields twice.
-    assert.notDeepEqual({ ...stampFr.localeMatch }, { ...stampDe.localeMatch });
+    assert.notDeepEqual({ ...stampFr.localeMatchResult }, { ...stampDe.localeMatchResult });
 
     // Plan 6.4:2243-2245 — a direct context "is resolved ONLY by calling
     // `strings.getDirectLocaleContext(locale)`". Asserting the stamp against that call's answer is
     // the behavioural echo of what `test/ssr-graph.test.js` already pins structurally.
     assert.equal(stampFr.lookupLocale, contextFr.lookupLocale);
-    assert.deepEqual({ ...stampFr.localeMatch },
-      { locale: contextFr.localeMatch.locale, matchType: contextFr.localeMatch.matchType });
+    assert.deepEqual({ ...stampFr.localeMatchResult },
+      { locale: contextFr.localeMatchResult.locale, matchType: contextFr.localeMatchResult.matchType });
 
     // ── CROSS-VALIDATION, the sharper half ────────────────────────────────────────────────────
     // Written as a `throws` with a NAMED error predicate rather than a bare `throws`, because an
     // ablated build that failed for an unrelated reason would otherwise satisfy it and report green.
     assert.throws(() => validateSsrStamp(stampFr, strings, { kind: "locale", locale: "de-AT" }),
       (/** @type {any} */ error) => error?.name === "ConfigurationError"
-        && /lookupLocale|localeMatch/.test(String(error.message)));
+        && /lookupLocale|localeMatchResult/.test(String(error.message)));
     assert.throws(() => validateSsrStamp(stampDe, strings, { kind: "locale", locale: "fr-BE" }),
       (/** @type {any} */ error) => error?.name === "ConfigurationError");
   });
@@ -1768,20 +1768,20 @@ describe("S1 — two rendering contexts from one manifest-backed instance", () =
     // alone would accept the wrong page.
     const loaded = /** @type {any} */ ((await settledWithin(
       loadEntireManifestFromFiles(SSR_MANIFEST), "the SSR fixture load")).value);
-    const strings = /** @type {any} */ (createStrings({ loaded, localeResolver: () => "en" }));
+    const strings = /** @type {any} */ (createStrings({ loaded, localeSupplier: () => "en" }));
 
     const direct = { kind: /** @type {const} */ ("locale"), locale: "de" };
     const supplied = {
       kind: /** @type {const} */ ("locale-match"),
-      localeMatch: { locale: "de", matchType: "wildcard" },
+      localeMatchResult: { locale: "de", matchType: "wildcard" },
     };
     const stampDirect = createSsrStamp(strings, direct);
     const stampSupplied = createSsrStamp(strings, supplied);
 
     // The fixture fact: identical lookup, identical selection, different type.
     assert.equal(stampDirect.lookupLocale, stampSupplied.lookupLocale);
-    assert.equal(stampDirect.localeMatch.locale, stampSupplied.localeMatch.locale);
-    assert.notEqual(stampDirect.localeMatch.matchType, stampSupplied.localeMatch.matchType);
+    assert.equal(stampDirect.localeMatchResult.locale, stampSupplied.localeMatchResult.locale);
+    assert.notEqual(stampDirect.localeMatchResult.matchType, stampSupplied.localeMatchResult.matchType);
 
     // CONTROL, which must pass end to end: each stamp validates against its own context.
     validateSsrStamp(stampDirect, strings, direct);
@@ -1790,10 +1790,10 @@ describe("S1 — two rendering contexts from one manifest-backed instance", () =
     // And the cross pair must not, in both directions, naming the field that differs.
     assert.throws(() => validateSsrStamp(stampDirect, strings, supplied),
       (/** @type {any} */ e) => e?.name === "ConfigurationError"
-        && String(e.message).includes("localeMatch.matchType"));
+        && String(e.message).includes("localeMatchResult.matchType"));
     assert.throws(() => validateSsrStamp(stampSupplied, strings, direct),
       (/** @type {any} */ e) => e?.name === "ConfigurationError"
-        && String(e.message).includes("localeMatch.matchType"));
+        && String(e.message).includes("localeMatchResult.matchType"));
   });
 });
 
@@ -1801,7 +1801,7 @@ describe("S1 — two rendering contexts from one manifest-backed instance", () =
 // S2 — A MANIFEST-BACKED INSTANCE UNDER INTERLEAVING. Every core row above builds directly, and
 // S9's landed split is per-instance state with TWO members a shared scratch can cross: the SELECTION
 // channel reads the full `manifestLocaleConfiguration` while the RESOLUTION channel keeps the loaded
-// catalogs and the FILTERED tiebreakers. All 2,112 conformance cases construct directly, so they are
+// catalogs and the FILTERED tiebreakerLocalesByLanguageCode. All 2,112 conformance cases construct directly, so they are
 // structurally blind to it.
 // ---------------------------------------------------------------------------------------------
 
@@ -1811,7 +1811,7 @@ const SUBSET_MANIFEST = manifestOf("subset", {
   "fr-CA": JSON.stringify({ Note: "FR-CA-note" }),
   "fr-FR": JSON.stringify({ Note: "FR-FR-note" }),
 }, { fallbackLocale: "en" });
-SUBSET_MANIFEST.tiebreakers = { fr: ["fr-CA", "fr-FR"] };
+SUBSET_MANIFEST.tiebreakerLocalesByLanguageCode = { fr: ["fr-CA", "fr-FR"] };
 SUBSET_MANIFEST.catalogFingerprint =
   computeCatalogIdentity(catalogIdentityInputFor(SUBSET_MANIFEST)).catalogFingerprint;
 
@@ -1837,8 +1837,8 @@ describe("S2 — two manifest-backed instances keep their own applicable configu
       assert.notEqual(subsetLoaded.catalogIdentity.catalogFingerprint,
         wholeLoaded.catalogIdentity.catalogFingerprint);
 
-      const subset = /** @type {any} */ (createStrings({ loaded: subsetLoaded, localeResolver: () => "fr-BE" }));
-      const whole = /** @type {any} */ (createStrings({ loaded: wholeLoaded, localeResolver: () => "en" }));
+      const subset = /** @type {any} */ (createStrings({ loaded: subsetLoaded, localeSupplier: () => "fr-BE" }));
+      const whole = /** @type {any} */ (createStrings({ loaded: wholeLoaded, localeSupplier: () => "en" }));
 
       /** @type {string[]} */ const log = [];
       const gates = barrier();

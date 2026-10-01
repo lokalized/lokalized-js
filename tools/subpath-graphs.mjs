@@ -68,7 +68,7 @@ const HISTORY_ORIGIN = "348eea727da03e20c728cddb2317d7a864060b888f3383aa66395fff
  * forward once per landed batch — a deliberate edit, like the origin.
  * @type {{ index: number, sha256: string } | undefined}
  */
-const HISTORY_FROZEN_THROUGH = { index: 63, sha256: "a525d24c143f756efc2c3e9bda7bbd0582ada9ca6e353fd9b474dcfeacca8ddb" };
+const HISTORY_FROZEN_THROUGH = { index: 68, sha256: "a2f278b2b8af54fff56e3f1ab69867f73538f5c4584876855f1d4b26cbb816cb" };
 
 const isCount = (/** @type {unknown} */ n) => Number.isSafeInteger(n) && /** @type {number} */ (n) >= 0;
 

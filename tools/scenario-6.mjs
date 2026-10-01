@@ -154,7 +154,7 @@ const REBASELINES_ORIGIN = "4f1b2eb3ceef3f5de7deb859d2b5fdb24445d58c81f4d5c36fa9
  * them. Move it forward once per landed batch — a deliberate edit, like the origin.
  * @type {{ index: number, sha256: string } | undefined}
  */
-const REBASELINES_FROZEN_THROUGH = { index: 29, sha256: "a199efe372a87104b60f73280cead6e7258c17eb716717ff7106bfdaaefb2d09" };
+const REBASELINES_FROZEN_THROUGH = { index: 33, sha256: "7e567c26828f3871f965dfd3a91fb9f74c3717b263eb008078cd2096d06ff338" };
 
 const RECORD = "measurements/scenario-6.json";
 const REQUESTS = "requests per render";
@@ -254,7 +254,7 @@ function fixtureDigest() {
 
 const { publishCatalogs } = await import(new URL("../examples/server/publish.js", import.meta.url).href);
 const { handleRequest } = await import(new URL("../examples/edge/worker.js", import.meta.url).href);
-const { createLocaleNegotiator, forAcceptLanguage } = await import(new URL("../src/negotiate/index.js", import.meta.url).href);
+const { createLocaleMatcher, forAcceptLanguage } = await import(new URL("../src/negotiate/index.js", import.meta.url).href);
 const { localeConfigurationForManifest } = await import(new URL("../src/load/index.js", import.meta.url).href);
 const { decodeLanguageEquivalents } = await import(new URL("../src/data/iana-range-equivalents.js", import.meta.url).href);
 
@@ -319,7 +319,7 @@ for (const variant of RECIPE.variants) {
 // ---- negotiation and delivery ------------------------------------------------------------------
 
 const configuration = localeConfigurationForManifest(published.manifest);
-const negotiator = createLocaleNegotiator(configuration);
+const negotiator = createLocaleMatcher(configuration);
 
 // Warm, then measure: the first call through a cold code path measures compilation, not negotiation.
 for (const header of RECIPE.headers) forAcceptLanguage(negotiator, header);

@@ -49,7 +49,7 @@ export function optionsFromLoadedStrings(options) {
   // `loadingLimits`, NOT `limits`: that is the option's public name (core/index.js:70, and it is what
   // `types/core/index.d.ts` emits). Guarding the wrong spelling let a caller pass `loadingLimits`
   // beside `loaded` unchallenged — the "second override" plan 3.4 forbids in the same sentence.
-  for (const conflicting of ["strings", "fallbackLocale", "tiebreakers", "loadingLimits", "catalogIdentity"])
+  for (const conflicting of ["localizedStringSupplier", "fallbackLocale", "tiebreakerLocalesByLanguageCode", "loadingLimits", "catalogIdentity"])
     if (options[conflicting] !== undefined)
       throw configurationError(
         `createStrings({ loaded }) already carries ${conflicting}; supplying it alongside would make ` +
@@ -158,7 +158,7 @@ export function optionsFromLoadedStrings(options) {
         normalizeTag(coverage.lookupLocale),
         manifestTags,
         normalizeTag(manifestConfiguration.fallbackLocale),
-        manifestConfiguration.tiebreakers ?? {},
+        manifestConfiguration.tiebreakerLocalesByLanguageCode ?? {},
       ).filter((/** @type {string} */ tag) => manifestTags.includes(tag))
     : coverage.kind === "entire-manifest"
       ? manifestTags
@@ -180,8 +180,8 @@ export function optionsFromLoadedStrings(options) {
     options: {
       ...rest,
       fallbackLocale: loaded.fallbackLocale,
-      strings: loaded.catalogs,
-      ...(loaded.tiebreakers === undefined ? {} : { tiebreakers: loaded.tiebreakers }),
+      localizedStringSupplier: () => loaded.catalogs,
+      ...(loaded.tiebreakerLocalesByLanguageCode === undefined ? {} : { tiebreakerLocalesByLanguageCode: loaded.tiebreakerLocalesByLanguageCode }),
       // The loader's OWN normalized record, reused verbatim. Plan 3.4: the branch "neither falls back
       // to defaults nor permits a second override", so a catalog loaded under relaxed limits
       // revalidates under those same limits rather than being spuriously rejected by the defaults.
@@ -289,7 +289,7 @@ function verificationRecord(
     manifestLocaleConfiguration: Object.freeze({
       fallbackLocale: normalizeTag(manifestConfiguration.fallbackLocale),
       supportedLocales: Object.freeze(normalizedSorted(manifestConfiguration.supportedLocales)),
-      tiebreakers: Object.freeze({ ...(manifestConfiguration.tiebreakers ?? {}) }),
+      tiebreakerLocalesByLanguageCode: Object.freeze({ ...(manifestConfiguration.tiebreakerLocalesByLanguageCode ?? {}) }),
     }),
     // Defensively copied, so a later mutation of the caller's object cannot rewrite what the
     // instance reports about itself.

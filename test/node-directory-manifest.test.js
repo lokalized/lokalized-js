@@ -60,7 +60,7 @@ test("an equivalent fallback file is accepted and recorded by its exact tag", as
     catalogVersion: "2026.09.11", fallbackLocale: "de",
   });
   assert.equal(loaded.fallbackLocale, "deu");
-  assert.equal(createStrings({ loaded, localeResolver: () => "ja" }).get("Hi"), "hello deu");
+  assert.equal(createStrings({ loaded, localeSupplier: () => "ja" }).get("Hi"), "hello deu");
 });
 
 // ------------------------------------------------------------ discovery parity with the raw door
@@ -90,7 +90,7 @@ test("keys are NORMALIZED TAGS and urls are the names ON DISK", async () => {
   // The tiebreaker is not incidental to the fixture: a directory publishing both `en` and `en-US`
   // declares an ambiguous language, and plan 6.2:2103 refuses a manifest that leaves it unresolved
   // because no instance could ever be constructed from one.
-  const manifest = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { en: ["en-US", "en"] } });
+  const manifest = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakerLocalesByLanguageCode: { en: ["en-US", "en"] } });
 
   assert.deepEqual(Object.keys(manifest.files).sort(), ["de", "en", "en-US", "fr"]);
   const resolved = (/** @type {string} */ tag) => new URL(manifest.files[tag].url, manifest.baseUrl).href;
@@ -205,7 +205,7 @@ test("an ordinary catalog name is not gratuitously escaped", async () => {
   // and a space. What is left to assert here is the complement — that an ordinary name is passed
   // through unchanged rather than escaped into something the CDN will not serve.
   const path = directory({ "en.json": bodyFor("en"), "en-US.JSON": bodyFor("en-US") });
-  const manifest = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { en: ["en-US", "en"] } });
+  const manifest = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakerLocalesByLanguageCode: { en: ["en-US", "en"] } });
   assert.equal(manifest.files.en.url, "en.json");
   assert.equal(manifest.files["en-US"].url, "en-US.JSON");
 });
@@ -260,8 +260,8 @@ test("the digest covers the RAW bytes — BOM included, formatting included", as
 
 test("tiebreaker ORDER is part of the identity, with the files held constant", async () => {
   const path = directory(catalogs(["en", "fr", "fr-CA"]));
-  const a = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { fr: ["fr", "fr-CA"] } });
-  const b = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { fr: ["fr-CA", "fr"] } });
+  const a = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakerLocalesByLanguageCode: { fr: ["fr", "fr-CA"] } });
+  const b = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakerLocalesByLanguageCode: { fr: ["fr-CA", "fr"] } });
   assert.deepEqual(a.files, b.files, "the attribution control: only the tiebreaker order differs");
   assert.equal(a.catalogVersion, b.catalogVersion);
   assert.notEqual(a.catalogFingerprint, b.catalogFingerprint);
@@ -280,7 +280,7 @@ test("the GENERATOR does not parse — and the composed door does", async () => 
   assert.equal(manifest.files.de.decodedBytes, 0);
 
   const error = await loadStringsFromDirectory(empty, OPTIONS).then(() => null, (e) => e);
-  assert.equal(error?.name, "StringsLoadingError");
+  assert.equal(error?.name, "LocalizedStringLoadingError");
   assert.deepEqual(error.failures.map((/** @type {any} */ f) => f.stage), ["parse"]);
 
   // And the raw door refuses it outright, because it parses everything it walks. Three doors, three
@@ -387,7 +387,7 @@ test("loadStringsFromDirectory composes all the way to a rendered string and a s
   assert.equal(loaded.complete, true);
   assert.deepEqual(loaded.requestedFiles.map((/** @type {any} */ e) => e.locale), ["de", "en", "fr"]);
 
-  const strings = createStrings({ loaded, localeResolver: () => "fr" });
+  const strings = createStrings({ loaded, localeSupplier: () => "fr" });
   assert.equal(strings.get("Hi"), "hello fr");
 
   // The generated manifest's identity survives all the way into the SSR stamp, and the manifest a
@@ -405,7 +405,7 @@ test("the generated manifest carries the RENDERER's pinned data, not a placehold
   const manifest = await createStringsManifestFromDirectory(path, OPTIONS);
   assert.equal(manifest.cldrVersion, pinnedProvenance().cldrVersion);
   assert.equal(manifest.dataFingerprint, pinnedProvenance().dataFingerprint);
-  assert.ok(createStrings({ loaded: await loadStringsFromDirectory(path, OPTIONS), localeResolver: () => "en" }));
+  assert.ok(createStrings({ loaded: await loadStringsFromDirectory(path, OPTIONS), localeSupplier: () => "en" }));
 });
 
 test("EVERY FILE IS READ TWICE, and the second read is what makes the digest real", async () => {
@@ -428,7 +428,7 @@ test("EVERY FILE IS READ TWICE, and the second read is what makes the digest rea
   }).then(() => null, (e) => e);
 
   assert.equal(served, 2, "the load half reads every file again; it does not reuse the scan's bytes");
-  assert.equal(error?.name, "StringsLoadingError");
+  assert.equal(error?.name, "LocalizedStringLoadingError");
   assert.deepEqual(error.failures.map((/** @type {any} */ f) => f.stage), ["digest"]);
   assert.equal(error.failures[0].locale, "fr");
 });
@@ -461,20 +461,20 @@ test("manifest keys are emitted in NORMALIZED-TAG order, not in filename order",
   assert.deepEqual(Object.keys(manifest.files), ["en", "zh-Hant"], "not the walk's filename order");
 });
 
-test("a ReadonlyMap of tiebreakers is HONOURED, not silently dropped", async () => {
+test("a ReadonlyMap of tiebreakerLocalesByLanguageCode is HONOURED, not silently dropped", async () => {
   // Plan 3.2 types the option `Readonly<Record<…>> | ReadonlyMap<…>`; the manifest FIELD is a record,
   // so converting is the generator's job. It did not: a Map passed the validator's object test and
   // then met `Object.entries`, which answers `[]` — so a publisher's declared orders vanished and the
   // manifest fingerprinted EXACTLY as if none had been given. Nothing downstream could detect it.
   const path = directory(catalogs(["en", "fr", "fr-CA"]));
-  const viaRecord = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { fr: ["fr", "fr-CA"] } });
-  const viaMap = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: new Map([["fr", ["fr", "fr-CA"]]]) });
-  const reversed = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { fr: ["fr-CA", "fr"] } });
+  const viaRecord = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakerLocalesByLanguageCode: { fr: ["fr", "fr-CA"] } });
+  const viaMap = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakerLocalesByLanguageCode: new Map([["fr", ["fr", "fr-CA"]]]) });
+  const reversed = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakerLocalesByLanguageCode: { fr: ["fr-CA", "fr"] } });
 
-  assert.deepEqual(viaMap.tiebreakers, viaRecord.tiebreakers);
+  assert.deepEqual(viaMap.tiebreakerLocalesByLanguageCode, viaRecord.tiebreakerLocalesByLanguageCode);
   assert.equal(viaMap.catalogFingerprint, viaRecord.catalogFingerprint);
   // THE ANTI-VACUITY HALF, and it is stronger than the control it replaced. This used to compare
-  // against declaring NO tiebreakers, which a directory holding `fr` and `fr-CA` may no longer do —
+  // against declaring NO tiebreakerLocalesByLanguageCode, which a directory holding `fr` and `fr-CA` may no longer do —
   // plan 6.2:2103 refuses a manifest that leaves an ambiguous language unresolved. Comparing against
   // the REVERSED order proves more than presence did: the declared ORDER reaches the fingerprint, so
   // a generator that kept the entry and lost its order is caught too.
@@ -486,9 +486,9 @@ test("a non-canonically spelled tiebreaker is normalized, not turned into a self
   // normalized and RE-derived it — so the generator rejected its own output with "declared X,
   // computed Y" from a single call. Any ordinary lowercase region reached it.
   const path = directory(catalogs(["en", "fr", "fr-CA"]));
-  const canonical = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { fr: ["fr", "fr-CA"] } });
-  const sloppy = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: { FR: ["fr", "fr-ca"] } });
-  assert.deepEqual(sloppy.tiebreakers, { fr: ["fr", "fr-CA"] });
+  const canonical = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakerLocalesByLanguageCode: { fr: ["fr", "fr-CA"] } });
+  const sloppy = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakerLocalesByLanguageCode: { FR: ["fr", "fr-ca"] } });
+  assert.deepEqual(sloppy.tiebreakerLocalesByLanguageCode, { fr: ["fr", "fr-CA"] });
   assert.equal(sloppy.catalogFingerprint, canonical.catalogFingerprint);
 });
 
@@ -510,7 +510,7 @@ test("a malformed tiebreaker is a ConfigurationError, not a bare TypeError from 
   // quoted a key the caller never wrote.
   const path = directory(catalogs(["en", "fr"]));
   for (const bad of [{ fr: "fr-CA" }, { fr: [1] }, "fr-CA"]) {
-    const error = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakers: /** @type {any} */ (bad) })
+    const error = await createStringsManifestFromDirectory(path, { ...OPTIONS, tiebreakerLocalesByLanguageCode: /** @type {any} */ (bad) })
       .then(() => null, (e) => e);
     assert.equal(error?.name, "ConfigurationError", `${JSON.stringify(bad)} must be a ConfigurationError`);
     assert.equal(error.code, "CONFIGURATION");
@@ -532,7 +532,7 @@ test("END TO END: an ordinary directory of sibling catalogs generates, loads AND
   // **THE WHOLE NODE PIPELINE WAS BROKEN FOR THE MOST ORDINARY MULTI-CATALOG LAYOUT THERE IS, and
   // every slice that built a piece of it was green.** `en.json` beside `en-GB.json` generated a
   // manifest, loaded it with `complete: true`, and then `createStrings` refused — advising the caller
-  // to pass `createStrings({ tiebreakers })`, which the loaded branch explicitly forbids. Two defects
+  // to pass `createStrings({ tiebreakerLocalesByLanguageCode })`, which the loaded branch explicitly forbids. Two defects
   // met here and neither was visible from inside the slice that shipped it: the generator published a
   // manifest that left an ambiguous language unresolved, and the runner handed the core the FULL
   // declared tiebreaker list rather than the one filtered to what loaded.
@@ -541,12 +541,12 @@ test("END TO END: an ordinary directory of sibling catalogs generates, loads AND
   // the same lesson one layer down.
   const path = directory(catalogs(["en", "en-GB", "fr"]));
   const manifest = await createStringsManifestFromDirectory(path,
-    { ...OPTIONS, tiebreakers: { en: ["en-GB", "en"] } });
-  const loaded = await loadStringsFromDirectory(path, { ...OPTIONS, tiebreakers: { en: ["en-GB", "en"] } });
+    { ...OPTIONS, tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en"] } });
+  const loaded = await loadStringsFromDirectory(path, { ...OPTIONS, tiebreakerLocalesByLanguageCode: { en: ["en-GB", "en"] } });
 
   assert.equal(loaded.complete, true);
   assert.deepEqual(Object.keys(manifest.files).sort(), ["en", "en-GB", "fr"]);
-  const strings = createStrings({ loaded, localeResolver: () => "en-GB" });
+  const strings = createStrings({ loaded, localeSupplier: () => "en-GB" });
   assert.equal(strings.get("Hi"), "hello en-GB");
 
   // A LOOKUP SUBSET over the same directory, which is where the filter is load-bearing: `fr` pulls
@@ -561,6 +561,6 @@ test("END TO END: an ordinary directory of sibling catalogs generates, loads AND
   const subset = await loadStringsFromFiles(manifest, "fr");
   assert.equal(subset.coverage.kind, "lookup", "guard against the conditional that made this vacuous");
   assert.deepEqual(Object.keys(subset.catalogs).sort(), ["en", "fr"], "en-GB is NOT fetched");
-  assert.deepEqual({ ...subset.tiebreakers }, { en: ["en"] });
-  assert.doesNotThrow(() => createStrings({ loaded: subset, localeResolver: () => "fr" }));
+  assert.deepEqual({ ...subset.tiebreakerLocalesByLanguageCode }, { en: ["en"] });
+  assert.doesNotThrow(() => createStrings({ loaded: subset, localeSupplier: () => "fr" }));
 });

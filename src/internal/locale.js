@@ -217,7 +217,7 @@ export function languageRangeExpansions(range, languageEquivalents) {
  * default for every ESM consumer of this package.
  *
  * It stays assignable FROM a caller's mutable object, which is what keeps the narrowing free: a
- * supplied `{ localeMatch }` is an INPUT here as well as an output, and `readonly` members accept a
+ * supplied `{ localeMatchResult }` is an INPUT here as well as an output, and `readonly` members accept a
  * mutable source.
  *
  * @typedef {Readonly<{
@@ -229,7 +229,7 @@ export function languageRangeExpansions(range, languageEquivalents) {
  *   effectiveWeight: number | null,
  *   languageRange: string | WeightedLanguageRange | null,
  *   requestedLanguageRanges: readonly WeightedLanguageRange[],
- * }>} LocaleMatch
+ * }>} LocaleMatchResult
  *
  * `languageRange` is the range that WON, spelled either as a bare string — the one-argument
  * `LanguageRange` spelling, whose weight is 1.0 by definition — or as the `{ range, weight }` pair.
@@ -871,18 +871,18 @@ function compatibleLikelyScripts(requestedLanguageScript, availableLanguageScrip
  * canonically. `sortedSupported` need not in fact be sorted: the order is read only by the identity
  * synthesis below, which fires only for a language code carried by exactly one loaded locale.
  *
- * @param {Tiebreakers} tiebreakers
+ * @param {Tiebreakers} tiebreakerLocalesByLanguageCode
  * @param {string[] | readonly string[]} sortedSupported
  * @returns {Map<string, string[]>}
  */
-export function resolveTiebreakers(tiebreakers, sortedSupported) {
+export function resolveTiebreakers(tiebreakerLocalesByLanguageCode, sortedSupported) {
 	/** @type {Map<string, string[]>} */
 	const resolved = new Map();
 
 	/** @type {[string, string[]][]} */
-	const entries = tiebreakers instanceof Map
-		? [...tiebreakers.entries()]
-		: tiebreakers == null ? [] : Object.entries(tiebreakers);
+	const entries = tiebreakerLocalesByLanguageCode instanceof Map
+		? [...tiebreakerLocalesByLanguageCode.entries()]
+		: tiebreakerLocalesByLanguageCode == null ? [] : Object.entries(tiebreakerLocalesByLanguageCode);
 
 	for (const [languageCode, locales] of entries) {
 		const normalized = primaryLanguage(languageCode);
@@ -931,27 +931,27 @@ export function resolveTiebreakers(tiebreakers, sortedSupported) {
  *
  * @param {string} configured normalized locale tag
  * @param {readonly string[]} supported normalized catalog tags
- * @param {Tiebreakers} tiebreakers
+ * @param {Tiebreakers} tiebreakerLocalesByLanguageCode
  * @returns {string | null}
  */
-export function electFallbackLocale(configured, supported, tiebreakers) {
+export function electFallbackLocale(configured, supported, tiebreakerLocalesByLanguageCode) {
 	if (supported.includes(configured)) return configured;
 	const equivalents = supported.filter((tag) => equivalentTags(tag, configured)).sort(compareTags);
 	if (equivalents.length === 0) return null;
 	if (equivalents.length === 1) return /** @type {string} */ (equivalents[0]);
 	const languageCode = normalizedLanguageCode(javaSplit(canonicalLanguageTag(configured))[0] ?? "");
-	const ordered = resolveTiebreakers(tiebreakers, supported).get(languageCode);
+	const ordered = resolveTiebreakers(tiebreakerLocalesByLanguageCode, supported).get(languageCode);
 	return ordered?.find((tag) => equivalents.includes(tag)) ?? null;
 }
 
 /**
  * @param {string} languageCode
  * @param {string[]} candidates
- * @param {Map<string, string[]>} tiebreakers
+ * @param {Map<string, string[]>} tiebreakerLocalesByLanguageCode
  * @returns {string | null}
  */
-function lookupMatchByTiebreakers(languageCode, candidates, tiebreakers) {
-	const ordered = tiebreakers.get(languageCode);
+function lookupMatchByTiebreakers(languageCode, candidates, tiebreakerLocalesByLanguageCode) {
+	const ordered = tiebreakerLocalesByLanguageCode.get(languageCode);
 
 	if (ordered !== undefined)
 		for (const tiebreaker of ordered)
@@ -964,16 +964,16 @@ function lookupMatchByTiebreakers(languageCode, candidates, tiebreakers) {
  * @param {string} range
  * @param {string[]} candidates
  * @param {string} fallbackLocale
- * @param {Map<string, string[]>} tiebreakers
+ * @param {Map<string, string[]>} tiebreakerLocalesByLanguageCode
  * @returns {string | null}
  */
-function preferredLocaleForRange(range, candidates, fallbackLocale, tiebreakers) {
+function preferredLocaleForRange(range, candidates, fallbackLocale, tiebreakerLocalesByLanguageCode) {
 	if (candidates.length === 0) return null;
 	if (candidates.length === 1) return candidates[0] ?? null;
 
 	const canonicalRange = canonicalLanguageTag(range);
 	const primary = normalizedLanguageCode(javaSplit(canonicalRange)[0] ?? "");
-	const tiebreakerMatch = lookupMatchByTiebreakers(primary, candidates, tiebreakers);
+	const tiebreakerMatch = lookupMatchByTiebreakers(primary, candidates, tiebreakerLocalesByLanguageCode);
 
 	if (tiebreakerMatch !== null) return tiebreakerMatch;
 	if (candidates.includes(fallbackLocale)) return fallbackLocale;
@@ -984,23 +984,23 @@ function preferredLocaleForRange(range, candidates, fallbackLocale, tiebreakers)
 /**
  * `DefaultStrings:1955`. A bare or leading wildcard expresses no language preference of its own, so
  * the CONFIGURED fallback speaks for the caller: the fallback locale itself when it survived, then —
- * when it was excluded — the fallback LANGUAGE's configured tiebreakers, before any unrelated
+ * when it was excluded — the fallback LANGUAGE's configured tiebreakerLocalesByLanguageCode, before any unrelated
  * language. Deliberately not `preferredLocaleForRange`, which consults the RANGE's own language and
  * would consult `*`.
  *
  * @param {string[]} availableLocales already restricted to the winning quality
  * @param {string} fallbackLocale
- * @param {Map<string, string[]>} tiebreakers
+ * @param {Map<string, string[]>} tiebreakerLocalesByLanguageCode
  * @returns {string}
  */
-function preferredLocaleForWildcard(availableLocales, fallbackLocale, tiebreakers) {
+function preferredLocaleForWildcard(availableLocales, fallbackLocale, tiebreakerLocalesByLanguageCode) {
 	if (availableLocales.length === 0) throw new RangeError("At least one available locale is required");
 	if (availableLocales.includes(fallbackLocale)) return fallbackLocale;
 
 	const fallbackLanguage = primaryLanguage(fallbackLocale);
 	const tiebreakerMatch = fallbackLanguage.length === 0
 		? null
-		: lookupMatchByTiebreakers(fallbackLanguage, availableLocales, tiebreakers);
+		: lookupMatchByTiebreakers(fallbackLanguage, availableLocales, tiebreakerLocalesByLanguageCode);
 
 	return tiebreakerMatch ?? availableLocales[0] ?? "";
 }
@@ -1009,10 +1009,10 @@ function preferredLocaleForWildcard(availableLocales, fallbackLocale, tiebreaker
  * @param {string} range
  * @param {string[]} availableLocales
  * @param {string} fallbackLocale
- * @param {Map<string, string[]>} tiebreakers
+ * @param {Map<string, string[]>} tiebreakerLocalesByLanguageCode
  * @returns {string | null}
  */
-function lookupMatchByLikelySubtag(range, availableLocales, fallbackLocale, tiebreakers) {
+function lookupMatchByLikelySubtag(range, availableLocales, fallbackLocale, tiebreakerLocalesByLanguageCode) {
 	if (range.includes("*")) return null;
 	if (hasUndeterminedLanguage(range)) return null;
 
@@ -1034,7 +1034,7 @@ function lookupMatchByLikelySubtag(range, availableLocales, fallbackLocale, tieb
 	if (matchingLocales.length === 1) return matchingLocales[0] ?? null;
 
 	const primary = normalizedLanguageCode(javaSplit(range)[0] ?? "");
-	const tiebreakerMatch = lookupMatchByTiebreakers(primary, matchingLocales, tiebreakers);
+	const tiebreakerMatch = lookupMatchByTiebreakers(primary, matchingLocales, tiebreakerLocalesByLanguageCode);
 
 	if (tiebreakerMatch !== null) return tiebreakerMatch;
 	if (matchingLocales.includes(fallbackLocale)) return fallbackLocale;
@@ -1046,10 +1046,10 @@ function lookupMatchByLikelySubtag(range, availableLocales, fallbackLocale, tieb
  * @param {string} range
  * @param {string[]} availableLocales
  * @param {string} fallbackLocale
- * @param {Map<string, string[]>} tiebreakers
+ * @param {Map<string, string[]>} tiebreakerLocalesByLanguageCode
  * @returns {string | null}
  */
-function lookupMatchByFallbackCandidates(range, availableLocales, fallbackLocale, tiebreakers) {
+function lookupMatchByFallbackCandidates(range, availableLocales, fallbackLocale, tiebreakerLocalesByLanguageCode) {
 	if (range.includes("*")) return null;
 
 	const fallbackTags = fallbackLocaleTagsFor(jdkLanguageTag(range));
@@ -1060,7 +1060,7 @@ function lookupMatchByFallbackCandidates(range, availableLocales, fallbackLocale
 
 	for (const candidateTag of fallbackTags) {
 		const equivalentMatches = availableLocales.filter((locale) => equivalentTags(locale, candidateTag));
-		const equivalentMatch = preferredLocaleForRange(candidateTag, equivalentMatches, fallbackLocale, tiebreakers);
+		const equivalentMatch = preferredLocaleForRange(candidateTag, equivalentMatches, fallbackLocale, tiebreakerLocalesByLanguageCode);
 		if (equivalentMatch !== null) return equivalentMatch;
 	}
 
@@ -1135,10 +1135,10 @@ function languageRangeSpecificityFor(localeStatics, member) {
  * @param {string} locale
  * @param {MemberStatics} member
  * @param {string} fallbackLocale
- * @param {Map<string, string[]>} tiebreakers
- * @returns {LocaleMatch["matchType"]}
+ * @param {Map<string, string[]>} tiebreakerLocalesByLanguageCode
+ * @returns {LocaleMatchResult["matchType"]}
  */
-function languageRangeMatchTypeFor(locale, member, fallbackLocale, tiebreakers) {
+function languageRangeMatchTypeFor(locale, member, fallbackLocale, tiebreakerLocalesByLanguageCode) {
 	const range = member.range;
 
 	if (range === "*") return "wildcard";
@@ -1154,9 +1154,9 @@ function languageRangeMatchTypeFor(locale, member, fallbackLocale, tiebreakers) 
 
 	const selectedLocaleOnly = [locale];
 
-	if (lookupMatchByFallbackCandidates(member.semanticRange, selectedLocaleOnly, fallbackLocale, tiebreakers) !== null)
+	if (lookupMatchByFallbackCandidates(member.semanticRange, selectedLocaleOnly, fallbackLocale, tiebreakerLocalesByLanguageCode) !== null)
 		return "cldr-fallback";
-	if (lookupMatchByLikelySubtag(member.semanticRange, selectedLocaleOnly, fallbackLocale, tiebreakers) !== null)
+	if (lookupMatchByLikelySubtag(member.semanticRange, selectedLocaleOnly, fallbackLocale, tiebreakerLocalesByLanguageCode) !== null)
 		return "likely-subtag";
 	if (structurallyFilteredLocales(range, selectedLocaleOnly).length > 0) return "extended-range";
 
@@ -1182,11 +1182,11 @@ function languageRangeMatchTypeFor(locale, member, fallbackLocale, tiebreakers) 
  * @param {string} requested requested locale tag
  * @param {Iterable<string>} supported loaded locale tags
  * @param {string} fallbackLocale resolved fallback locale tag
- * @param {Tiebreakers} [tiebreakers] language code -> ordered loaded tags
- * @returns {LocaleMatch}
+ * @param {Tiebreakers} [tiebreakerLocalesByLanguageCode] language code -> ordered loaded tags
+ * @returns {LocaleMatchResult}
  */
-export function matchFor(requested, supported, fallbackLocale, tiebreakers) {
-	return matchForRange(lower(normalizeTag(requested)), 1, supported, fallbackLocale, tiebreakers);
+export function matchFor(requested, supported, fallbackLocale, tiebreakerLocalesByLanguageCode) {
+	return matchForRange(lower(normalizeTag(requested)), 1, supported, fallbackLocale, tiebreakerLocalesByLanguageCode);
 }
 
 /**
@@ -1205,13 +1205,13 @@ export function matchFor(requested, supported, fallbackLocale, tiebreakers) {
  * @param {number} weight the member's quality weight
  * @param {Iterable<string>} supported loaded locale tags
  * @param {string} fallbackLocale resolved fallback locale tag
- * @param {Tiebreakers} [tiebreakers] language code -> ordered loaded tags
+ * @param {Tiebreakers} [tiebreakerLocalesByLanguageCode] language code -> ordered loaded tags
  * @param {RangeEquivalentResolver} [rangeEquivalents] the IANA equivalence expansion to use; the
  *   reduced inline table when omitted, which a raw range can outgrow — see the resolver's own note
- * @returns {LocaleMatch}
+ * @returns {LocaleMatchResult}
  */
-export function matchForRange(range, weight, supported, fallbackLocale, tiebreakers, rangeEquivalents) {
-	return matchForRanges([{ range, weight }], supported, fallbackLocale, tiebreakers, rangeEquivalents);
+export function matchForRange(range, weight, supported, fallbackLocale, tiebreakerLocalesByLanguageCode, rangeEquivalents) {
+	return matchForRanges([{ range, weight }], supported, fallbackLocale, tiebreakerLocalesByLanguageCode, rangeEquivalents);
 }
 
 /**
@@ -1249,33 +1249,33 @@ export function matchForRange(range, weight, supported, fallbackLocale, tiebreak
  *   caller's own order; every range already lowercased and grammar-checked by its ingress
  * @param {Iterable<string>} supported loaded locale tags
  * @param {string} fallbackLocale resolved fallback locale tag
- * @param {Tiebreakers} [tiebreakers] language code -> ordered loaded tags
+ * @param {Tiebreakers} [tiebreakerLocalesByLanguageCode] language code -> ordered loaded tags
  * @param {RangeEquivalentResolver} [rangeEquivalents] the IANA equivalence expansion to use; the
  *   reduced inline table when omitted, which a raw range can outgrow — see the resolver's own note
- * @returns {LocaleMatch}
+ * @returns {LocaleMatchResult}
  */
-export function matchForRanges(languageRanges, supported, fallbackLocale, tiebreakers, rangeEquivalents) {
-	// FROZEN HERE, AT THE ONE PLACE A `LocaleMatch` IS BUILT, because this is the only function in
+export function matchForRanges(languageRanges, supported, fallbackLocale, tiebreakerLocalesByLanguageCode, rangeEquivalents) {
+	// FROZEN HERE, AT THE ONE PLACE A `LocaleMatchResult` IS BUILT, because this is the only function in
 	// the port that constructs one: `matchFor` and `matchForRange` are wrappers over it, and every
 	// public door that hands a match to a caller — `negotiator.matchFor*`, `forLanguageRanges`,
-	// `forAcceptLanguage`, `getResult().localeMatch`, `getDirectLocaleContext().localeMatch` —
+	// `forAcceptLanguage`, `getResult().localeMatchResult`, `getDirectLocaleContext().localeMatchResult` —
 	// reaches the caller through one of those. Plan :345 and :762 make the freeze a contract and
 	// plan 3.4:788-796 declares every member `readonly`; before this, the top-level record was
 	// frozen by its consumers while `consideredLocales`, `languageRange` and
 	// `requestedLanguageRanges` (and its members) were not, so the guarantee stopped one level down.
 	//
 	// The cost is ONE match per call, not one per candidate: every site below is `return
-	// localeMatch(...)` or `return noMatch()`, and the two shared arrays are frozen once here rather
+	// localeMatchResult(...)` or `return noMatch()`, and the two shared arrays are frozen once here rather
 	// than inside either builder. Neither is mutated after construction — `sortedSupported` is read
 	// through `.indexOf`/`supportedTagAt` and `requestedLanguageRanges` only through `.length`.
 	const sortedSupported = Object.freeze(sortedSupportedTags(supported));
-	const resolvedTiebreakers = resolveTiebreakers(tiebreakers, sortedSupported);
+	const resolvedTiebreakers = resolveTiebreakers(tiebreakerLocalesByLanguageCode, sortedSupported);
 
 	/** @type {readonly WeightedLanguageRange[]} */
 	const requestedLanguageRanges = Object.freeze(
 		[...languageRanges].map(({ range, weight }) => Object.freeze({ range, weight })));
 
-	/** @returns {LocaleMatch} */
+	/** @returns {LocaleMatchResult} */
 	const noMatch = () => Object.freeze({
 		matchType: "none",
 		locale: null,
@@ -1629,15 +1629,15 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 	}
 
 	/**
-	 * `DefaultStrings#localeMatch` (`:1930`). The public match type is re-derived once, FOR THE
+	 * `DefaultStrings#localeMatchResult` (`:1930`). The public match type is re-derived once, FOR THE
 	 * SELECTED LOCALE ONLY, from that locale's GOVERNOR — never mapped out of the governor's internal
 	 * category, which is why a structural relationship on a wildcard-free range reports its CLDR or
 	 * likely-subtag nature and never `extended-range`.
 	 *
 	 * @param {string} locale
-	 * @returns {LocaleMatch}
+	 * @returns {LocaleMatchResult}
 	 */
-	const localeMatch = (locale) => {
+	const localeMatchResult = (locale) => {
 		const localeIndex = sortedSupported.indexOf(locale);
 		const governor = memberAt(governorMemberIndexByLocale[localeIndex] ?? 0);
 
@@ -1658,7 +1658,7 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 			//
 			// Emitting the bare string here made the port produce a match its OWN validator refuses:
 			// `matchForLanguageRanges([{range:"fr",weight:0.5}])` answered `languageRange: "fr"`, which
-			// layer one reads as weight 1.0, and handing that straight back through `{ localeMatch }`
+			// layer one reads as weight 1.0, and handing that straight back through `{ localeMatchResult }`
 			// raised "The matched language range must be present in requested language ranges". Two
 			// corpus rows A4 unlocks turn on it (`supplied-match.contradiction.per-call-ranges-bypass-
 			// invalid-supplier` at q=0.8 and `browser-chooser.shape.advance-past-unmatched-serves-
@@ -1683,7 +1683,7 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 		if (member.weight <= 0) continue;
 
 		if (range === "*")
-			return localeMatch(preferredLocaleForWildcard(languageRangeLocales, fallbackLocale, resolvedTiebreakers));
+			return localeMatchResult(preferredLocaleForWildcard(languageRangeLocales, fallbackLocale, resolvedTiebreakers));
 
 		if (member.undetermined && !member.privateUse) continue;
 
@@ -1696,7 +1696,7 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 				break;
 			}
 
-		if (served !== null) return localeMatch(served);
+		if (served !== null) return localeMatchResult(served);
 
 		// A Java 9 parser may omit an IANA alias a newer runtime materializes as a later exact member.
 		for (const locale of languageRangeLocales) {
@@ -1709,7 +1709,7 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 			if (served !== null) break;
 		}
 
-		if (served !== null) return localeMatch(served);
+		if (served !== null) return localeMatchResult(served);
 
 		// Noninitial wildcards have RFC 4647 STRUCTURAL semantics only (`DefaultStrings:1836-1852`). An
 		// extended range with no structural candidate must not be broadened through canonical, CLDR,
@@ -1727,7 +1727,7 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 				: preferredLocaleForRange(range, filteredCandidates, fallbackLocale, resolvedTiebreakers)
 					?? filteredCandidates[0] ?? "";
 
-			return localeMatch(preferred);
+			return localeMatchResult(preferred);
 		}
 
 		// Private-use tags have no language semantics to broaden: they select an exact source or yield
@@ -1740,17 +1740,17 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 		const canonicalMatch =
 			preferredLocaleForRange(canonicalRange, canonicalMatches, fallbackLocale, resolvedTiebreakers);
 
-		if (canonicalMatch !== null) return localeMatch(canonicalMatch);
+		if (canonicalMatch !== null) return localeMatchResult(canonicalMatch);
 
 		const lookupMatch = lookupMatchByFallbackCandidates(
 			member.semanticRange, languageRangeLocales, fallbackLocale, resolvedTiebreakers);
 
-		if (lookupMatch !== null) return localeMatch(lookupMatch);
+		if (lookupMatch !== null) return localeMatchResult(lookupMatch);
 
 		const likelySubtagMatch = lookupMatchByLikelySubtag(
 			member.semanticRange, languageRangeLocales, fallbackLocale, resolvedTiebreakers);
 
-		if (likelySubtagMatch !== null) return localeMatch(likelySubtagMatch);
+		if (likelySubtagMatch !== null) return localeMatchResult(likelySubtagMatch);
 
 		// Primary-tag candidates (for example `pt` or `pt-XX`).
 		const primary = member.requestedPrimary ?? "";
@@ -1782,13 +1782,13 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
 			if (hasSpecificMatch) candidates = filteredCandidates;
 		}
 
-		if (candidates.length === 1) return localeMatch(candidates[0] ?? "");
+		if (candidates.length === 1) return localeMatchResult(candidates[0] ?? "");
 
 		const tiebreakerMatch = lookupMatchByTiebreakers(primary, candidates, resolvedTiebreakers);
 
-		if (tiebreakerMatch !== null) return localeMatch(tiebreakerMatch);
+		if (tiebreakerMatch !== null) return localeMatchResult(tiebreakerMatch);
 
-		return localeMatch(candidates[0] ?? "");
+		return localeMatchResult(candidates[0] ?? "");
 	}
 
 	return noMatch();
@@ -1808,14 +1808,14 @@ export function matchForRanges(languageRanges, supported, fallbackLocale, tiebre
  * @param {string} lookupTag the locale resolution starts from
  * @param {Iterable<string>} supported loaded locale tags
  * @param {string} fallbackLocale resolved fallback locale tag
- * @param {Tiebreakers} [tiebreakers] language code -> ordered loaded tags
+ * @param {Tiebreakers} [tiebreakerLocalesByLanguageCode] language code -> ordered loaded tags
  * @returns {string[]}
  */
-export function candidateChain(lookupTag, supported, fallbackLocale, tiebreakers) {
+export function candidateChain(lookupTag, supported, fallbackLocale, tiebreakerLocalesByLanguageCode) {
 	const locale = normalizeTag(lookupTag);
 	const sortedSupported = sortedSupportedTags(supported);
 	const supportedSet = new Set(sortedSupported);
-	const resolvedTiebreakers = resolveTiebreakers(tiebreakers, sortedSupported);
+	const resolvedTiebreakers = resolveTiebreakers(tiebreakerLocalesByLanguageCode, sortedSupported);
 
 	/** @type {Set<string>} */
 	const candidates = new Set(fallbackLocaleTagsFor(locale));
@@ -1903,9 +1903,9 @@ export const CANDIDATE_CHAIN_MEMO_LIMIT = 256;
  * A deterministic LRU over `candidateChain`, per `Strings` instance.
  *
  * **WHY IT IS SAFE TO KEY ON THE TAG ALONE, which is the only question that matters here.**
- * `candidateChain(tag, supported, fallbackLocale, tiebreakers)` takes four arguments and this caches
+ * `candidateChain(tag, supported, fallbackLocale, tiebreakerLocalesByLanguageCode)` takes four arguments and this caches
  * on one. The other three are INSTANCE CONSTANTS: `supported` is `[...catalogs.keys()]` and
- * `tiebreakers` is `safeTiebreakers(direct.tiebreakers)`, both computed once inside `createStrings`,
+ * `tiebreakerLocalesByLanguageCode` is `safeTiebreakers(direct.tiebreakerLocalesByLanguageCode)`, both computed once inside `createStrings`,
  * and `fallbackLocale` with them. They are also the RESOLUTION channel rather than the selection one
  * — S9's separation — so a partial manifest load cannot widen them mid-instance either.
  *
@@ -1925,16 +1925,16 @@ export const CANDIDATE_CHAIN_MEMO_LIMIT = 256;
  *
  * @param {readonly string[]} supported
  * @param {string} fallbackLocale
- * @param {Parameters<typeof candidateChain>[3]} tiebreakers
+ * @param {Parameters<typeof candidateChain>[3]} tiebreakerLocalesByLanguageCode
  * @param {boolean} enabled
  * @returns {{ chainFor: (normalizedTag: string) => readonly string[], size: () => number,
  *   keys: () => readonly string[] }}
  */
-export function candidateChainMemo(supported, fallbackLocale, tiebreakers, enabled) {
+export function candidateChainMemo(supported, fallbackLocale, tiebreakerLocalesByLanguageCode, enabled) {
 	if (!enabled)
 		return {
 			chainFor: (normalizedTag) =>
-				Object.freeze(candidateChain(normalizedTag, supported, fallbackLocale, tiebreakers)),
+				Object.freeze(candidateChain(normalizedTag, supported, fallbackLocale, tiebreakerLocalesByLanguageCode)),
 			size: () => 0,
 			keys: () => Object.freeze([]),
 		};
@@ -1953,7 +1953,7 @@ export function candidateChainMemo(supported, fallbackLocale, tiebreakers, enabl
 			}
 
 			const computed = Object.freeze(
-				candidateChain(normalizedTag, supported, fallbackLocale, tiebreakers));
+				candidateChain(normalizedTag, supported, fallbackLocale, tiebreakerLocalesByLanguageCode));
 			entries.set(normalizedTag, computed);
 			if (entries.size > CANDIDATE_CHAIN_MEMO_LIMIT)
 				entries.delete(/** @type {string} */ (entries.keys().next().value));

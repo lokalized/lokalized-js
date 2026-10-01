@@ -191,11 +191,11 @@ describe("cache bounds survive adversarial tags", () => {
     // Since A30 both IANA tables are decoded once and only read, so there is no key a caller can add.
     // This sweep is what would notice a future memo keyed on caller input creeping into the parse —
     // which is the shape the recovery memo it replaced had, bounded then only by the artifact's keys.
-    const { createLocaleNegotiator } = await import("../src/negotiate/index.js");
-    const negotiator = createLocaleNegotiator({
+    const { createLocaleMatcher } = await import("../src/negotiate/index.js");
+    const negotiator = createLocaleMatcher({
       fallbackLocale: "en",
       supportedLocales: ["en", "fr"],
-      tiebreakers: null,
+      tiebreakerLocalesByLanguageCode: null,
     });
 
     for (let index = 0; index < 4096; index++)
@@ -208,19 +208,19 @@ describe("cache bounds survive adversarial tags", () => {
 
   it("the constant-instance-locale match is RECOMPUTED, and so is every resolver call", () => {
     // Plan 3.4 permits caching the automatic direct result for a constant instance locale. The port
-    // declines, and this is what makes the decline observable: a `localeResolver` that answers a
+    // declines, and this is what makes the decline observable: a `localeSupplier` that answers a
     // different tag on each call must produce a different lookup each time. An instance-level cache
     // that leaked onto the resolver path renders the first answer forever.
     const answers = ["fr", "de", "fr", "en"];
     let call = 0;
     const strings = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => /** @type {string} */ (answers[call++ % answers.length]),
-      strings: {
+      localeSupplier: () => /** @type {string} */ (answers[call++ % answers.length]),
+      localizedStringSupplier: () => ({
         en: { Greeting: "en" },
         fr: { Greeting: "fr" },
         de: { Greeting: "de" },
-      },
+      }),
     });
 
     assert.deepEqual(answers.map(() => strings.get("Greeting")), ["fr", "de", "fr", "en"]);
@@ -229,8 +229,8 @@ describe("cache bounds survive adversarial tags", () => {
     // different requests, four different answers, in both spellings.
     const fixed = createStrings({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: { en: { Greeting: "en" }, fr: { Greeting: "fr" }, de: { Greeting: "de" } },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: { Greeting: "en" }, fr: { Greeting: "fr" }, de: { Greeting: "de" } }),
     });
 
     assert.equal(fixed.get("Greeting"), "en");

@@ -171,8 +171,8 @@ describe("the no-NO-NY rewrite, which changes the language", () => {
     // and fallback: Java answers NYNORSK / BOKMAAL / NYNORSK for these three requests.
     const strings = createStrings({
       fallbackLocale: "fr",
-      localeResolver: () => "fr",
-      strings: { nn: { greeting: "NYNORSK" }, nb: { greeting: "BOKMAAL" }, fr: { greeting: "FRENCH" } },
+      localeSupplier: () => "fr",
+      localizedStringSupplier: () => ({ nn: { greeting: "NYNORSK" }, nb: { greeting: "BOKMAAL" }, fr: { greeting: "FRENCH" } }),
     });
 
     const answer = /** @param {string} tag */ (tag) => strings.getResult("greeting", undefined, { locale: tag });
@@ -218,12 +218,12 @@ describe("the no-NO-NY rewrite, which changes the language", () => {
       () =>
         createStrings({
           fallbackLocale: "en",
-          localeResolver: () => "en",
-          strings: {
+          localeSupplier: () => "en",
+          localizedStringSupplier: () => ({
             en: { k: "EN" },
             "en-US-x-lvariant-POSIX": { k: "A" },
             "en-US-x-lvariant-posix": { k: "B" },
-          },
+          }),
         }),
       /locales 'en-US-x-lvariant-POSIX' and 'en-US-x-lvariant-posix' both use IETF BCP 47 language tag 'en-US-posix'/,
     );
@@ -235,8 +235,8 @@ describe("the no-NO-NY rewrite, which changes the language", () => {
       () =>
         createStrings({
           fallbackLocale: "en",
-          localeResolver: () => "en",
-          strings: { en: { k: "EN" }, "en-US-POSIX": { k: "A" }, "en-US-posix": { k: "B" } },
+          localeSupplier: () => "en",
+          localizedStringSupplier: () => ({ en: { k: "EN" }, "en-US-POSIX": { k: "A" }, "en-US-posix": { k: "B" } }),
         }),
       (/** @type {unknown} */ error) =>
         error instanceof RangeError &&
@@ -256,12 +256,12 @@ describe("the no-NO-NY rewrite, which changes the language", () => {
     assert.doesNotThrow(() =>
       createStrings({
         fallbackLocale: "en",
-        localeResolver: () => "en",
-        strings: {
+        localeSupplier: () => "en",
+        localizedStringSupplier: () => ({
           en: { k: "EN" },
           "fr-FR-x-lvariant-POSIX": { k: "A" },
           "de-DE-x-lvariant-1901": { k: "B" },
-        },
+        }),
       }),
     );
   });
@@ -327,12 +327,12 @@ describe("the Unicode extension payload is a set and a map, not a subtag list", 
       () =>
         createStrings({
           fallbackLocale: "en",
-          localeResolver: () => "en",
-          strings: {
+          localeSupplier: () => "en",
+          localizedStringSupplier: () => ({
             en: { k: "EN" },
             "en-US-u-nu-latn-ca-gregory": { k: "A" },
             "en-US-u-ca-gregory-nu-latn": { k: "B" },
-          },
+          }),
         }),
       /both use IETF BCP 47 language tag/,
     );
@@ -345,12 +345,12 @@ describe("the Unicode extension payload is a set and a map, not a subtag list", 
       () =>
         createStrings({
           fallbackLocale: "en",
-          localeResolver: () => "en",
-          strings: {
+          localeSupplier: () => "en",
+          localizedStringSupplier: () => ({
             en: { k: "EN" },
             "en-US-u-nu-latn-ca-gregory": { k: "A" },
             "en-US-u-ca-gregory-nu-latn": { k: "B" },
-          },
+          }),
         }),
       /locales 'en-US-u-nu-latn-ca-gregory' and 'en-US-u-ca-gregory-nu-latn' both use/,
     );
@@ -360,12 +360,12 @@ describe("the Unicode extension payload is a set and a map, not a subtag list", 
     assert.doesNotThrow(() =>
       createStrings({
         fallbackLocale: "en",
-        localeResolver: () => "en",
-        strings: {
+        localeSupplier: () => "en",
+        localizedStringSupplier: () => ({
           en: { k: "EN" },
           "fr-FR-u-nu-latn-ca-gregory": { k: "A" },
           "de-DE-u-ca-gregory-nu-latn": { k: "B" },
-        },
+        }),
       }),
     );
   });

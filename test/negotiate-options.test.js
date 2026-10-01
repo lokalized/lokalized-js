@@ -5,7 +5,7 @@
  *
  * **WHY THE HELPERS EXIST IS A STATEMENT ABOUT THE MODULE GRAPH**, and it is the only reason to put
  * them on this subpath rather than on core: plan 3.4:933 — "`forLanguageRanges` and
- * `forAcceptLanguage` negotiate immediately and return core `localeMatch` options, so the
+ * `forAcceptLanguage` negotiate immediately and return core `localeMatchResult` options, so the
  * browser/root graph does not contain the whole-list solver." The alternative shape, handing core a
  * MATCHER and letting core call it, drags this module and its full IANA language table (and the
  * whole-list solver) into every graph that can render.
@@ -23,21 +23,21 @@ import { describe, test } from "node:test";
 
 import { createStrings, forLocaleMatch } from "../src/core/index.js";
 import {
-  createLocaleNegotiator, forAcceptLanguage, forLanguageRanges,
+  createLocaleMatcher, forAcceptLanguage, forLanguageRanges,
   ianaDataFingerprint, ianaRegistryDate, parseLanguageRanges,
 } from "../src/negotiate/index.js";
 import { ianaDataFingerprint as coreFingerprint, ianaRegistryDate as coreDate } from "../src/core/index.js";
 import { graphBytes } from "../tools/graph-walk.mjs";
 
 const strings = createStrings({
-  strings: {
+  localizedStringSupplier: () => ({
     en: { Hi: "hello en" }, fr: { Hi: "bonjour fr" },
     "fr-CA": { Hi: "bonjour fr-CA" }, es: { Hi: "hola es" }, ja: { Hi: "konnichiwa ja" },
-  },
-  fallbackLocale: "en", tiebreakers: { fr: ["fr", "fr-CA"] }, localeResolver: () => "en",
+  }),
+  fallbackLocale: "en", tiebreakerLocalesByLanguageCode: { fr: ["fr", "fr-CA"] }, localeSupplier: () => "en",
 });
 const configuration = strings.getLocaleConfiguration();
-const negotiator = createLocaleNegotiator(configuration);
+const negotiator = createLocaleMatcher(configuration);
 
 /** The corpus's own pair, quoted by id so a reader can find the recorded Java answer. */
 const THIRTY_THREE = "he,id,yi,cmn,yue,nan,hak,jbo,tlh,gan,wuu,hsn,ase,fr;q=0.1";
@@ -58,8 +58,8 @@ const UNUSABLE = /** @type {const} */ ([
 describe("forLanguageRanges is strict", () => {
   test("it negotiates a usable list and returns frozen core options", () => {
     const options = forLanguageRanges(negotiator, parseLanguageRanges("fr-CH"));
-    assert.equal(options.localeMatch.locale, "fr");
-    assert.equal(options.localeMatch.matchType, "cldr-fallback");
+    assert.equal(options.localeMatchResult.locale, "fr");
+    assert.equal(options.localeMatchResult.matchType, "cldr-fallback");
     assert.ok(Object.isFrozen(options));
   });
 
@@ -85,14 +85,14 @@ describe("forLanguageRanges is strict", () => {
 describe("forAcceptLanguage is fail-soft, and says so in the diagnostic", () => {
   for (const [label, header] of UNUSABLE) {
     test(`${label}: an unmatched result whose own locale is null`, () => {
-      const { localeMatch } = forAcceptLanguage(negotiator, header);
-      assert.equal(localeMatch.locale, null, "plan 3.4:931 — the unmatched result's own locale remains null");
-      assert.equal(localeMatch.matchType, "none");
-      assert.equal(localeMatch.isMatch, false);
+      const { localeMatchResult } = forAcceptLanguage(negotiator, header);
+      assert.equal(localeMatchResult.locale, null, "plan 3.4:931 — the unmatched result's own locale remains null");
+      assert.equal(localeMatchResult.matchType, "none");
+      assert.equal(localeMatchResult.isMatch, false);
       // NOTHING IS TRUNCATED (:931). A 33-expanded-range header reports ZERO requested ranges, not
       // the first 32 — which is the whole difference between refusing and truncating, and the
       // corpus pins it from the other side at `accept-language.limit.thirty-three-expanded-ranges`.
-      assert.deepEqual(localeMatch.requestedLanguageRanges, []);
+      assert.deepEqual(localeMatchResult.requestedLanguageRanges, []);
     });
   }
 
@@ -105,8 +105,8 @@ describe("forAcceptLanguage is fail-soft, and says so in the diagnostic", () => 
     // unusable input and this is the one that said otherwise.
     const long = `${"fr,".repeat(1400)}fr`;
     assert.ok(long.length > 4096);
-    assert.equal(forAcceptLanguage(negotiator, long).localeMatch.locale, null);
-    assert.equal(forLanguageRanges(negotiator, parseLanguageRanges(long)).localeMatch.locale, "fr");
+    assert.equal(forAcceptLanguage(negotiator, long).localeMatchResult.locale, null);
+    assert.equal(forLanguageRanges(negotiator, parseLanguageRanges(long)).localeMatchResult.locale, "fr");
 
     // Every OTHER class of unusable input is refused by the strict door too, which is what makes the
     // fail-soft door a policy rather than a second parser.
@@ -118,19 +118,19 @@ describe("forAcceptLanguage is fail-soft, and says so in the diagnostic", () => 
     // Both are unmatched, and a consumer can still tell them apart: `de` was parsed and considered,
     // the fail-soft inputs above were not. Collapsing the two would make a malformed header
     // indistinguishable from a visitor who asked for a language this deployment does not publish.
-    const { localeMatch } = forAcceptLanguage(negotiator, "de");
-    assert.equal(localeMatch.locale, null);
-    assert.equal(localeMatch.matchType, "none");
-    assert.deepEqual(localeMatch.requestedLanguageRanges, [{ range: "de", weight: 1 }]);
+    const { localeMatchResult } = forAcceptLanguage(negotiator, "de");
+    assert.equal(localeMatchResult.locale, null);
+    assert.equal(localeMatchResult.matchType, "none");
+    assert.deepEqual(localeMatchResult.requestedLanguageRanges, [{ range: "de", weight: 1 }]);
   });
 
   test("the 32-member sibling is accepted WHOLE", () => {
     // `accept-language.limit.thirty-two-expanded-ranges`. A port that truncated to 32 instead of
     // refusing at 33 answers this row correctly and the other one wrongly, which is why the pair is
     // here rather than either half alone.
-    const { localeMatch } = forAcceptLanguage(negotiator, THIRTY_TWO);
-    assert.equal(localeMatch.requestedLanguageRanges.length, 32);
-    assert.equal(localeMatch.locale, "fr");
+    const { localeMatchResult } = forAcceptLanguage(negotiator, THIRTY_TWO);
+    assert.equal(localeMatchResult.requestedLanguageRanges.length, 32);
+    assert.equal(localeMatchResult.locale, "fr");
   });
 
   test("a usable header negotiates exactly as the strict door would", () => {
@@ -207,9 +207,9 @@ describe("the two Accept-Language doors share one predicate", () => {
       "fr-CA,fr;q=0.9", "fr-CH", "de", "es;q=0.4,ja;q=0.8", THIRTY_TWO, "*", "*;q=0.5,fr;q=0.1",
     ];
     for (const header of probes) {
-      const { localeMatch } = forAcceptLanguage(negotiator, header);
+      const { localeMatchResult } = forAcceptLanguage(negotiator, header);
       assert.equal(
-        localeMatch.locale ?? configuration.fallbackLocale,
+        localeMatchResult.locale ?? configuration.fallbackLocale,
         negotiator.bestMatchForAcceptLanguage(header),
         `the doors disagree on ${JSON.stringify(header)}`);
     }
@@ -224,7 +224,7 @@ describe("the two Accept-Language doors share one predicate", () => {
     const result = strings.getResult("Hi", undefined, forAcceptLanguage(negotiator, "fr;q=2"));
     assert.equal(result.translation, "hello en");
     assert.equal(result.lookupLocale, "en", "plan 3.4:930 — core consumption uses the configured fallback");
-    assert.equal(result.localeMatch?.locale, null, "and the result's own locale is still null");
+    assert.equal(result.localeMatchResult?.locale, null, "and the result's own locale is still null");
 
     // The control: a usable header reaches a different catalog through the same call shape.
     assert.equal(strings.get("Hi", undefined, forAcceptLanguage(negotiator, "fr-CH")), "bonjour fr");
@@ -233,7 +233,7 @@ describe("the two Accept-Language doors share one predicate", () => {
 
 describe("matchFor delegates to the same strict kernel core's direct diagnostic uses", () => {
   // THE M9 SCOPE MAP'S BLOCKER 4: "the `matchFor` delegation has almost no gate. Ablating it reds
-  // exactly ONE test on one axis." The clause (plan :2925) is that `LocaleNegotiator.matchFor(locale)`
+  // exactly ONE test on one axis." The clause (plan :2925) is that `LocaleMatcher.matchFor(locale)`
   // "delegates to or differentially equals core's automatic single-locale operation". Both doors
   // import one kernel from `src/internal/locale.js` today, so the strongest available check is that
   // their OBSERVATIONS agree exactly over a probe space that reaches every outcome — which is what a
@@ -262,13 +262,13 @@ describe("matchFor delegates to the same strict kernel core's direct diagnostic 
     { label: "with a bare `fr` to land on", strings, negotiator },
     (() => {
       const elected = createStrings({
-        strings: { en: { Hi: "hello en" }, "fr-CA": { Hi: "bonjour fr-CA" }, "fr-FR": { Hi: "bonjour fr-FR" } },
-        fallbackLocale: "en", tiebreakers: { fr: ["fr-FR", "fr-CA"] }, localeResolver: () => "en",
+        localizedStringSupplier: () => ({ en: { Hi: "hello en" }, "fr-CA": { Hi: "bonjour fr-CA" }, "fr-FR": { Hi: "bonjour fr-FR" } }),
+        fallbackLocale: "en", tiebreakerLocalesByLanguageCode: { fr: ["fr-FR", "fr-CA"] }, localeSupplier: () => "en",
       });
       return {
         label: "where the tiebreaker must elect",
         strings: elected,
-        negotiator: createLocaleNegotiator(elected.getLocaleConfiguration()),
+        negotiator: createLocaleMatcher(elected.getLocaleConfiguration()),
       };
     })(),
   ];
@@ -278,7 +278,7 @@ describe("matchFor delegates to the same strict kernel core's direct diagnostic 
       for (const tag of TAGS)
         assert.deepEqual(
           door.negotiator.matchFor(tag),
-          door.strings.getDirectLocaleContext(tag).localeMatch,
+          door.strings.getDirectLocaleContext(tag).localeMatchResult,
           `the two doors disagree on ${tag}`);
     });
 
@@ -288,10 +288,10 @@ describe("matchFor delegates to the same strict kernel core's direct diagnostic 
     const [, elected] = DOORS;
     assert.equal(elected?.negotiator.matchFor("fr").locale, "fr-FR");
     const reversed = createStrings({
-      strings: { en: { Hi: "hello en" }, "fr-CA": { Hi: "bonjour fr-CA" }, "fr-FR": { Hi: "bonjour fr-FR" } },
-      fallbackLocale: "en", tiebreakers: { fr: ["fr-CA", "fr-FR"] }, localeResolver: () => "en",
+      localizedStringSupplier: () => ({ en: { Hi: "hello en" }, "fr-CA": { Hi: "bonjour fr-CA" }, "fr-FR": { Hi: "bonjour fr-FR" } }),
+      fallbackLocale: "en", tiebreakerLocalesByLanguageCode: { fr: ["fr-CA", "fr-FR"] }, localeSupplier: () => "en",
     });
-    assert.equal(createLocaleNegotiator(reversed.getLocaleConfiguration()).matchFor("fr").locale, "fr-CA",
+    assert.equal(createLocaleMatcher(reversed.getLocaleConfiguration()).matchFor("fr").locale, "fr-CA",
       "reversing the declared order must move the answer, or the list is not being read");
   });
 

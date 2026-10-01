@@ -6,7 +6,7 @@
  * not preferred.** Plan 6.2:2122-2126 enumerates what the generator does — "hashes raw file bytes and
  * emits URLs against the absolute publicationBaseUrl, computes the canonical identity projection, and
  * returns the browser manifest shape" — and parsing is not in it. The decisive structural evidence is
- * the option type: `DirectoryManifestOptions` carries no `onWarning`, and parsing a catalog PRODUCES
+ * the option type: `DirectoryManifestOptions` carries no `warningHandler`, and parsing a catalog PRODUCES
  * warnings (incomplete cardinality and ordinality), so a parsing generator would have nowhere to
  * deliver them. The limits it can honour are therefore exactly the ones plan 6.2:2123 names —
  * file, count and aggregate BYTE budgets — and not `maximumTranslationNodes`, which has no meaning
@@ -50,7 +50,7 @@ import { directoryLabel, discoverCatalogFiles, keyedByRenderedTag, resolveDiscov
  * @typedef {object} DirectoryManifestOptions
  * @property {string} catalogVersion
  * @property {string} fallbackLocale
- * @property {Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]>} [tiebreakers]
+ * @property {Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]>} [tiebreakerLocalesByLanguageCode]
  * @property {string | URL} [publicationBaseUrl]
  * @property {import("../internal/catalog.js").ParseLimits} [limits]
  * @property {number} [maximumDiscoveryEntries]
@@ -105,7 +105,7 @@ function publicationBase(supplied, directory) {
 /** Every member the generator reads, measured with a recording proxy over the options object. */
 const DIRECTORY_MANIFEST_OPTIONS = /** @type {const} */ ([
   "catalogVersion", "fallbackLocale", "limits", "maximumDiscoveryEntries", "publicationBaseUrl",
-  "tiebreakers",
+  "tiebreakerLocalesByLanguageCode",
 ]);
 
 /**
@@ -254,7 +254,7 @@ export async function createStringsManifestFromDirectory(directory, options) {
     // NOT synthesized — plan 2.2's one-element synthesis is a VALIDATION rule, and doing it here
     // would make the fingerprint depend on the file set through a second, invisible route. But
     // NORMALIZED, for the reason the fingerprint below depends on: see `normalizedTiebreakers`.
-    tiebreakers: normalizedTiebreakers(options.tiebreakers),
+    tiebreakerLocalesByLanguageCode: normalizedTiebreakers(options.tiebreakerLocalesByLanguageCode),
   };
   // **COMPUTED OVER A DRAFT THAT IS ALREADY NORMALIZED, and that is not a detail.** Found by review:
   // computing it over the caller's spelling made `validateStringsManifest` — which normalizes, then
@@ -270,7 +270,7 @@ export async function createStringsManifestFromDirectory(directory, options) {
 }
 
 /**
- * The caller's tiebreakers, in the ONE shape a manifest carries.
+ * The caller's tiebreakerLocalesByLanguageCode, in the ONE shape a manifest carries.
  *
  * Plan 3.2 types the OPTION as `TiebreakerMap` — `Readonly<Record<…>> | ReadonlyMap<…>` — while plan
  * 6.1 types the manifest FIELD as a plain record. Converting between them is therefore this
@@ -291,7 +291,7 @@ function normalizedTiebreakers(supplied) {
   for (const [rawTag, candidates] of entries) {
     const tag = requireManifestTag(rawTag, "A tiebreaker key");
     if (!Array.isArray(candidates))
-      throw configurationError(`The tiebreakers for '${tag}' must be an array of locale tags`);
+      throw configurationError(`The tiebreakerLocalesByLanguageCode for '${tag}' must be an array of locale tags`);
     normalized[tag] = candidates.map((candidate, index) =>
       requireManifestTag(candidate, `The tiebreaker for '${tag}' at index ${index}`));
   }

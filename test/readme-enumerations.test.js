@@ -66,7 +66,7 @@ test("every authored copy of the eight `matchType` values agrees with every othe
   const values = (text) => [...new Set([...text.matchAll(/"([a-z-]+)"|`([a-z-]+)`/g)]
     .map((m) => m[1] ?? m[2]))];
 
-  // The anchor is the union ITSELF, not the JSDoc tag that used to carry it. `LocaleMatch` moved
+  // The anchor is the union ITSELF, not the JSDoc tag that used to carry it. `LocaleMatchResult` moved
   // from an `@property`-per-field typedef to a single `Readonly<{...}>` when the record was frozen
   // and every member declared `readonly`; this pattern went red on that change, which is the
   // behaviour the note above promises for a copy whose spelling moves, and it is a PIN UPDATE
@@ -82,7 +82,7 @@ test("every authored copy of the eight `matchType` values agrees with every othe
   // what filtering cost: a ninth spelling ADDED to the README's prose, to MODULE-CONTRACTS.md's, or
   // to the conformance runner's enum map left this file at 5/5 green. Three of the five compared
   // copies could gain a value nobody would ever see. The Java-enum maps carry OTHER vocabularies in
-  // the same object (`FailureReason`, `BidiIsolation`), so each is anchored on its own first and
+  // the same object (`TranslationFailureReason`, `BidiIsolation`), so each is anchored on its own first and
   // last member; the two prose lists are anchored to the end of their sentence.
   const COPIES = [
     ["src/ssr/index.js", /const MATCH_TYPES = new Set\(\[([\s\S]*?)\]\)/,

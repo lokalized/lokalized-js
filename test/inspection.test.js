@@ -16,9 +16,9 @@ import { createStrings } from "../src/index.js";
 const strings = () =>
   createStrings({
     fallbackLocale: "en",
-    localeResolver: () => "en",
-    strings: { en: { Beta: "b", Alpha: "a", Gamma: "g" }, "en-GB": { Alpha: "a" }, ro: { Alpha: "a" } },
-    tiebreakers: { en: ["en", "en-GB"] },
+    localeSupplier: () => "en",
+    localizedStringSupplier: () => ({ en: { Beta: "b", Alpha: "a", Gamma: "g" }, "en-GB": { Alpha: "a" }, ro: { Alpha: "a" } }),
+    tiebreakerLocalesByLanguageCode: { en: ["en", "en-GB"] },
   });
 
 describe("getKeysForLocale", () => {

@@ -783,9 +783,8 @@ export function requireJdkWellFormedLocale(normalizedTag, description) {
  * strings: a differential, a test file and the conformance runner all compare them literally, and
  * three copies of `"Requested locale"` across three modules is how one of them silently drifts.
  *
- * THE RULE THE MAINTAINER SET, applied here without reinterpretation: **Java's SHAPE with the JS
- * name substituted**, the same rule that already produces `localeResolver returned null` where Java
- * says `localeSupplier returned null`. Java's three lookup-reachable descriptions are `Locale
+ * THE RULE THE MAINTAINER SET: shared API concepts keep their names and diagnostic descriptions
+ * across ports. Java's three lookup-reachable descriptions are `Locale
  * override` (`TranslationOptions.java:73/310`), `localeSupplier result` (`DefaultStrings.java:2457`)
  * and `Requested locale` (`LocaleMatcher.java:64`).
  *
@@ -793,9 +792,8 @@ export function requireJdkWellFormedLocale(normalizedTag, description) {
  * noun phrases describing the caller's input, and the JS surfaces they name — the per-call
  * `{ locale }` option and `matchFor`'s argument — are the same things under the same description.
  * Substituting a JS name into a phrase that contains no name would be a change, not a translation,
- * so both are reproduced VERBATIM. Only `localeSupplier result` names an identifier, and the port's
- * name for that callback is `localeResolver`; it becomes `localeResolver result`, which is exactly
- * the `returned null` precedent one word over.
+ * so both are reproduced VERBATIM. `localeSupplier result` also keeps its description because
+ * the callback is named `localeSupplier` in both ports
  *
  * `Instance locale` WAS A FOURTH, for `createStrings({ locale })`, a port affordance with no Java
  * counterpart. The option was removed before 1.0.0 (a `Strings` has no language of its own), so the
@@ -809,7 +807,7 @@ export function requireJdkWellFormedLocale(normalizedTag, description) {
  * third site, `Fallback locale` at `:101`, reuses the construction key because it is the same Java
  * sentence). None of the eight carries a Java
  * IDENTIFIER — they are plain noun phrases for a caller's own argument, exactly like `Locale
- * override` and `Requested locale` — so the substitution rule that produced `localeResolver result`
+ * override` and `Requested locale` — so the substitution rule that produced `localeSupplier result`
  * has nothing to substitute and they are reproduced unchanged. **That is why they needed no
  * maintainer decision**: the wording question decision 2 raised was only ever about the two sites
  * whose Java text names a Java callback.
@@ -820,14 +818,14 @@ export function requireJdkWellFormedLocale(normalizedTag, description) {
  * (`LocalizedStringLoader.java:1119/1165/1211`, which are M8's). A named key makes the JS site
  * commit to WHICH Java sentence it is reproducing.
  *
- * @type {Readonly<Record<"perCallLocale" | "localeResolverResult" |
+ * @type {Readonly<Record<"perCallLocale" | "localeSupplierResult" |
  *   "requestedLocale" | "fallbackLocale" | "localizedStringsLocale" | "tiebreakerLocale" |
  *   "inspectionLocale" | "sourceLocale" | "targetLocale" | "selectedLocale" |
  *   "consideredLocale", string>>}
  */
 export const LOCALE_INGRESS_DESCRIPTION = Object.freeze({
 	perCallLocale: "Locale override",
-	localeResolverResult: "localeResolver result",
+	localeSupplierResult: "localeSupplier result",
 	requestedLocale: "Requested locale",
 	fallbackLocale: "Fallback locale",
 	localizedStringsLocale: "Localized strings locale",

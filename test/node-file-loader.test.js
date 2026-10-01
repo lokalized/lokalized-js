@@ -59,7 +59,7 @@ function directoryManifest(tags, flaws = {}) {
   const draft = {
     formatVersion: 1, catalogVersion: "2026.09.11", catalogFingerprint: "0".repeat(64),
     ...BUILD_IDENTITY,
-    fallbackLocale: "en", baseUrl: pathToFileURL(`${directory}/`).href, files, tiebreakers: {},
+    fallbackLocale: "en", baseUrl: pathToFileURL(`${directory}/`).href, files, tiebreakerLocalesByLanguageCode: {},
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return { directory, manifest: /** @type {any} */ (draft) };
@@ -73,7 +73,7 @@ test("a whole-manifest file load constructs a Strings, through the DEFAULT strea
   assert.equal(loaded.complete, true);
   assert.deepEqual(loaded.coverage, { kind: "entire-manifest" });
 
-  const strings = createStrings({ loaded, localeResolver: () => "fr" });
+  const strings = createStrings({ loaded, localeSupplier: () => "fr" });
   assert.equal(strings.get("Hi"), "hello fr");
   assert.deepEqual(strings.getSupportedLocales(), ["de", "en", "fr"]);
 });
@@ -148,7 +148,7 @@ test("a non-file: URL is refused BEFORE the reader is invoked even once", async 
   // placed inside the reader stops being a wording difference and becomes a defect: the `https:`
   // entry would degrade into one `LoadFailure`, the partial policy would accept the rest, and the
   // caller would receive a successful load that had silently skipped a file it asked for. Measured
-  // by ablation — moving the check into `read` produces exactly `StringsLoadingError: 1 catalog
+  // by ablation — moving the check into `read` produces exactly `LocalizedStringLoadingError: 1 catalog
   // file(s) failed to load` here instead of a refusal.
   await assert.rejects(
     () => loadEntireManifestFromFiles(/** @type {any} */ (remote), { partialFailure: "allow-partial" }),
@@ -200,7 +200,7 @@ test("network options are refused rather than ignored, before any read — at EV
 test("a digest that does not match the file on disk fails at the DIGEST stage", async () => {
   const { manifest } = directoryManifest(["en"], { corrupt: "en" });
   const error = await loadEntireManifestFromFiles(manifest).then(() => null, (e) => e);
-  assert.equal(error?.name, "StringsLoadingError");
+  assert.equal(error?.name, "LocalizedStringLoadingError");
   assert.equal(error.failures.length, 1);
   assert.equal(error.failures[0].stage, "digest");
 });
@@ -225,7 +225,7 @@ test("allow-partial keeps a load whose fallback arrived, and refuses one whose f
   assert.deepEqual(Object.keys(partial.catalogs), ["en"]);
   assert.equal(partial.failures.length, 1);
   // And it still constructs — the loaded branch accepts an incomplete result, and refuses to stamp it.
-  assert.equal(createStrings({ loaded: partial, localeResolver: () => "en" }).get("Hi"), "hello en");
+  assert.equal(createStrings({ loaded: partial, localeSupplier: () => "en" }).get("Hi"), "hello en");
 
   const { manifest: noFallback } = directoryManifest(["en", "fr"], { omit: "en" });
   await assert.rejects(
@@ -276,7 +276,7 @@ test("a manifest read from disk loads through the same door it describes", async
   const path = join(directory, "strings.manifest.json");
   writeFileSync(path, JSON.stringify(manifest));
   const loaded = await loadEntireManifestFromFiles(await readStringsManifest(path));
-  assert.equal(createStrings({ loaded, localeResolver: () => "fr" }).get("Hi"), "hello fr");
+  assert.equal(createStrings({ loaded, localeSupplier: () => "fr" }).get("Hi"), "hello fr");
 });
 
 // ------------------------------------------------------------- the two doors agree
@@ -290,7 +290,7 @@ test("the file door and the Fetch door produce the SAME result from the same man
   // 6.2:2035 has each door refuse the other's scheme BEFORE any I/O, so the comparison is between two
   // manifests that differ in `baseUrl` and in nothing else. Their `catalogFingerprint`s are asserted
   // EQUAL below, which is what makes them the same catalog set: the identity projection covers
-  // {formatVersion, catalogVersion, resolvedFallbackLocale, localeToSha256, tiebreakers} and neither
+  // {formatVersion, catalogVersion, resolvedFallbackLocale, localeToSha256, tiebreakerLocalesByLanguageCode} and neither
   // `baseUrl` nor any file URL, so a scheme change is invisible to identity by design.
   //
   // This test used to hand the file-scheme manifest to BOTH doors, which the Fetch door accepted

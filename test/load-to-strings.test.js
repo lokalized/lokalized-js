@@ -42,7 +42,7 @@ function manifest(/** @type {string[]} */ tags) {
   const draft = {
     formatVersion: 1, catalogVersion: "2026.09.11", catalogFingerprint: "0".repeat(64),
     ...BUILD_IDENTITY,
-    fallbackLocale: "en", baseUrl: "https://cdn.example/v1/", files, tiebreakers: {},
+    fallbackLocale: "en", baseUrl: "https://cdn.example/v1/", files, tiebreakerLocalesByLanguageCode: {},
   };
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return /** @type {any} */ (draft);
@@ -73,9 +73,9 @@ test("a WHOLE-MANIFEST load built from unsorted keys constructs and stamps", asy
   assert.deepEqual(loaded.requestedFiles.map((/** @type {any} */ e) => e.locale), ["de", "en", "fr"],
     "the whole-manifest plan is normalized-tag order");
   assert.deepEqual(loaded.manifestLocaleConfiguration,
-    { fallbackLocale: "en", supportedLocales: ["de", "en", "fr"], tiebreakers: {} });
+    { fallbackLocale: "en", supportedLocales: ["de", "en", "fr"], tiebreakerLocalesByLanguageCode: {} });
 
-  const strings = createStrings({ loaded, localeResolver: () => "fr" });
+  const strings = createStrings({ loaded, localeSupplier: () => "fr" });
   assert.equal(strings.get("Hi"), "hello fr");
   assert.deepEqual(strings.getSupportedLocales(), ["de", "en", "fr"]);
   assert.deepEqual(strings.getCatalogIdentity(), {
@@ -97,9 +97,9 @@ test("a LOOKUP-SUBSET load constructs, and its coverage tag is the normalized re
   assert.deepEqual(loaded.coverage, { kind: "lookup", lookupLocale: "fr" });
   assert.deepEqual(loaded.requestedFiles.map((/** @type {any} */ e) => e.locale), ["fr", "en"]);
 
-  const strings = createStrings({ loaded, localeResolver: () => "fr" });
+  const strings = createStrings({ loaded, localeSupplier: () => "fr" });
   const stamp = createSsrStamp(strings, { kind: "locale", locale: "fr" });
-  assert.equal(stamp.localeMatch.locale, "fr");
+  assert.equal(stamp.localeMatchResult.locale, "fr");
 
   // The coverage rule is live on a REAL loader result, not only on a hand-built one: this instance
   // was planned from `fr` and cannot stamp an `en` render.
@@ -110,7 +110,7 @@ test("a LOOKUP-SUBSET load constructs, and its coverage tag is the normalized re
 test("a copied load with changed translations cannot claim the original catalog identity in an SSR stamp", async () => {
   const source = manifest(["fr", "en"]);
   const loaded = await loadEntireManifest(source, { fetch: fetchImpl });
-  const genuine = createStrings({ loaded, localeResolver: () => "fr" });
+  const genuine = createStrings({ loaded, localeSupplier: () => "fr" });
   const original = createSsrStamp(genuine, { kind: "locale", locale: "fr" });
   assert.equal(original.catalogFingerprint, source.catalogFingerprint);
 
@@ -118,13 +118,13 @@ test("a copied load with changed translations cannot claim the original catalog 
     ...loaded,
     catalogs: { ...loaded.catalogs, fr: parseStrings('{"Hi":"changed"}', { locale: "fr" }) },
   };
-  const strings = createStrings({ loaded: altered, localeResolver: () => "fr" });
+  const strings = createStrings({ loaded: altered, localeSupplier: () => "fr" });
   assert.equal(strings.get("Hi"), "changed");
   assert.equal(strings.getLoadVerification()?.source, "unverified-loaded-v1");
   assert.throws(() => createSsrStamp(strings, { kind: "locale", locale: "fr" }),
     /source 'verified-manifest-v1'/);
 
-  const roundTrip = createStrings({ loaded: JSON.parse(JSON.stringify(loaded)), localeResolver: () => "fr" });
+  const roundTrip = createStrings({ loaded: JSON.parse(JSON.stringify(loaded)), localeSupplier: () => "fr" });
   assert.equal(roundTrip.get("Hi"), "hello fr");
   assert.throws(() => createSsrStamp(roundTrip, { kind: "locale", locale: "fr" }),
     /source 'verified-manifest-v1'/);

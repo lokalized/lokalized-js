@@ -1,3 +1,4 @@
+import { currentApiVocabulary } from "../tools/api-vocabulary.mjs";
 // @ts-check
 /**
  * THE OTHER DIRECTION OF THE ALLOWLIST CONTRACT: every name the plan promises must actually exist.
@@ -27,7 +28,7 @@ import { test } from "node:test";
 
 const root = new URL("../", import.meta.url);
 const pkg = JSON.parse(readFileSync(new URL("package.json", root), "utf8"));
-const allowlist = JSON.parse(readFileSync(new URL("../lokalized-spec/symbol-allowlist.json", root), "utf8"));
+const allowlist = currentApiVocabulary(JSON.parse(readFileSync(new URL("../lokalized-spec/symbol-allowlist.json", root), "utf8")));
 
 /** Kept in step with `symbol-allowlist.test.js`'s copy by hand; both encode plan 3.1. */
 const OWNERS_BY_SUBPATH = /** @type {Record<string, string[]>} */ ({

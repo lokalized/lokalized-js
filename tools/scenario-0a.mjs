@@ -107,7 +107,7 @@ const REBASELINES_ORIGIN = "3e4ec0720d93393a367a55bdf6473784444e1d963828d47bbac8
  * would freeze them. Move it forward once per landed batch — a deliberate edit, like the origin.
  * @type {{ index: number, sha256: string } | undefined}
  */
-const REBASELINES_FROZEN_THROUGH = { index: 76, sha256: "6ac80acd85ed35135409a7c881e4f6efb96fa61d365dc696a029d4eabea7b565" };
+const REBASELINES_FROZEN_THROUGH = { index: 80, sha256: "64fffb2b95d6b62a70045160584ba4b1e7cc52938819c956232d47b811dab7a9" };
 
 /**
  * The digest of the browser half entry 71 bound, frozen here because that entry — the checkpoint above

@@ -330,7 +330,7 @@ const INVENTORY = {
   },
   "src/internal/locale.js::languageRangeMatchTypeFor::canonicalLanguageTag": {
     what: "Re-derives the PUBLIC match type for the selected locale — the value a caller reads off " +
-      "`localeMatch`, which is a separate channel from the selection itself.",
+      "`localeMatchResult`, which is a separate channel from the selection itself.",
     evidence: ["diff:lookup", "corpus:supplied-match", "corpus:m3b-supplied-match"],
   },
   "src/internal/locale.js::matchForRanges::canonicalLanguageTag": {

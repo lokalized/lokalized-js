@@ -4,7 +4,7 @@
  * `lokalized/negotiate` — the RAW RFC 4647 range ingress.
  *
  * The corpus gates most of what is here: 74 recorded `matchFor(List)` cases run through
- * `createLocaleNegotiator` in `tools/conformance.mjs` (50 single-member since A2, plus A3's 24
+ * `createLocaleMatcher` in `tools/conformance.mjs` (50 single-member since A2, plus A3's 24
  * multi-member arrays), and every one of them compares all eight recorded match fields. This file is
  * for the properties those 74 CANNOT see, verified by ablation rather than assumed — each was
  * measured by deleting the code and re-running the corpus:
@@ -31,7 +31,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { createStrings } from "../src/core/index.js";
-import { createLocaleNegotiator, forAcceptLanguage, parseLanguageRanges } from "../src/negotiate/index.js";
+import { createLocaleMatcher, forAcceptLanguage, parseLanguageRanges } from "../src/negotiate/index.js";
 import { decodeLanguageEquivalents } from "../src/data/iana-range-equivalents.js";
 import { decodeRegionVariantEquivalents } from "../src/data/iana-identity-equivalents.js";
 import { normalizeTag } from "../src/internal/locale.js";
@@ -41,34 +41,34 @@ import { IANA_EQUIVALENCES_ARTIFACT, specPath } from "../tools/iana-artifact.mjs
 const LANGUAGE_EQUIVALENTS = decodeLanguageEquivalents();
 
 /** @param {Record<string, unknown>} options */
-const negotiatorFor = (options) => createLocaleNegotiator(
-  createStrings(/** @type {any} */ ({ ...options, strings: options.strings })).getLocaleConfiguration());
+const negotiatorFor = (options) => createLocaleMatcher(
+  createStrings(/** @type {any} */ ({ ...options })).getLocaleConfiguration());
 
 const catalog = (/** @type {string[]} */ tags) =>
   Object.fromEntries(tags.map((tag) => [tag, { GREETING: tag }]));
 
-describe("createLocaleNegotiator — the applicable configuration", () => {
+describe("createLocaleMatcher — the applicable configuration", () => {
   it("takes the configuration a Strings reports, fallback already resolved", () => {
-    const strings = createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: catalog(["de", "en", "fr"]) });
-    const negotiator = createLocaleNegotiator(strings.getLocaleConfiguration());
+    const strings = createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (catalog(["de", "en", "fr"])) });
+    const negotiator = createLocaleMatcher(strings.getLocaleConfiguration());
     assert.equal(negotiator.bestMatchForLanguageRanges([{ range: "fr", weight: 1 }]), "fr");
   });
 
   it("refuses a hand-built configuration whose fallback names no supported locale", () => {
     assert.throws(
-      () => createLocaleNegotiator({ fallbackLocale: "es", supportedLocales: ["de", "en"] }),
+      () => createLocaleMatcher({ fallbackLocale: "es", supportedLocales: ["de", "en"] }),
       { name: "RangeError", message: /Fallback locale 'es' is not one of the supported locales/ },
     );
 
     // The control that must PASS, so the refusal above is known to be about the fallback rather than
     // about hand-built configurations in general.
-    const negotiator = createLocaleNegotiator({ fallbackLocale: "en", supportedLocales: ["de", "en"] });
+    const negotiator = createLocaleMatcher({ fallbackLocale: "en", supportedLocales: ["de", "en"] });
     assert.equal(negotiator.bestMatchForLanguageRanges([{ range: "de", weight: 1 }]), "de");
   });
 });
 
 describe("the RFC 4647 extended-range grammar", () => {
-  const negotiator = negotiatorFor({ fallbackLocale: "en", localeResolver: () => "en", strings: catalog(["en"]) });
+  const negotiator = negotiatorFor({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (catalog(["en"])) });
   const match = (/** @type {string} */ range) =>
     negotiator.matchForLanguageRanges([{ range, weight: 1 }]);
 
@@ -109,7 +109,7 @@ describe("the RFC 4647 extended-range grammar", () => {
     assert.throws(() => parseLanguageRanges(""), { name: "RangeError", message: "range=" });
     assert.throws(() => match("-a"), { name: "RangeError", message: "range=-a" });
     // And the fail-soft door still answers the fallback for it.
-    assert.equal(createLocaleNegotiator({ supportedLocales: ["en", "fr"], fallbackLocale: "en" })
+    assert.equal(createLocaleMatcher({ supportedLocales: ["en", "fr"], fallbackLocale: "en" })
       .bestMatchForAcceptLanguage("-"), "en");
   });
 
@@ -122,7 +122,7 @@ describe("the RFC 4647 extended-range grammar", () => {
 });
 
 describe("the member weight, which no recorded case varies", () => {
-  const negotiator = negotiatorFor({ fallbackLocale: "en", localeResolver: () => "en", strings: catalog(["en", "fr"]) });
+  const negotiator = negotiatorFor({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (catalog(["en", "fr"])) });
 
   it("reports the member's own weight as the effective weight", () => {
     // Hardcoding `effectiveWeight: 1` leaves all 50 corpus cases green; this is what sees it.
@@ -152,7 +152,7 @@ describe("the wildcard preference", () => {
     // `preferredLocaleForWildcard` (`DefaultStrings:1955`), which is NOT `preferredLocaleForRange`:
     // a wildcard expresses no language of its own, so the configured fallback speaks for the caller.
     // `de` sorts first among the supported tags, so "first survivor" would answer `de` here.
-    const negotiator = negotiatorFor({ fallbackLocale: "en", localeResolver: () => "en", strings: catalog(["de", "en", "fr"]) });
+    const negotiator = negotiatorFor({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (catalog(["de", "en", "fr"])) });
     assert.equal(negotiator.matchForLanguageRanges([{ range: "*", weight: 1 }]).locale, "en");
     assert.equal(negotiator.matchForLanguageRanges([{ range: "*", weight: 1 }]).matchType, "wildcard");
 
@@ -164,14 +164,14 @@ describe("the wildcard preference", () => {
     // `de-*` against a catalog with no German at all must answer NONE rather than reaching `en`
     // through likely-subtag or primary-language inference. The control is the same catalog and a
     // wildcard-free range that DOES broaden.
-    const negotiator = negotiatorFor({ fallbackLocale: "en", localeResolver: () => "en", strings: catalog(["en", "fr-CA"]) });
+    const negotiator = negotiatorFor({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (catalog(["en", "fr-CA"])) });
     assert.equal(negotiator.matchForLanguageRanges([{ range: "de-*", weight: 1 }]).matchType, "none");
     assert.equal(negotiator.matchForLanguageRanges([{ range: "fr-ca", weight: 1 }]).isMatch, true);
   });
 });
 
 describe("the two ingresses are separate, and must stay separate", () => {
-  const negotiator = negotiatorFor({ fallbackLocale: "en", localeResolver: () => "en", strings: catalog(["en", "nsl"]) });
+  const negotiator = negotiatorFor({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (catalog(["en", "nsl"])) });
 
   it("normalizes a LOCALE and never a RANGE", () => {
     // The regression guard for A1, stated as the pair that separates the two doors. `sgn-nsl` is a
@@ -203,7 +203,7 @@ describe("the full IANA table, which the root graph's direct-match projection do
     // full registry table behind this subpath keeps it, and the parse finds it by truncating
     // `no-bok-no` one subtag at a time. Without the prefix walk the range expands to nothing and
     // `nb-NO` is unreachable. Corpus case `m3b-canonicalization.compound-alias-no-bok`.
-    const negotiator = negotiatorFor({ fallbackLocale: "en", localeResolver: () => "en", strings: catalog(["en", "nb-NO"]) });
+    const negotiator = negotiatorFor({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (catalog(["en", "nb-NO"])) });
     const match = negotiator.matchForLanguageRanges([{ range: "no-bok-no", weight: 1 }]);
     assert.equal(match.locale, "nb-NO");
     assert.equal(match.matchType, "canonical");
@@ -214,7 +214,7 @@ describe("the full IANA table, which the root graph's direct-match projection do
 });
 
 describe("the N-member solver's contract at this door", () => {
-  const negotiator = negotiatorFor({ fallbackLocale: "en", localeResolver: () => "en", strings: catalog(["en", "fr"]) });
+  const negotiator = negotiatorFor({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (catalog(["en", "fr"])) });
 
   it("answers a multi-member request instead of refusing it", () => {
     // Until M7 A3 this door threw `The multi-member language-range solver is not implemented yet`.
@@ -257,7 +257,7 @@ describe("the N-member solver's contract at this door", () => {
 });
 
 describe("EXTENDED_RANGE is re-derived per selected locale, never mapped from the governor", () => {
-  // `DefaultStrings#localeMatch:1942` states it outright: the public match type is NOT the governor's
+  // `DefaultStrings#localeMatchResult:1942` states it outright: the public match type is NOT the governor's
   // internal category. `en-latn` matches `en-Latn-US` through the DIRECT_STRUCTURAL cell — the same
   // category a wildcard range produces — and must still report LIKELY_SUBTAG, because
   // `languageRangeMatchTypeFor` re-derives from the range's own shape. A solver that mapped
@@ -267,8 +267,8 @@ describe("EXTENDED_RANGE is re-derived per selected locale, never mapped from th
   // LIKELY_SUBTAG / en-Latn-US and EXTENDED_RANGE / en-Latn-US respectively.
   const negotiator = negotiatorFor({
     fallbackLocale: "fr",
-    localeResolver: () => "fr",
-    strings: catalog(["en-Latn-US", "fr"]),
+    localeSupplier: () => "fr",
+    localizedStringSupplier: () => (catalog(["en-Latn-US", "fr"])),
   });
 
   it("reports the derived nature of a WILDCARD-FREE structural match", () => {
@@ -312,9 +312,9 @@ describe("the two solver rules the corpus cannot check", () => {
     // MEASURED on the pinned JDK: Java answers EXACT / zh / 1.0 / range=zh.
     const negotiator = negotiatorFor({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: catalog(["cmn-Hans", "en", "zh"]),
-      tiebreakers: { zh: ["zh", "cmn-Hans"] },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => (catalog(["cmn-Hans", "en", "zh"])),
+      tiebreakerLocalesByLanguageCode: { zh: ["zh", "cmn-Hans"] },
     });
 
     const match = negotiator.matchForLanguageRanges([{ range: "cmn", weight: 1 }, { range: "zh", weight: 1 }]);
@@ -348,8 +348,8 @@ describe("the two solver rules the corpus cannot check", () => {
     // MEASURED on the pinned JDK: Java answers LIKELY_SUBTAG / nsi-Latn-DE / 1.0 / range=sgn-no.
     const negotiator = negotiatorFor({
       fallbackLocale: "en",
-      localeResolver: () => "en",
-      strings: catalog(["en", "nsi-Latn-DE", "nsl"]),
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => (catalog(["en", "nsi-Latn-DE", "nsl"])),
     });
 
     const match = negotiator.matchForLanguageRanges([{ range: "sgn-no", weight: 1 }, { range: "nsl", weight: 1 }]);
@@ -362,8 +362,8 @@ describe("the two solver rules the corpus cannot check", () => {
     // Java: CLDR_FALLBACK / no / 1.0 / range=no-bok; collapsed, `exact`/`nb`.
     const norwegian = negotiatorFor({
       fallbackLocale: "nb",
-      localeResolver: () => "nb",
-      strings: catalog(["en", "nb", "no"]),
+      localeSupplier: () => "nb",
+      localizedStringSupplier: () => (catalog(["en", "nb", "no"])),
     });
 
     const second = norwegian.matchForLanguageRanges([{ range: "no-bok", weight: 1 }, { range: "nb", weight: 1 }]);
@@ -475,7 +475,7 @@ describe("parseLanguageRanges — one registry parse, at every door", () => {
    * locale — asserting the locale alone would make this test vacuous.
    */
   it("expands yol at the public parse, the header door, and in a list built from the public parse", () => {
-    const negotiator = createLocaleNegotiator({ supportedLocales: ["en", "enm"], fallbackLocale: "en" });
+    const negotiator = createLocaleMatcher({ supportedLocales: ["en", "enm"], fallbackLocale: "en" });
 
     assert.deepEqual(LANGUAGE_EQUIVALENTS.get("yol"), ["enm"], "yol is the probe this test is built on");
     assert.deepEqual(parseLanguageRanges("yol"), [{ range: "yol", weight: 1 }, { range: "enm", weight: 1 }]);
@@ -488,7 +488,7 @@ describe("parseLanguageRanges — one registry parse, at every door", () => {
     assert.deepEqual(parsed.requestedLanguageRanges, [{ range: "yol", weight: 1 }, { range: "enm", weight: 1 }]);
 
     // The header door parses the same way.
-    const header = forAcceptLanguage(negotiator, "yol").localeMatch;
+    const header = forAcceptLanguage(negotiator, "yol").localeMatchResult;
     assert.equal(header.matchType, "exact");
     assert.deepEqual(header.requestedLanguageRanges, parsed.requestedLanguageRanges);
 
@@ -531,7 +531,7 @@ describe("parseLanguageRanges — one registry parse, at every door", () => {
       // A fallback that shares no language with the pair, so a CLDR-fallback answer cannot pass for
       // the IANA equivalence (`en-gb-oxendict` over `[en, en-gb-oed]` answers `en` for that reason).
       const fallback = tag.startsWith("en") || partner.startsWith("en") ? "fr" : "en";
-      const match = createLocaleNegotiator({ supportedLocales: [fallback, partner], fallbackLocale: fallback })
+      const match = createLocaleMatcher({ supportedLocales: [fallback, partner], fallbackLocale: fallback })
         .matchForLanguageRanges([{ range: tag, weight: 1 }]);
       if (match.locale !== normalizeTag(partner)) notMatched.push([tag, partner, match.locale]);
       probed += 1;
@@ -711,7 +711,7 @@ describe("parseLanguageRanges — the header grammar", () => {
 
 describe("bestMatchForAcceptLanguage — the fail-soft door", () => {
   const chooser = () => negotiatorFor({
-    fallbackLocale: "ja", localeResolver: () => "ja", strings: catalog(["de", "en", "fr", "ja"]),
+    fallbackLocale: "ja", localeSupplier: () => "ja", localizedStringSupplier: () => (catalog(["de", "en", "fr", "ja"])),
   });
 
   it("contradicts matchForLanguageRanges on the same 33-range header, deliberately", () => {

@@ -40,11 +40,11 @@ const RLI = "⁧";
 function stringsFor(options) {
   return createStrings({
     fallbackLocale: "en",
-    localeResolver: () => "en",
-    strings: {
+    localeSupplier: () => "en",
+    localizedStringSupplier: () => ({
       en: { "Wrap.Value": "[{{value}}]", "Greeting.Named": "Hello, {{name}}" },
       he: { "Greeting.Named": "שלום, {{name}}" },
-    },
+    }),
     .../** @type {any} */ (options ?? {}),
   });
 }
@@ -142,7 +142,7 @@ describe("shouldApplyBidiIsolation", () => {
 
   it("keys off the locale, never the mode alone", () => {
     assert.equal(shouldApplyBidiIsolation("none", "he"), false);
-    assert.equal(shouldApplyBidiIsolation("all", "en"), true);
+    assert.equal(shouldApplyBidiIsolation("always", "en"), true);
     assert.equal(shouldApplyBidiIsolation("rtl-locales", "he"), true);
     assert.equal(shouldApplyBidiIsolation("rtl-locales", "en"), false);
   });
@@ -150,9 +150,9 @@ describe("shouldApplyBidiIsolation", () => {
   it("refuses an unrecognized mode instead of falling back to the default", () => {
     // The Java spelling is the likeliest typo, and silently accepting it would turn the option off.
     assert.throws(() => validateBidiIsolation("ALWAYS", "createStrings({ bidiIsolation })"), RangeError);
-    assert.throws(() => validateBidiIsolation("always", "createStrings({ bidiIsolation })"), RangeError);
+    assert.throws(() => validateBidiIsolation("all", "createStrings({ bidiIsolation })"), RangeError);
     assert.throws(() => validateBidiIsolation(null, "createStrings({ bidiIsolation })"), RangeError);
-    assert.equal(validateBidiIsolation("all", "x"), "all");
+    assert.equal(validateBidiIsolation("always", "x"), "always");
   });
 });
 
@@ -178,7 +178,7 @@ describe("createStrings({ bidiIsolation })", () => {
   });
 
   it("lets a per-call mode replace the instance mode in both directions on ONE instance", () => {
-    const always = stringsFor({ bidiIsolation: "all" });
+    const always = stringsFor({ bidiIsolation: "always" });
     assert.equal(always.get("Wrap.Value", { value: "Sarah" }), `[${FSI}Sarah${PDI}]`);
     assert.equal(always.get("Wrap.Value", { value: "Sarah" }, { bidiIsolation: "none" }), "[Sarah]");
     assert.equal(always.get("Wrap.Value", { value: "Sarah" }, { bidiIsolation: "rtl-locales" }), "[Sarah]");
@@ -187,11 +187,11 @@ describe("createStrings({ bidiIsolation })", () => {
 
     const none = stringsFor({ bidiIsolation: "none" });
     assert.equal(none.get("Wrap.Value", { value: "Sarah" }), "[Sarah]");
-    assert.equal(none.get("Wrap.Value", { value: "Sarah" }, { bidiIsolation: "all" }), `[${FSI}Sarah${PDI}]`);
+    assert.equal(none.get("Wrap.Value", { value: "Sarah" }, { bidiIsolation: "always" }), `[${FSI}Sarah${PDI}]`);
   });
 
   it("isolates the CONVERTED value, not the caller's record", () => {
-    const always = stringsFor({ bidiIsolation: "all" });
+    const always = stringsFor({ bidiIsolation: "always" });
     assert.equal(always.get("Wrap.Value", { value: GENDER_FEMININE }), `[${FSI}FEMININE${PDI}]`);
     assert.equal(always.get("Wrap.Value", { value: decimal("1.50") }), `[${FSI}1.50${PDI}]`);
     assert.equal(always.get("Wrap.Value", { value: 0 }), `[${FSI}0${PDI}]`);
@@ -200,16 +200,16 @@ describe("createStrings({ bidiIsolation })", () => {
 
   it("adds no marks for a falsy-but-present empty string", () => {
     // Present, so it is substituted; empty, so `isolate` returns early with no marks at all.
-    assert.equal(stringsFor({ bidiIsolation: "all" }).get("Wrap.Value", { value: "" }), "[]");
+    assert.equal(stringsFor({ bidiIsolation: "always" }).get("Wrap.Value", { value: "" }), "[]");
   });
 });
 
 describe("the donor rule", () => {
   const donor = createStrings({
     fallbackLocale: "en",
-    localeResolver: () => "en",
+    localeSupplier: () => "en",
     // `ar` holds only a marker, so an Arabic request for Greeting.Named is served by `en`.
-    strings: { en: { "Locale.Marker": "en", "Greeting.Named": "Hello, {{name}}" }, ar: { "Locale.Marker": "ar" } },
+    localizedStringSupplier: () => ({ en: { "Locale.Marker": "en", "Greeting.Named": "Hello, {{name}}" }, ar: { "Locale.Marker": "ar" } }),
   });
 
   it("does not isolate an RTL request served by an LTR catalog", () => {
@@ -229,8 +229,8 @@ describe("the donor rule", () => {
   it("isolates an LTR request served by an RTL catalog", () => {
     const reversed = createStrings({
       fallbackLocale: "ar",
-      localeResolver: () => "en",
-      strings: { ar: { "Greeting.Named": "مرحبا، {{name}}" }, en: { "Locale.Marker": "en" } },
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ ar: { "Greeting.Named": "مرحبا، {{name}}" }, en: { "Locale.Marker": "en" } }),
     });
     const result = reversed.getResult("Greeting.Named", { name: "Sarah" }, { locale: "en" });
     assert.equal(result.resolvedLocale, "ar");
@@ -241,9 +241,9 @@ describe("the donor rule", () => {
 describe("generated text is not isolated merely because it was generated", () => {
   const strings = createStrings({
     fallbackLocale: "en",
-    localeResolver: () => "en",
-    bidiIsolation: "all",
-    strings: {
+    localeSupplier: () => "en",
+    bidiIsolation: "always",
+    localizedStringSupplier: () => ({
       en: {
         "Greeting.Titled": {
           translation: "{{title}} {{name}} — {{city}}",
@@ -252,7 +252,7 @@ describe("generated text is not isolated merely because it was generated", () =>
           },
         },
       },
-    },
+    }),
   });
 
   it("isolates the caller's values and leaves the file-defined one bare", () => {
@@ -287,9 +287,9 @@ describe("generated text is not isolated merely because it was generated", () =>
     };
     const values = { gender: GENDER_FEMININE, name: "Sarah", city: "القاهرة" };
     const build = (/** @type {string} */ bidiIsolation) =>
-      createStrings({ fallbackLocale: "en", localeResolver: () => "en", strings: nested, .../** @type {any} */ ({ bidiIsolation }) });
+      createStrings({ fallbackLocale: "en", localeSupplier: () => "en", localizedStringSupplier: () => (nested), .../** @type {any} */ ({ bidiIsolation }) });
 
-    assert.equal(build("all").get("Nested", values), `<her ${FSI}Sarah${PDI} in ${FSI}القاهرة${PDI}>`);
+    assert.equal(build("always").get("Nested", values), `<her ${FSI}Sarah${PDI} in ${FSI}القاهرة${PDI}>`);
     assert.equal(build("none").get("Nested", values), "<her Sarah in القاهرة>");
     // `en` is LTR, so the default leaves it alone even though one of the values is Arabic.
     assert.equal(build("rtl-locales").get("Nested", values), "<her Sarah in القاهرة>");

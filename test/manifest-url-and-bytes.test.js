@@ -100,7 +100,7 @@ function manifestWith(baseUrl, urls) {
   const draft = /** @type {any} */ ({
     formatVersion: 1, catalogVersion: "v1", catalogFingerprint: "0".repeat(64),
     ...BUILD_IDENTITY,
-    fallbackLocale: "en", baseUrl, files, tiebreakers: {},
+    fallbackLocale: "en", baseUrl, files, tiebreakerLocalesByLanguageCode: {},
   });
   draft.catalogFingerprint = computeCatalogIdentity(catalogIdentityInputFor(draft)).catalogFingerprint;
   return draft;
@@ -336,7 +336,7 @@ test("9b: a LoadFailure carries the absolute serialized URL, not the manifest en
   const transport = servingFetch(SPLAYED_BODIES, { statusFor: (locale) => (locale === "fr" ? 404 : 200) });
   const error = await loadEntireManifest(SPLAYED, { fetch: transport.impl }).then(() => null, (e) => e);
 
-  assert.equal(error?.name, "StringsLoadingError");
+  assert.equal(error?.name, "LocalizedStringLoadingError");
   // Pinned BEFORE index 0 is read: failures are in plan order (6.2:2077), so an unexpected second
   // failure would otherwise be read through the wrong slot.
   assert.equal(error?.failures?.length, 1);
@@ -449,7 +449,7 @@ function declaring(manifest, tag, decodedBytes) {
 
 /** Plan 6.2:2072-2079 — a byte failure keeps the `limit` stage; only `fetch`/`read` are defaults. */
 function assertLimitFailure(/** @type {any} */ error, /** @type {string} */ locale) {
-  assert.equal(error?.name, "StringsLoadingError");
+  assert.equal(error?.name, "LocalizedStringLoadingError");
   assert.equal(error?.failures?.length, 1);
   assert.equal(error?.failures?.[0]?.locale, locale);
   // The STAGE, not merely "it rejected": `limit` is what distinguishes the length rule firing from
@@ -549,7 +549,7 @@ test("9e CONTROL: a BOM-prefixed catalog loads and no U+FEFF survives in a key o
   const loaded = await loadEntireManifest(manifest, { fetch: transport.impl });
   assert.equal(loaded.complete, true);
 
-  const strings = createStrings({ loaded, localeResolver: () => "fr" });
+  const strings = createStrings({ loaded, localeSupplier: () => "fr" });
   assert.equal(strings.get("Hi"), "bonjour");
   for (const key of strings.getKeysForLocale("fr"))
     assert.ok(!key.includes("﻿"), `no BOM may survive into a key; saw ${JSON.stringify(key)}`);
@@ -619,7 +619,7 @@ test("9i: the Node door hashes RAW FILE BYTES — a BOM-carrying catalog verifie
   const manifest = await fileBom();
   const loaded = await loadEntireManifestFromFiles(manifest);
   assert.equal(loaded.complete, true);
-  assert.equal(createStrings({ loaded, localeResolver: () => "fr" }).get("Hi"), "bonjour");
+  assert.equal(createStrings({ loaded, localeSupplier: () => "fr" }).get("Hi"), "bonjour");
 });
 
 // ------------------------------------------------------------------- the Content-Length channel
@@ -645,7 +645,7 @@ test("9g: a content-coded response whose Content-Length disagrees with decodedBy
 
   assert.equal(transport.calls.length, 2, "asserted first: a completed load with zero fetches is not a pass");
   assert.equal(loaded.complete, true, "an encoded Content-Length is never compared for equality to decodedBytes");
-  assert.equal(createStrings({ loaded, localeResolver: () => "fr" }).get("Hi"), "bonjour le monde entier");
+  assert.equal(createStrings({ loaded, localeSupplier: () => "fr" }).get("Hi"), "bonjour le monde entier");
 
   // ANTI-VACUITY, read off the response object the LOADER actually received rather than a locally
   // built twin — as written the other way round, these assert the fixture and not what was seen.
@@ -707,7 +707,7 @@ test("9g: a REAL gzip response over loopback loads, digest and length taken over
 
     const loaded = await loadEntireManifest(manifest);
     assert.equal(loaded.complete, true);
-    assert.equal(createStrings({ loaded, localeResolver: () => "fr" }).get("Hi"), "bonjour le monde entier",
+    assert.equal(createStrings({ loaded, localeSupplier: () => "fr" }).get("Hi"), "bonjour le monde entier",
       "the digest declared over the PLAIN bytes verified against what the body exposed");
   } finally {
     server.close();
