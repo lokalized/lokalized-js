@@ -12,7 +12,7 @@
  * `strings.getLoadVerification()` returns, and the answers `strings` itself gives to questions about
  * locales.
  *
- * That is enforced structurally, not by intent: this file imports one thing, and
+ * That is enforced structurally, not by intent: this file imports only the shared error factory and a pure manifest wire projection, and
  * `test/ssr-graph.test.js` walks the module graph and fails if `lokalized/ssr` ever acquires a route
  * to the locale kernel, the pinned data or the fetch planner. A prohibition that is invisible to a
  * result assertion needs a gate shaped like the prohibition.
@@ -25,6 +25,7 @@
  * merely the narrow projection this stamp carries.
  */
 import { configurationError } from "../internal/configuration-error.js";
+import { manifestLocaleTag } from "../internal/manifest-locale.js";
 
 /**
  * The narrow serialized match projection.
@@ -38,8 +39,7 @@ import { configurationError } from "../internal/configuration-error.js";
  *
  * The match type is core's `LocaleMatchType`, referenced through core rather than spelled
  * out again — a JSDoc `import(...)` sits in a comment, so `tools/graph-walk.mjs` strips it before
- * matching and this adds NO module edge. `test/ssr-graph.test.js` pins this subpath to exactly two
- * modules and still does.
+ * matching and this adds NO module edge. `test/ssr-graph.test.js` pins the complete module set and forbids any locale kernel or data edge.
  *
  * @typedef {Readonly<{ locale: string | null, matchType: import("../core/index.js").LocaleMatchType }>} SsrLocaleMatchV1
  */
@@ -276,7 +276,7 @@ function requireMatchInvariants(strings, projection) {
 function requireCoverage(coverage, lookupLocale) {
   if (coverage?.kind === "entire-manifest") return;
   if (coverage?.kind === "lookup") {
-    if (coverage.lookupLocale !== lookupLocale)
+    if (coverage.lookupLocale !== manifestLocaleTag(lookupLocale))
       throw configurationError(
         `This load covers lookup '${coverage.lookupLocale}' only, and the rendering context is ` +
         `'${lookupLocale}'`);

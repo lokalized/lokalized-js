@@ -8,6 +8,20 @@ All notable changes to lokalized are recorded here. This package is a JavaScript
 
 First release.
 
+- Follow shared manifest-normalization profile 1.1.0: private-use-only
+  `UND-x-foo` / `und-x-foo` claims and lookups stabilize as `x-foo` across
+  validation, identity projection, planning and loader coverage. Loaded rendering
+  and SSR compare coverage using that spelling while preserving core locale
+  contexts. Republish affected manifests with fingerprints computed from normalized
+  keys/values and regenerate SSR stamps. Wire format 1, the current tiebreaker name
+  and arbitrary raw identity keys retain their contracts; no legacy alias is added.
+
+- Follow shared diagnostic-text profile 1.1.0: repair a surrogate pair split by
+  bounded diagnostic truncation with U+FFFD before the ellipsis, and cap nested
+  manifest duplicate-member displays at the catalog’s existing 256 UTF-16 units.
+  Paths retain the 4,096-unit cap. All 36 shared public-parser cases are digest
+  pinned; native error/path field representations and public APIs are preserved.
+
 - Align public configuration, matching, and translation callback names with Java's vocabulary
 - Supply catalogs through `localizedStringSupplier`, called once during synchronous construction
 - Use the same option names in manifests, returned configuration records, and per-call options

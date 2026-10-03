@@ -657,44 +657,170 @@
         }
       },
       "previousSha256": "093ee8bd50d87b8250746c961ee4a6547c94fe9141eb44a5f67528cba933e5bb"
+    },
+    {
+      "reason": "Shared diagnostic-text profile 1.1 repairs split UTF-16 pairs and caps nested manifest member displays",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 782259
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 769233
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582598
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674850
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36714
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287911
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 708485
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 801877
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 806752
+        }
+      },
+      "previousSha256": "a2f278b2b8af54fff56e3f1ab69867f73538f5c4584876855f1d4b26cbb816cb"
+    },
+    {
+      "reason": "Shared manifest-normalization profile 1.1 gives private-use-only tags a stable serialized spelling and matching load coverage",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 782259
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 769233
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582598
+        },
+        "lokalized/load": {
+          "modules": 40,
+          "bytes": 675501
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36714
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287911
+        },
+        "lokalized/node": {
+          "modules": 43,
+          "bytes": 709111
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 801877
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 806752
+        }
+      },
+      "previousSha256": "ffd5b200de482d6a5fad45ce6cf39943413a72e3805c609f59719c2eeb7113be"
+    },
+    {
+      "reason": "Manifest profile 1.1 aligns loaded-catalog and SSR coverage with stable private-use locale spelling through a pure wire projection",
+      "recorded": {
+        "lokalized": {
+          "modules": 33,
+          "bytes": 783003
+        },
+        "lokalized/core": {
+          "modules": 32,
+          "bytes": 769977
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582598
+        },
+        "lokalized/load": {
+          "modules": 41,
+          "bytes": 675816
+        },
+        "lokalized/ssr": {
+          "modules": 4,
+          "bytes": 37293
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287911
+        },
+        "lokalized/node": {
+          "modules": 44,
+          "bytes": 709436
+        },
+        "lokalized/data/ordinal": {
+          "modules": 35,
+          "bytes": 802621
+        },
+        "lokalized/data/ranges": {
+          "modules": 35,
+          "bytes": 807496
+        }
+      },
+      "previousSha256": "f486552c759564784b344d0f131b8cdb1f1dc1352435ed248dffb78b8ab81fe8"
     }
   ],
   "subpaths": {
     "lokalized": {
-      "modules": 32,
-      "bytes": 781778
+      "modules": 33,
+      "bytes": 783003
     },
     "lokalized/core": {
-      "modules": 31,
-      "bytes": 768752
+      "modules": 32,
+      "bytes": 769977
     },
     "lokalized/parse": {
       "modules": 30,
-      "bytes": 582117
+      "bytes": 582598
     },
     "lokalized/load": {
-      "modules": 39,
-      "bytes": 674319
+      "modules": 41,
+      "bytes": 675816
     },
     "lokalized/ssr": {
-      "modules": 3,
-      "bytes": 36714
+      "modules": 4,
+      "bytes": 37293
     },
     "lokalized/negotiate": {
       "modules": 19,
       "bytes": 287911
     },
     "lokalized/node": {
-      "modules": 42,
-      "bytes": 707954
+      "modules": 44,
+      "bytes": 709436
     },
     "lokalized/data/ordinal": {
-      "modules": 34,
-      "bytes": 801396
+      "modules": 35,
+      "bytes": 802621
     },
     "lokalized/data/ranges": {
-      "modules": 34,
-      "bytes": 806271
+      "modules": 35,
+      "bytes": 807496
     }
   }
 }

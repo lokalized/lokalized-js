@@ -354,6 +354,11 @@ jobs:
           npm run check:snapshot
           npm run check:schemas
           npm run check:partitions
+          npm run check:native-adaptations
+          npm run check:manifest-contract
+          npm run check:diagnostic-text
+          npm run check:manifest-normalization
+          npm run check:url-oracle
           npm run check:iana-registry
           npm run check:selection
           npm run check:archive

@@ -23,6 +23,7 @@
  * identity is this core's pinned data, never the loader's claim about it.
  */
 import { candidateChain, compareTags, normalizeTag } from "./locale.js";
+import { manifestLocaleTag } from "./manifest-locale.js";
 import { configurationError } from "./configuration-error.js";
 import { RUNTIME_METADATA, isVerifiedLoad } from "./runtime-metadata.js";
 import { decode as decodePinnedProvenance } from "../data/provenance.js";
@@ -30,8 +31,11 @@ import { decode as decodePinnedProvenance } from "../data/provenance.js";
 /** @param {unknown} value */
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
+/** @param {string} tag */
+const normalizeManifestTag = (tag) => manifestLocaleTag(normalizeTag(tag));
+
 /** @param {readonly string[]} tags */
-const normalizedSorted = (tags) => [...tags].map(normalizeTag).sort(compareTags);
+const normalizedSorted = (tags) => [...tags].map(normalizeManifestTag).sort(compareTags);
 
 /**
  * Turn a `LoadedStrings` into the options the direct construction path already accepts, and build the
@@ -90,7 +94,7 @@ export function optionsFromLoadedStrings(options) {
       "`loaded.manifestLocaleConfiguration` must be the manifest's LocaleConfiguration; without it " +
       "the recorded fetch plan cannot be recomputed, only believed",
     );
-  if (normalizeTag(manifestConfiguration.fallbackLocale) !== normalizeTag(loaded.fallbackLocale))
+  if (normalizeManifestTag(manifestConfiguration.fallbackLocale) !== normalizeManifestTag(loaded.fallbackLocale))
     throw configurationError(
       `The result resolves fallback '${String(loaded.fallbackLocale)}' while its manifest ` +
       `configuration resolves '${String(manifestConfiguration.fallbackLocale)}'`,
@@ -107,7 +111,7 @@ export function optionsFromLoadedStrings(options) {
   // served under a name it does not claim, and every later comparison is against the wrong one.
   for (const [tag, parsed] of Object.entries(loaded.catalogs)) {
     const declared = isRecord(parsed) ? parsed.locale : undefined;
-    if (typeof declared !== "string" || normalizeTag(declared) !== normalizeTag(tag))
+    if (typeof declared !== "string" || normalizeManifestTag(declared) !== normalizeManifestTag(tag))
       throw configurationError(
         `The catalog filed under '${tag}' declares locale ${JSON.stringify(declared)}; a map key and a ` +
         `ParsedStringsFile.locale must be the same normalized loaded tag`,
@@ -155,9 +159,9 @@ export function optionsFromLoadedStrings(options) {
   // `loaded.requestedFiles.map(entry => entry.locale)`".
   const recomputed = coverage.kind === "lookup"
     ? candidateChain(
-        normalizeTag(coverage.lookupLocale),
+        normalizeManifestTag(coverage.lookupLocale),
         manifestTags,
-        normalizeTag(manifestConfiguration.fallbackLocale),
+        normalizeManifestTag(manifestConfiguration.fallbackLocale),
         manifestConfiguration.tiebreakerLocalesByLanguageCode ?? {},
       ).filter((/** @type {string} */ tag) => manifestTags.includes(tag))
     : coverage.kind === "entire-manifest"
@@ -287,7 +291,7 @@ function verificationRecord(
     producerImplementation: RUNTIME_METADATA.producerImplementation,
     producerVersion: RUNTIME_METADATA.producerVersion,
     manifestLocaleConfiguration: Object.freeze({
-      fallbackLocale: normalizeTag(manifestConfiguration.fallbackLocale),
+      fallbackLocale: normalizeManifestTag(manifestConfiguration.fallbackLocale),
       supportedLocales: Object.freeze(normalizedSorted(manifestConfiguration.supportedLocales)),
       tiebreakerLocalesByLanguageCode: Object.freeze({ ...(manifestConfiguration.tiebreakerLocalesByLanguageCode ?? {}) }),
     }),
@@ -305,7 +309,7 @@ function verificationRecord(
     localeDataMode: RUNTIME_METADATA.localeDataMode,
     cardinalityMode: RUNTIME_METADATA.cardinalityMode,
     coverage: coverage.kind === "lookup"
-      ? Object.freeze({ kind: /** @type {const} */ ("lookup"), lookupLocale: normalizeTag(coverage.lookupLocale) })
+      ? Object.freeze({ kind: /** @type {const} */ ("lookup"), lookupLocale: normalizeManifestTag(coverage.lookupLocale) })
       : Object.freeze({ kind: /** @type {const} */ ("entire-manifest") }),
     plannedLocales: Object.freeze([...planned]),
     coveredLocales: Object.freeze([...covered]),

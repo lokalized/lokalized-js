@@ -55,6 +55,19 @@ file; `test/locale.test.js`'s "reproduces every attemptedLocales prefix" is the 
 
 ---
 
+## `src/internal/manifest-locale.js`
+
+```js
+export function manifestLocaleTag(projected)
+```
+
+Accept an already JDK-projected locale tag and return its stable manifest-profile
+spelling. Only a private-use-only `und-x-…` projection loses its `und-` prefix;
+script, region, variant and ordinary extension tags retain it. This function is
+idempotent and imports no locale parser, data or planning kernel. Load helpers
+perform strict parsing before calling it; core and SSR use it solely to compare a
+rendering context with manifest lookup coverage, preserving the core context tag.
+
 ## `src/internal/plural.js`
 
 ```js

@@ -65,12 +65,13 @@ export function appendBoundedPathPart(path, part) {
   if (remaining <= 0) return path;
   if (part.length <= remaining) return path + part;
 
-  return `${path}${remaining > 1 ? part.slice(0, remaining - 1) : ""}…`;
+  return `${path}${remaining > 1 ? diagnosticPrefix(part, remaining - 1) : ""}…`;
 }
 
 /**
  * `LocalizedStringLoader.boundedJsonPath` — a JSON pointer-ish diagnostic path capped at 4096
- * UTF-16 units with a trailing ellipsis, exactly as Java caps it.
+ * UTF-16 units with a trailing ellipsis. The shared diagnostic-text profile 1.1.0
+ * repairs a pair split by the cap, preserving a valid Unicode diagnostic.
  *
  * @param {string} parentPath
  * @param {string} prefix
@@ -95,7 +96,17 @@ export function boundedJsonPath(parentPath, prefix, component, suffix) {
  * @returns {string}
  */
 export function boundedDiagnosticValue(value) {
-  return value.length <= 256 ? value : `${value.slice(0, 255)}…`;
+  return value.length <= 256 ? value : `${diagnosticPrefix(value, 255)}…`;
+}
+
+/** @param {string} value @param {number} length @returns {string} */
+function diagnosticPrefix(value, length) {
+  const prefix = value.slice(0, length);
+  const last = value.charCodeAt(length - 1);
+  const next = value.charCodeAt(length);
+  return last >= 0xd800 && last <= 0xdbff && next >= 0xdc00 && next <= 0xdfff
+    ? `${prefix.slice(0, -1)}\ufffd`
+    : prefix;
 }
 
 /**

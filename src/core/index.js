@@ -16,6 +16,7 @@
  * wrong.
  */
 import { ConfigurationError, configurationError } from "../internal/configuration-error.js";
+import { manifestLocaleTag } from "../internal/manifest-locale.js";
 import { optionsFromLoadedStrings } from "../internal/loaded-input.js";
 import {
   DEFAULT_BIDI_ISOLATION,
@@ -1425,7 +1426,7 @@ export function createStrings(options) {
   function requireCoveredLookup(lookupLocale) {
     const coverage = loadVerification?.coverage;
     if (coverage?.kind !== "lookup") return;
-    if (coverage.lookupLocale !== lookupLocale)
+    if (coverage.lookupLocale !== manifestLocaleTag(lookupLocale))
       throw configurationError(
         `This Strings was loaded for lookup '${coverage.lookupLocale}' only, and this lookup starts ` +
         `from '${lookupLocale}'. The loaded subset was planned from that one tag, so another tag's ` +

@@ -54,21 +54,21 @@
   "node": [
     {
       "label": "root + raw-text catalog",
-      "modules": 32,
-      "sourceBytes": 781778,
-      "importMs": 0.326,
-      "constructionMs": 0.1251,
-      "firstRenderMs": 0.3195,
-      "retainedBytes": 101080
+      "modules": 33,
+      "sourceBytes": 783003,
+      "importMs": 0.308,
+      "constructionMs": 0.1044,
+      "firstRenderMs": 0.3825,
+      "retainedBytes": 87424
     },
     {
       "label": "core + parsed equivalent",
-      "modules": 31,
-      "sourceBytes": 768752,
-      "importMs": 0.818,
-      "constructionMs": 0.438,
-      "firstRenderMs": 0.3456,
-      "retainedBytes": 478328
+      "modules": 32,
+      "sourceBytes": 769977,
+      "importMs": 0.718,
+      "constructionMs": 0.392,
+      "firstRenderMs": 0.3107,
+      "retainedBytes": 467248
     }
   ],
   "browser": {
@@ -865,6 +865,48 @@
       "browserHalf": true,
       "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
       "previousSha256": "6c69cf63f742fd425815e423c3995591ff3f3073e520e7e714ea69da2100ab34"
+    },
+    {
+      "reason": "Shared diagnostic-text profile 1.1 repairs split UTF-16 pairs and caps nested manifest member displays",
+      "growth": [
+        "root + raw-text catalog: source graph grew 781778 -> 782259 bytes",
+        "core + parsed equivalent: source graph grew 768752 -> 769233 bytes"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 782259
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 769233
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "64fffb2b95d6b62a70045160584ba4b1e7cc52938819c956232d47b811dab7a9"
+    },
+    {
+      "reason": "Manifest profile 1.1 aligns loaded-catalog and SSR coverage with stable private-use locale spelling through a pure wire projection",
+      "growth": [
+        "root + raw-text catalog: source graph grew 782259 -> 783003 bytes",
+        "root + raw-text catalog: module count grew 32 -> 33",
+        "core + parsed equivalent: source graph grew 769233 -> 769977 bytes",
+        "core + parsed equivalent: module count grew 31 -> 32"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 33,
+          "sourceBytes": 783003
+        },
+        "core + parsed equivalent": {
+          "modules": 32,
+          "sourceBytes": 769977
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "16d956d5d00e762a2651bea00dd09074601d425b8a240f942cb05c4c69d9af93"
     }
   ]
 }

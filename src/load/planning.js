@@ -28,7 +28,7 @@
  * would prove self-consistency and nothing else, because this module CALLS that function.
  */
 import { candidateChain } from "../internal/locale.js";
-import { normalizeTag } from "../internal/locale.js";
+import { normalizeManifestTag } from "./manifest-locale.js";
 import { refuseUnknownOptions } from "../internal/configuration-error.js";
 import { validateStringsManifest } from "./manifest.js";
 
@@ -61,7 +61,7 @@ export function chain(manifest, lookupLocale, options = {}) {
   const validated = validateStringsManifest(manifest, { limits: options.limits });
   // Normalized once, here, and it is the normalized serialized value that is planned from and
   // recorded — plan 6.1: "both functions use and record the normalized serialized value".
-  const lookup = normalizeTag(lookupLocale);
+  const lookup = normalizeManifestTag(lookupLocale);
   return Object.freeze(
     candidateChain(lookup, Object.keys(validated.files), validated.fallbackLocale, validated.tiebreakerLocalesByLanguageCode),
   );

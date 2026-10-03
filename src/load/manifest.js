@@ -30,6 +30,7 @@ import { resolveLimits } from "../internal/catalog.js";
 import { decode as decodePinnedProvenance } from "../data/provenance.js";
 import { configurationError } from "../internal/configuration-error.js";
 import {
+  boundedDiagnosticValue,
   normalizeCatalogText,
   parseJsonDocument,
   readCharacters,
@@ -49,7 +50,7 @@ import { javaSplit } from "../internal/locale-jdk-tag.js";
  */
 const javaList = (tags) => `[${tags.join(", ")}]`;
 import { jdkLocaleWellFormed } from "../internal/locale-jdk-tag.js";
-import { normalizeTag } from "../internal/locale.js";
+import { normalizeManifestTag } from "./manifest-locale.js";
 import { parseError, rethrowAsParseError } from "../internal/parse-diagnostics.js";
 import { catalogIdentityInputFor, computeCatalogIdentity } from "./identity.js";
 import { RUNTIME_METADATA } from "../internal/runtime-metadata.js";
@@ -96,7 +97,7 @@ export function requireManifestTag(tag, where) {
   try {
     if (!jdkLocaleWellFormed(tag) || !isKnownLanguageTag(tag))
       throw configurationError(`${where} is '${tag}', which is not a valid pinned-data-known locale tag`);
-    return normalizeTag(tag);
+    return normalizeManifestTag(tag);
   } catch (error) {
     if (error instanceof Error && error.name === "ConfigurationError") throw error;
     throw configurationError(`${where} is '${tag}', which is not a valid pinned-data-known locale tag`);
@@ -439,7 +440,7 @@ export function parseStringsManifest(input, options = {}) {
   const [nested] = /** @type {{ duplicates: { name: string, path: string }[] }} */ (document).duplicates;
   if (nested)
     throw parseError(
-      `${source}: duplicate JSON object member '${nested.name}' encountered at ${nested.path}`,
+      `${source}: duplicate JSON object member '${boundedDiagnosticValue(nested.name)}' encountered at ${nested.path}`,
       { source },
     );
 

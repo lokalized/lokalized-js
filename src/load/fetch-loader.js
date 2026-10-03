@@ -21,7 +21,7 @@
  * belongs to the transport rather than to the runner.
  */
 import { configurationError, refuseUnknownOptions } from "../internal/configuration-error.js";
-import { normalizeTag } from "../internal/locale.js";
+import { normalizeManifestTag } from "./manifest-locale.js";
 import { fetchSet } from "./planning.js";
 import { validateStringsManifest } from "./manifest.js";
 import { hex, readBoundedStream, requirePartialFailurePolicy, runPlan, wholeManifestPlan } from "./run-plan.js";
@@ -215,7 +215,7 @@ export async function loadStrings(manifest, lookupLocale, options = {}) {
   // depend on how the load was typed.
   return markVerifiedLoad(Object.freeze({
     ...loaded,
-    coverage: Object.freeze({ kind: "lookup", lookupLocale: normalizeTag(lookupLocale) }),
+    coverage: Object.freeze({ kind: "lookup", lookupLocale: normalizeManifestTag(lookupLocale) }),
   }));
 }
 

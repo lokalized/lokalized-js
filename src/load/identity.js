@@ -20,7 +20,8 @@
  */
 import { canonicalBytes } from "../internal/jcs.js";
 import { sha256Hex } from "../internal/sha256.js";
-import { electFallbackLocale, normalizeTag } from "../internal/locale.js";
+import { electFallbackLocale } from "../internal/locale.js";
+import { normalizeManifestTag } from "./manifest-locale.js";
 
 /** @typedef {import("../core/index.js").CatalogIdentity} CatalogIdentity */
 /** @typedef {import("./index.js").CatalogIdentityInputV1} CatalogIdentityInputV1 */
@@ -125,8 +126,8 @@ export function catalogIdentityInputFor(manifest) {
   // differently but serve the same files must derive the same catalog fingerprint.
   let resolvedFallbackLocale = manifest.fallbackLocale;
   try {
-    const configured = normalizeTag(manifest.fallbackLocale);
-    const supported = Object.keys(manifest.files ?? {}).map(normalizeTag);
+    const configured = normalizeManifestTag(manifest.fallbackLocale);
+    const supported = Object.keys(manifest.files ?? {}).map(normalizeManifestTag);
     resolvedFallbackLocale = electFallbackLocale(configured, supported, manifest.tiebreakerLocalesByLanguageCode) ?? configured;
   } catch {
     // Semantic validation owns malformed tags and tiebreakerLocalesByLanguageCode; the identity projection must still

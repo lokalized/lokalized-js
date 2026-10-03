@@ -36,24 +36,24 @@
   "node": [
     {
       "label": "edge worker",
-      "modules": 47,
-      "sourceBytes": 995667,
+      "modules": 49,
+      "sourceBytes": 997485,
       "nodeBuiltinEdges": 0,
       "ianaClosureBytes": 11358,
-      "importMs": 0.6632
+      "importMs": 0.474
     },
     {
       "label": "server renderer",
-      "modules": 54,
-      "sourceBytes": 1077199,
+      "modules": 56,
+      "sourceBytes": 1079173,
       "nodeBuiltinEdges": 10,
       "ianaClosureBytes": 11358,
-      "importMs": 22.9333
+      "importMs": 18.4347
     }
   ],
-  "negotiateMsPerHeader": 0.10408,
-  "firstRenderMs": 1.0709,
-  "retainedBytes": -2864,
+  "negotiateMsPerHeader": 0.06401,
+  "firstRenderMs": 0.9332,
+  "retainedBytes": 8976,
   "requestsPerRender": {
     "fr-CA": 4,
     "fr-CH": 4,
@@ -629,6 +629,127 @@
         "closureClasses": 369
       },
       "previousSha256": "7e450a26f175c5c957bec7e73191106bdf718aabf6da38885c06675bb74999e3"
+    },
+    {
+      "reason": "Shared diagnostic-text profile 1.1 repairs split UTF-16 pairs and caps nested manifest member displays",
+      "growth": [
+        "edge worker: source graph grew 995667 -> 996198 bytes",
+        "server renderer: source graph grew 1077199 -> 1077730 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 996198,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1077730,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "7e567c26828f3871f965dfd3a91fb9f74c3717b263eb008078cd2096d06ff338"
+    },
+    {
+      "reason": "Shared manifest-normalization profile 1.1 gives private-use-only tags a stable serialized spelling and matching load coverage",
+      "growth": [
+        "edge worker: source graph grew 996198 -> 996849 bytes",
+        "edge worker: module count grew 47 -> 48",
+        "server renderer: source graph grew 1077730 -> 1078381 bytes",
+        "server renderer: module count grew 54 -> 55"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 48,
+          "sourceBytes": 996849,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 55,
+          "sourceBytes": 1078381,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "53242b0ef66d985791d6a593b4576e946d334186d8c68184de7f4257b470ded7"
+    },
+    {
+      "reason": "Manifest profile 1.1 aligns loaded-catalog and SSR coverage with stable private-use locale spelling through a pure wire projection",
+      "growth": [
+        "edge worker: source graph grew 996849 -> 997485 bytes",
+        "edge worker: module count grew 48 -> 49",
+        "server renderer: source graph grew 1078381 -> 1079173 bytes",
+        "server renderer: module count grew 55 -> 56"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 49,
+          "sourceBytes": 997485,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 56,
+          "sourceBytes": 1079173,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "5829115127264a67a68dc18e8816dce138a068140a22f05bd9f18700def13119"
     }
   ]
 }

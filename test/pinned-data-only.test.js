@@ -254,7 +254,8 @@ test("the root graph carries no optional plural data", () => {
   // generated table living in hand-written source "only because this milestone ships no such
   // module" — so the root carries LESS IANA data than before, now in the module it always belonged
   // in, and the list below names it.
-  assert.equal(reached.size, 32, "the root module graph changed size");
+  // Manifest profile 1.1 adds only a pure, data-free coverage spelling projection.
+  assert.equal(reached.size, 33, "the root module graph changed size");
 
   // The exact set of generated tables the root pulls in. `scenario:0a`'s byte ratchet is a PROXY for
   // this invariant, and a weak one: it is re-recorded whenever hand-written code legitimately grows,
