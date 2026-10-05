@@ -46,7 +46,8 @@ asserted — so a sample that has gone stale fails the build rather than mislead
 
 **Reference** &nbsp;[Coming from lokalized-java](#coming-from-lokalized-java) ·
 [Entry points](#entry-points) ·
-[What this port does and does not do](#what-this-port-does-and-does-not-do)
+[What this port does and does not do](#what-this-port-does-and-does-not-do) ·
+[Building the API reference](Documentation/API-REFERENCE.md)
 
 ---
 
@@ -3086,13 +3087,13 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 | load | files | raw | brotli |
 |---|---|---|---|
 | `lokalized` | 1 | 186,481 | 55,261 |
-| `lokalized/core` | 8 | 185,772 | 55,109 |
+| `lokalized/core` | 8 | 185,772 | 55,218 |
 | `lokalized/parse` | 5 | 159,872 | 49,064 |
 | `lokalized/load` | 8 | 179,636 | 54,128 |
 | `lokalized/ssr` | 3 | 7,844 | 2,437 |
 | `lokalized/negotiate` | 4 | 91,167 | 31,812 |
-| `lokalized/data/ordinal` | 9 | 192,481 | 56,667 |
-| `lokalized/data/ranges` | 9 | 195,009 | 56,979 |
+| `lokalized/data/ordinal` | 9 | 192,481 | 56,645 |
+| `lokalized/data/ranges` | 9 | 195,009 | 56,944 |
 | `lokalized.global.js`, the classic script | 1 | 246,484 | 69,393 |
 <!-- dist-table:end -->
 

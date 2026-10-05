@@ -75,10 +75,6 @@ const freeze = Object.freeze;
  * because this module is in the ratcheted root graph and cannot import `lokalized/data/ordinal`
  * for itself.
  *
- * **WRAPPED, PER BOOT-M0-0721 THROUGH BOOT-M0-0724.** `Readonly<>` on an OPTIONS type costs a caller
- * nothing — a mutable object literal is still assignable to a readonly-membered parameter — and it
- * says the true thing, which is that this door reads the options once and never writes them back.
- *
  * @typedef {Readonly<{
  *   locale: string,
  *   source?: string,
@@ -89,7 +85,7 @@ const freeze = Object.freeze;
  */
 
 /**
- * The parsed model of one strings file — BOOT-M0-0301 through BOOT-M0-0306, all six `readonly`.
+ * The readonly parsed model of one localized strings file.
  *
  * It is an OUTPUT of `parseStrings` and an INPUT to `mergeParsedStringsFiles`, so the wrap has to
  * hold in both directions: a caller may still build one and hand it over, because readonly members
@@ -106,7 +102,7 @@ const freeze = Object.freeze;
  */
 
 /**
- * BOOT-M0-0566 for `key`, and the four optional members with it.
+ * A programmatic localized string definition with an exact key.
  *
  * @typedef {Readonly<{
  *   key: string,
@@ -118,7 +114,7 @@ const freeze = Object.freeze;
  */
 
 /**
- * BOOT-M0-0568 for `expression`.
+ * A whole-message alternative selected by its expression.
  *
  * @typedef {Readonly<{
  *   expression: string,
@@ -130,10 +126,9 @@ const freeze = Object.freeze;
  */
 
 /**
- * The registry names the two arms separately — `LanguageFormTranslationInput` (BOOT-M0-0571 to
- * BOOT-M0-0576) and `ExpressionTranslationInput` (BOOT-M0-0577 to BOOT-M0-0581) — where the port
- * publishes the union under one name. Both arms are wrapped; the nested `range` and the
- * expression-fragment alternatives already were.
+ * A placeholder definition selected by language forms or expression alternatives.
+ * Language-form definitions name a value or range and map tokens to text;
+ * expression definitions provide a default translation and conditional fragments.
  *
  * @typedef {Readonly<{ kind: "language-form", value?: string,
  *     range?: Readonly<{ start: string, end: string }>,

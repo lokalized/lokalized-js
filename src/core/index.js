@@ -68,99 +68,38 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
 /** @typedef {import("../internal/parse-warnings.js").LocalizedStringWarning} LocalizedStringWarning */
 
 /**
- * The DIRECT arm of `CreateStringsOptions`, which is a UNION —
- * `DirectCreateStringsOptions | LoadedCreateStringsOptions` — whose arms carry `never` members that
- * make the two mutually exclusive.
+ * Construction options for caller-supplied catalogs.
  *
- * **EVERY MEMBER IS `readonly`, per BOOT-M0-0315 through BOOT-M0-0341, and the cost to a caller was
- * MEASURED before the wrap rather than assumed.** Three consumer shapes were compiled: an object
- * literal passed straight in, a caller's own mutable object built up, mutated and then handed over,
- * and a variable ANNOTATED with this type and then mutated. The first two compile — a
- * readonly-membered parameter still accepts a mutable argument — and only the third is refused, which
- * is the intended guarantee and the one pattern a caller can rewrite where they stand.
+ * Supply `localizedStringSupplier` and `fallbackLocale`, plus exactly one of
+ * `localeSupplier` or `localeMatchSupplier`. Catalogs are supplied once at
+ * construction; the locale supplier is consulted per lookup without an override.
  *
- * The per-member notes below were `@property` documentation until that wrap. JSDoc has no readonly
- * modifier for a `@property`, so the object type is written inline and the notes move up here, where
- * the emitted declaration still carries every word of them.
+ * - `localizedStringSupplier`: returns locale-tagged catalogs as a record or Map.
+ * - `fallbackLocale`: final fallback catalog locale; it must be loaded.
+ * - `localeSupplier`: returns a requested language tag. The tag remains the
+ *   diagnostic lookup locale, while matching determines the candidate chain.
+ * - `localeMatchSupplier`: returns a negotiation result. Its selected locale,
+ *   or its fallback when unmatched, becomes the lookup locale.
+ * - `tiebreakerLocalesByLanguageCode`: ordered preferences for ambiguous languages.
+ * - `loadingLimits`: limits applied while accepting the supplied catalogs.
+ * - `runtimeLimits`: reserved; custom runtime limits are refused.
+ * - `catalogIdentity`: an optional catalog identity claim. It does not establish
+ *   verified manifest delivery or make this instance eligible for SSR stamping.
+ * - `warningHandler`: observes construction warnings; throwing aborts construction.
+ * - `pluralData`: optional data from `lokalized/data/ordinal` or `lokalized/data/ranges`.
+ * - `phoneticResolver`: synchronous pronunciation-category resolver for a term
+ *   and evaluation locale. The default throws if phonetic resolution is required.
+ * - `bidiIsolation`: placeholder isolation mode; defaults to `"rtl-locales"`.
+ * - `translationFallbackPolicy`: continuation decision after a failed candidate;
+ *   defaults to `"missing-or-no-match"`.
+ * - `translationFailureHandler`: final-failure response; defaults to returning
+ *   the interpolated key.
+ * - `translationFallbackObserver`: observes a translation from a later candidate,
+ *   once, before it returns. Throwing propagates without resuming fallback.
  *
- * - `localizedStringSupplier` — returns a `CatalogMap`: each locale tag mapped to one `CatalogInput`.
- *   A `Map` is accepted alongside a record because the keys can come from a generated or untrusted
- *   source — see `catalogEntries`. The supplier runs once during synchronous construction.
- *
- * - THERE IS NO CONSTANT INSTANCE LOCALE. An instance is given exactly one RESOLVER, asked on
- *   every lookup that does not name its own language (`get(key, values, { locale })`) — Java's
- *   `localeSupplier`/`localeMatchSupplier` rule. `locale` was a constant-tag option through
- *   1.0.0-rc.2 and is refused with its replacement named: the maintainer's decision of 2026-09-27,
- *   because a language fixed at construction beside `fallbackLocale` read as a second default (36 of
- *   the README's 64 constructions wrote the same tag into both). The pair is an EXACTLY-ONE union in
- *   the declaration too, so a TypeScript caller who names neither, or both, is refused at compile time
- *   rather than by the runtime check below.
- *
- * - `tiebreakerLocalesByLanguageCode` — a `TiebreakerMap`. Snapshotted and frozen at construction —
- *   see `safeTiebreakers`.
- *
- * - `loadingLimits` — per-load bounds, a `Partial<StringsLoadingLimits>`. The RAW boundaries —
- *   input bytes, reader characters, JSON nesting — apply only to the forms that still have the
- *   original text; the model/file/node/warning boundaries apply to every form, across all raw and
- *   already-parsed catalogs.
- *
- * - `runtimeLimits` — not customizable: every instance runs under the same fixed runtime limits,
- *   and a non-undefined value is refused at construction rather than silently ignored.
- *
- * - `loaded` — `never` on this arm. WITHOUT THIS THE UNION DOES NOT DISCRIMINATE, which the control
- *   caught: TypeScript relaxes excess-property checking against a union, so a call naming BOTH
- *   `loaded` and the direct catalog source matched this arm with `loaded` waved through. Both arms
- *   have to spell the other's members `never` for the pair to be mutually exclusive to a caller.
- *
- * - `catalogIdentity` — a build-produced identity for a DIRECT construction. Core validates its
- *   shape, not its truth, and reports it from `getCatalogIdentity()`; it does not make the instance
- *   stampable, because an SSR stamp requires a verified `LoadedStrings` and a shape-valid identity
- *   is exactly what that rule exists to refuse.
- *
- * - `warningHandler` — observer for the incomplete language-form warnings this construction raises,
- *   called as each is admitted by the warning budget. A throwing handler aborts construction.
- *
- * - `pluralData` — the OPTIONAL plural modules' exported data objects. The root graph cannot
- *   reach `lokalized/data/ordinal` or `lokalized/data/ranges` — `npm run scenario:0a` ratchets it
- *   so it cannot — so a catalog that selects on `ORDINALITY_*` or uses a range placeholder is
- *   answerable only if the application hands the data over here.
- *
- * - `phoneticResolver` — a `PhoneticResolver`: synchronous, handed a raw TERM
- *   and the EVALUATION locale, and returning a tagged `PHONETIC_*` value. Omitting it is not the
- *   same as having none — see `THROWING_PHONETIC_RESOLVER`.
- *
- * - `bidiIsolation` — whether caller-supplied values are wrapped in Unicode isolate controls.
- *   DEFAULTS TO `"rtl-locales"`, so isolation is on for RTL evaluation locales with nothing
- *   configured; it is not opt-in behavior.
- *
- * - `translationFallbackPolicy` — the per-candidate continuation decision. `== null` means
- *   unset and selects `"missing-or-no-match"`, the same defaulting `bidiIsolation` uses and for
- *   the same reason (`DefaultStrings.java:473` substitutes the built-in when handed null, so an
- *   explicit null and an omitted option are one state in Java and must be one state here).
- *
- * - `translationFailureHandler` — the final-failure handler, consulted EXACTLY ONCE and only
- *   after the walk has ended with nothing. `== null` selects the library default, which returns
- *   the interpolated key (`DefaultStrings.java:472`).
- *
- * - `translationFallbackObserver` — the fallback OBSERVER, called at most once per lookup —
- *   after a LATER candidate has produced a translation and before that translation is returned. It
- *   has NO Java counterpart: `DefaultStrings` discards each candidate's failure the moment a later
- *   one succeeds, so nothing in the corpus can check this and the tests in
- *   `test/fallback-observer.test.js` are the specification's only enforcement. `== null` means "no
- *   observer" rather than a library default, because there is no sensible default observation.
- *
- * - `localeSupplier` — the ambient locale ingress, Java's `localeSupplier`
- *   (`DefaultStrings.java:2456`). Consulted per lookup, never at construction. The value it
- *   returns is the REQUESTED tag and stays the `lookupLocale`; the diagnostic match is computed
- *   from it. Takes no matcher argument: callers that need negotiation close over a
- *   `LocaleMatcher` from `lokalized/negotiate`.
- *
- * - `localeMatchSupplier` — the negotiation ingress, Java's `localeMatchSupplier`
- *   (`DefaultStrings.java:2447`). Consulted per lookup. Its SELECTION, or the match's own fallback
- *   when unmatched, REPLACES the lookup locale — the asymmetry against `localeSupplier` that the
- *   one-fixture six-ingress table exists to pin.
- *
- * `localizedStringSupplier` supplies catalogs once during synchronous construction, matching Java
+ * Omitted or null policy and handler settings select library defaults. An omitted
+ * or null observer disables observation. Callbacks are synchronous.
+ * This arm cannot be combined with `loaded`; its members are readonly.
  *
  * @typedef {Readonly<{
  *   fallbackLocale: string,
@@ -182,18 +121,13 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  */
 
 /**
- * The LOADED arm of `CreateStringsOptions`. Every member only the direct arm takes is spelled here
- * as `never`, which is what makes the two arms mutually exclusive TO A TYPESCRIPT CALLER — the runtime
- * has refused the same combinations since S9, in `internal/loaded-input.js`, and the declaration is
- * what had never said so.
+ * Construction options for a loader-produced `LoadedStrings` snapshot.
  *
- * `readonly` throughout, per BOOT-M0-0344 and the behaviour members this arm shares with the direct
- * one; see that type for the measurement behind the wrap.
- *
- * - `loaded` — the record a loader returned, passed as `createStrings({ loaded, localeSupplier })`
- *   with the language named per lookup; see the direct arm.
- *
- * - `localeMatchSupplier` — returns a `LocaleMatchResult` for the negotiated request.
+ * Pass `loaded` and exactly one locale supplier. The snapshot supplies fallback,
+ * supported locales, tiebreakers, and catalog identity; direct catalog settings
+ * cannot be combined with it. Callback, bidi, warning, and optional plural-data
+ * settings have the same behavior as `DirectCreateStringsOptions`.
+ * Members are readonly.
  *
  * @typedef {Readonly<{
  *   loaded: import("../load/index.js").LoadedStrings,
@@ -226,19 +160,6 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  * @typedef {(reason: TranslationFailureReason, attemptedLocale: string, cause: unknown) => boolean} TranslationFallbackPolicy
  * @typedef {{ action: "return-key" } | { action: "return-string", translation: string } | { action: "throw" }} TranslationFailureResponse
  * @typedef {(failure: TranslationFailure) => TranslationFailureResponse} TranslationFailureHandler
- * **`TranslationFailure.localeMatchResult` AND `TranslationFallbackEvent.localeMatchResult` WERE `unknown` UNTIL M-R S3.**
- * Both records are handed to CONSUMER CALLBACKS — `translationFailureHandler` and `translationFallbackObserver` — so anyone writing a
- * failure handler received `unknown` and had to cast before reading the match that caused the
- * failure. The requirement registry states both as the match result (`BOOT-M0-0484`, `BOOT-M0-0499`),
- * and the sibling field on the lookup result has carried `Readonly<LocaleMatchResult>` all along; these two
- * simply never got it. Found by reading 1,338 registered release requirements nobody had opened.
- *
- * **NOT `| null`, and that is measured rather than assumed.** `translationFailureFor`'s own parameter
- * was annotated `unknown` and `isFallbackFor` accepts `{ matchType } | null`, so nullability looked
- * open. Instrumented at the assignment and run across the whole suite AND the corpus — 1,656 tests
- * and 2,363 cases — the value was null or undefined ZERO times: the kernel's no-match path returns a
- * record with `matchType: "none"` rather than nothing. Typing it nullable would have made every
- * consumer write a branch that can never be taken.
  * @typedef {import("../internal/locale.js").WeightedLanguageRange} WeightedLanguageRange
  * @typedef {import("../internal/bidi.js").BidiIsolation} BidiIsolation
  * @typedef {(term: string, locale: string) => Phonetic} PhoneticResolver
@@ -246,31 +167,16 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  */
 
 /**
- * `LocaleMatchType`, the `matchType` a `LocaleMatchResult` carries. It is owned by core, which is why it
- * is declared here.
- *
- * DERIVED FROM `internal/locale.js`'s typedef RATHER THAN SPELLED OUT, and that is deliberate: the
- * eight values are already authored in two places under `src/` (that typedef and `ssr/index.js`'s
- * runtime `MATCH_TYPES` set), and an enumeration nothing re-derives is the thing this project has
- * watched rot more than any other. A third authored copy here would be a third thing to keep in
- * step. `test/readme-enumerations.test.js` compares every copy that remains.
- *
- * The field was `string` until this landed, which is why `test/plan-surface.test.js` carried a
- * STRUCTURAL disposition reading "a string union, inlined on the delivered LocaleMatchResult" — measured
- * false: `types/core/index.d.ts` said `matchType: string`, so nothing was inlined and no consumer of
- * `lokalized/core` could branch on the set. `lokalized/negotiate` has shipped the real union all
- * along through `types/internal/locale.d.ts`, so the two subpaths disagreed about one field's type.
+ * The negotiation category recorded by `LocaleMatchResult.matchType`.
  *
  * @typedef {import("../internal/locale.js").LocaleMatchResult["matchType"]} LocaleMatchType
  */
 
 /**
- * DERIVED, for the reason the `LocaleMatchType` note directly above gives about a third authored
- * copy — and this WAS the second one. It was spelled out here field for field with every member
- * mutable, while `internal/locale.js` (which `lokalized/negotiate` ships) declared the same eight
- * fields and the runtime froze the record. So the two subpaths disagreed about the whole type the
- * way they had disagreed about `matchType` alone, and a `lokalized/core` consumer was told it could
- * write to a frozen object. Deriving it is what stops them drifting apart again.
+ * Readonly lookup, failure, and per-call option contracts.
+ * A locale match is always present in runtime diagnostics; an unmatched request
+ * uses a result with `matchType: "none"`. Callback records retain the original
+ * cause and match references. Options omit settings to inherit the instance.
  *
  * @typedef {import("../internal/locale.js").LocaleMatchResult} LocaleMatchResult
  * @typedef {Readonly<{ key: string, lookupLocale: string, localeMatchResult: Readonly<LocaleMatchResult>,
@@ -289,14 +195,9 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  */
 
 /**
- * The three loading types core itself names.
- *
- * THEY ARE DECLARED HERE AND NOT IMPORTED FROM `lokalized/load` ON PURPOSE. Core must not import that
- * subpath — it is a ~690 KB delivery graph and the root module-count ratchet exists to keep it out —
- * and a shared nominal type would be wrong anyway: the record is STRUCTURAL rather than branded, so a
- * `Strings` value created by one installed copy or direct-browser entry remains usable by
- * `lokalized/ssr` from another copy. Two structurally identical declarations
- * in two subpaths is the intended shape, not duplication to be tidied away.
+ * Readonly catalog identity, locale configuration, and delivery verification.
+ * Verification records distinguish manifest-verified delivery from unverified
+ * loaded data and describe which locales the load covered.
  *
  * @typedef {Readonly<{ catalogVersion: string, catalogFingerprint: string }>} CatalogIdentity
  * @typedef {Readonly<{ kind: "lookup", lookupLocale: string }>
@@ -313,18 +214,16 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  */
 
 /**
- * The names the symbol allowlist has promised since M0 and the port declared NOWHERE.
- *
- * Found by `test/declared-surface.test.js` in M8 S5 — the allowlist gate was one-directional, so ten
- * promised names had no declaration at all. These are types for runtime that ALREADY SHIPS, so
- * declaring them is a gap in the published surface rather than new behaviour.
- *
- * **THE FIRST TWO ARE DERIVED, NOT TRANSCRIBED.** `Strings` is the shape `createStrings` returns and
- * `DirectLocaleContext` the shape one of its methods returns, so neither can drift from the runtime
- * the way a hand-written interface would — and this file has already had a comment assert the inverse
- * of the code beside it.
+ * An immutable synchronous translation runtime returned by `createStrings`.
+ * Exactly one ambient locale supplier is consulted per lookup without overrides.
+ * Use `getResult` to retain locale selection, fallback attempts, and outcome.
  *
  * @typedef {ReturnType<typeof createStrings>} Strings
+ */
+
+/**
+ * Public runtime result and locale-context types, derived from their methods.
+ *
  * @typedef {ReturnType<Strings["getResult"]>} TranslationResult
  * @typedef {TranslationResult["status"]} TranslationResultStatus
  * @typedef {ReturnType<Strings["getDirectLocaleContext"]>} DirectLocaleContext
@@ -332,14 +231,9 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  */
 
 /**
- * The pinned-data provenance the optional plural modules carry.
- *
- * **THE RUNTIME WAS NARROWER THAN THE CONTRACT AND THE RUNTIME MOVED, not the type.** The shipped
- * object carried `{cldrVersion, dataFingerprint}` — two of the five declared — so writing
- * that shape here would have asserted fields `ordinalData.provenance` does not have, and `tsc`
- * would have caught it the moment anything consumed them. `cldr-data-lock.json` has held all five all
- * along; `tools/gen-data.js` now emits them, so the contract and the runtime agree rather than one
- * being quietly bent to the other.
+ * Pinned source-data provenance carried by the optional plural modules.
+ * Pass `ordinalData` and `rangeData` through construction's `pluralData` setting
+ * when localized strings require ordinality or cardinal ranges.
  *
  * @typedef {Readonly<{ formatVersion: number, cldrVersion: string, generatorVersion: string,
  *   inputsSha256: string }>} SourceDataProvenance
@@ -781,36 +675,15 @@ export { ResolutionError };
 /** @typedef {import("../internal/lokalized-error.js").LokalizedErrorCode} LokalizedErrorCode */
 
 /**
- * THE TAGGED-VALUE TYPE FAMILY, delivered as a batch.
- *
- * The 61 constants have shipped since M5b; **their TYPES had not**, and the gap was not cosmetic.
- * `src/index.js` built them by looping over the generated table into a
- * `Record<string, Readonly<{ axis: string, name: string, … }>>`, so `tsc` emitted every one of the
- * 61 as `Readonly<{…}> | undefined` with `axis` and `name` WIDENED TO `string`. Two consequences a
- * consumer hits immediately, both measured before this block existed: reading
- * `GENDER_FEMININE.axis` into a `"gender"` fails with TS2322, and the `| undefined` means a
- * consumer must non-null-assert a frozen compile-time constant. A tagged union whose tag is
- * `string` is not a tagged union.
- *
- * The unions below are GENERATED FROM `LANGUAGE_FORM_NAMES` — the same generated table the runtime
- * loop reads — and `test/language-form-types.test.js` re-derives them from it on every run, so a
- * table that gains a member and a union that does not is a red test rather than a silent widening.
- *
- * **THE THIRD PARAMETER DEFAULTS, AND THAT IS THE WHOLE OF BOOT-M0-0672 THROUGH BOOT-M0-0675.**
- * The documented contract and fourteen registry statements spell this type with TWO arguments —
- * `TaggedLanguageFormValue<"gender", "GENDER_FEMININE">` at BOOT-M0-0708, and ten more at
- * BOOT-M0-0676 to BOOT-M0-0685 — while the port required three, so the SPELLING THE REGISTRY USES
- * did not compile: `TS2314: Generic type 'TaggedLanguageFormValue' requires 3 type argument(s)`.
- * A default keeps the precision where a caller supplies it and makes the two-argument form legal,
- * which is exactly what BOOT-M0-0675 asks for anyway — `renderName` of type `string`.
+ * An immutable tagged language form, preserving the axis and canonical token.
+ * The optional third type parameter specifies the display name and defaults
+ * to `string`. Use the exported language-form constants as application values.
  *
  * @template {LanguageFormAxis} A
  * @template {LanguageFormName} N
  * @template {string} [R=string]
  * @typedef {Readonly<{ $lokalized: "language-form", axis: A, name: N, renderName: R }>}
- *   TaggedLanguageFormValue A `TaggedLanguageFormValue<axis, name>`, with the third parameter
- *   carrying `renderName` — the Java enum member's own name, which is never derived by stripping a
- *   prefix and which the corpus's `languageForms` case pins for all 61.
+ *   TaggedLanguageFormValue A tagged form with its axis, canonical token, and display name.
  */
 
 /**
@@ -867,23 +740,9 @@ export { ResolutionError };
  */
 
 /**
- * THE SEVEN BUILD-IDENTITY CONSTANTS, delivered in S30.
- *
- * The contract declares them at module scope — `const cldrVersion: string;` and six siblings — and the
- * port had none of them. MEASURED across all nine published subpaths before this block existed: not
- * one of the seven was exported anywhere. The VALUES were never missing; they live in
- * `RUNTIME_METADATA` and reach a consumer only as members of the record `getLoadVerification()`
- * returns, which means an application could not read the build's CLDR version without first
- * constructing a `Strings` from a loaded manifest.
- *
- * TWO GATES FOUND THIS INDEPENDENTLY, which is why it is worth stating how. S28's category gate
- * reported core's "CLDR/IANA runtime metadata" family as having no delivered member, working only
- * from the documented prose categories. S29's plan-surface census named the seven, working from the
- * declared signatures. Neither could see what the other saw, and they agreed.
- *
- * `localeDataMode` and `cardinalityMode` keep their LITERAL types rather than widening to `string`:
- * strict SSR hydration discriminates on them, and a widened type would let a future
- * host-`Intl` build satisfy this build's declaration.
+ * Build identity for the pinned CLDR and IANA data, behavioral-vector version,
+ * and deterministic locale/plural modes. Read these without creating a strings
+ * instance; manifest validation and SSR stamps use the same values.
  */
 // The CLDR pair comes from the PINNED DATA artifact, not from the runtime record: `RUNTIME_METADATA`
 // carries the build's own identity, and these two are properties of the generated tables it reads.
@@ -2163,7 +2022,9 @@ export function createStrings(options) {
     // consumer cannot name it; a function returning a NUMBER, so no mutable cache state leaves with
     // it. It is the only way the 256-entry ceiling, the deterministic eviction and the
     // disabled-branch zero can be asserted at all.
+    /** @internal Memo instrumentation; not a consumer API. */
     [CANDIDATE_CHAIN_MEMO_SIZE]: () => chainMemo.size(),
+    /** @internal Memo instrumentation; not a consumer API. */
     [CANDIDATE_CHAIN_MEMO_KEYS]: () => chainMemo.keys(),
     get,
     t: get,

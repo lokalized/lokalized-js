@@ -344,6 +344,8 @@ jobs:
       # `Cannot find package 'ajv'`, and it has been in the list below since A7 without ever
       # running — the job failed earlier every time, so the gap only surfaced once the steps ahead
       # of it were fixed. A gate that has never executed is not a gate.
+      # The 2026-10-04 fallback-observer profile gate uses Python stdlib only and
+      # passes with both planning and oracle-JDK paths set to nonexistent values.
       - name: Install the spec repo's own dependencies
         working-directory: lokalized-spec
         run: npm ci || npm install
@@ -358,6 +360,8 @@ jobs:
           npm run check:manifest-contract
           npm run check:diagnostic-text
           npm run check:manifest-normalization
+          npm run check:fallback-observer
+          npm run check:exact-identifier
           npm run check:url-oracle
           npm run check:iana-registry
           npm run check:selection

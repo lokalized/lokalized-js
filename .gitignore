@@ -1,6 +1,7 @@
 node_modules/
 types/
 dist/
+.build/
 *.tgz
 .DS_Store
 .tmp-*
