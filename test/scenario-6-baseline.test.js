@@ -80,9 +80,21 @@ function freezeThrough(/** @type {string} */ dir, /** @type {string} */ value) {
   assert.ok(readFileSync(path, "utf8").includes(`const REBASELINES_FROZEN_THROUGH = ${value};`), "the checkpoint did not move");
 }
 
-/** Both example graphs reach the package root, so this grows both variants. */
-const grow = (/** @type {string} */ dir) =>
-  writeFileSync(join(dir, "src/index.js"), `${readFileSync(join(dir, "src/index.js"), "utf8")}// grown\n`);
+/** Both example graphs reach the package root; grow both past the baseline even after a source shrink. */
+function grow(/** @type {string} */ dir) {
+  const file = "src/index.js";
+  const record = readRecord(dir);
+  const recorded = record.rebaselines.at(-1).recorded;
+  const variants = /** @type {{ label: string, entry: string }[]} */ (record.recipe.variants);
+  const graphs = variants.map((variant) => {
+    const graph = exampleGraph(dir, variant.entry);
+    assert.ok(graph.files.includes(file), `${variant.label} must reach ${file}`);
+    return { variant, graph };
+  });
+  const padding = Math.max(0, ...graphs.map(({ variant, graph }) => recorded[variant.label].sourceBytes - graph.bytes));
+  const path = join(dir, file);
+  writeFileSync(path, `${readFileSync(path, "utf8")}// grown${"x".repeat(padding)}\n`);
+}
 const FREEZE = /to freeze them: const REBASELINES_FROZEN_THROUGH = (\{"index":\d+,"sha256":"[0-9a-f]{64}"\});/;
 /** A byte-level change to one fixture catalog that keeps it valid JSON and the same catalog. */
 function changeFixture(/** @type {string} */ dir) {

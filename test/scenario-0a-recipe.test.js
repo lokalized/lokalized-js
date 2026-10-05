@@ -46,6 +46,7 @@ import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import * as RECIPE_MODULE from "../tools/0a-recipe.mjs";
+import { graphBytes } from "../tools/graph-walk.mjs";
 
 /** The recipe revision the working tree is at; every bump below is relative to it. */
 const CURRENT = RECIPE_MODULE.RECIPE.revision;
@@ -114,8 +115,17 @@ function editRows(/** @type {string} */ dir, /** @type {(row: any) => void} */ c
   writeRecord(dir, record);
 }
 
-const grow = (/** @type {string} */ dir, /** @type {string} */ file) =>
-  writeFileSync(join(dir, file), `${readFileSync(join(dir, file), "utf8")}// grown\n`);
+/** Grow past the recorded baseline even when the working source has shrunk since it was recorded. */
+function grow(/** @type {string} */ dir, /** @type {string} */ file) {
+  const path = resolve(dir, file);
+  const recorded = readRecord(dir).rebaselines.at(-1).recorded;
+  const affected = RECIPE_MODULE.RECIPE.variants
+    .map((variant) => ({ variant, graph: graphBytes(dir, variant.entry) }))
+    .filter(({ graph }) => graph.files.includes(path));
+  assert.ok(affected.length > 0, `${file} must be reachable from a measured variant`);
+  const padding = Math.max(0, ...affected.map(({ variant, graph }) => recorded[variant.label].sourceBytes - graph.bytes));
+  writeFileSync(path, `${readFileSync(path, "utf8")}// grown${"x".repeat(padding)}\n`);
+}
 
 /**
  * Moves the copy's recipe to revision `to` (2 unless said) after `change`, and freezes that
@@ -474,7 +484,7 @@ test("a reason is a sentence: a blank, or the next flag read as one, is refused 
 test("growth fails and is refused without a reason; with one it is recorded, chained, and passes", () => {
   const dir = copy();
   const before = readFileSync(join(dir, RECORD));
-  writeFileSync(join(dir, "src/core/index.js"), `${readFileSync(join(dir, "src/core/index.js"), "utf8")}// grown\n`);
+  grow(dir, "src/core/index.js");
   const grown = run(dir);
   assert.equal(grown.status, 1, grown.out);
   assert.match(grown.out, /GRAPH GROWTH[\s\S]*source graph grew/);
