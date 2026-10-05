@@ -275,6 +275,7 @@ const PURPOSE = {
   // Splitting them out would mean a second construction entry point, which is the drift this branch
   // was normalized to avoid — recorded here rather than left for a size review to rediscover.
   "src/internal/loaded-input.js": ["validates a LoadedStrings before construction accepts it", "loaded branch only"],
+  "src/internal/manifest-locale.js": ["stable manifest-profile locale spelling for loaded catalog validation and SSR stamps", "loaded branch only"],
   "src/internal/configuration-error.js": ["the shared ConfigurationError factory", "always"],
   "src/internal/lokalized-error.js":
     ["the base class every library error extends, and the LokalizedErrorCode union", "always"],

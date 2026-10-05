@@ -10,12 +10,12 @@
     "brotli": "1.2.0"
   },
   "run": {
-    "tarballSha256": "57c9d44b48a4407215c7003bfb373a7b841343b8364238f4603e7561cabf806d",
-    "outputGraphSha256": "b4008f45ef2483aa61bfe7982f1d22f88007f74eec0d1f0a12bb23ca7815039f",
+    "tarballSha256": "ea99cd17b0c23611530ec1806f24b43209888df9b112048f18572f1ca31f6445",
+    "outputGraphSha256": "aa166135e86ebc92f0f6f86019b30feb1a8bb70f2f14f42934df1abcf6706fce",
     "dataFingerprint": "9b4f24165b6dd1ee6dbb5f0822abc7bcde49c5b94d35903045826b45e1f30e68",
     "ianaDataFingerprint": "87b3a43b03f490206cead05d865357bd7cfc3953a52ec4d8405243f699385815",
-    "identityRebuild": "34 of 34 shipped dist/browser files byte-identical",
-    "resultSha256": "c006efc7ea1c8777907d1c7d74b44f85d62d7186014339c021c5a38bd259b568",
+    "identityRebuild": "36 of 36 shipped dist/browser files byte-identical",
+    "resultSha256": "3b26e16ec00dfda7cb6d38039d8638d8adebbace5594c3ad314146820d528670",
     "environment": {
       "node": "v24.15.0",
       "v8": "13.6.233.17-node.48",
@@ -38,13 +38,13 @@
             "lokalized.js"
           ],
           "columns": {
-            "rawSource": 781778,
-            "rawModules": 32,
-            "preMinify": 363965,
-            "minified": 186258,
-            "gzip9": 66848,
-            "brotliQ11": 55126,
-            "brotliQ5": 62176,
+            "rawSource": 772018,
+            "rawModules": 33,
+            "preMinify": 364715,
+            "minified": 186481,
+            "gzip9": 66948,
+            "brotliQ11": 55261,
+            "brotliQ5": 62264,
             "requests": 1
           },
           "dataRows": {
@@ -80,6 +80,7 @@
             "src/internal/locale-jdk-tag.js",
             "src/internal/locale.js",
             "src/internal/lokalized-error.js",
+            "src/internal/manifest-locale.js",
             "src/internal/parse-warnings.js",
             "src/internal/plural.js",
             "src/internal/resolution-error.js",
@@ -87,10 +88,10 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 8.422,
-            "constructMs": 1.987,
-            "firstRenderMs": 1.918,
-            "retainedBytes": 2612432
+            "importMs": 8.478,
+            "constructMs": 1.925,
+            "firstRenderMs": 1.879,
+            "retainedBytes": 2615112
           }
         }
       }
@@ -107,13 +108,13 @@
             "(one bundle)"
           ],
           "columns": {
-            "rawSource": 781778,
-            "rawModules": 32,
-            "preMinify": 359302,
-            "minified": 183014,
-            "gzip9": 65927,
-            "brotliQ11": 54382,
-            "brotliQ5": 61288,
+            "rawSource": 772018,
+            "rawModules": 33,
+            "preMinify": 360075,
+            "minified": 183237,
+            "gzip9": 66007,
+            "brotliQ11": 54410,
+            "brotliQ5": 61368,
             "requests": 1
           },
           "dataRows": {
@@ -149,6 +150,7 @@
             "src/internal/locale-jdk-tag.js",
             "src/internal/locale.js",
             "src/internal/lokalized-error.js",
+            "src/internal/manifest-locale.js",
             "src/internal/parse-warnings.js",
             "src/internal/plural.js",
             "src/internal/resolution-error.js",
@@ -156,10 +158,10 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 7.886,
-            "constructMs": 1.876,
-            "firstRenderMs": 1.819,
-            "retainedBytes": 2584200
+            "importMs": 7.661,
+            "constructMs": 1.853,
+            "firstRenderMs": 1.793,
+            "retainedBytes": 2587112
           }
         }
       }
@@ -176,13 +178,13 @@
             "(one bundle)"
           ],
           "columns": {
-            "rawSource": 768752,
-            "rawModules": 31,
-            "preMinify": 357641,
-            "minified": 181661,
-            "gzip9": 65510,
-            "brotliQ11": 53994,
-            "brotliQ5": 60851,
+            "rawSource": 758992,
+            "rawModules": 32,
+            "preMinify": 358414,
+            "minified": 181884,
+            "gzip9": 65605,
+            "brotliQ11": 54111,
+            "brotliQ5": 60890,
             "requests": 1
           },
           "dataRows": {
@@ -217,6 +219,7 @@
             "src/internal/locale-jdk-tag.js",
             "src/internal/locale.js",
             "src/internal/lokalized-error.js",
+            "src/internal/manifest-locale.js",
             "src/internal/parse-warnings.js",
             "src/internal/plural.js",
             "src/internal/resolution-error.js",
@@ -224,32 +227,33 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 7.93,
-            "constructMs": 1.729,
-            "firstRenderMs": 1.894,
-            "retainedBytes": 2556320
+            "importMs": 7.62,
+            "constructMs": 1.61,
+            "firstRenderMs": 1.774,
+            "retainedBytes": 2558992
           }
         },
         "no-build core.js": {
           "form": "no-build",
           "files": [
             "chunks/chunk-4LAQU2SK.js",
-            "chunks/chunk-4YEAV6IL.js",
-            "chunks/chunk-FWADWRZK.js",
+            "chunks/chunk-HYRKH33S.js",
             "chunks/chunk-LJCYBSJ6.js",
             "chunks/chunk-QU3LBEYR.js",
             "chunks/chunk-R2EDDRQC.js",
+            "chunks/chunk-TXPIZ4NS.js",
+            "chunks/chunk-YOEZMB6G.js",
             "core.js"
           ],
           "columns": {
-            "rawSource": 768752,
-            "rawModules": 31,
-            "preMinify": 364929,
-            "minified": 185412,
-            "gzip9": 68563,
-            "brotliQ11": 57254,
-            "brotliQ5": 64185,
-            "requests": 7
+            "rawSource": 758992,
+            "rawModules": 32,
+            "preMinify": 365876,
+            "minified": 185772,
+            "gzip9": 68801,
+            "brotliQ11": 57472,
+            "brotliQ5": 64398,
+            "requests": 8
           },
           "dataRows": {
             "rendering locale/cardinal": 48265,
@@ -283,6 +287,7 @@
             "src/internal/locale-jdk-tag.js",
             "src/internal/locale.js",
             "src/internal/lokalized-error.js",
+            "src/internal/manifest-locale.js",
             "src/internal/parse-warnings.js",
             "src/internal/plural.js",
             "src/internal/resolution-error.js",
@@ -290,10 +295,10 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 9.361,
-            "constructMs": 1.789,
-            "firstRenderMs": 1.981,
-            "retainedBytes": 2705816
+            "importMs": 8.645,
+            "constructMs": 1.638,
+            "firstRenderMs": 1.803,
+            "retainedBytes": 2735632
           }
         }
       }
@@ -310,13 +315,13 @@
             "(one bundle)"
           ],
           "columns": {
-            "rawSource": 801396,
-            "rawModules": 34,
-            "preMinify": 369925,
-            "minified": 188497,
-            "gzip9": 67629,
-            "brotliQ11": 55693,
-            "brotliQ5": 62783,
+            "rawSource": 791636,
+            "rawModules": 35,
+            "preMinify": 370698,
+            "minified": 188720,
+            "gzip9": 67732,
+            "brotliQ11": 55758,
+            "brotliQ5": 62868,
             "requests": 1
           },
           "dataRows": {
@@ -356,6 +361,7 @@
             "src/internal/locale-jdk-tag.js",
             "src/internal/locale.js",
             "src/internal/lokalized-error.js",
+            "src/internal/manifest-locale.js",
             "src/internal/parse-warnings.js",
             "src/internal/plural.js",
             "src/internal/resolution-error.js",
@@ -363,34 +369,35 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 8.625,
-            "constructMs": 1.44,
-            "firstRenderMs": 1.584,
-            "retainedBytes": 2638464
+            "importMs": 8.27,
+            "constructMs": 1.391,
+            "firstRenderMs": 1.528,
+            "retainedBytes": 2640520
           }
         },
         "no-build core.js + data/ordinal.js": {
           "form": "no-build",
           "files": [
             "chunks/chunk-4LAQU2SK.js",
-            "chunks/chunk-4YEAV6IL.js",
-            "chunks/chunk-FWADWRZK.js",
+            "chunks/chunk-HYRKH33S.js",
             "chunks/chunk-LJCYBSJ6.js",
             "chunks/chunk-QU3LBEYR.js",
             "chunks/chunk-R2EDDRQC.js",
-            "chunks/chunk-VIHBIRTH.js",
+            "chunks/chunk-TXPIZ4NS.js",
+            "chunks/chunk-YOEZMB6G.js",
+            "chunks/chunk-ZKOUENNF.js",
             "core.js",
             "data/ordinal.js"
           ],
           "columns": {
-            "rawSource": 801396,
-            "rawModules": 34,
-            "preMinify": 378362,
-            "minified": 193016,
-            "gzip9": 71649,
-            "brotliQ11": 60021,
-            "brotliQ5": 67160,
-            "requests": 9
+            "rawSource": 791636,
+            "rawModules": 35,
+            "preMinify": 379347,
+            "minified": 193412,
+            "gzip9": 71901,
+            "brotliQ11": 60242,
+            "brotliQ5": 67387,
+            "requests": 10
           },
           "dataRows": {
             "rendering locale/cardinal": 48265,
@@ -429,6 +436,7 @@
             "src/internal/locale-jdk-tag.js",
             "src/internal/locale.js",
             "src/internal/lokalized-error.js",
+            "src/internal/manifest-locale.js",
             "src/internal/parse-warnings.js",
             "src/internal/plural.js",
             "src/internal/resolution-error.js",
@@ -436,10 +444,10 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 10.558,
-            "constructMs": 1.455,
-            "firstRenderMs": 1.697,
-            "retainedBytes": 2848584
+            "importMs": 9.777,
+            "constructMs": 1.368,
+            "firstRenderMs": 1.557,
+            "retainedBytes": 2860608
           }
         }
       }
@@ -456,13 +464,13 @@
             "(one bundle)"
           ],
           "columns": {
-            "rawSource": 806271,
-            "rawModules": 34,
-            "preMinify": 371921,
-            "minified": 191202,
-            "gzip9": 67724,
-            "brotliQ11": 55868,
-            "brotliQ5": 62995,
+            "rawSource": 796511,
+            "rawModules": 35,
+            "preMinify": 372694,
+            "minified": 191425,
+            "gzip9": 67831,
+            "brotliQ11": 55877,
+            "brotliQ5": 63043,
             "requests": 1
           },
           "dataRows": {
@@ -502,6 +510,7 @@
             "src/internal/locale-jdk-tag.js",
             "src/internal/locale.js",
             "src/internal/lokalized-error.js",
+            "src/internal/manifest-locale.js",
             "src/internal/parse-warnings.js",
             "src/internal/plural.js",
             "src/internal/resolution-error.js",
@@ -509,34 +518,35 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 8.844,
-            "constructMs": 1.757,
-            "firstRenderMs": 1.702,
-            "retainedBytes": 2648736
+            "importMs": 8.112,
+            "constructMs": 1.638,
+            "firstRenderMs": 1.592,
+            "retainedBytes": 2650800
           }
         },
         "no-build core.js + data/ranges.js": {
           "form": "no-build",
           "files": [
             "chunks/chunk-4LAQU2SK.js",
-            "chunks/chunk-4YEAV6IL.js",
-            "chunks/chunk-FWADWRZK.js",
+            "chunks/chunk-HYRKH33S.js",
             "chunks/chunk-LJCYBSJ6.js",
             "chunks/chunk-QU3LBEYR.js",
             "chunks/chunk-R2EDDRQC.js",
-            "chunks/chunk-VIHBIRTH.js",
+            "chunks/chunk-TXPIZ4NS.js",
+            "chunks/chunk-YOEZMB6G.js",
+            "chunks/chunk-ZKOUENNF.js",
             "core.js",
             "data/ranges.js"
           ],
           "columns": {
-            "rawSource": 806271,
-            "rawModules": 34,
-            "preMinify": 380025,
-            "minified": 195544,
-            "gzip9": 71746,
-            "brotliQ11": 60090,
-            "brotliQ5": 67274,
-            "requests": 9
+            "rawSource": 796511,
+            "rawModules": 35,
+            "preMinify": 381010,
+            "minified": 195940,
+            "gzip9": 71998,
+            "brotliQ11": 60334,
+            "brotliQ5": 67502,
+            "requests": 10
           },
           "dataRows": {
             "rendering locale/cardinal": 48265,
@@ -575,6 +585,7 @@
             "src/internal/locale-jdk-tag.js",
             "src/internal/locale.js",
             "src/internal/lokalized-error.js",
+            "src/internal/manifest-locale.js",
             "src/internal/parse-warnings.js",
             "src/internal/plural.js",
             "src/internal/resolution-error.js",
@@ -582,10 +593,10 @@
           ],
           "runtime": {
             "samples": 5,
-            "importMs": 10.932,
-            "constructMs": 1.803,
-            "firstRenderMs": 1.763,
-            "retainedBytes": 2848232
+            "importMs": 9.568,
+            "constructMs": 1.592,
+            "firstRenderMs": 1.598,
+            "retainedBytes": 2860264
           }
         }
       }
@@ -981,6 +992,85 @@
         "STALE: scenario 5 no-build core.js + data/ranges.js: brotliQ5 67277 -> 67274 (-3, within 337)"
       ],
       "previousSha256": "9e613a4a1a4891ff1c28bee0578c0576cf2818ffa20f60b825c58e315472fe11"
+    },
+    {
+      "reason": "Record manifest-profile 1.1 shared private-use locale projection in consumer module and delivery graphs after the normalization change",
+      "date": "2026-10-05",
+      "suite": {
+        "revision": 4,
+        "sha256": "b39974d5a44f9e9d979c7af6550d21c3394005b2156fd85b3d4142544988a1e6"
+      },
+      "baselineSha256": "3b26e16ec00dfda7cb6d38039d8638d8adebbace5594c3ad314146820d528670",
+      "changes": [
+        "GROWTH: scenario 1 root module: rawModules grew 32 -> 33",
+        "GROWTH: scenario 1 root module: preMinify grew 363965 -> 364715",
+        "GROWTH: scenario 1 root module: minified grew 186258 -> 186481",
+        "GROWTH: scenario 1 root module: 1 module(s) entered the included graph: src/internal/manifest-locale.js",
+        "GROWTH: scenario 2 esbuild: rawModules grew 32 -> 33",
+        "GROWTH: scenario 2 esbuild: preMinify grew 359302 -> 360075",
+        "GROWTH: scenario 2 esbuild: minified grew 183014 -> 183237",
+        "GROWTH: scenario 2 esbuild: 1 module(s) entered the included graph: src/internal/manifest-locale.js",
+        "GROWTH: scenario 3 esbuild: rawModules grew 31 -> 32",
+        "GROWTH: scenario 3 esbuild: preMinify grew 357641 -> 358414",
+        "GROWTH: scenario 3 esbuild: minified grew 181661 -> 181884",
+        "GROWTH: scenario 3 esbuild: 1 module(s) entered the included graph: src/internal/manifest-locale.js",
+        "GROWTH: scenario 3 no-build core.js: rawModules grew 31 -> 32",
+        "GROWTH: scenario 3 no-build core.js: preMinify grew 364929 -> 365876",
+        "GROWTH: scenario 3 no-build core.js: minified grew 185412 -> 185772",
+        "GROWTH: scenario 3 no-build core.js: requests grew 7 -> 8",
+        "GROWTH: scenario 3 no-build core.js: 1 module(s) entered the included graph: src/internal/manifest-locale.js",
+        "GROWTH: scenario 4 esbuild: rawModules grew 34 -> 35",
+        "GROWTH: scenario 4 esbuild: preMinify grew 369925 -> 370698",
+        "GROWTH: scenario 4 esbuild: minified grew 188497 -> 188720",
+        "GROWTH: scenario 4 esbuild: 1 module(s) entered the included graph: src/internal/manifest-locale.js",
+        "GROWTH: scenario 4 no-build core.js + data/ordinal.js: rawModules grew 34 -> 35",
+        "GROWTH: scenario 4 no-build core.js + data/ordinal.js: preMinify grew 378362 -> 379347",
+        "GROWTH: scenario 4 no-build core.js + data/ordinal.js: minified grew 193016 -> 193412",
+        "GROWTH: scenario 4 no-build core.js + data/ordinal.js: requests grew 9 -> 10",
+        "GROWTH: scenario 4 no-build core.js + data/ordinal.js: 1 module(s) entered the included graph: src/internal/manifest-locale.js",
+        "GROWTH: scenario 5 esbuild: rawModules grew 34 -> 35",
+        "GROWTH: scenario 5 esbuild: preMinify grew 371921 -> 372694",
+        "GROWTH: scenario 5 esbuild: minified grew 191202 -> 191425",
+        "GROWTH: scenario 5 esbuild: 1 module(s) entered the included graph: src/internal/manifest-locale.js",
+        "GROWTH: scenario 5 no-build core.js + data/ranges.js: rawModules grew 34 -> 35",
+        "GROWTH: scenario 5 no-build core.js + data/ranges.js: preMinify grew 380025 -> 381010",
+        "GROWTH: scenario 5 no-build core.js + data/ranges.js: minified grew 195544 -> 195940",
+        "GROWTH: scenario 5 no-build core.js + data/ranges.js: requests grew 9 -> 10",
+        "GROWTH: scenario 5 no-build core.js + data/ranges.js: 1 module(s) entered the included graph: src/internal/manifest-locale.js",
+        "STALE: scenario 1 root module: rawSource 781778 -> 772018",
+        "STALE: scenario 1 root module: gzip9 66848 -> 66948 (+100, within 335)",
+        "STALE: scenario 1 root module: brotliQ11 55126 -> 55261 (+135, within 276)",
+        "STALE: scenario 1 root module: brotliQ5 62176 -> 62264 (+88, within 311)",
+        "STALE: scenario 2 esbuild: rawSource 781778 -> 772018",
+        "STALE: scenario 2 esbuild: gzip9 65927 -> 66007 (+80, within 330)",
+        "STALE: scenario 2 esbuild: brotliQ11 54382 -> 54410 (+28, within 272)",
+        "STALE: scenario 2 esbuild: brotliQ5 61288 -> 61368 (+80, within 307)",
+        "STALE: scenario 3 esbuild: rawSource 768752 -> 758992",
+        "STALE: scenario 3 esbuild: gzip9 65510 -> 65605 (+95, within 328)",
+        "STALE: scenario 3 esbuild: brotliQ11 53994 -> 54111 (+117, within 270)",
+        "STALE: scenario 3 esbuild: brotliQ5 60851 -> 60890 (+39, within 305)",
+        "STALE: scenario 3 no-build core.js: rawSource 768752 -> 758992",
+        "STALE: scenario 3 no-build core.js: gzip9 68563 -> 68801 (+238, within 343)",
+        "STALE: scenario 3 no-build core.js: brotliQ11 57254 -> 57472 (+218, within 287)",
+        "STALE: scenario 3 no-build core.js: brotliQ5 64185 -> 64398 (+213, within 321)",
+        "STALE: scenario 4 esbuild: rawSource 801396 -> 791636",
+        "STALE: scenario 4 esbuild: gzip9 67629 -> 67732 (+103, within 339)",
+        "STALE: scenario 4 esbuild: brotliQ11 55693 -> 55758 (+65, within 279)",
+        "STALE: scenario 4 esbuild: brotliQ5 62783 -> 62868 (+85, within 314)",
+        "STALE: scenario 4 no-build core.js + data/ordinal.js: rawSource 801396 -> 791636",
+        "STALE: scenario 4 no-build core.js + data/ordinal.js: gzip9 71649 -> 71901 (+252, within 359)",
+        "STALE: scenario 4 no-build core.js + data/ordinal.js: brotliQ11 60021 -> 60242 (+221, within 301)",
+        "STALE: scenario 4 no-build core.js + data/ordinal.js: brotliQ5 67160 -> 67387 (+227, within 336)",
+        "STALE: scenario 5 esbuild: rawSource 806271 -> 796511",
+        "STALE: scenario 5 esbuild: gzip9 67724 -> 67831 (+107, within 339)",
+        "STALE: scenario 5 esbuild: brotliQ11 55868 -> 55877 (+9, within 280)",
+        "STALE: scenario 5 esbuild: brotliQ5 62995 -> 63043 (+48, within 315)",
+        "STALE: scenario 5 no-build core.js + data/ranges.js: rawSource 806271 -> 796511",
+        "STALE: scenario 5 no-build core.js + data/ranges.js: gzip9 71746 -> 71998 (+252, within 359)",
+        "STALE: scenario 5 no-build core.js + data/ranges.js: brotliQ11 60090 -> 60334 (+244, within 301)",
+        "STALE: scenario 5 no-build core.js + data/ranges.js: brotliQ5 67274 -> 67502 (+228, within 337)"
+      ],
+      "previousSha256": "b90447c64fe4e33dfd3a1bea88ab0da7262e3c8194fdbd68f529860bc36d674a"
     }
   ]
 }
