@@ -113,15 +113,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: lokalized/lokalized-spec
-          ref: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
+          ref: main
           path: lokalized-spec
           fetch-depth: 1
           token: ${{ secrets.SPEC_REPO_TOKEN || github.token }}
           persist-credentials: false
 
       - name: Verify the corpus checkout carries what the gates read
-        env:
-          SPEC_REPO_REF: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
         run: node tools/check-spec-checkout.mjs
 
       # NO `registry-url:`. That input exists only to make setup-node write an `.npmrc` carrying

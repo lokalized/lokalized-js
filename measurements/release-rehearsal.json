@@ -11,14 +11,14 @@
   "note": "The browser half is DRIVEN BY HAND in a real browser, on scenario:0a reasoning — a green `verify` must not need a person at one. `npm run check:release` compares what it can without a browser: that every file this capture loaded is in the tarball, that nothing 404ed, and that the render is the French catalog s entry rather than the fallback.",
   "procedure": "npm pack -> npm install the tarball into a clean ESM project -> serve node_modules/lokalized over HTTP -> import map pointing `lokalized` at dist/browser/lokalized.js -> import and render.",
   "browser": {
-    "engine": "Chromium 153 (Codex in-app browser)",
+    "engine": "Chromium 154 (Codex in-app browser)",
     "capturedFrom": "the packed 1.0.0-rc.2 tarball, installed into a clean ESM project and served over HTTP from localhost with no caching; all eight import-map entries and the classic bundle loaded",
     "isSecureContext": true,
     "cryptoSubtle": "object",
     "rendered": "Bonjour, Ada",
     "plural": "2 items",
     "rootRequests": 1,
-    "totalRequests": 17,
+    "totalRequests": 18,
     "notFound": 0,
     "classicScript": {
       "file": "dist/browser/lokalized.global.js",
@@ -30,17 +30,17 @@
         "specifier": "lokalized",
         "file": "dist/browser/lokalized.js",
         "files": 1,
-        "rawBytes": 186258,
-        "brotliBytes": 55126,
+        "rawBytes": 186481,
+        "brotliBytes": 55261,
         "exports": 70,
         "loadedInBrowser": true
       },
       {
         "specifier": "lokalized/core",
         "file": "dist/browser/core.js",
-        "files": 7,
-        "rawBytes": 185412,
-        "brotliBytes": 55092,
+        "files": 8,
+        "rawBytes": 185772,
+        "brotliBytes": 55218,
         "exports": 21,
         "loadedInBrowser": true
       },
@@ -48,26 +48,26 @@
         "specifier": "lokalized/parse",
         "file": "dist/browser/parse.js",
         "files": 5,
-        "rawBytes": 159727,
-        "brotliBytes": 48783,
+        "rawBytes": 159872,
+        "brotliBytes": 49064,
         "exports": 5,
         "loadedInBrowser": true
       },
       {
         "specifier": "lokalized/load",
         "file": "dist/browser/load.js",
-        "files": 7,
-        "rawBytes": 179283,
-        "brotliBytes": 54032,
+        "files": 8,
+        "rawBytes": 179636,
+        "brotliBytes": 54128,
         "exports": 10,
         "loadedInBrowser": true
       },
       {
         "specifier": "lokalized/ssr",
         "file": "dist/browser/ssr.js",
-        "files": 2,
-        "rawBytes": 7678,
-        "brotliBytes": 2379,
+        "files": 3,
+        "rawBytes": 7844,
+        "brotliBytes": 2437,
         "exports": 2,
         "loadedInBrowser": true
       },
@@ -83,44 +83,45 @@
       {
         "specifier": "lokalized/data/ordinal",
         "file": "dist/browser/data/ordinal.js",
-        "files": 8,
-        "rawBytes": 192120,
-        "brotliBytes": 56678,
+        "files": 9,
+        "rawBytes": 192481,
+        "brotliBytes": 56645,
         "exports": 5,
         "loadedInBrowser": true
       },
       {
         "specifier": "lokalized/data/ranges",
         "file": "dist/browser/data/ranges.js",
-        "files": 8,
-        "rawBytes": 194648,
-        "brotliBytes": 56790,
+        "files": 9,
+        "rawBytes": 195009,
+        "brotliBytes": 56944,
         "exports": 2,
         "loadedInBrowser": true
       }
     ],
-    "sizesRecordedFor": "Record packaged artifact sizes after approved shared API names and type exports",
+    "sizesRecordedFor": "Re-measure the current packed 1.0.0-rc.2 browser artifacts after the shared-profile and API-documentation changes (Node 22.19.0, Brotli 1.1.0).",
     "capturedAgainst": {
       "files": {
-        "dist/browser/chunks/chunk-CLASXSID.js": "a9bb4dc1b02c8d4fe43bde4ca463dce35d83512fadee90238f0c4a0718035c1a",
-        "dist/browser/chunks/chunk-FDWQ7NLM.js": "2b4b3bc6ef285d3ca1b47115aa07a522a3111f8afa992be8c61ed1597c6f3738",
-        "dist/browser/chunks/chunk-KCPTRZUC.js": "25264635f10b1e5c59742d708e252ce9293fbdbccc068f1696254fb60a770c7b",
-        "dist/browser/chunks/chunk-MFLSVFWW.js": "914f473d08c5129694a65df0ec4fbaa6e0333d5e8701b2219735d9bccef20edc",
+        "dist/browser/chunks/chunk-4LAQU2SK.js": "5069690648bb0488a62efe522626f3e17ad47ee989436a7e03950d5f1856a96e",
+        "dist/browser/chunks/chunk-EVMCUX6Z.js": "44323bca28a605e02c4b5c9651c4b6bce51508d1b559621330b485208d377a6a",
+        "dist/browser/chunks/chunk-HYRKH33S.js": "c521d3d0c00072aade76be44d315d99869fe8da5fc2084cf79a8a0f18ca3d1ab",
+        "dist/browser/chunks/chunk-LJCYBSJ6.js": "bd80762efeaa223572112dac4032a8f16e65dc57a7616be528158187a07818da",
         "dist/browser/chunks/chunk-QU3LBEYR.js": "7b795ba5ae65818645e708f3022ebfd44c26a90da7cbe3553430fac72b25b194",
         "dist/browser/chunks/chunk-R2EDDRQC.js": "2acdbd49c5f445b2df472d99c285cc965f257b62c8c0043339237424ba294e5f",
-        "dist/browser/chunks/chunk-UAAWCOPY.js": "a76a9414fd0f626b7c9d44be775af72470431622e1414b21857f61828fb056fe",
-        "dist/browser/chunks/chunk-Z7YBD3WG.js": "f1d639ec30d737ee50710f10228d43b0880588b2445c7c06db4d80a4c169a328",
-        "dist/browser/core.js": "3ee6726c3a12e43ea82894f804bc0bf1014ab04fbf9efd4e8399dc94f9595d49",
-        "dist/browser/data/ordinal.js": "82a6aa257f42ec70fa7a761624fcc570862d44e807f9e1597e24fad8cb27b2a6",
-        "dist/browser/data/ranges.js": "5c0a540e71958c4572ea0db053ae3b72e718e708456456a32d49b587ea0d2de2",
-        "dist/browser/load.js": "c2631023633434e71de9aebbe80ee198c4a308c708e134957b5c7c20c5942b87",
-        "dist/browser/lokalized.global.js": "b4bc98b9f67615a3b0901945a71e8ce8da77b9ea4c9441a5428de0e9cee290f1",
-        "dist/browser/lokalized.js": "f46ec028a4a0c625561cff977eb4b70233b5f6de88393f1aec832417795da2df",
-        "dist/browser/negotiate.js": "3012c5675e6af4e0827bfe27b94e9d711303325a9b6584202e4495062de4440d",
-        "dist/browser/parse.js": "a274ea82afb8031cc52ba45ee491aa6a5ba186011fd2d0008b80ed22560f2d9a",
-        "dist/browser/ssr.js": "462c2929e3ba4fb60535f72c92566498f511c584ecab1b4acc8ac78eba6f7389"
+        "dist/browser/chunks/chunk-TXPIZ4NS.js": "d101627e7c53b9ebe105ed10d69b753538ed3f2adf443be1a9bf791bbd6c9e1b",
+        "dist/browser/chunks/chunk-YOEZMB6G.js": "7eb4d3440a5bbb1edb31e1cb0b8e319ea207c9507d83588f5c9da018aedfdcf6",
+        "dist/browser/chunks/chunk-ZKOUENNF.js": "2a26d9a25729f8420dca457b5c8dbe273922a3ab39afc84f454d754ccce60e03",
+        "dist/browser/core.js": "93a660f96f570a387b5433475d04d550bb8b3bf79d13b2bc73bd0bdd7c4bca9e",
+        "dist/browser/data/ordinal.js": "77d32fcdeec9d5f559d34264ea22602ad9b4206e6482da6f488ec4c716a6e073",
+        "dist/browser/data/ranges.js": "dd35a9836f4930ed237308221da3a09c8947f1d477a22f115457f0f2ce835a41",
+        "dist/browser/load.js": "7a8c3211517fb5edcfb6a7b8d5b2cdf8de2bbe6e3fb351b30fc6c6238efeaf8c",
+        "dist/browser/lokalized.global.js": "05e0f72efb58cbd7ede5801cc5b8e33763c9738fe2828d674d5e83b888e9a34d",
+        "dist/browser/lokalized.js": "f85db8e0cbf19c3c1a517fb844e003c1fa2227aa28becc42e1f05ff73b5c5c0d",
+        "dist/browser/negotiate.js": "f3c44f35df307f509e9fd951d1f69216ebfd1bbd149d27ae87b1aaf0bdf7e918",
+        "dist/browser/parse.js": "4221cf48289ba9fdf01fadb1d520b8232d768e590fb4b3192fc8eab7b31c47f8",
+        "dist/browser/ssr.js": "d658893252edbc15a66acb3ec740eeaba4bbd1a7b0e972a01903aa4bec45c347"
       },
-      "stampedFor": "Re-drove all eight import-map entries and the classic script from the packed 1.0.0-rc.2 tarball in Chromium 153; French and cardinal renders passed, with 17 bundle requests and no browser errors."
+      "stampedFor": "Re-drove all eight import-map entries and the classic script from the current packed 1.0.0-rc.2 tarball in Chromium 154. French and cardinal renders passed, with 18 bundle requests, one root request, and no failed requests."
     }
   }
 }

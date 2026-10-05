@@ -38,12 +38,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: lokalized/lokalized-spec
-          # THE REF IS LOAD-BEARING. `lokalized-spec`'s DEFAULT branch (`main`) holds two files,
-          # LICENSE and README — the 725 that matter, including the corpus, live on this branch.
-          # Checking out the default silently produced an EMPTY-looking spec, which is why the first
-          # attempt at this fix still skipped 44 tests. Override with the SPEC_REPO_REF repository
-          # variable, and delete this default once the spec's default branch carries the artifacts.
-          ref: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
+          # The shared spec lives on main. The checkout guard below verifies its corpus hash.
+          ref: main
           path: lokalized-spec
           # Shallow is fine here: nothing reads the spec's history, only its artifacts.
           fetch-depth: 1
@@ -57,8 +53,6 @@ jobs:
       # live in the script, because `publish.yml` needs exactly this check and a second copy of 46
       # lines of shell is a copy that drifts.
       - name: Verify the corpus checkout carries what the gates read
-        env:
-          SPEC_REPO_REF: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
         run: node tools/check-spec-checkout.mjs
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -395,14 +389,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: lokalized/lokalized-spec
-          ref: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
+          ref: main
           path: lokalized-spec
           fetch-depth: 1
           token: ${{ secrets.SPEC_REPO_TOKEN || github.token }}
           persist-credentials: false
       - name: Verify the corpus checkout carries what the gates read
-        env:
-          SPEC_REPO_REF: ${{ vars.SPEC_REPO_REF || 'feature/spec-repo-init' }}
         run: node tools/check-spec-checkout.mjs
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
