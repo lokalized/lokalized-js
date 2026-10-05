@@ -11,13 +11,11 @@ Every rule below is arbitrated against the Java implementation by an executed te
 by description.
 
 ```bash
-npm install lokalized@1.0.0-rc.2
+npm install lokalized@1.0.0
 ```
 
-**Pin the version.** `1.0.0-rc.2` is a release candidate, published under the `next` dist-tag. npm set
-`latest` to this package's first version, 1.0.0-rc.1, and publishing under `next` does not move it,
-so a bare `npm install lokalized` installs that older candidate. Naming the version is how you say
-which one you meant, and it is what this document's CDN section asks for too.
+The installation and CDN examples pin `1.0.0` so they identify the same package release.
+Use an explicit version in CDN URLs when deploying browser applications.
 
 Requires Node 20+ or any modern browser. **Zero dependencies.** ESM only.
 Node 20 reached end of life on 2026-04-30 and the floor names it because a great many projects
@@ -2684,7 +2682,7 @@ No modules, no import map, no build step — `lokalized.global.js` is a classic 
 one global:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/lokalized.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/lokalized.global.js"></script>
 <script>
   const strings = lokalized.createStrings({
     localizedStringSupplier: () => ({ en: { Hi: "Hello {{name}}" }, fr: { Hi: "Bonjour {{name}}" } }),
@@ -2716,7 +2714,7 @@ write the URL, you need no map at all:
 
 ```html
 <script type="module">
-  import { createStrings } from "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/lokalized.js";
+  import { createStrings } from "https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/lokalized.js";
 
   const strings = createStrings({
     localizedStringSupplier: () => ({ en: { Hi: "Hello {{name}}" }, fr: { Hi: "Bonjour {{name}}" } }),
@@ -2762,14 +2760,14 @@ The same eight over the network:
 <script type="importmap">
 {
   "imports": {
-    "lokalized":                "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/lokalized.js",
-    "lokalized/core":           "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/core.js",
-    "lokalized/parse":          "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/parse.js",
-    "lokalized/load":           "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/load.js",
-    "lokalized/ssr":            "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/ssr.js",
-    "lokalized/negotiate":      "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/negotiate.js",
-    "lokalized/data/ordinal":   "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/data/ordinal.js",
-    "lokalized/data/ranges":    "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/data/ranges.js"
+    "lokalized":                "https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/lokalized.js",
+    "lokalized/core":           "https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/core.js",
+    "lokalized/parse":          "https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/parse.js",
+    "lokalized/load":           "https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/load.js",
+    "lokalized/ssr":            "https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/ssr.js",
+    "lokalized/negotiate":      "https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/negotiate.js",
+    "lokalized/data/ordinal":   "https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/data/ordinal.js",
+    "lokalized/data/ranges":    "https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/data/ranges.js"
   }
 }
 </script>
@@ -3072,11 +3070,11 @@ second table. Both columns are re-derived on every run, so they describe this co
 
 | import | minified | brotli |
 |---|---|---|
-| `import { createStrings } from "lokalized"` | 183,213 | 54,513 |
-| `import { createLocaleMatcher, parseLanguageRanges } from "lokalized/negotiate"` | 89,585 | 31,249 |
+| `import { createStrings } from "lokalized"` | 183,208 | 54,472 |
+| `import { createLocaleMatcher, parseLanguageRanges } from "lokalized/negotiate"` | 89,580 | 31,269 |
 | `import { createSsrStamp, validateSsrStamp } from "lokalized/ssr"` | 6,810 | 2,043 |
 | `import { GENDER_FEMININE } from "lokalized"` | 2,350 | 914 |
-| the four above, in one bundle | 225,326 | 64,924 |
+| the four above, in one bundle | 225,321 | 64,805 |
 <!-- bundle-table:end -->
 
 <!-- dist-table:start -->
@@ -3086,15 +3084,15 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 
 | load | files | raw | brotli |
 |---|---|---|---|
-| `lokalized` | 1 | 186,481 | 55,261 |
-| `lokalized/core` | 8 | 185,772 | 55,218 |
+| `lokalized` | 1 | 186,476 | 55,320 |
+| `lokalized/core` | 8 | 185,767 | 55,088 |
 | `lokalized/parse` | 5 | 159,872 | 49,064 |
-| `lokalized/load` | 8 | 179,636 | 54,128 |
+| `lokalized/load` | 8 | 179,631 | 54,121 |
 | `lokalized/ssr` | 3 | 7,844 | 2,437 |
-| `lokalized/negotiate` | 4 | 91,167 | 31,812 |
-| `lokalized/data/ordinal` | 9 | 192,481 | 56,645 |
-| `lokalized/data/ranges` | 9 | 195,009 | 56,944 |
-| `lokalized.global.js`, the classic script | 1 | 246,484 | 69,393 |
+| `lokalized/negotiate` | 4 | 91,162 | 31,769 |
+| `lokalized/data/ordinal` | 9 | 192,476 | 56,701 |
+| `lokalized/data/ranges` | 9 | 195,004 | 56,749 |
+| `lokalized.global.js`, the classic script | 1 | 246,479 | 69,370 |
 <!-- dist-table:end -->
 
 **What a no-build page downloads.** The table above is what a bundler produces from the source; this
@@ -3112,7 +3110,7 @@ larger, so a figure quoted in it overstates what a visitor on a modern CDN actua
 not printed here, because a number nothing re-derives is how this section came to be wrong before.
 
 Three things are worth reading off that table. **Half of the root bundle is one pinned CLDR table** —
-replacing `likely-subtags` with an empty one takes the same bundle from 183,213 to 160,284 minified
+replacing `likely-subtags` with an empty one takes the same bundle from 183,208 to 160,279 minified
 bytes, which is the price of resolving `fr-CH` to `fr` without asking the host. **The tables are
 shared, not duplicated**: adding three more subpaths to the root costs 42,113 bytes, not another
 whole copy. And **`lokalized/ssr` carries no pinned data at all**, which is what lets the stamp
@@ -3138,7 +3136,7 @@ Object.keys(await import("lokalized/ssr"));   // => ["createSsrStamp", "validate
 ```
 
 `sideEffects` is declared `false` and bundlers honour it — removing that field takes the
-single-constant import from 2,350 to 78,529 minified bytes, 33× larger.
+single-constant import from 2,350 to 78,524 minified bytes, 33× larger.
 
 ---
 

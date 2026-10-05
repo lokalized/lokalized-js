@@ -4,9 +4,19 @@ All notable changes to lokalized are recorded here. This package is a JavaScript
 [lokalized-java](https://github.com/lokalized/lokalized-java) 3.1.0; where the two differ on purpose,
 [DIVERGENCES.md](DIVERGENCES.md) lists it.
 
-## 1.0.0 - Unreleased
+## 1.0.0 - 2026-10-05
 
-First release.
+First stable release. ESM for Node 20+, modern browsers and the qualified
+Cloudflare `workerd` runtime, with zero runtime dependencies.
+
+- Share JSON catalog syntax with the Java and Swift ports: expressions, recursive
+  fragments, cardinal/ordinal/range plural selection and all ten language-form axes.
+- Ship pinned CLDR 48.2 and IANA locale data, exact plural arithmetic, locale
+  negotiation, bidi isolation and structured translation/fallback diagnostics.
+- Provide browser, Node filesystem and caller-supplied catalog delivery, manifest
+  validation and identity helpers, and SSR hand-off validation.
+- Publish nine documented entry points, TypeScript declarations, browser ESM and
+  classic-script distributions, and a generated API reference.
 
 - Follow shared manifest-normalization profile 1.1.0: private-use-only
   `UND-x-foo` / `und-x-foo` claims and lookups stabilize as `x-foo` across

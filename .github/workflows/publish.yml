@@ -278,9 +278,9 @@ jobs:
 
       # `--tag` is passed unconditionally below, and a CLI flag REMOVES the matching key from
       # `publishConfig` before it is flattened (lib/commands/publish.js:294-305) — so passing it
-      # disables package.json's `publishConfig: {"tag": "next"}` safety net. npm will not catch a
+      # overrides package.json's configured default dist-tag. npm will not catch a
       # wrong value either: `semver.validRange("latest")` is null, so publish.js:88's range guard
-      # does not fire. Restore the net here, and make it stricter than it was.
+      # does not fire. Require the stable/prerelease distinction explicitly here.
       - name: The dist-tag must be one of two, and must suit the version
         env:
           VERSION: ${{ inputs.version }}
