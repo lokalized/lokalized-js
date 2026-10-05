@@ -1,0 +1,10 @@
+node_modules/
+types/
+dist/
+.build/
+*.tgz
+.DS_Store
+.tmp-*
+
+# scenario 0b: the browser capture is the recorder INPUT; measurements/scenario-0b.json is the record.
+tools/browser-0b/capture.json

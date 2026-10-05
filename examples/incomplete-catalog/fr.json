@@ -1,0 +1,27 @@
+{
+  "Books": {
+    "translation": "{{count}} {{books}}",
+    "placeholders": {
+      "books": {
+        "value": "count",
+        "translations": {
+          "CARDINALITY_ONE": "livre",
+          "CARDINALITY_OTHER": "livres"
+        }
+      }
+    }
+  },
+
+  "Photos": {
+    "translation": "{{count}} {{photos}}",
+    "placeholders": {
+      "photos": {
+        "value": "count",
+        "translations": {
+          "CARDINALITY_ONE": "photo",
+          "CARDINALITY_OTHER": "photos"
+        }
+      }
+    }
+  }
+}

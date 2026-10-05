@@ -1,0 +1,241 @@
+// @ts-check
+
+/**
+ * CACHE BOUNDS UNDER ADVERSARIAL TAGS — the M7 row's "cache bounds survive adversarial tags".
+ *
+ * WHAT IS ACTUALLY CACHED, enumerated rather than assumed. M7-PLAN.md's C2 row says "no tag-keyed
+ * cache exists today"; that is stale, and this file is the correction. Exactly THREE things in
+ * `src/` GROW AT RUNTIME — re-derived by reading every module-scope `Map`/`Set` in the package and
+ * every closure that outlives a call, not by trusting an earlier list. (There were four until A30:
+ * see the note between items 2 and 3.) (The other memos in the port are per-CALL and retain nothing between calls: `projectNode`'s
+ * in `src/parse/index.js`, the `built`/`validatedDepth` pair threaded through
+ * `src/internal/catalog.js`'s builder, and the `expanded` map plus `IsolatedValue.rendered` inside
+ * one `render()` in `src/internal/interpolate.js`. Everything else at module scope — the RTL script
+ * set, the grandfathered-tag table, the token-type maps, the pinned data modules — is a FIXED table
+ * built once from pinned data and never written to again.)
+ *
+ *   1. `src/internal/bidi.js` `RIGHT_TO_LEFT_BY_TAG` — memoizes `localeUsesRightToLeftScript`.
+ *      Bound 512 entries, cleared wholesale on overflow. KEYED ON CALLER INPUT: the failure-key path
+ *      isolates under the REQUESTED locale, which is whatever tag the caller asked for.
+ *   2. `src/internal/plural.js` `indexByTag`, one per compiled rule table — memoizes the CLDR
+ *      candidate walk. Bound 512, cleared wholesale on overflow. Also keyed on caller input:
+ *      `en-US-x-p1`, `en-US-x-p2` … all resolve to the `en` group and each caches under its own full
+ *      spelling. `indexForLocale` writes only on a HIT (`plural.js:947-960`), so an unsupported tag
+ *      never enters it — but that is a SOURCE property and it is unobservable from outside, because
+ *      caching a miss would change no answer and, under the same 512 bound, no measurable footprint
+ *      either. An earlier version of this file asserted it anyway and the assertion was empty:
+ *      ablating `indexForLocale` to cache `-1` left all five tests green. What is asserted below
+ *      instead is the property that actually protects anything and that a probe can see — the
+ *      UNSUPPORTED tag space, which is the one an attacker can spell without limit, cannot grow
+ *      retained memory. That ablation now fails.
+ *      (`src/negotiate/index.js`'s `RECOVERED_LANGUAGE_EQUIVALENTS` was the third until A30: a memo
+ *      of language equivalents recovered from the probed closure, keyed only by artifact keys. A30
+ *      replaced the closure with registry classes the parse reads directly, so there is nothing to
+ *      recover and the memo is gone; both IANA tables are now decoded once at module load and never
+ *      written to again, like every other pinned table.)
+ *   3. `src/core/index.js`'s `chainMemo` — added by M9 S5, plan 2.2:150's blessed candidate-chain
+ *      LRU. ONE PER `Strings` INSTANCE, keyed on the normalized lookup tag, which IS caller input —
+ *      so it carries a hard 256-entry ceiling with strict-LRU eviction, and its whole contract is
+ *      gated by `test/candidate-chain-memo.test.js`, including a 4,096-tag sweep, the surviving key
+ *      order, a disabled branch that retains zero, and a 4,096 -> 40,960 heap protocol with the same
+ *      unbounded control this file uses.
+ *
+ * AND WHAT IS DELIBERATELY NOT CACHED — which is a DIFFERENT permission from the one M9 took, and
+ * the two were conflated until the measurement separated them. Plan 3.4:864 blesses caching the
+ * automatic direct result for "a constant instance locale"; plan 2.2:150 separately blesses
+ * memoizing the candidate CHAIN. M9 S5 took the second and DECLINED THE FIRST PERMANENTLY.
+ *
+ * The decline is a measurement rather than a preference. M7's close deferred 3.4's memo to M9 on the
+ * maintainer's reasoning that "a cache belongs with the server/edge packaging that creates pressure
+ * for it"; M9 built that packaging and then counted which arm of `localeLookupFor` it uses.
+ * Instrumented over 1,440 lookups — 100 SSR renders, 80 edge preserve-arm renders, 60 redirect
+ * targets — **the instance-locale arm was hit ZERO times**. The server's lookups are 80%
+ * supplied-match and 20% per-call locale; the edge's are 100% one or the other. So the deferred memo
+ * is inert for the workload it was deferred to, and taking it would buy nothing while making the
+ * plan's harder half ("resolver and per-call locale values are normalized and recomputed on every
+ * use") a matter of discipline rather than construction. `localeLookupFor` still calls `matchFor` on
+ * every lookup through every ingress, and the last test here is what catches a future cache that
+ * quietly extended itself to the resolver.
+ *
+ * WHAT DECLINING IT COSTS, AND WHY THAT IS DEFERRED RATHER THAN UNKNOWN. Priced by ablation against
+ * a scratch copy of `src/` carrying that one memo — identical rendered output, identical catalog
+ * digest — and then re-derived independently by a second pass to within a percent: at 2,000 keys the
+ * full walk goes 81,575 -> 32,941 ns/lookup (-59.6%) and the direct hit 44,360 -> 24,128 (-45.6%).
+ * `tools/scenario-2k.mjs`'s header carries the same table from the first measurement.
+ *
+ * **DEFERRED TO M9 by the maintainer on 2026-09-09, and DECLINED BY M9 S5 on the measurement above.**
+ * The price recorded here was real and is left standing, but it is a price on arms the server and
+ * edge packaging does not use. Worth noting for anyone re-reading it: the chain memo M9 DID take
+ * moves the instance-locale arm 43,720 -> 23,855 ns on its own, so a large part of what this table
+ * measured was the chain rather than the match. The tests below are what have to keep passing either
+ * way, and the last one is aimed at exactly the way taking 3.4's memo could go wrong.
+ *
+ * THE PROBE HAS A CONTROL THAT MUST EXCEED THE THRESHOLD. A memory assertion with no failing control
+ * "passes" on any machine where the sweep is cheap for unrelated reasons, which is this project's
+ * named `zh-123` shape. The same 200,000 tags are therefore also pushed into an ordinary unbounded
+ * `Map` in the same child process, and that measurement must blow past the same limit.
+ */
+
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { execFileSync } from "node:child_process";
+
+import { createStrings } from "../src/core/index.js";
+import { localeUsesRightToLeftScript } from "../src/internal/bidi.js";
+import { cardinalityForNumber } from "../src/index.js";
+import { CARDINALITY_ONE } from "../src/index.js";
+
+const root = new URL("../", import.meta.url).href;
+
+/** How many distinct adversarial tags each sweep pushes through a cache bounded at 512. */
+const SWEEP = 200_000;
+/** Generous: the bounded caches measured ~0.14 MB and ~0.33 MB, the unbounded control ~18 MB. */
+const BOUNDED_LIMIT_BYTES = 2_000_000;
+const CONTROL_FLOOR_BYTES = 8_000_000;
+
+describe("cache bounds survive adversarial tags", () => {
+  it("retains bounded memory over 200,000 distinct tags, with an unbounded control that does not", () => {
+    // Measured in a child process because a trustworthy retained-heap figure needs `--expose-gc`,
+    // which `node --test` does not carry. Same technique as `tools/scenario-0a.mjs`.
+    const source = `
+      import { localeUsesRightToLeftScript } from ${JSON.stringify(new URL("src/internal/bidi.js", root).href)};
+      import { cardinalityForNumber } from ${JSON.stringify(new URL("src/index.js", root).href)};
+      const gc = globalThis.gc;
+      const tag = (i) => \`en-US-x-p\${i}\`;
+      const measure = (fn) => {
+        gc(); gc();
+        const before = process.memoryUsage().heapUsed;
+        fn();
+        gc(); gc();
+        return process.memoryUsage().heapUsed - before;
+      };
+      // A tag with NO rule group at all — the miss path. Private-use primary language, so no CLDR
+      // candidate the walk tries can rescue it into a group.
+      const missTag = (i) => \`qaa-x-m\${i}\`;
+      let misses = 0;
+      const bidi = measure(() => { for (let i = 0; i < ${SWEEP}; i++) localeUsesRightToLeftScript(tag(i)); });
+      const plural = measure(() => { for (let i = 0; i < ${SWEEP}; i++) cardinalityForNumber(1, tag(i)); });
+      const pluralMiss = measure(() => {
+        for (let i = 0; i < ${SWEEP}; i++) {
+          try { cardinalityForNumber(1, missTag(i)); } catch { misses++; }
+        }
+      });
+      const sink = new Map();
+      const control = measure(() => { for (let i = 0; i < ${SWEEP}; i++) sink.set(tag(i), i % 2 === 0); });
+      process.stdout.write(JSON.stringify({ bidi, plural, pluralMiss, misses, control, controlSize: sink.size }));
+    `;
+    const measured = JSON.parse(
+      execFileSync(process.execPath, ["--expose-gc", "--input-type=module", "-e", source], {
+        encoding: "utf8",
+        maxBuffer: 1 << 20,
+      }),
+    );
+
+    assert.equal(measured.controlSize, SWEEP, "the control must actually have retained every tag");
+    assert.ok(
+      measured.control > CONTROL_FLOOR_BYTES,
+      `the UNBOUNDED control retained only ${measured.control} bytes — the sweep did not exercise ` +
+        "anything, so the two assertions below prove nothing",
+    );
+    assert.ok(
+      measured.bidi < BOUNDED_LIMIT_BYTES,
+      `bidi RTL memo retained ${measured.bidi} bytes over ${SWEEP} distinct tags`,
+    );
+    assert.ok(
+      measured.plural < BOUNDED_LIMIT_BYTES,
+      `plural rule-table memo retained ${measured.plural} bytes over ${SWEEP} distinct tags`,
+    );
+    // THE MISS PATH, which is the attacker's half: a tag with no rule group is refused, and a
+    // refusal is the input an attacker can spell without limit. Every one of the sweep's tags must
+    // actually have been refused, or the measurement is of the hit path under another name.
+    assert.equal(measured.misses, SWEEP, "every unsupported tag must have been refused");
+    assert.ok(
+      measured.pluralMiss < BOUNDED_LIMIT_BYTES,
+      `plural rule-table memo retained ${measured.pluralMiss} bytes over ${SWEEP} UNSUPPORTED tags`,
+    );
+  });
+
+  it("answers correctly on both sides of an eviction", () => {
+    // Clearing wholesale is the cheapest eviction policy there is, and the risk it carries is that a
+    // cleared entry comes back WRONG rather than merely slow. Both caches are read before the sweep,
+    // driven past their bound, and read again.
+    assert.equal(localeUsesRightToLeftScript("ar"), true);
+    assert.equal(localeUsesRightToLeftScript("en"), false);
+    assert.equal(cardinalityForNumber(1, "en"), CARDINALITY_ONE);
+
+    for (let index = 0; index < 4096; index++) {
+      localeUsesRightToLeftScript(`en-US-x-e${index}`);
+      cardinalityForNumber(1, `en-US-x-e${index}`);
+    }
+
+    assert.equal(localeUsesRightToLeftScript("ar"), true);
+    assert.equal(localeUsesRightToLeftScript("en"), false);
+    assert.equal(localeUsesRightToLeftScript("ar-Latn"), false);
+    assert.equal(cardinalityForNumber(1, "en"), CARDINALITY_ONE);
+    assert.equal(cardinalityForNumber(2, "cy").name, "CARDINALITY_TWO");
+  });
+
+  it("a sweep of unsupported tags leaves the supported answers intact", () => {
+    // The correctness half of the miss path; the MEMORY half is asserted in the probe above, where
+    // an unbounded miss cache is visible. Here the only question is whether driving 2,048 refusals
+    // through the walk disturbs the answers around them — a wholesale `clear()` reached from the
+    // wrong branch would show up as a wrong answer, not as a slow one.
+    for (let index = 0; index < 2048; index++)
+      assert.throws(() => cardinalityForNumber(1, `qaa-x-m${index}`));
+
+    assert.equal(cardinalityForNumber(1, "en"), CARDINALITY_ONE);
+    assert.equal(cardinalityForNumber(2, "cy").name, "CARDINALITY_TWO");
+  });
+
+  it("the negotiator's IANA tables are fixed at module load, whatever a caller sends", async () => {
+    // Since A30 both IANA tables are decoded once and only read, so there is no key a caller can add.
+    // This sweep is what would notice a future memo keyed on caller input creeping into the parse —
+    // which is the shape the recovery memo it replaced had, bounded then only by the artifact's keys.
+    const { createLocaleMatcher } = await import("../src/negotiate/index.js");
+    const negotiator = createLocaleMatcher({
+      fallbackLocale: "en",
+      supportedLocales: ["en", "fr"],
+      tiebreakerLocalesByLanguageCode: null,
+    });
+
+    for (let index = 0; index < 4096; index++)
+      negotiator.bestMatchForLanguageRanges([{ range: `qaa-x-r${index % 26}${index}`, weight: 1 }]);
+
+    // A range that IS in the table still answers correctly afterwards.
+    assert.equal(negotiator.bestMatchForAcceptLanguage("iw"), "en");
+    assert.equal(negotiator.bestMatchForAcceptLanguage("fr-CA"), "fr");
+  });
+
+  it("the constant-instance-locale match is RECOMPUTED, and so is every resolver call", () => {
+    // Plan 3.4 permits caching the automatic direct result for a constant instance locale. The port
+    // declines, and this is what makes the decline observable: a `localeSupplier` that answers a
+    // different tag on each call must produce a different lookup each time. An instance-level cache
+    // that leaked onto the resolver path renders the first answer forever.
+    const answers = ["fr", "de", "fr", "en"];
+    let call = 0;
+    const strings = createStrings({
+      fallbackLocale: "en",
+      localeSupplier: () => /** @type {string} */ (answers[call++ % answers.length]),
+      localizedStringSupplier: () => ({
+        en: { Greeting: "en" },
+        fr: { Greeting: "fr" },
+        de: { Greeting: "de" },
+      }),
+    });
+
+    assert.deepEqual(answers.map(() => strings.get("Greeting")), ["fr", "de", "fr", "en"]);
+
+    // The per-call locale is normalized and recomputed on every use too — same instance, four
+    // different requests, four different answers, in both spellings.
+    const fixed = createStrings({
+      fallbackLocale: "en",
+      localeSupplier: () => "en",
+      localizedStringSupplier: () => ({ en: { Greeting: "en" }, fr: { Greeting: "fr" }, de: { Greeting: "de" } }),
+    });
+
+    assert.equal(fixed.get("Greeting"), "en");
+    assert.equal(fixed.get("Greeting", undefined, { locale: "FR" }), "fr");
+    assert.equal(fixed.get("Greeting", undefined, { locale: "de" }), "de");
+    assert.equal(fixed.get("Greeting"), "en");
+  });
+});

@@ -1,0 +1,826 @@
+{
+  "note": "Per-subpath module graphs. Module count and source bytes ratchet; growth needs a reason.",
+  "generatedBy": "tools/subpath-graphs.mjs",
+  "history": [
+    {
+      "reason": "Initial baseline, recorded after M8 S2/S3 landed the directory loader. lokalized/load and lokalized/ssr are still export-{} scaffolds at 1 module each; lokalized/node is 27 modules because the loader composes the shipped parser rather than duplicating it.",
+      "previousSha256": null
+    },
+    {
+      "reason": "M8 S5: lokalized/load's type surface authored from the plan's own TypeScript blocks — CatalogIdentity, StringsManifestV1, FetchEntry, CatalogIdentityInputV1, StringsLoadCoverage, LoadedStrings and LoadFailure. Types only; no runtime, so the graph gains the subpath's own bytes and no new module.",
+      "previousSha256": "348eea727da03e20c728cddb2317d7a864060b888f3383aa66395fffd2157156"
+    },
+    {
+      "reason": "M8 S6: computeCatalogIdentity, plus the synchronous SHA-256 and the bounded RFC 8785 canonicalizer plan 6.1 gives the load graph so identity stays synchronous in a browser. lokalized/load 1 -> 4 modules; the ROOT graph is unchanged at 25 modules, which is the containment claim this ratchet exists to check.",
+      "previousSha256": "3b5763b139af42c12aafcd84bd554f37692ea57c1feab210b4bc8759a8b7a222"
+    },
+    {
+      "reason": "M8 S6b: parseStringsManifest, validateStringsManifest and localeConfigurationForManifest. The load graph gains the bounded JSON path, the CLDR tag data and the locale machinery it validates manifest tags against; the ROOT graph is unchanged.",
+      "previousSha256": "59c887229d6cb68a663a9c6dba72c448aee9b3e8d5bce29b900e403dcf16ed50"
+    },
+    {
+      "reason": "M8 S7: chain and fetchSet. One module, and the graph barely moves because the candidate sequence is REUSED from src/internal/locale.js rather than reimplemented for the manifest door.",
+      "previousSha256": "0dcd7fa704078b48ec9d723611cf42f543e162fee5ee4454611ee58303b625af"
+    },
+    {
+      "reason": "M8 S8: loadStrings and loadEntireManifest. The load graph gains src/parse and its catalog machinery, because a fetched body is parsed by the SAME bounded parser every other door uses rather than a second one.",
+      "previousSha256": "3277d7de7d617c74fa6175d1d2be32d4e684d7453baeab421b20124f35aa0ae2"
+    },
+    {
+      "reason": "M8 S9a: the runtime CLDR/data compatibility check plan :1893 requires before catalog I/O. lokalized/load gains src/data/provenance.js — ONE module — which slice S6b had wrongly declared unreachable.",
+      "previousSha256": "756f63e0a434c00e67835d45c7c1cd880c10088dce55ec34781012e31b2caf7f"
+    },
+    {
+      "reason": "M8 S9: the loaded branch reaches core and therefore every published subpath that re-exports it.",
+      "previousSha256": "d06492225b73f9ab2e507f5ec11e2c938ac0e608bbd1a1ecb29d01f046536a06"
+    },
+    {
+      "reason": "M8 S10: the SSR stamp ships (lokalized/ssr 1 -> 2 modules), and core gains src/internal/runtime-metadata.js — the producer/IANA/corpus identity a stamp must take from the RENDERER, which only works if the renderer holds it. Root/core +1 module; the load subpath grows only by fetch-loader emitting manifestLocaleConfiguration.",
+      "previousSha256": "1ec9a3e21765e40ea7c6c98bcff7263f5e3a779417e694b392550634af121b4a"
+    },
+    {
+      "reason": "M8 S11a: lokalized/node gains the manifest-mediated file loaders, so it now reaches the whole lokalized/load graph (manifest validation, planning, identity, SHA-256, JCS) — 27 -> 37 modules. lokalized/load gains src/load/run-plan.js, the plan runner both doors share: plan order, the concurrency cap, the partial-failure policy, abort and digest-before-parse live in ONE place and the door supplies only a transport.",
+      "previousSha256": "2c83579dbda518435d68722d1cdf98d6a0ca738bc6b96ad37fc000e2bfaa5fb9"
+    },
+    {
+      "reason": "M8 S11b: the directory walk EXTRACTED to src/node/discovery.js so both Node doors drive one enumeration, plus createStringsManifestFromDirectory. lokalized/node 37 -> 39 modules — discovery.js and manifest-directory.js — and no other subpath moves, because the generator reuses the load graph's identity, SHA-256 and manifest validation rather than duplicating them. (Reason text reconstructed 2026-09-11 after a review session reverted this file by accident; the measured numbers are re-derived from the same source.)",
+      "previousSha256": "0728182af4dd1ba9ce7d5d7013be3b30cbdf3cb0b1e7783941a61dea6210396b"
+    },
+    {
+      "reason": "M8 S11b review fixes: normalizedTiebreakers plus the per-file manifest-tag check in the generator, and manifest.js refusing a Map where every read is Object.entries.",
+      "previousSha256": "1ff194a8c28448b61c8376c4e76f4af81999a1db85ffe0bf6807c271af76be64"
+    },
+    {
+      "reason": "M8 S9-owed: core gains the applicable-configuration split (the selection channel reads the full manifest, the resolution channel the loaded catalogs) and the per-use lookup-coverage check. No new module — source only.",
+      "previousSha256": "2e69036c4f12c3f99d63eab8825daa6f801dd99e1877a9f2edcd329fd5ba018a"
+    },
+    {
+      "reason": "M8 close-out: the nine promised-but-undeclared type names land in core and negotiate, and tools/gen-data.js now emits all five fields plan 2.2 declares for DataProvenance (the shipped provenance carried two, so the type could not be declared truthfully).",
+      "previousSha256": "34f07758f91e26cff516550219c3035b3a41492be7e730eebee88418475a0179"
+    },
+    {
+      "reason": "M8 clause 30: manifest tiebreakers validated against the full manifest (src/load/manifest.js) and filtered to loaded tags in the shared runner (src/load/run-plan.js). No new modules; both graphs grew by the same 5,986 bytes because lokalized/node composes lokalized/load.",
+      "previousSha256": "1ee01baac684b34d65627fcedd9da841d76bfd2365ed4686c5bc622b06eb085d"
+    },
+    {
+      "reason": "M8 clause 22: the plan runner now checks options.signal at the top of its worker loop, so aborting stops ADMISSION rather than relying on the transport to refuse. 748 bytes, no new modules; node composes load.",
+      "previousSha256": "13b71d7588add3d2d690304496cc5d2555144b39a4944ed6b61bfa9f98921335"
+    },
+    {
+      "reason": "M8 clause 19: the loaded branch now refuses a record whose two copies of its own warning list disagree (src/internal/loaded-input.js). 3,725 bytes, no new modules; it is in the root graph, so every subpath that composes core moves.",
+      "previousSha256": "46d38d50216d9df51c0c60caed9b7fed63dcabbaba478d2edafd364549fc1f17"
+    },
+    {
+      "reason": "M8 clauses 10 and 33: the Fetch door gained the scheme preflight its Node sibling already had (src/load/fetch-loader.js), and the loaded branch now hands construction the option name it actually reads (src/internal/loaded-input.js).",
+      "previousSha256": "efda31cd6336d058ba17dd2b34cdcf8fb72232b0521d8af2d5c40ae1d4a34c98"
+    },
+    {
+      "reason": "M8 clause 75: StringsLoadingError gains the construction token StringsParseError has had since M5, and DigestUnavailableError becomes a real Error subclass instead of a plain Error with its name assigned afterwards. No new modules.",
+      "previousSha256": "ace30075bde43e2782b1be035f117d1ef6efa894d2de328e943711c236d32466"
+    },
+    {
+      "reason": "S28: src/load/index.js stops DECLARING core's CatalogIdentity and StringsLoadCoverage and consumes them inline, so lokalized/load no longer re-exports the two types plan 3.1 says it must not re-own. The two typedef blocks became prose recording why; +439 B on load, +6 B on node. No module added to any graph.",
+      "previousSha256": "93c7e1bc4587ece8cdc9834167eea11ef5b175e5d44ec87837a4256954a969ff"
+    },
+    {
+      "reason": "S29: plan 3.5:1092-1100 declares nine error classes as package exports and the port shipped three. DigestUnavailableError now exports from lokalized/load and ExpressionEvaluationError from lokalized/core; the latter gained the construction token plan 3.5:1107 requires, plus an expressionEvaluationError() factory because it is raised from three modules. No module added to any graph; the growth is the guard, the factory and the prose recording why.",
+      "previousSha256": "584fb695034d17a3da748ad552dc1da9e63b0ab7add2b78a29ec38a9448e4905"
+    },
+    {
+      "reason": "S29: createStrings gains the OPTION UNION plan 3.2:565-588 declares. The port had only the direct arm and read the loaded member through an any cast, so createStrings({ loaded, locale }) -- M8's flagship call -- failed to typecheck for a TypeScript consumer (TS2353). Both arms now spell the other's members never, so a mixed call is refused too. Growth is the two typedefs and the prose recording the defect.",
+      "previousSha256": "1a54dd2474ccabab0d6692033fc77d282ee3feff8bc11fc6f4a1b90bf16efc82"
+    },
+    {
+      "reason": "S30: plan 3.2:447-453's seven build-identity constants now export from lokalized/core (cldrVersion, dataFingerprint, behavioralVectorsVersion, localeDataMode, cardinalityMode, ianaRegistryDate, ianaDataFingerprint). The values already existed in RUNTIME_METADATA and the pinned provenance module, both already in core's graph, so no module is added; the growth is the seven bindings and the docblock recording that two independent gates found them missing.",
+      "previousSha256": "6f16b211d3d9ede38d315148c220cbb300b4d3f6c04d1aaa12d74e547c8149df"
+    },
+    {
+      "reason": "S34: ConfigurationError becomes a real token-guarded class and exports from lokalized/core. Plan 3.5:1100 declares it; 119 call sites across core, load, ssr and node raised a plain Error with name assigned afterwards, catchable only by string. No module added; the growth is the class, the token, the factory and the prose recording the third instance of this shape.",
+      "previousSha256": "e0bda2d31a04917b71550f283b6960715e6ac4cbedc0c196fbf23bc4cb9cb4f3"
+    },
+    {
+      "reason": "S35: plan 3.5:1092's LokalizedError base class lands in src/internal/lokalized-error.js, and all seven library error classes now extend it, so one instanceof answers 'did this come from lokalized'. +1 module in every graph that can fail — which is every graph, because a base class is reachable from every error that extends it. UnsupportedLocaleError also gained the token, the UNSUPPORTED_LOCALE code plan 3.5:1050 declares, and the plan's field name (locale, not localeTag).",
+      "previousSha256": "12cbcc658cc3da1435f75c5a39dbf9728029c9b3cdf531a11961cbe4616691cd"
+    },
+    {
+      "reason": "BATCH: plan 3.7's tagged-value type family (15 names) plus seven more promised symbols land, and the 61 language-form constants gain exact per-constant types. They were emitted as Readonly<{...}> | undefined with axis and name widened to string, because src/index.js built them by looping into a Record; a consumer had to non-null-assert a frozen compile-time constant and could not name the axis. No module joins any graph — the 61-key map lives in internal/catalog.js, which every graph already reaches. The growth is JSDoc.",
+      "previousSha256": "b0760bfe1bb053ab2c93d3e67485093c31ed9fb0ea0436afa3af35dceb3638bf"
+    },
+    {
+      "reason": "Decision batch D1-D10: the manifest door now refuses zero-candidate and ambiguous fallbacks at validation (plan 6.2:145, both arms, before any per-file plan exists); every library error constructor is private or protected so the declarations expose no constructor or extension signature (plan 3.5:1107); dead ResolutionFailure class deleted. Growth is the two refusal arms, the seven static raisers and the prose recording each decision.",
+      "previousSha256": "0a5f33a8067d745078d9b291ee5a97ede3839f13f55f5a2e2d7b5e1cc1ed095c"
+    },
+    {
+      "reason": "D8: plan 3.5's ninth and last error class lands. ResolutionError carries Java's two recognized resolution categories, ~28 leaf raisers across three files take their codes from the executed oracle, and both contextualizing ladders now have Java's arms in Java's order — including ARM 4, which returns an unrecognized APPLICATION exception unchanged, as plan 2.5:249 requires and the port did not do. +1 module (src/internal/resolution-error.js), reachable from every graph that can fail.",
+      "previousSha256": "2099acd629381cff30b2846448a0ff867274fa351b4d2e35c5fc730739abb433"
+    },
+    {
+      "reason": "M9 examples: run-plan.js gained the annotation record that makes a loader result assignable to createStrings({ loaded }), plus the comment recording how it was found",
+      "previousSha256": "bb7566f60e4f9fdadf21f3ac7f77dc62026edc4819adf7bf97df7f62f6582007"
+    },
+    {
+      "reason": "M9 S2: lokalized/negotiate gains plan 3.4:904-915's forLanguageRanges, forAcceptLanguage and the two IANA constants, which pull in the zero-import internal/runtime-metadata.js leaf (15 -> 16 modules)",
+      "previousSha256": "c3ed96ddd9a14ef51eb96a43a133b4d825ee29d5e5cd6a13306c4f4dcd265711"
+    },
+    {
+      "reason": "M9 S3: src/parse/index.js gains plan 3.6:1477's mergeParsedStringsFiles, the last promised-and-undelivered name, with the Java-measured equality predicate; parse/load/node all reach that module",
+      "previousSha256": "74e6f2f1ac4172755cd2ddd96a37f8e79089e0cf7af01a224a4e6e5c409690f2"
+    },
+    {
+      "reason": "M9 S5: plan 2.2:150's candidate-chain LRU lands in src/internal/locale.js (the memo factory and its two test-only probe symbols) and src/core/index.js (construction and the probe); every subpath reaches the locale kernel",
+      "previousSha256": "a8ced3b4b78be1fca4d3469f27626a8f0c99e081d9f78f496aadada6a29f9165"
+    },
+    {
+      "reason": "M9 S6: src/load/fetch-loader.js exports DEFAULT_REQUEST so test/example-server.test.js can pair the loader's CORS mode with the preload's bare crossorigin attribute — plan 6.3:2180 makes those one claim in two places",
+      "previousSha256": "2041e1c813a3001e06bf60cd5ff4099b427aeb7dafb8836c2fd3dd7c30245b9f"
+    },
+    {
+      "reason": "M9 S8: src/negotiate/index.js renders a refused weight with javaDoubleText on the object door, matching the header door and Java's Double.toString; the comment records the measurement that found it",
+      "previousSha256": "7c3230d2f430c6fce767f30529e4e592e9faea25de10437b962fb1c395075c45"
+    },
+    {
+      "reason": "M9 S9: jdkLanguageSubtag maps the superseded ISO codes FORWARD to the modern spelling (the pinned JDK 21 behaviour) and both inverted comments are corrected with their measurements",
+      "previousSha256": "03c72645d913f756644613b0c30896dc29f4b11caa641cbbafe3fea738ee3e82"
+    },
+    {
+      "reason": "M8 clause 78: src/load/run-plan.js releases the parse slots on every rejection path (a held StringsLoadingError retained 5 of 5 parsed catalogs through the error's captured stack; measured 0 after). +1,347 bytes, of which the mechanism is three lines and the rest is the comment explaining why a memory property is being asserted in a loader.",
+      "previousSha256": "3144491e9f1334f6ba54ca51d8c485a92d6521a3f5c2c1ef87fabe210a9beae3"
+    },
+    {
+      "reason": "src/load/manifest.js: an inline comment reading 'only the comparison is missing' sat seven lines above the comparison it said was missing — a stale self-asserting text in shipped source, found by an agent measuring the data-mismatch surface. Replaced with two lines stating why the shape check precedes the comparison; +88 bytes in the load and node graphs, no behaviour change.",
+      "previousSha256": "742ca3db6bbdea075763f43ff7d22736ef2743a4833e4186de96e1283b940e93"
+    },
+    {
+      "reason": "M-D S31: re-recorded after the new SHRINK report surfaced a stale artifact. The record read 872,639 bytes for lokalized against a live 872,635 — four bytes, from a comment reworded in S30 — because this ratchet only ever failed on growth and said nothing about a shrink. Found by tools/bundle-sizes.mjs, which ran a real bundler over the same graphs and agreed with the tree while disagreeing with this file.",
+      "previousSha256": "becf156922292ae05ee464142a4b1e21551de7ccc972e4909236877cd6e7aebd"
+    },
+    {
+      "reason": "M-D S32: two stale graph counts removed from shipped source docblocks — src/index.js said the root 'stays 25 root / 24 core' in the present tense (it is 31/30) and src/internal/interpolate.js said scenario:0a 'ratchets at 19 modules'. Both propositions held; only the figures had not been re-read since M2, so the numbers are gone and the propositions stay.",
+      "previousSha256": "819e7fc9b91e5dd4be371706d6e145bcbcb891c94f823dc4008446cb53a175df"
+    },
+    {
+      "reason": "M-D S33: four maintainer decisions land together — the manifest format carries all seven build-identity fields (runtime-metadata.js joins the load and node graphs, +1 module each), every public door refuses an unknown option (configuration-error.js joins the parse graph via catalog.js, +1 module), matchType is narrowed to plan 3.4's LocaleMatchType (JSDoc only), and the onWarning observer is documented. No behaviour moved that the corpus can see: conformance is 2,150/0/0 across all four.",
+      "previousSha256": "8064fce9631a537b6839c5c992cc179af3e0715c821b4e11677eb49f39678079"
+    },
+    {
+      "reason": "M-D S34: the four aggregate load budgets are charged ACROSS a load at the manifest doors, as the types and README have always documented and as the directory door has always done. runPlan now gives each file its own LoadingSession (unchanged as a per-file bound, new as a measurement) and reconciles the four counters in FETCH-PLAN order after the workers finish, replaying through the session's own guarded methods so both door families raise one sentence. lokalized/load 39 -> 38 and lokalized/node 42 -> 41 modules: the runner calls the INTERNAL parseStringsWithSession, so the public parse door leaves both loader graphs. Root/core/parse grow by the shared LoadingSession.absorb. conformance byte-identical at 2,150/0/0.",
+      "previousSha256": "acfc119c1dfa17ce9b2c6ee2521aa68b8c015595801c58ab16a96c879c27a7e2"
+    },
+    {
+      "reason": "M-R S3: TranslationFailure/FallbackEvent localeMatch typed Readonly<LocaleMatch> and StringsLoadingError.failures typed LoadFailure; documentation comments only, no runtime change",
+      "previousSha256": "23815191cc2ae1da3ef98a0a6f7a875f004b8934d89dd83a4e0513d6e46d8c97"
+    },
+    {
+      "reason": "M-R: every returned LocaleMatch and language-range list is deep-frozen at its one construction site in matchForRanges, and parseLanguageRanges freezes its members; LocaleMatch and WeightedLanguageRange are each a single Readonly<...> typedef that core and negotiate derive instead of authoring their own mutable copies.",
+      "previousSha256": "aef84f67524e7719b6279d700350327165baf754aa8ec7a6858bd4e3a4cd77c8"
+    },
+    {
+      "reason": "M-R S3: the consumer-facing contract defects the requirement registry exposed. Returned values are now frozen one level down — getResult().localeMatch's consideredLocales, languageRange and requestedLanguageRanges (and its members) were mutable, so a consumer could write into a record the library handed them; the typedef's arrays became readonly to match what the runtime now enforces. StringsLoadingError.failures is typed LoadFailure[] rather than any[], and the runner's internal cast narrowed from stage?: string to the seven-member union. TranslationFailure.localeMatch and FallbackEvent.localeMatch are typed Readonly<LocaleMatch> rather than unknown — both are handed to consumer callbacks. All JSDoc and freeze calls; conformance byte-identical at 2,150/0/0.",
+      "previousSha256": "8c9a019ad57d85b3bda2a04b489cfecb6b8b51e39fa6773ad6f4f83080042306"
+    },
+    {
+      "reason": "M-R S4: the registry's 179 readonly statements land. Fourteen JSDoc typedefs wrapped in Readonly<> with their per-property documentation restated as prose in the docblock (which is what grew the source), nine error-class fields marked @readonly, the code threaded through LokalizedError's constructor, and five parameter element types narrowed from unknown.",
+      "previousSha256": "84a1b454ba919bfa7f223704e44584c267b9f6c14786bb9d05bb3988c808aef6"
+    },
+    {
+      "reason": "M-R S5: the Unicode attribution becomes a preserved legal comment on each of the fifteen generated CLDR modules, so it survives minification into whatever a consumer bundles. ~2.1 KB of source per graph; esbuild deduplicates the identical banners to one copy in the artifact.",
+      "previousSha256": "ee99c9e0eb577f69440c859beb788a624918b39b6dbc08ec229d0097acbd1a63"
+    },
+    {
+      "reason": "M-R S8: likely-subtags.js is re-encoded structurally — 7,788 rows in 25 KB of source instead of 158 KB, decoding to output byte-identical to the pinned CLDR artifact. The browser root bundle falls 322,509 -> 187,679 minified and 73,653 -> 55,610 brotli, -24.5% on the wire. Conformance byte-identical at 2,150/0/0.",
+      "previousSha256": "21f10b699796d580d17b2fad0d5b8418cec3d36573b21182f186e48c19211a22"
+    },
+    {
+      "reason": "M-R S11: runtime-metadata.js gained the ianaClosureSource field and a real File-Date for ianaRegistryDate, after the maintainer took the pinned-IANA-snapshot decision. +1,572 source bytes in every graph that carries build identity; no module joined any graph.",
+      "previousSha256": "8881727ea598e45b2a0d571a5a6547c0eb2b1d095e2a8e75bb2d1edfc178a503"
+    },
+    {
+      "reason": "M-R S13: lokalized-java 3.1.0's registry-sourced IANA table. The pinned closure grows 806 -> 814 classes and carries an 8-tag JDK delta (negotiate +4,162 B); the reduced identity table in src/internal/locale.js grows 269 -> 277 rows, which every graph reaches (+955 B)",
+      "previousSha256": "66ad7ffb6368db9d4e652d4f967763aadb4782edc0dc8009a7dc3018d5d0e6a8"
+    },
+    {
+      "reason": "M-R S13: the IANA closure 806 -> 818 classes (twelve JDK-absent tags; four recovered by seeding the probe space from the oracle's own key list) plus Java's prefix walk at the single-locale door in src/internal/locale.js",
+      "previousSha256": "476e227deef4c6d3f392fc980d00ccd3f9835a54b451e4a73b3f3d74e673f663"
+    },
+    {
+      "reason": "version 0.0.0 -> 1.0.0-rc.1 for the first publish: producerVersion is a source string, +5 bytes in every graph that reaches src/internal/runtime-metadata.js",
+      "previousSha256": "3f09ec159862eab2a30dd2c71715fece75b7fc06902910701edb27efff78520e"
+    },
+    {
+      "reason": "M-R S24: two shipped docblocks still said ianaRegistryDate is 'NOT A DATE' / 'jdk-oracle:21.0.11'; it has been the pinned registry's File-Date since M-R S11. Comment text only: negotiate +11 bytes, load shorter.",
+      "previousSha256": "27cead6b6d8867a0909653c63326ee7a9505d18a77aadb8747f0bc86ac819c7e"
+    },
+    {
+      "reason": "A30: the IANA data is generated from the pinned registry snapshot. +1 generated root module in every subpath reaching the kernel (src/data/iana-identity-equivalents.js: the direct-match projection plus the 14 region/variant substitutions, replacing a 277-row table inlined in src/internal/locale.js); negotiate's full table re-encoded as 369 classes (297,927 -> 268,076 B there); net growth elsewhere is docblock prose recording the change",
+      "previousSha256": "899c03bdd3826be06a4d2a3162bb43692e89d9694d3815a525d0ce36756ff084"
+    },
+    {
+      "reason": "A30 follow-up: src/internal/locale.js's docblock re-states the 88 single-locale divergences from a re-measurement (22,493 door-grid pairs; mgp/mrd 28, mrh/shl 28, enm/yol 28, nsl/sgn-no 4), replacing an unreproducible 2,396-probe breakdown. +235 comment bytes; no code and no module moved",
+      "previousSha256": "fbc45c4af17aa96d9994504a122c78963531edfb9e064b3232d0a7331f57e31c"
+    },
+    {
+      "reason": "M-D S33 follow-up: the doors the S33 sweep missed now refuse an unknown option through the shared refuseUnknownOptions helper — createLocaleNegotiator and the two root choosers (LocaleConfiguration), strings.get/t/getResult per-call options, chain/fetchSet (with the two loader forwards projected), pluralOperands; lokalized/negotiate reaches internal/configuration-error.js and internal/lokalized-error.js for the first time (17 -> 19 modules), the root, core, load, node and two data graphs grow by the guards and their comments, and parse and ssr reach no changed file",
+      "previousSha256": "bbfa631c5f9c6d6189252989c26392a0e0ef6877718611c8694e61da8a92a8af"
+    },
+    {
+      "reason": "the Fetch doors' options are declared as plan 6.2's LoadStringsOptions instead of any, and that type is wrapped Readonly as the plan declares it; src/load/index.js and fetch-loader.js grow by the annotation and its comment, no code and no module",
+      "previousSha256": "c33c9cb3068ee11875e6efece753d7bd0398fe18cd817f76ea23f2ed5de280c9"
+    },
+    {
+      "reason": "the Node file doors' two options typedefs declare partialFailure as the Fetch doors' PartialFailurePolicy (\"reject\" | \"allow-partial\"), as plan 6.2 derives them, instead of \"all-or-nothing\" | \"allow-partial\"; src/node/file-loader.js grows by the annotation's comment, no code and no module",
+      "previousSha256": "0064fbba68dc3dcb014936a235e05d654d7232beb20095bb9c7edc08ac0bcc67"
+    },
+    {
+      "reason": "M-R S26 pre-push follow-up (2026-09-23): src/internal/configuration-error.js refuses a non-object options argument and returns a normalized frozen {} that required and optional doors both take (maintainer decision), src/negotiate refuses language-range members other than range/weight (maintainer decision), src/load/run-plan.js stops a read still in flight across a rejection from writing its catalog into a cleared slot, src/load/index.js types the Fetch doors' fetch option as the call the loader makes (amendment A31), and comment corrections from three pre-push reviews. configuration-error.js is reached by every graph, so every graph grows; load, node and negotiate grow most. No module count moved.",
+      "previousSha256": "d3c20830ce74b270276b0294b9eb62a389ab66f88e481e1525ecb9cfda85a856"
+    },
+    {
+      "reason": "Promise refusal (maintainer decision, 2026-09-23): src/internal/configuration-error.js refuses a promise or other thenable in the options position, which an unawaited async options factory used to pass as 'no options'. configuration-error.js is reached by every graph, so every graph grows by the check and its comment. No module count moved.",
+      "previousSha256": "11dc0d155e88af816bb34ac32cf6b197f44c6c7ef02d57bc53ad2dc58ca58273"
+    },
+    {
+      "reason": "2026-09-25, no re-measurement: this history was chained (tools/ratchet-chain.mjs) and the figures this record holds were bound to it. From this entry on, each entry records the figures its write stored, and the record may hold no figure above the newest entry's and none missing. tools/subpath-graphs.mjs freezes this entry as its checkpoint, because the chain alone cannot see entries cut from its end. Nothing grew.",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 777038
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 765955
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582002
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 671420
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36530
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 286950
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 704728
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 796764
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 801637
+        }
+      },
+      "previousSha256": "3b0d0e07b106636cd2512b1687b5b059f00975c4ca69cf2d91735895ac75fde4"
+    },
+    {
+      "reason": "Graphs moved: createStrings lost its constant locale option before 1.0.0 (maintainer, 2026-09-27): every instance takes exactly one resolver, as a Java instance takes exactly one supplier; the refusal naming the replacement moves source bytes.",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 776117
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 765034
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 581357
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 670775
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36530
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 286305
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 704083
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 795843
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 800716
+        }
+      },
+      "previousSha256": "44a7c7a93a5db83ef29cbb63a0dfa3393369f9acaf2549aac481af5ac776e723"
+    },
+    {
+      "reason": "Source shrank: two shipped error messages (the createStrings runtimeLimits refusal and the createSsrStamp direct-construction refusal) no longer cite internal planning sections.",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 776106
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 765023
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 581357
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 670775
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36518
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 286305
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 704083
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 795832
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 800705
+        }
+      },
+      "previousSha256": "3be762be4c116bb821efa620f1cc16d2bb117beb5b74fde284b9b5221c50cfdf"
+    },
+    {
+      "reason": "Source shrank: the JSDoc emitted into the published .d.ts files no longer cites internal planning sections.",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 773869
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 762837
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 580161
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 669100
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36053
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 285182
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 702697
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 793595
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 798453
+        }
+      },
+      "previousSha256": "d72da5ab920500555024ace6f16e97d2779d081d505aeeb587cd876fa1d8fa41"
+    },
+    {
+      "reason": "Fallback resolution, loader provenance, and SSR typing changes alter published graph sizes for the 1.0 review.",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 775144
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 764112
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 581153
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 672347
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36550
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 286654
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 705849
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 794870
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 799728
+        }
+      },
+      "previousSha256": "ea44b6b0725206c9d4e6e2865d0415ad4aed78c455409c0e9bf51ab680d6c07f"
+    },
+    {
+      "reason": "Align shared public API names across ports before 1.0.0",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 778655
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 767623
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582266
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674380
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36550
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287988
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 708047
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 798381
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 803239
+        }
+      },
+      "previousSha256": "a525d24c143f756efc2c3e9bda7bbd0582ada9ca6e353fd9b474dcfeacca8ddb"
+    },
+    {
+      "reason": "Finalize documentation for the shared API vocabulary before 1.0.0",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 778396
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 767364
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582007
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674121
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36550
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287765
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 707788
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 798122
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 802980
+        }
+      },
+      "previousSha256": "ebc229f64c71c88f405403acab412d96b783be1e7713089f89da424bf53bf0f0"
+    },
+    {
+      "reason": "Use localizedStringSupplier for construction-time catalogs, matching Java before 1.0.0",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 778315
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 767283
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582007
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674121
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36550
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287765
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 707788
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 798041
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 802899
+        }
+      },
+      "previousSha256": "0a95b8d1d1110f6f574da49f8db216be625d403d5326a9a828a92c06a529f3b8"
+    },
+    {
+      "reason": "Complete the approved Java/JS API alignment with localeMatchResult, LocalizedStringLoadingError, and named public types",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 781720
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 768694
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582117
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674319
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36714
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287911
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 707954
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 801338
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 806213
+        }
+      },
+      "previousSha256": "6cc671759734fb740f45511477002d3b413e7e0f900c82e66fc5b87e074e7fa5"
+    },
+    {
+      "reason": "Correct supplier documentation after approved cross-port API naming cleanup",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 781778
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 768752
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582117
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674319
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36714
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287911
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 707954
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 801396
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 806271
+        }
+      },
+      "previousSha256": "093ee8bd50d87b8250746c961ee4a6547c94fe9141eb44a5f67528cba933e5bb"
+    },
+    {
+      "reason": "Shared diagnostic-text profile 1.1 repairs split UTF-16 pairs and caps nested manifest member displays",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 782259
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 769233
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582598
+        },
+        "lokalized/load": {
+          "modules": 39,
+          "bytes": 674850
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36714
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287911
+        },
+        "lokalized/node": {
+          "modules": 42,
+          "bytes": 708485
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 801877
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 806752
+        }
+      },
+      "previousSha256": "a2f278b2b8af54fff56e3f1ab69867f73538f5c4584876855f1d4b26cbb816cb"
+    },
+    {
+      "reason": "Shared manifest-normalization profile 1.1 gives private-use-only tags a stable serialized spelling and matching load coverage",
+      "recorded": {
+        "lokalized": {
+          "modules": 32,
+          "bytes": 782259
+        },
+        "lokalized/core": {
+          "modules": 31,
+          "bytes": 769233
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582598
+        },
+        "lokalized/load": {
+          "modules": 40,
+          "bytes": 675501
+        },
+        "lokalized/ssr": {
+          "modules": 3,
+          "bytes": 36714
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287911
+        },
+        "lokalized/node": {
+          "modules": 43,
+          "bytes": 709111
+        },
+        "lokalized/data/ordinal": {
+          "modules": 34,
+          "bytes": 801877
+        },
+        "lokalized/data/ranges": {
+          "modules": 34,
+          "bytes": 806752
+        }
+      },
+      "previousSha256": "ffd5b200de482d6a5fad45ce6cf39943413a72e3805c609f59719c2eeb7113be"
+    },
+    {
+      "reason": "Manifest profile 1.1 aligns loaded-catalog and SSR coverage with stable private-use locale spelling through a pure wire projection",
+      "recorded": {
+        "lokalized": {
+          "modules": 33,
+          "bytes": 783003
+        },
+        "lokalized/core": {
+          "modules": 32,
+          "bytes": 769977
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 582598
+        },
+        "lokalized/load": {
+          "modules": 41,
+          "bytes": 675816
+        },
+        "lokalized/ssr": {
+          "modules": 4,
+          "bytes": 37293
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 287911
+        },
+        "lokalized/node": {
+          "modules": 44,
+          "bytes": 709436
+        },
+        "lokalized/data/ordinal": {
+          "modules": 35,
+          "bytes": 802621
+        },
+        "lokalized/data/ranges": {
+          "modules": 35,
+          "bytes": 807496
+        }
+      },
+      "previousSha256": "f486552c759564784b344d0f131b8cdb1f1dc1352435ed248dffb78b8ab81fe8"
+    }
+  ],
+  "subpaths": {
+    "lokalized": {
+      "modules": 33,
+      "bytes": 783003
+    },
+    "lokalized/core": {
+      "modules": 32,
+      "bytes": 769977
+    },
+    "lokalized/parse": {
+      "modules": 30,
+      "bytes": 582598
+    },
+    "lokalized/load": {
+      "modules": 41,
+      "bytes": 675816
+    },
+    "lokalized/ssr": {
+      "modules": 4,
+      "bytes": 37293
+    },
+    "lokalized/negotiate": {
+      "modules": 19,
+      "bytes": 287911
+    },
+    "lokalized/node": {
+      "modules": 44,
+      "bytes": 709436
+    },
+    "lokalized/data/ordinal": {
+      "modules": 35,
+      "bytes": 802621
+    },
+    "lokalized/data/ranges": {
+      "modules": 35,
+      "bytes": 807496
+    }
+  }
+}

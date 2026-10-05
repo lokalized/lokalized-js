@@ -1,0 +1,26 @@
+{
+  "description": "Scenario 5. Two range placeholders, which need lokalized/data/ranges. Odia's cardinals are ONE for 1 and OTHER for 0, and CLDR's range table for Odia's group (ak, fa, or, sd) depends on BOTH endpoints: 0-1 (OTHER to ONE) is ONE and 1-1 (ONE to ONE) is OTHER. So the render tells the table apart from classifying by the start value, by the end value, or by either endpoint looked up twice, and from answering OTHER for every range; a missing data module refuses at construction.",
+  "options": {
+    "fallbackLocale": "or",
+    "locale": "or",
+    "strings": {
+      "or": {
+        "Ranges": {
+          "translation": "Ranges {{first}}, {{second}}.",
+          "placeholders": {
+            "first": {
+              "range": { "start": "firstFrom", "end": "firstTo" },
+              "translations": { "CARDINALITY_ONE": "{{firstFrom}}-{{firstTo}}: ONE", "CARDINALITY_OTHER": "{{firstFrom}}-{{firstTo}}: OTHER" }
+            },
+            "second": {
+              "range": { "start": "secondFrom", "end": "secondTo" },
+              "translations": { "CARDINALITY_ONE": "{{secondFrom}}-{{secondTo}}: ONE", "CARDINALITY_OTHER": "{{secondFrom}}-{{secondTo}}: OTHER" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "call": { "key": "Ranges", "values": { "firstFrom": 0, "firstTo": 1, "secondFrom": 1, "secondTo": 1 } },
+  "expected": "Ranges 0-1: ONE, 1-1: OTHER."
+}

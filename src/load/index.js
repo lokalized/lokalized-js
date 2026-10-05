@@ -1,0 +1,195 @@
+// @ts-check
+
+/**
+ * lokalized/load — manifest validation, planning, Fetch loading, identity.
+ *
+ * THE TYPE SURFACE LANDS BEFORE THE RUNTIME, deliberately. These are the shapes slices S6-S8 will be
+ * written against, and declaring them first means the contract is reviewable — and machine-checked by
+ * `test/declared-surface.test.js` — while it is still cheap to change. Every declaration here is
+ * transcribed from `IMPLEMENTATION-PLAN-v7.md`'s own TypeScript blocks, cited per type, rather than
+ * invented: this subpath has no Java counterpart at all, so the plan is the only oracle it has, and
+ * a type that drifts from the plan has nothing to catch it.
+ *
+ * A NOTE ON WHAT THIS DOES NOT YET DECLARE. `chain` and `fetchSet` are FUNCTIONS with real planning
+ * behaviour behind them, so they arrive with slice S7 rather than as empty signatures; they remain
+ * recorded as owed. Declaring a function's type without its implementation would satisfy the gate
+ * while delivering nothing, which is the shape of decoration this project audits for.
+ */
+
+/** @typedef {import("../parse/index.js").ParsedStringsFile} ParsedStringsFile */
+/** @typedef {import("../parse/index.js").StringsLoadingLimits} StringsLoadingLimits */
+/** @typedef {import("../internal/parse-warnings.js").LocalizedStringWarning} LocalizedStringWarning */
+
+/**
+ * A catalog set's identity, independent of where it was served from — CORE'S TYPE, CONSUMED HERE.
+ *
+ * Plan section 2.2 (`interface CatalogIdentity`) gives it to `core`, and plan 3.1's `load` row ends
+ * "it consumes but does not re-own or re-export core's `CatalogIdentity` and `StringsLoadCoverage`".
+ * This module used to DECLARE it, which `tsc` emits as `export type CatalogIdentity` on
+ * `lokalized/load` — the re-export that sentence forbids. The two declarations had also drifted:
+ * core's was `Readonly<{...}>` and this one was not, so the same public name meant a frozen record on
+ * one subpath and a mutable one on the other. Referenced INLINE rather than through a module-scope
+ * `@typedef`, because an imported typedef is emitted as an export too — measured on
+ * `ParsedStringsFile`, which arrives by import and still appears as `export type` in `types/load`.
+ */
+
+/**
+ * @typedef {"reject" | "allow-partial"} PartialFailurePolicy The partial-failure policy, read at
+ *   `run-plan.js:236` as a bare string against an untyped literal until this named it. An
+ *   adversarial pass classified it RENAMED; the plan-surface gate's "a RENAMED disposition names a
+ *   spelling the port actually has" test refused, because there was no spelling at all.
+ */
+
+/**
+ * The option bag for BOTH Fetch doors, `loadStrings` and `loadEntireManifest`.
+ *
+ * `fetch` is the transport; an injected one is explicitly free to ignore the signal, which is why
+ * the loader owns cancellation rather than delegating it. It is typed as the call the loader makes, a
+ * string URL and an init object, rather than as `typeof globalThis.fetch`: that type refused a
+ * custom transport typed
+ * `(url: string) => Promise<Response>` (TS2322), and the global `fetch` is still assignable to this
+ * one. The maintainer's decision of 2026-09-23 (amendment A31).
+ * `partialFailure` defaults to `"reject"`, and the declared union is the ONLY guard a misspelled
+ * policy has: `run-plan.js` reads `=== "allow-partial"`, so at run time any other string is the
+ * default. `request` is declared with two members; the runtime forwards whatever
+ * `RequestInit` members a JavaScript caller adds, and the declaration does not promise that.
+ *
+ * **WRAPPED AND APPLIED ON 2026-09-23.** Until then this type was declared and exported, and neither
+ * door used it: both annotated their options `any`, so a TypeScript caller writing `{ transport }` or
+ * `{ partialFailure: "allow_partial" }` got no error at all. Its members were also mutable where
+ * every one should be `readonly` — the same wrap, for the same reason, as `ParseStringsOptions`.
+ * `npm run declarations` carries the four probes that hold both.
+ *
+ * @typedef {Readonly<{
+ *   fetch?: (url: string, init: RequestInit) => Promise<Response>,
+ *   signal?: AbortSignal,
+ *   request?: Readonly<{ mode?: "cors" | "same-origin", credentials?: "omit" | "same-origin" | "include" }>,
+ *   partialFailure?: PartialFailurePolicy,
+ *   limits?: import("../parse/index.js").StringsLoadingLimits,
+ * }>} LoadStringsOptions
+ */
+
+/**
+ * The manifest a browser or edge runtime loads from.
+ *
+ * `formatVersion` is the literal `1` rather than a number, so a future format cannot be mistaken for
+ * this one by a structural check.
+ *
+ * @typedef {object} StringsManifestV1
+ * @property {1} formatVersion
+ * @property {string} catalogVersion
+ * @property {string} catalogFingerprint
+ * @property {string} cldrVersion
+ * @property {string} dataFingerprint
+ * @property {string} behavioralVectorsVersion
+ * @property {"pinned"} localeDataMode
+ * @property {"exact"} cardinalityMode
+ * @property {string} ianaRegistryDate
+ *   The `File-Date` of the pinned IANA Language Subtag Registry snapshot, as `YYYY-MM-DD`. It
+ *   carried `jdk-oracle:<version>` until that snapshot was pinned (M-R S11), and a manifest from
+ *   before then still does. See `src/internal/runtime-metadata.js`.
+ * @property {string} ianaDataFingerprint
+ * @property {string} fallbackLocale
+ * @property {string} baseUrl
+ * @property {Readonly<Record<string, Readonly<{ url: string, sha256: string, decodedBytes?: number }>>>} files
+ *   Per locale: the URL, the full lowercase SHA-256 of the RESPONSE-BODY OCTETS (not of the decoded
+ *   text — the digest is taken after any content coding and before decoding), and an optional
+ *   expected decoded size.
+ * @property {Readonly<Record<string, readonly string[]>>} tiebreakerLocalesByLanguageCode
+ */
+
+/**
+ * One file the loader intends to fetch, after planning.
+ *
+ * `url` is the ABSOLUTE serialized URL — resolution
+ * against the manifest's `baseUrl` happens during planning, so nothing downstream re-resolves it.
+ *
+ * @typedef {object} FetchEntry
+ * @property {string} locale
+ * @property {string} url
+ * @property {string} sha256
+ * @property {number} [expectedDecodedBytes]
+ */
+
+/**
+ * The canonical projection a catalog fingerprint is computed over.
+ *
+ * What it OMITS is the point, with one negative test per omitted field: `baseUrl`, per-file `url`
+ * and `decodedBytes` are all
+ * absent, so moving a catalog to a different host or re-encoding it does NOT change its identity,
+ * while changing a locale's bytes does.
+ *
+ * @typedef {object} CatalogIdentityInputV1
+ * @property {1} formatVersion
+ * @property {string} catalogVersion
+ * @property {string} resolvedFallbackLocale
+ * @property {Readonly<Record<string, string>>} localeToSha256
+ * @property {Readonly<Record<string, readonly string[]>>} tiebreakerLocalesByLanguageCode
+ */
+
+/**
+ * What a load was asked to cover — CORE'S TYPE, CONSUMED HERE, for the same reason as
+ * `CatalogIdentity` above.
+ *
+ * Plan section 2.2 (`type StringsLoadCoverage`). The `lookup` arm carries NORMALIZED planning input
+ * and the plan states plainly that the tag NEED NOT OCCUR IN THE MANIFEST — a lookup locale is a
+ * request, not a claim about what was published.
+ */
+
+/**
+ * One file that did not load.
+ *
+ * The `stage` is a seven-member sequence rather than a
+ * boolean because the partial-failure policy and the diagnostics both discriminate on WHERE it went
+ * wrong; collapsing it would make "the digest did not match" indistinguishable from "the JSON was
+ * malformed", which are different problems for whoever published the catalog.
+ *
+ * @typedef {object} LoadFailure
+ * @property {string} locale
+ * @property {string} url
+ * @property {"fetch" | "read" | "limit" | "digest" | "decode" | "parse" | "validate"} stage
+ * @property {unknown} cause
+ */
+
+/**
+ * The result of a load, and the input `createStrings({ loaded })` accepts.
+ *
+ * It carries its own provenance — identity, CLDR version, data fingerprint and the resolved limits —
+ * because `createStrings` REVALIDATES all of it rather than trusting the caller: a fabricated
+ * `LoadedStrings` is REJECTED with a `ConfigurationError` rather than downgraded.
+ *
+ * @typedef {object} LoadedStrings
+ * @property {Readonly<Record<string, ParsedStringsFile>>} catalogs
+ * @property {Readonly<Record<string, readonly string[]>>} tiebreakerLocalesByLanguageCode
+ * @property {string} fallbackLocale
+ * @property {Readonly<{ fallbackLocale: string, supportedLocales: readonly string[], tiebreakerLocalesByLanguageCode: Readonly<Record<string, readonly string[]>> }>} manifestLocaleConfiguration
+ * @property {import("../core/index.js").CatalogIdentity} catalogIdentity
+ * @property {string} cldrVersion
+ * @property {string} dataFingerprint
+ * @property {StringsLoadingLimits} loadingLimits
+ * @property {import("../core/index.js").StringsLoadCoverage} coverage
+ * @property {readonly FetchEntry[]} requestedFiles
+ * @property {readonly LoadFailure[]} failures
+ * @property {readonly LocalizedStringWarning[]} warnings
+ * @property {boolean} complete
+ */
+
+export { computeCatalogIdentity } from "./identity.js";
+export { chain, fetchSet } from "./planning.js";
+/**
+ * `DigestUnavailableError` IS EXPORTED BECAUSE THE PLAN ALREADY DECLARED IT, not because this widens
+ * anything. Plan 3.5:1099 lists `const DigestUnavailableError: CatchOnlyErrorClass<DigestUnavailableError>`
+ * among nine package exports, and :1107 says those runtime values "are public for catching and
+ * `instanceof`" while their declarations "expose no constructor or extension signature" — which is
+ * exactly the shape S22 gave this class. Plan 3.1's `load` row permits it under the "loading errors"
+ * category that `LocalizedStringLoadingError` already sits in. M8 clause 75 was recorded as blocked on a
+ * maintainer decision to widen the surface; there was no widening to decide.
+ */
+export { DigestUnavailableError, LocalizedStringLoadingError, loadEntireManifest, loadStrings } from "./fetch-loader.js";
+export {
+  localeConfigurationForManifest,
+  parseStringsManifest,
+  validateStringsManifest,
+} from "./manifest.js";
+
+export {};

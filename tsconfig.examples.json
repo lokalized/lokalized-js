@@ -1,0 +1,24 @@
+{
+  "_comment": [
+    "THE EXAMPLES ARE TYPECHECKED, AND THAT IS A CHANNEL THIS REPOSITORY DID NOT HAVE.",
+    "S29 found `createStrings({ loaded })` uncallable from TypeScript — TS2353 — while every one of",
+    "the repository's 1,000+ tests was green, because every one of them is JavaScript. The",
+    "declaration probes in `tools/declaration-probes/` were built for exactly that gap; the examples",
+    "are the same kind of evidence at a larger scale, because they are the consumer code a reader",
+    "will copy. So they are compiled under the same `strict` settings as `src/`.",
+    "",
+    "`noEmit` is the whole reason this is a separate configuration rather than an addition to",
+    "`tsconfig.json`'s `include`. That one EMITS into `types/`, which is the artifact",
+    "`declared-surface.test.js`, `symbol-allowlist.test.js` and `plan-surface.test.js` read as the",
+    "library's public surface — so an example compiled through it would publish `types/examples/*`",
+    "and the port would appear to export a bookshop."
+  ],
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "rootDir": "."
+  },
+  "include": ["examples/**/*.js"]
+}

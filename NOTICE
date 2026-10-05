@@ -1,0 +1,52 @@
+Lokalized-JS
+Copyright 2017-2022 Product Mog LLC, 2022-2026 Revetware LLC.
+
+This product includes software developed at Revetware LLC (https://www.revetware.com).
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+--------------------------------------------------------------------------------
+Third-party notices
+--------------------------------------------------------------------------------
+
+Unicode CLDR
+------------
+
+This package INCLUDES data derived from Unicode CLDR 48.2, licensed under Unicode
+License v3. It is generated, not vendored verbatim: fifteen modules under
+`src/data/` encode plural rules, ordinal rules, plural ranges, likely subtags,
+supplemental metadata, script metadata and the language/script/region/variant
+validity sets, derived from these CLDR files:
+
+  common/supplemental/plurals.xml          common/supplemental/ordinals.xml
+  common/supplemental/pluralRanges.xml     common/supplemental/likelySubtags.xml
+  common/supplemental/supplementalMetadata.xml
+  common/supplemental/supplementalData.xml
+  common/properties/scriptMetadata.txt
+  common/validity/{language,script,region,variant}.xml
+
+Source: https://github.com/unicode-org/cldr/tree/release-48-2
+
+  Copyright (c) 1991-2025 Unicode, Inc. All rights reserved.
+  Distributed under the Terms of Use in https://www.unicode.org/copyright.html
+  SPDX-License-Identifier: Unicode-3.0
+
+The full Unicode License v3 text is in THIRD-PARTY-NOTICES.md, which is published
+with this package. Each of the fifteen modules also carries the copyright and a
+pointer to that file as a preserved legal comment, so the attribution survives
+minification into whatever a consumer bundles.
+
+IANA language range equivalents
+-------------------------------
+
+`src/data/iana-range-equivalents.js` and `src/data/iana-identity-equivalents.js`
+are NOT CLDR data. They encode the language range equivalences lokalized-java
+applies, generated without a JDK from a pinned IANA Language Subtag Registry
+snapshot. See THIRD-PARTY-NOTICES.md.
+
+minimal-json
+------------
+
+`src/internal/json-parse.js` reproduces the observable behaviour of the JSON
+reader the upstream Java implementation embeds. No minimal-json source is
+included here. See THIRD-PARTY-NOTICES.md.

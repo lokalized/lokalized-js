@@ -1,0 +1,421 @@
+name: CI
+
+on:
+  push:
+    branches: [master, develop, "feature/**"]
+  pull_request:
+    branches: [master, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # THE FIRST LEG IS THE FLOOR, and it is the only one that tests `engines.node`.
+        # A floor CI does not execute is a claim, not a measurement — the shape A3 and A7
+        # each found for real (scenario:2k in neither verify nor CI; CI running zero spec
+        # gates). Keep this equal to package.json's `engines.node` lower bound.
+        node: ["20", "22", "24", "current"]
+    # Every corpus-driven gate resolves `../lokalized-spec` as a SIBLING of this checkout, so both
+    # repositories are checked out side by side under the workspace. Without this the spec artifacts
+    # are simply absent: `npm test` skipped 43 tests and crashed 5 files outright, and `conformance`
+    # — the project's central gate — could never have run at all.
+    defaults:
+      run:
+        working-directory: lokalized-js
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: lokalized-js
+          # Plan validators reject shallow repositories: they verify capacity
+          # and start-record commit ancestry with `git merge-base --is-ancestor`.
+          fetch-depth: 0
+      - name: Check out the behavioral corpus and pinned artifacts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: lokalized/lokalized-spec
+          # The shared spec lives on main. The checkout guard below verifies its corpus hash.
+          ref: main
+          path: lokalized-spec
+          # Shallow is fine here: nothing reads the spec's history, only its artifacts.
+          fetch-depth: 1
+          # `github.token` is scoped to THIS repository. It is sufficient while lokalized-spec is
+          # public; if it is ever made private, add a SPEC_REPO_TOKEN secret with read access and
+          # this picks it up without another edit.
+          token: ${{ secrets.SPEC_REPO_TOKEN || github.token }}
+      # Fail HERE, naming the cause, rather than 10 minutes later as 44 anonymous skips. A checkout
+      # that succeeds says the ref resolved, NOT that it carried what the gates read — and carrying
+      # the files is not carrying the right REVISION. Both halves, and the reasoning for each, now
+      # live in the script, because `publish.yml` needs exactly this check and a second copy of 46
+      # lines of shell is a copy that drifts.
+      - name: Verify the corpus checkout carries what the gates read
+        run: node tools/check-spec-checkout.mjs
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci || npm install
+      - name: Type-check JSDoc
+        run: npm run check
+      - name: Emit declarations
+        run: npm run types
+      # THE TWO STEPS BELOW WERE IN `verify` AND IN NEITHER LIST HERE — the third time this file's
+      # own warning about drift has come true, and the first time it happened to the newest gates
+      # rather than the oldest. `npm run declarations` (S29) and `npm run diff:check` (S31, below)
+      # were added to `verify` and never added here, so the only consumer-facing TypeScript channel
+      # and the differential record both ran on the authoring machine and nowhere else. Measured
+      # 2026-09-15 while wiring `check:examples`, which would have been the fourth.
+      - name: Type-check the executed examples as consumer TypeScript
+        run: npm run check:examples
+      # Every README sample is EXECUTED and every output it claims is asserted. A README is the
+      # largest prose surface this project has, and prose asserting its own correctness is the defect
+      # class it has caught fourteen times.
+      - name: Execute the README's samples and assert their claimed output
+        run: npm run check:readme
+      # AND AGAIN FROM THE PUBLISHED PACKAGE, in a directory holding nothing but the tarball and the
+      # catalogs the README itself publishes. The step above runs the samples inside the repository,
+      # where the whole working tree is present; measured 2026-09-16, NINE of the 42 groups were green
+      # there and failed for anybody who had installed the package.
+      - name: Execute the same samples as a newcomer who installed the package
+        run: npm run check:readme:packed
+      # The README's bundler numbers, measured by a real bundler. Until 2026-09-17 the section
+      # `### What it costs a browser` opened "Measured with esbuild 0.24.2 against this checkout" and
+      # carried fourteen figures in markdown that `check:readme` is structurally blind to, attributed
+      # to a tool that existed nowhere in the repository — and every one of the fourteen was stale.
+      # esbuild is pinned to an exact version because its output is a pure function of its input and
+      # its version, which is what makes these numbers a ratchet rather than a snapshot.
+      - name: Bundler sizes and containment against the packed artifact
+        run: npm run check:bundle
+      - name: Consumer-shaped TypeScript declaration probes
+        run: npm run declarations
+      # The requirement registry states 179 times that some member, parameter or return value is
+      # `readonly`; this compiles one consumer-shaped probe per statement against the EMITTED
+      # declarations, resolved through the package's own `exports` map. It needs the sibling spec
+      # checkout above for the registry and exits 2 rather than passing when it is absent.
+      - name: Registry readonly statements against the shipped declarations
+        run: npm run check:readonly
+      # Plan 6.3's no-build browser distribution, built by the pinned esbuild (amendment A20) and
+      # checked against the prohibitions that prose puts on the BROWSER GRAPH — no Node built-ins,
+      # no bare specifiers, no top-level await, no dynamic import — plus the repo-wide eval/Intl
+      # rules, which until M-R S6 walked `src/` and would have passed any artifact whatsoever. It
+      # builds into a temp directory; `prepack` is what writes `dist/` for the tarball.
+      - name: Browser distribution and its prohibitions
+        run: npm run check:dist
+      # Plan 8.5's release verification, run against `npm pack` and — unlike every other gate here —
+      # against the tarball INSTALLED into a clean project, which is the only resolution a consumer
+      # actually gets. The browser half is recorded in measurements/release-rehearsal.json and
+      # compared without a browser, on scenario:0a's rule that a green run must not need a person.
+      - name: Release verification against the installed tarball
+        run: npm run check:release
+      # Plan 6.5's worker smoke test in the NAMED runtime (workerd, A29), from the packed tarball,
+      # unbundled: M8's load-only graph and M9's edge example, each probe answered by workerd AND by
+      # Node over the same package and required to agree byte-for-byte, at two compatibility dates —
+      # 2024-01-01, where workerd itself refuses a `node:` import, and a current one. The workerd
+      # binary is the pinned devDependency `npm ci` installs; its absence FAILS rather than skips.
+      - name: Worker smoke test in workerd from the packed tarball
+        run: npm run smoke:worker
+      # A SKIP IS A GATE THAT STOPPED GATING. Each corpus-driven test skips when the sibling spec
+      # checkout is absent, which is right for a bare local clone and WRONG here: with the spec
+      # checked out above, nothing may skip. Asserting that is what stops a silently shrinking suite
+      # from reading as a green run — the failure mode that hid this for as long as it did.
+      #
+      # The status is read from `$?` on a redirected run, never through a pipe: `npm test | tail`
+      # reports `tail`'s status, and this project has already banked a passing status that way.
+      # And it is read with `|| status=$?`, because this step's shell is `bash -e`, which exits at the
+      # first failing command: the previous `npm test > test.log 2>&1; status=$?` stopped the step
+      # right there, so `cat test.log` never ran and EVERY failing run's log ended before a single
+      # line of test output (found 2026-09-24, after two such failures could not be read).
+      #
+      # A FAILURE IS NAMED WHERE IT CAN BE READ WITHOUT SIGNING IN. Downloading a job's log needs a
+      # GitHub login; reading its annotations does not. So a failing run turns each failing test into
+      # an annotation (tools/annotate-test-failures.mjs), which needs one output format on every leg:
+      # Node 20 and 22 print TAP when writing to a file and later versions print the spec reporter's
+      # output, hence `--test-reporter=tap`. `|| true` keeps a broken annotator from replacing the
+      # tests' own status.
+      - name: Unit tests
+        run: |
+          status=0
+          npm test -- --test-reporter=tap > test.log 2>&1 || status=$?
+          cat test.log
+          if [ "$status" -ne 0 ]; then
+            node tools/annotate-test-failures.mjs test.log || true
+            exit "$status"
+          fi
+          # Format-agnostic on purpose: node --test prints `# skipped N` under TAP and `i skipped N`
+          # under the spec reporter, and CI and a local run do not use the same one. An earlier
+          # version of this line matched neither and could never have failed.
+          skipped=$(awk '/skipped[[:space:]]+[0-9]+[[:space:]]*$/ { n = $NF } END { print n + 0 }' test.log)
+          echo "skipped: ${skipped:-0}"
+          if [ "${skipped:-0}" -ne 0 ]; then
+            echo "::error::${skipped} test(s) skipped. With lokalized-spec checked out nothing may skip."
+            exit 1
+          fi
+      # THE STEPS BELOW MIRROR `npm run verify`, IN ITS ORDER, AND THE LIST IS LOAD-BEARING. This job
+      # deliberately does NOT call `npm run verify`, because the unit-test step above adds the
+      # skipped-count assertion that `verify` has no way to make — so the two lists have to be kept
+      # in step by hand, and they DRIFTED: `size:graph`, `likely-subtag-consumers` and
+      # `spike:placeholders` were all in `verify` and in none of these steps, so they executed on the
+      # authoring machine and nowhere else. If a step is added to `verify`, add it here.
+      - name: Module graph classification and size
+        run: npm run size:graph
+      # Per-subpath graphs. Two things nothing else here watches: the CONTAINMENT rule (a subpath the
+      # allowlist marks browser-reachable must not enter Node-only territory — caught even when the
+      # offending module imports no Node built-in and exports nothing, which is the case the
+      # package-shape scan cannot see), and the SIZE of `lokalized/{load,ssr,node}`, where M8 builds
+      # most of its remaining work and where 20 KB was previously invisible to every gate.
+      - name: Per-subpath module graphs and containment
+        run: npm run subpath:graphs
+      # M7 clause 2's inventory half. It derives the likely-subtag consumer set from `src/` and fails
+      # on a consumer with no entry, an entry nothing derives, or an alias carrying a gateway past
+      # the boundary. It needs only `src/` and the corpus, so unlike the eight differentials — which
+      # need a JDK and a built `lokalized-java` — it can run here.
+      - name: Likely-subtag consumer inventory
+        run: npm run likely-subtag-consumers
+      # M2 is tracked by engineering measurement rather than frozen thresholds, so these ARE the
+      # gate. Conformance enforces zero failures plus a ratchet on the passing-ID set; 0a ratchets
+      # the deterministic size/module figures and reports the noisy timings without gating them.
+      - name: Behavioral conformance against the Java corpus
+        run: npm run conformance
+
+      # M-R S10. Both read `measurements/conformance.json`, so they follow the run that writes it.
+      # `test/verify-ci-parity.test.js` is what makes this a rule rather than a habit: it compares
+      # this list to `verify`'s as a set AND in order, and it fired on the commit that added these
+      # two steps to `verify` alone.
+      - name: Divergence document is what the declared records produce
+        run: npm run divergences
+
+      # Plan 8.4's reference-runtime lock. This is the step that lets a runner with NO JDK and no
+      # lokalized-java checkout catch a perturbed reference field: before it existed, the parity
+      # report's oracle-derived values were carried from the record with nothing to carry them
+      # against, and M-R S13 measured a perturbed `referenceJdkVendor` exiting 0 here.
+      - name: The parity declaration repeats the pinned Java/JDK references
+        run: npm run check:reference-lock
+
+      - name: Release parity declaration is what this build produces
+        run: npm run parity:check
+      # The nine differentials need the pinned JDK, which CI provisions none of — but their RECORDED
+      # result does not, and `diff:check` is the half that re-checks it: a missing record, a recorded
+      # red, an unknown or omitted entry, or a differential whose TOOL has moved since its last Java
+      # run all fail here without Java.
+      - name: Differential record re-check
+        run: npm run diff:check
+      # THE SAME SHAPE, ONE LIBRARY OVER. The README's i18next comparison is measured by running BOTH
+      # libraries, and i18next is an oracle this package may not depend on — it has zero dependencies
+      # and `test/package-shape.test.js` enforces that — exactly as the JDK is an oracle CI does not
+      # carry. So `diff:i18next` runs it with i18next installed and `check:i18next` re-checks the
+      # record here without it: a missing record, a probe that did not execute both sides, a tool
+      # edited since its last real run, or a census in which the COMPETITOR NEVER WINS all fail.
+      - name: i18next comparison record re-check
+        run: npm run check:i18next
+      - name: Scenario 0a static integration measurement
+        run: npm run scenario:0a
+      # Scenario 0b re-checks its RECORD and touches no network: the browser half runs against the
+      # real host once per release, and what runs here is whether that record is still the recipe's
+      # and the subject's, its four ratcheted figures re-derived from the capture's own resources and
+      # its request count and decoded bytes equal to the published graph the recorder read from the
+      # verified tarball, its cold arm clean, its controls, streaming-limit boundary, render and host
+      # facts all holding, and its run history chained from the first run frozen for its revision and
+      # pinned through the checkpoint frozen beside it, every growth carrying its reason (A4 and A7,
+      # restated as A33). The checkpoint must name the newest run: a run recorded since fails this step
+      # until its line is set in tools/0b-recipe.mjs. A4 made this the bar 0b had to clear when it
+      # landed — the one scenario:2k had failed, being in neither list. It could not join while its
+      # only record was a warm run the check correctly refused.
+      - name: Scenario 0b production-host network delivery (record re-check)
+        run: npm run scenario:0b
+      # Plan 9.2's scenarios 1-5, one frozen suite measured from an `npm pack` of this checkout, and in
+      # CI from its first commit because A4/A7 (restated as A33) mean "recorded" only if a machine
+      # re-checks it. It fails on a frozen recipe, fixture or suite digest that moved (the code that
+      # takes the measurements is inside the recipe digest), a recipe that measures nothing, a scenario
+      # or variant the record omits or invents, containment, a wrong render, a dist/browser rebuild that
+      # is not byte-identical to the shipped files, a runtime sample that crashes or times out, a missing
+      # record or one whose chained history does not run from its frozen first entry to its frozen newest
+      # one, a ratcheted column or graph that grew, and a compressed column that grew beyond its
+      # tolerance ON THE COMPRESSOR VERSION IT WAS RECORDED WITH — a leg with another zlib or brotli
+      # reports those columns as not compared rather than going red, so which legs compare them moves
+      # with the Node release each resolves. Timings and heap are reported; `--write` is refused under CI.
+      - name: Scenarios 1-5 consumer sizes and cold starts (frozen suite)
+        run: npm run scenario:1-5
+      # M7 clause 19 as amended: the 2,000-key budgets are RECORDED and the recording is re-checked,
+      # rather than being a JSON file somebody wrote once. This step cannot fail on a timing — what
+      # fails it is the catalog's identity: a missing or unreadable record (absence is never
+      # agreement, and deleting the record used to pass), a tool whose catalog no longer digests to the
+      # one frozen in it, or a record describing any other catalog, each of which would mean the
+      # medians in the artifact were measured on a catalog that is not this scenario's — and a record
+      # missing a timing, a heap figure or a source graph, which are reported and required present.
+      # Source-graph movement is reported STALE here and deliberately not gated, so CI never demands
+      # that machine-dependent timings be re-recorded from whatever host happened to go red.
+      - name: Scenario 2k performance and memory measurement
+        run: npm run scenario:2k
+      # Plan 9.2:2818's scenario 6, in CI from its first commit — which is the whole of A3's and A7's
+      # proof obligation: both amendments turned on whether "recorded" meant machine-re-checked, and
+      # both found a real gap the moment someone asked. It needs no JDK and no browser. It fails on a
+      # missing or unreadable record, a rebaseline history that does not run from its frozen first
+      # entry through its frozen checkpoint or holds an entry with no reason, figures or an identity
+      # (revision, recipe, fixture, closure) its newest entry did not record, a variant row held twice,
+      # a timing missing, a changed recipe or re-pinned closure under an unmoved revision, and any
+      # growth, fixture change or revision move not recorded with a reason — a sentence, not a blank
+      # or the next flag. Deleting or re-writing the record is not a reset: both fail, and --write will
+      # not start a new one (A33).
+      - name: Scenario 6 edge/server negotiation measurement
+        run: npm run scenario:6
+      # Plan 9.3's sixth measurement, "Node server concurrency with per-call locales", which had no
+      # recorded scenario until M-D S23 — the only numbers for it lived in a README sentence. What
+      # runs here is the CORRECTNESS half: every interleaved request must see only its own locale,
+      # and the negative control must come back WRONG or nothing interleaved. The milliseconds are
+      # reported and never gated, so this is safe on a shared CI runner.
+      - name: Scenario concurrency (per-call locales under interleaving)
+        run: npm run scenario:concurrency
+      # Plan 9.3's "construction PEAK memory", which retained-memory figures are not. Peak is found
+      # by bisecting --max-old-space-size in a child process, because a sampler on the same thread
+      # cannot observe a synchronous operation's own peak. The caps are REPORTED; what is gated here
+      # is that the largest catalog costs more than the runtime's own floor, without which the run
+      # would be measuring node and looking exactly like a result.
+      - name: Scenario peak construction memory
+        run: npm run scenario:peak-memory
+      # A clause may not be recorded PROVEN without a gate that exists on disk AND an ablation that
+      # was actually performed. M8's close-out was otherwise going to be a prose verdict table, and a
+      # close-out that reads its own prose back to itself is this project's most-repeated defect.
+      - name: M8 acceptance-clause ledger
+        run: npm run clause:ledger
+      - name: Generated-placeholder spike
+        run: npm run spike:placeholders
+
+      # THE SPEC REPOSITORY'S OWN GATES, which nothing in CI ran until 2026-09-11.
+      #
+      # This job already checked lokalized-spec out for its ARTIFACTS and never ran its CHECKS, so
+      # every spec-side ratchet was re-verified only when a human happened to run `npm run check`
+      # there. `check:coverage` is the one that matters most: it fails on an undispositioned branch
+      # AND on a STALE one, and slice S14 moved it — four dispositions deleted — with no automated
+      # re-check behind the claim. That is the same shape as clause 19's proof obligation, found the
+      # same way, and it is fixed here rather than argued around.
+      #
+      # EIGHT OF THE SIXTEEN RUN HERE. The exclusions are measured, not assumed, and each is named
+      # so a reader does not mistake this for the whole suite:
+      #   check:allowlist, check:surface, check:registry, check:documentation-topics,
+      #   check:parity-obligations                        — resolve the PLAN through
+      #     scripts/planning-path.mjs and exit 2 with a remedy when it is absent. The planning
+      #     directory is deliberately outside every checkout and is not pushed, so these cannot run
+      #     in CI by design. Measured 2026-09-19: each exits 2 naming LOKALIZED_PLANNING_DIR.
+      #   check:vectors, check:iana                       — drive the pinned JDK against
+      #     lokalized-java, which this workflow does not check out or build. Measured 2026-09-23:
+      #     `check:vectors` exits 1 naming the JDK path, `check:iana` (the JDK CHECK on the
+      #     registry-generated IANA data since A30) exits 2 with status `cannot-run` naming it. They
+      #     fail LOUDLY rather than skipping, which is why they are excluded here rather than run and
+      #     ignored. The IANA data itself is GENERATED with no JDK, and `check:iana-registry` below
+      #     re-generates it and checks the JDK run's record, so CI still gates it.
+      #   check:datalock                                  — hashes REAL SOURCE FILES out of the
+      #     sibling lokalized-java (`src/main/java/com/lokalized/GeneratedCldrLocaleData.java` and
+      #     the CLDR generator), so it needs that repo present even though it needs no JDK.
+      #     Measured 2026-09-20: exit 1 with ENOENT naming that path. **It was in this list and had
+      #     never run** — the job died earlier every time, so nothing revealed it. Checking the repo
+      #     out would fix it and is deliberately NOT done: it would also make `javaReferenceCommit`
+      #     measurable in `parity:check`, which then cross-checks it against a record taken from the
+      #     `feature/iana-registry-equivalences` branch, and CI would resolve some other ref. That
+      #     trades a silent gap for a confusing red. It runs in the spec's own `npm run check`.
+      #
+      # **THIS LIST WAS HAND-MAINTAINED AND HAD DRIFTED TWICE OVER BY M-R S13** — it read "SIX OF
+      # THE TWELVE" while the spec's `check` had grown to fifteen, and two CI-RUNNABLE gates were
+      # missing: `check:iana-registry`, which had never been here, and `check:provenance`, added
+      # that day. (`check:provenance` left again at A30, with the hand-written provenance document
+      # it checked: IANA-PROVENANCE.md is now GENERATED by the spec's JDK-free IANA generator,
+      # whose `--check` is `check:iana-registry`.) `test/verify-ci-parity.test.js` deliberately skips any step with a
+      # `working-directory` — correctly, since those are another package's scripts — so the drift
+      # this workflow's own comment warns about was gated on THIS repo's list and on nothing here.
+      # It is gated both ways now: that file requires every `check:*` in the spec's `npm run check`
+      # to appear below or in a declared exclusion.
+      #
+      # Measured 2026-09-23 with LOKALIZED_PLANNING_DIR and LOKALIZED_ORACLE_JDK pointing nowhere and
+      # no lokalized-java beside the spec: these eight exit 0, the five plan gates exit 2,
+      # `check:vectors` exits 1 and `check:iana` exits 2, and `check:datalock` exits 1 (ENOENT). The
+      # spec VENDORS what the eight need of lokalized-java, so that repo's absence costs them nothing.
+      # **THE SPEC IS ITS OWN NPM PACKAGE AND CI HAD NEVER INSTALLED IT.** `check:schemas` imports
+      # `ajv`, a devDependency of lokalized-spec; the only `npm ci` in this job runs in
+      # lokalized-js. Measured 2026-09-20: without this step `check:schemas` exits 1 with
+      # `Cannot find package 'ajv'`, and it has been in the list below since A7 without ever
+      # running — the job failed earlier every time, so the gap only surfaced once the steps ahead
+      # of it were fixed. A gate that has never executed is not a gate.
+      # The 2026-10-04 fallback-observer profile gate uses Python stdlib only and
+      # passes with both planning and oracle-JDK paths set to nonexistent values.
+      - name: Install the spec repo's own dependencies
+        working-directory: lokalized-spec
+        run: npm ci || npm install
+
+      - name: Spec-repo gates that need neither the plan nor the JDK
+        working-directory: lokalized-spec
+        run: |
+          npm run check:snapshot
+          npm run check:schemas
+          npm run check:partitions
+          npm run check:native-adaptations
+          npm run check:manifest-contract
+          npm run check:diagnostic-text
+          npm run check:manifest-normalization
+          npm run check:fallback-observer
+          npm run check:exact-identifier
+          npm run check:url-oracle
+          npm run check:iana-registry
+          npm run check:selection
+          npm run check:archive
+          npm run check:evidence
+          npm run check:coverage
+
+  packed:
+    runs-on: ubuntu-latest
+    # `npm pack` runs `prepack`, and prepack's `divergences --write` reads
+    # `../lokalized-spec/java-surface-amendments.json` for the declined-API section. Without that
+    # file it fails (exit 1) rather than publishing "none declined", and it does not rewrite
+    # DIVERGENCES.md. So this job needs the spec beside the package, exactly as `publish.yml`'s pack
+    # has it. Until 2026-09-23 it checked out this repository alone, and both pushes that day went red
+    # at `npm pack`.
+    #
+    # Both checkouts drop the token afterwards (`persist-credentials: false`), as `publish.yml`'s do:
+    # this job runs `npm ci`, which executes install scripts, and needs no git credentials after the
+    # checkout.
+    defaults:
+      run:
+        working-directory: lokalized-js
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: lokalized-js
+          fetch-depth: 0
+          persist-credentials: false
+      # The same checkout and guard as the verify job above; the reasoning for each is written there.
+      - name: Check out the behavioral corpus and pinned artifacts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: lokalized/lokalized-spec
+          ref: main
+          path: lokalized-spec
+          fetch-depth: 1
+          token: ${{ secrets.SPEC_REPO_TOKEN || github.token }}
+          persist-credentials: false
+      - name: Verify the corpus checkout carries what the gates read
+        run: node tools/check-spec-checkout.mjs
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # THE FLOOR, deliberately: a fresh installer on the oldest supported runtime is
+          # exactly what a packed-artifact check is for. Tracks engines.node's lower bound.
+          node-version: "20"
+      - run: npm ci || npm install
+      - run: npm run types
+      # Plan section 9.1: release verification runs against `npm pack`,
+      # not the working tree.
+      - name: Verify packed artifact
+        run: |
+          npm pack --silent
+          tar -tzf lokalized-*.tgz | sort > packed-files.txt
+          echo "--- packed contents ---"; cat packed-files.txt
+          for required in package/LICENSE package/NOTICE package/package.json; do
+            grep -qx "$required" packed-files.txt || { echo "missing $required"; exit 1; }
+          done
+          for forbidden in '^package/test/' '^package/\.github/' '^package/tsconfig\.json$'; do
+            if grep -qE "$forbidden" packed-files.txt; then
+              echo "must not be packed: $forbidden"; exit 1
+            fi
+          done
+          echo "packed artifact OK"

@@ -1,0 +1,40 @@
+name: JavaScript API documentation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm ci
+      - name: Check documentation boundaries
+        run: node --test test/api-documentation.test.js
+      - name: Generate the public reference
+        env:
+          DOCUMENTATION_REF_TYPE: ${{ github.ref_type }}
+          DOCUMENTATION_REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$DOCUMENTATION_REF_TYPE" = tag ]; then
+            npm run docs:api -- --release "${DOCUMENTATION_REF_NAME#v}"
+          else
+            npm run docs:api
+          fi
+      - name: Upload static reference for review and hosting
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: javascript-api-reference
+          path: .build/api-documentation/site
+          if-no-files-found: error

@@ -1,0 +1,89 @@
+{
+  "scenario": "peak-memory",
+  "revision": 1,
+  "frozenAt": "2026-09-16",
+  "note": "Caps are REPORTED, never gated (A3/A4). What gates is the recipe, the fixture, and the soundness precondition.",
+  "recipe": {
+    "description": "smallest --max-old-space-size (MB) under which construction completes, by bisection",
+    "arms": [
+      {
+        "label": "node alone, nothing imported",
+        "keys": -1
+      },
+      {
+        "label": "import only, no catalog",
+        "keys": 0
+      },
+      {
+        "label": "1 key",
+        "keys": 1
+      },
+      {
+        "label": "2,000 keys",
+        "keys": 2000
+      },
+      {
+        "label": "20,000 keys",
+        "keys": 20000
+      }
+    ],
+    "bisect": {
+      "lowMb": 2,
+      "highMb": 256
+    },
+    "runsPerArm": 2,
+    "reading": "the MAX across runs — the cap under which construction succeeded every time",
+    "derivation": "key i takes shape i % 2 and embeds its own index; no RNG, no seed"
+  },
+  "recipeSha256": "f4ead22b60114e4456e3c99ddc1593ed9798be4778ffc77d370f4a1ceaa6c0a6",
+  "fixtureSha256": "cc73f926b0b00c6853407552f7d7a4522fc154b0e11dfa38f685ba583f700c34",
+  "arms": [
+    {
+      "label": "node alone, nothing imported",
+      "keys": -1,
+      "runs": [
+        8,
+        8
+      ],
+      "capMb": 8
+    },
+    {
+      "label": "import only, no catalog",
+      "keys": 0,
+      "runs": [
+        9,
+        10
+      ],
+      "capMb": 10
+    },
+    {
+      "label": "1 key",
+      "keys": 1,
+      "runs": [
+        10,
+        10
+      ],
+      "capMb": 10
+    },
+    {
+      "label": "2,000 keys",
+      "keys": 2000,
+      "runs": [
+        11,
+        11
+      ],
+      "capMb": 11
+    },
+    {
+      "label": "20,000 keys",
+      "keys": 20000,
+      "runs": [
+        25,
+        24
+      ],
+      "capMb": 25
+    }
+  ],
+  "floorMb": 10,
+  "rebaselines": []
+}

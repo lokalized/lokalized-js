@@ -1,0 +1,755 @@
+{
+  "scenario": "6",
+  "revision": 3,
+  "frozenAt": "2026-09-19",
+  "note": "No thresholds, by the precedent of M7 clause 19 as amended (A3) and M8's A4: recorded and ratcheted where a ratchet exists, reported where none does. Frozen at M9 S4 rather than before M9 started, which plan 9.2:2818 asked for; the deviation is the record. REVISION 2 (M-R S13): the scenario's own subject -- 'the shared validity/IANA closure' -- was re-pinned from the JDK's table to lokalized-java 3.1.0's registry-sourced one, 806 -> 814 classes. That is an ENVIRONMENT change by this tool's own rule, so revision 1's figures are not comparable with these and the bump says so rather than a rebaseline quietly absorbing it. REVISION 3 (A30): the subject moved again, and further -- the IANA data is now GENERATED from the pinned registry snapshot with no JDK, as 369 ordered classes in two modules (the full table behind lokalized/negotiate, a direct-match projection plus the region/variant substitutions in the root), where revision 2 measured an 818-entry probed closure in one. closureClasses now counts classes, not entries, and closureBytes sums both modules. Another environment change by this tool's own rule.",
+  "recipe": {
+    "scenario": "6",
+    "description": "edge/server full-range negotiation atop the shared validity/IANA closure",
+    "environment": "node",
+    "iterations": 9,
+    "fixture": "examples/catalogs",
+    "variants": [
+      {
+        "label": "edge worker",
+        "entry": "examples/edge/worker.js"
+      },
+      {
+        "label": "server renderer",
+        "entry": "examples/server/server.js"
+      }
+    ],
+    "headers": [
+      "fr-CA",
+      "fr-CH",
+      "fr-CA,fr;q=0.9,en;q=0.1",
+      "de",
+      "iw,he;q=0.5",
+      "fr;q=2"
+    ],
+    "method": "median of 9; graph figures from tools/example-graph-walk.mjs; requests counted over an in-memory transport serving the published manifest and catalogs"
+  },
+  "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+  "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+  "closureClasses": 369,
+  "closureBytes": 11358,
+  "node": [
+    {
+      "label": "edge worker",
+      "modules": 49,
+      "sourceBytes": 997485,
+      "nodeBuiltinEdges": 0,
+      "ianaClosureBytes": 11358,
+      "importMs": 0.474
+    },
+    {
+      "label": "server renderer",
+      "modules": 56,
+      "sourceBytes": 1079173,
+      "nodeBuiltinEdges": 10,
+      "ianaClosureBytes": 11358,
+      "importMs": 18.4347
+    }
+  ],
+  "negotiateMsPerHeader": 0.06401,
+  "firstRenderMs": 0.9332,
+  "retainedBytes": 8976,
+  "requestsPerRender": {
+    "fr-CA": 4,
+    "fr-CH": 4,
+    "fr-CA,fr;q=0.9,en;q=0.1": 4,
+    "de": 2,
+    "iw,he;q=0.5": 2,
+    "fr;q=2": 2
+  },
+  "rebaselines": [
+    {
+      "reason": "M9 S5: plan 2.2:150's candidate-chain LRU. Both example graphs reach the locale kernel, so both grew by the memo factory and its docblock; module counts, the closure and requests-per-render are unchanged.",
+      "growth": [
+        "edge worker: source graph grew 1089504 -> 1097158 bytes",
+        "server renderer: source graph grew 1160467 -> 1168121 bytes"
+      ],
+      "previousSha256": null
+    },
+    {
+      "reason": "M9 S6: the DEFAULT_REQUEST export and its comment in src/load/fetch-loader.js, which both example graphs reach through lokalized/load",
+      "growth": [
+        "edge worker: source graph grew 1097158 -> 1097426 bytes",
+        "server renderer: source graph grew 1168121 -> 1168389 bytes"
+      ],
+      "previousSha256": "4f1b2eb3ceef3f5de7deb859d2b5fdb24445d58c81f4d5c36fa9099e6fdf69b5"
+    },
+    {
+      "reason": "M9 S8: the javaDoubleText weight rendering in src/negotiate/index.js, which both example graphs reach through lokalized/negotiate",
+      "growth": [
+        "edge worker: source graph grew 1097426 -> 1098953 bytes",
+        "server renderer: source graph grew 1168389 -> 1169916 bytes"
+      ],
+      "previousSha256": "3536938160240ea1570c176f48852ff937c52e8591235c794fae3c913d61b7fc"
+    },
+    {
+      "reason": "M9 S9: the ISO-code direction fix; both example graphs reach the locale kernel",
+      "growth": [
+        "edge worker: source graph grew 1098953 -> 1101675 bytes",
+        "server renderer: source graph grew 1169916 -> 1172638 bytes"
+      ],
+      "previousSha256": "a27873b06220816f1dc43c21c2837de563595def90a65f60ffbd837b3c0d5e2f"
+    },
+    {
+      "reason": "M-D S13: examples/app/render.js gained escapeJsonForScript, replacing escapeHtml for the SSR stamp inside <script type=\"application/json\"> — a script element is raw text, so the HTML-escaped stamp was unparseable by any browser. +1001 bytes in both variants (the two share the view).",
+      "growth": [
+        "edge worker: source graph grew 1101675 -> 1102676 bytes",
+        "server renderer: source graph grew 1172638 -> 1173639 bytes"
+      ],
+      "previousSha256": "38d2d4a60add3fca41f75ca4acfa84d37659c83959c775070eb1d0612911cf62"
+    },
+    {
+      "reason": "M8 clause 78: src/load/run-plan.js releases the parse slots on every rejection path. +1,347 bytes in both variants (the edge worker and the server renderer share the loader).",
+      "growth": [
+        "edge worker: source graph grew 1102676 -> 1104023 bytes",
+        "server renderer: source graph grew 1173639 -> 1174986 bytes"
+      ],
+      "previousSha256": "a8d1b6a651013b700a690c9d851b047e4e89eedb3cd34e94f1d949c51fd762e5"
+    },
+    {
+      "reason": "the fixture catalogs gained CARDINALITY_MANY: es, fr and fr-CA declared only ONE and OTHER, which French and Spanish CLDR do not, so the load warned on every run and fr at 1000000 returned the raw key. Found by readers following the README with no access to src/. The three files are also the README's published reference set, so the document showed an incomplete catalog as the example.",
+      "growth": [
+        "the fixture changed (59754a7dc591b630 -> 885dd1d9d5c53443). Every figure below was measured against different bytes."
+      ],
+      "previousSha256": "ebc95016df8ef32c6b0b8b0e3459a3560aa099ac0ece596c2e0918ad41131229"
+    },
+    {
+      "reason": "src/load/manifest.js: a stale inline comment reading 'only the comparison is missing' sat seven lines above the comparison it described. Replaced with two lines stating why the shape check precedes it; +88 bytes in both variants' graphs, no behaviour change.",
+      "growth": [
+        "edge worker: source graph grew 1104023 -> 1104111 bytes",
+        "server renderer: source graph grew 1174986 -> 1175074 bytes"
+      ],
+      "previousSha256": "881b9c0bb758ec95e51ce42641ae02fad6ed2672cdacba39528f8880792646c9"
+    },
+    {
+      "reason": "M-D S32: +291/+461 source bytes from removing two stale graph counts from shipped docblocks and correcting two plan citations in examples/server/publish.js. No module joins either graph.",
+      "growth": [
+        "edge worker: source graph grew 1104111 -> 1104402 bytes",
+        "server renderer: source graph grew 1175074 -> 1175535 bytes"
+      ],
+      "previousSha256": "7cafa2ff4ea6ffd82261898b41140d6e3ccff11d2acba8ea57752f63a479fe3b"
+    },
+    {
+      "reason": "M-D S33: four maintainer decisions land together — the manifest format carries all seven build-identity fields (runtime-metadata.js joins the load and node graphs, +1 module each), every public door refuses an unknown option (configuration-error.js joins the parse graph via catalog.js, +1 module), matchType is narrowed to plan 3.4's LocaleMatchType (JSDoc only), and the onWarning observer is documented. No behaviour moved that the corpus can see: conformance is 2,150/0/0 across all four.",
+      "growth": [
+        "edge worker: source graph grew 1104402 -> 1125055 bytes",
+        "server renderer: source graph grew 1175535 -> 1204558 bytes"
+      ],
+      "previousSha256": "b73d9c369b8322bc50137e91dbda7e3ee9673aa278475d662adf2ea89d5122d5"
+    },
+    {
+      "reason": "M-R S4: the readonly sweep. Source grew by docblock prose restated from @property lists; no module joined either graph.",
+      "growth": [
+        "edge worker: source graph grew 1125055 -> 1126347 bytes",
+        "server renderer: source graph grew 1204558 -> 1205860 bytes"
+      ],
+      "previousSha256": "c12b4f951beee4996a102e81075baa0f676dcedd3a0681f0e561d375bb7b6251"
+    },
+    {
+      "reason": "M-R S5: the legal-comment attribution on the fifteen generated CLDR modules. Comment bytes only.",
+      "growth": [
+        "edge worker: source graph grew 1126347 -> 1129116 bytes",
+        "server renderer: source graph grew 1205860 -> 1208629 bytes"
+      ],
+      "previousSha256": "b25996d9213ad9de137a670303b346f9d353a7287bb1055b13d8768b7c07c3f9"
+    },
+    {
+      "reason": "M-R S8: likely-subtags.js is re-encoded structurally — 7,788 rows in 25 KB of source instead of 158 KB, decoding to output byte-identical to the pinned CLDR artifact. The browser root bundle falls 322,509 -> 187,679 minified and 73,653 -> 55,610 brotli, -24.5% on the wire. Conformance byte-identical at 2,150/0/0.",
+      "growth": [],
+      "previousSha256": "9ab74f822c4017c9709a5fb5ad7d4f440f7c5310f5fa7006dd5cc5f44722ce63"
+    },
+    {
+      "reason": "M-R S11: runtime-metadata.js gained the ianaClosureSource field and a real File-Date for ianaRegistryDate, after the maintainer took the pinned-IANA-snapshot decision. +1,572 source bytes; no module joined any graph.",
+      "growth": [
+        "edge worker: source graph grew 995963 -> 997535 bytes",
+        "server renderer: source graph grew 1075476 -> 1077048 bytes"
+      ],
+      "previousSha256": "f77e537a34f610889004c804f3896bb0298b034d8976d067033580249edaeed6"
+    },
+    {
+      "reason": "M-R S13: the IANA closure moved from the JDK's table to lokalized-java 3.1.0's registry-sourced one (806 -> 814 classes, 23482 -> 23998 B); revision 1 -> 2 because the closure IS this scenario's environment",
+      "growth": [
+        "the IANA closure was re-pinned (806 -> 814 classes)",
+        "edge worker: source graph grew 997535 -> 1001697 bytes",
+        "edge worker: the IANA closure's share grew 23482 -> 23998 bytes",
+        "server renderer: source graph grew 1077048 -> 1081210 bytes",
+        "server renderer: the IANA closure's share grew 23482 -> 23998 bytes"
+      ],
+      "previousSha256": "a2f61813f5f6a0703001910e55a4bc152a25235552be9b355572b65398677f44"
+    },
+    {
+      "reason": "M-R S13: the IANA closure 806 -> 818 classes (twelve JDK-absent tags; four recovered by seeding the probe space from the oracle's own key list) plus Java's prefix walk at the single-locale door in src/internal/locale.js; revision 2 already records the closure re-pin as an environment change",
+      "growth": [
+        "the IANA closure was re-pinned (814 -> 818 classes)",
+        "edge worker: source graph grew 1001697 -> 1005814 bytes",
+        "edge worker: the IANA closure's share grew 23998 -> 24142 bytes",
+        "server renderer: source graph grew 1081210 -> 1085327 bytes",
+        "server renderer: the IANA closure's share grew 23998 -> 24142 bytes"
+      ],
+      "previousSha256": "5b5bd5671ec89e5c1ca9f04d5d07984cbbd01de58b5a33fbc32676e28a67a2cd"
+    },
+    {
+      "reason": "version 0.0.0 -> 1.0.0-rc.1 for the first publish: producerVersion is a source string, +5 bytes in every graph reaching src/internal/runtime-metadata.js",
+      "growth": [
+        "edge worker: source graph grew 1005814 -> 1005819 bytes",
+        "server renderer: source graph grew 1085327 -> 1085332 bytes"
+      ],
+      "previousSha256": "91d6ba50d3d96c7fff88678f008b80ba21ca49e18cf77271475406925fe5bf96"
+    },
+    {
+      "reason": "A30, revision 3: the IANA data is generated from the registry snapshot as 369 ordered classes in two modules (full table behind negotiate; direct-match projection + region/variant substitutions in the root). +1 module per variant (the root projection module); source graphs shrink 1,005,819 -> 975,992 and 1,085,332 -> 1,055,502; IANA bytes 24,142 -> 11,358 summed over both modules",
+      "growth": [
+        "edge worker: module count grew 46 -> 47",
+        "server renderer: module count grew 53 -> 54"
+      ],
+      "previousSha256": "5e2a5a181d7f96d82ef85881a0a16bb6968104eec23081f161b0c40623fc36d7"
+    },
+    {
+      "reason": "A30 follow-up: src/internal/locale.js's docblock re-states the 88 single-locale divergences from a re-measurement (22,493 door-grid pairs; mgp/mrd 28, mrh/shl 28, enm/yol 28, nsl/sgn-no 4), replacing an unreproducible 2,396-probe breakdown. +235 comment bytes; no code and no module moved",
+      "growth": [
+        "edge worker: source graph grew 975992 -> 976227 bytes",
+        "server renderer: source graph grew 1055502 -> 1055737 bytes"
+      ],
+      "previousSha256": "aa46c7162d05c8f81e8cadf6b842b9c1d3e9d63b06d4e91dc084b90c431659f1"
+    },
+    {
+      "reason": "M-D S33 follow-up: the doors the S33 sweep missed now refuse an unknown option through the shared refuseUnknownOptions helper — createLocaleNegotiator and the two root choosers (LocaleConfiguration), strings.get/t/getResult per-call options, chain/fetchSet (with the two loader forwards projected), pluralOperands; the edge worker and server renderer grow by the guards (no new module in either: both already reach configuration-error.js through load/core)",
+      "growth": [
+        "edge worker: source graph grew 976227 -> 981340 bytes",
+        "server renderer: source graph grew 1055737 -> 1061063 bytes"
+      ],
+      "previousSha256": "2e86293d1fcc2ca78636206997d8955efb8ecb3b87e7f74376d29f83e4c88a2c"
+    },
+    {
+      "reason": "the Fetch doors' options are declared as plan 6.2's LoadStringsOptions instead of any, and that type is wrapped Readonly as the plan declares it; src/load/index.js and fetch-loader.js grow by the annotation and its comment, no code and no module",
+      "growth": [
+        "edge worker: source graph grew 981340 -> 982329 bytes",
+        "server renderer: source graph grew 1061063 -> 1062052 bytes"
+      ],
+      "previousSha256": "01f38461933e3a1755b7a01cbec1e1ef607709605ef5001dcb1e41c522c3ef7a"
+    },
+    {
+      "reason": "the Node file doors' two options typedefs declare partialFailure as the Fetch doors' PartialFailurePolicy (\"reject\" | \"allow-partial\"), as plan 6.2 derives them, instead of \"all-or-nothing\" | \"allow-partial\"; src/node/file-loader.js grows by the annotation's comment, no code and no module",
+      "growth": [
+        "server renderer: source graph grew 1062052 -> 1062609 bytes"
+      ],
+      "previousSha256": "fda721b8ab0ec361edc8af46ffcda39437abc45bedf530d3fa2fb9a37d98629a"
+    },
+    {
+      "reason": "M-R S26 pre-push follow-up (2026-09-23): src/internal/configuration-error.js refuses a non-object options argument and returns a normalized frozen {} that required and optional doors both take (maintainer decision), src/negotiate refuses language-range members other than range/weight (maintainer decision), src/load/run-plan.js stops a read still in flight across a rejection from writing its catalog into a cleared slot, src/load/index.js types the Fetch doors' fetch option as the call the loader makes (amendment A31), and comment corrections from three pre-push reviews. configuration-error.js is reached by every graph, so every graph grows; load, node and negotiate grow most. No module count moved.",
+      "growth": [
+        "edge worker: source graph grew 982329 -> 988053 bytes",
+        "server renderer: source graph grew 1062609 -> 1068383 bytes"
+      ],
+      "previousSha256": "8b31e0fac3b1669727e55de8d56e9de6ce6866e6a1c428cd3ab407b2978f5383"
+    },
+    {
+      "reason": "Promise refusal (maintainer decision, 2026-09-23): src/internal/configuration-error.js refuses a promise or other thenable in the options position, which an unawaited async options factory used to pass as 'no options'. configuration-error.js is reached by every graph, so every graph grows by the check and its comment. No module count moved.",
+      "growth": [
+        "edge worker: source graph grew 988053 -> 988734 bytes",
+        "server renderer: source graph grew 1068383 -> 1069064 bytes"
+      ],
+      "previousSha256": "b03f96ce69f9428afe81319183fb445c9d0075478d0cc553b0836245085b2e46"
+    },
+    {
+      "reason": "2026-09-26, no re-measurement: this history was chained (tools/ratchet-chain.mjs) and the figures and identity this record holds were bound to it. From this entry on, each entry records the figures its write stored (per variant: modules, source bytes, IANA bytes and Node built-in edges; and requests per render per header; and the IANA data's total bytes) and the revision, recipe, fixture and closure they were measured against, and the record may hold no figure above the newest entry's, none missing, and no identity other than the newest entry's. tools/scenario-6.mjs freezes this entry as its checkpoint, because the chain alone cannot see entries cut from its end. Nothing grew.",
+      "growth": [],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 988734,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1069064,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "ca56b77ab2b26ece4f9fd824c7216958811679736fe74d161f0a5c5ab606c643"
+    },
+    {
+      "reason": "Source graph moved: createStrings lost its constant locale option before 1.0.0 (maintainer, 2026-09-27): every instance takes exactly one resolver, as a Java instance takes exactly one supplier; the refusal naming the replacement adds source bytes.",
+      "growth": [],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 987849,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1068358,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "946c5ab81455642d1923d4106145d3ff1dcd91c583fa5160d4b3548824806547"
+    },
+    {
+      "reason": "Source shrank: two shipped error messages (the createStrings runtimeLimits refusal and the createSsrStamp direct-construction refusal) no longer cite internal planning sections.",
+      "growth": [],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 987838,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1068335,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "f40877a7039d28e66544a2ba1cc53fc1216b992d63c6d72fb53cff8986caa9f3"
+    },
+    {
+      "reason": "Source shrank: the JSDoc emitted into the published .d.ts files no longer cites internal planning sections.",
+      "growth": [],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 984534,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1064855,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "8e446d0288e3366c7084df625f1b91753d20fe6332a220d9843be2deb5adac5e"
+    },
+    {
+      "reason": "Fallback resolution and verified loader provenance change the edge and server source graphs for 1.0.",
+      "growth": [
+        "edge worker: source graph grew 984534 -> 987584 bytes",
+        "server renderer: source graph grew 1064855 -> 1068587 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 987584,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1068587,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "d0dc6ca552d0171593da824532dee631d6c469b61e9694ef9e81d6a0a70200f0"
+    },
+    {
+      "reason": "The server example now waits for its listener and propagates bind failures during the 1.0 release review.",
+      "growth": [
+        "server renderer: source graph grew 1068587 -> 1068690 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 987584,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1068690,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "ef1e547aba83f7fac86cec904ef229ca5ced64b4582b38f1c864f69162813302"
+    },
+    {
+      "reason": "Align shared public API names across ports before 1.0.0",
+      "growth": [
+        "edge worker: source graph grew 987584 -> 992402 bytes",
+        "server renderer: source graph grew 1068690 -> 1073790 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 992402,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1073790,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "a199efe372a87104b60f73280cead6e7258c17eb716717ff7106bfdaaefb2d09"
+    },
+    {
+      "reason": "Use localizedStringSupplier for construction-time catalogs, matching Java before 1.0.0",
+      "growth": [],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 992062,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1073450,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "cf42547454c03fc549d092e2fa0ec95fbdbaa3d253cb6b40fae79cde205ed69f"
+    },
+    {
+      "reason": "Complete the approved Java/JS API alignment with consistent match-result and loading-error names",
+      "growth": [
+        "edge worker: source graph grew 992062 -> 995609 bytes",
+        "server renderer: source graph grew 1073450 -> 1077141 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 995609,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1077141,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "32999277f6ecf44882ac9c162c2b9aa9a5af63145c9d6283ad8a1c2236267f02"
+    },
+    {
+      "reason": "Correct supplier documentation after approved cross-port API naming cleanup",
+      "growth": [
+        "edge worker: source graph grew 995609 -> 995667 bytes",
+        "server renderer: source graph grew 1077141 -> 1077199 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 995667,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1077199,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "7e450a26f175c5c957bec7e73191106bdf718aabf6da38885c06675bb74999e3"
+    },
+    {
+      "reason": "Shared diagnostic-text profile 1.1 repairs split UTF-16 pairs and caps nested manifest member displays",
+      "growth": [
+        "edge worker: source graph grew 995667 -> 996198 bytes",
+        "server renderer: source graph grew 1077199 -> 1077730 bytes"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 47,
+          "sourceBytes": 996198,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 54,
+          "sourceBytes": 1077730,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "7e567c26828f3871f965dfd3a91fb9f74c3717b263eb008078cd2096d06ff338"
+    },
+    {
+      "reason": "Shared manifest-normalization profile 1.1 gives private-use-only tags a stable serialized spelling and matching load coverage",
+      "growth": [
+        "edge worker: source graph grew 996198 -> 996849 bytes",
+        "edge worker: module count grew 47 -> 48",
+        "server renderer: source graph grew 1077730 -> 1078381 bytes",
+        "server renderer: module count grew 54 -> 55"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 48,
+          "sourceBytes": 996849,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 55,
+          "sourceBytes": 1078381,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "53242b0ef66d985791d6a593b4576e946d334186d8c68184de7f4257b470ded7"
+    },
+    {
+      "reason": "Manifest profile 1.1 aligns loaded-catalog and SSR coverage with stable private-use locale spelling through a pure wire projection",
+      "growth": [
+        "edge worker: source graph grew 996849 -> 997485 bytes",
+        "edge worker: module count grew 48 -> 49",
+        "server renderer: source graph grew 1078381 -> 1079173 bytes",
+        "server renderer: module count grew 55 -> 56"
+      ],
+      "recorded": {
+        "edge worker": {
+          "modules": 49,
+          "sourceBytes": 997485,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 0
+        },
+        "server renderer": {
+          "modules": 56,
+          "sourceBytes": 1079173,
+          "ianaClosureBytes": 11358,
+          "nodeBuiltinEdges": 10
+        },
+        "requests per render": {
+          "fr-CA": 4,
+          "fr-CH": 4,
+          "fr-CA,fr;q=0.9,en;q=0.1": 4,
+          "de": 2,
+          "iw,he;q=0.5": 2,
+          "fr;q=2": 2
+        },
+        "IANA data": {
+          "closureBytes": 11358
+        }
+      },
+      "identity": {
+        "revision": 3,
+        "recipeSha256": "d1e6bcb4951ac5b5a2f9727cc14dd3b7e0d769594f59277f8e0adab61d603d0f",
+        "fixtureSha256": "885dd1d9d5c5344399e20609cd4f7c8c09e690e6a20e375a49a5305cbf5473ac",
+        "closureClasses": 369
+      },
+      "previousSha256": "5829115127264a67a68dc18e8816dce138a068140a22f05bd9f18700def13119"
+    }
+  ]
+}

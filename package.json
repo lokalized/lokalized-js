@@ -1,0 +1,143 @@
+{
+  "name": "lokalized",
+  "version": "1.0.0",
+  "description": "Natural-sounding software translations for JavaScript.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "src/",
+    "types/",
+    "dist/",
+    "LICENSE",
+    "NOTICE",
+    "THIRD-PARTY-NOTICES.md",
+    "README.md",
+    "CHANGELOG.md",
+    "measurements/lokalized-parity.json",
+    "DIVERGENCES.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./core": {
+      "types": "./types/core/index.d.ts",
+      "import": "./src/core/index.js"
+    },
+    "./parse": {
+      "types": "./types/parse/index.d.ts",
+      "import": "./src/parse/index.js"
+    },
+    "./load": {
+      "types": "./types/load/index.d.ts",
+      "import": "./src/load/index.js"
+    },
+    "./ssr": {
+      "types": "./types/ssr/index.d.ts",
+      "import": "./src/ssr/index.js"
+    },
+    "./negotiate": {
+      "types": "./types/negotiate/index.d.ts",
+      "import": "./src/negotiate/index.js"
+    },
+    "./node": {
+      "types": "./types/node/index.d.ts",
+      "import": "./src/node/index.js"
+    },
+    "./data/ordinal": {
+      "types": "./types/data/ordinal.d.ts",
+      "import": "./src/data/ordinal.js"
+    },
+    "./data/ranges": {
+      "types": "./types/data/ranges.d.ts",
+      "import": "./src/data/ranges.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "docs:api": "npm run types && node tools/api-documentation.mjs",
+    "check": "node tools/temp-hygiene.mjs tsc --noEmit",
+    "types": "node tools/temp-hygiene.mjs tsc --emitDeclarationOnly",
+    "prepack": "npm run types && npm run build:browser && npm run divergences -- --write",
+    "check:examples": "node tools/temp-hygiene.mjs tsc -p tsconfig.examples.json",
+    "check:readme": "node tools/temp-hygiene.mjs node tools/readme-examples.mjs",
+    "check:readme:packed": "node tools/temp-hygiene.mjs node tools/readme-newcomer.mjs",
+    "example:server": "node examples/server/server.js",
+    "test": "node tools/temp-hygiene.mjs node --test",
+    "verify": "npm run check && npm run types && npm run check:examples && npm run check:readme && npm run check:readme:packed && npm run check:bundle && npm run declarations && npm run check:readonly && npm run check:dist && npm run check:release && npm run smoke:worker && npm test && npm run size:graph && npm run subpath:graphs && npm run likely-subtag-consumers && npm run conformance && npm run divergences && npm run check:reference-lock && npm run parity:check && npm run diff:check && npm run check:i18next && npm run scenario:0a && npm run scenario:0b && npm run scenario:1-5 && npm run scenario:2k && npm run scenario:6 && npm run scenario:concurrency && npm run scenario:peak-memory && npm run clause:ledger && npm run spike:placeholders",
+    "likely-subtag-consumers": "node tools/temp-hygiene.mjs node tools/likely-subtag-consumers.mjs",
+    "conformance": "node tools/temp-hygiene.mjs node tools/conformance.mjs",
+    "conformance:write": "node tools/conformance.mjs --write",
+    "scenario:0a": "node tools/temp-hygiene.mjs node --expose-gc tools/scenario-0a.mjs",
+    "scenario:2k": "node tools/temp-hygiene.mjs node --expose-gc tools/scenario-2k.mjs",
+    "scenario:6": "node tools/temp-hygiene.mjs node --expose-gc tools/scenario-6.mjs",
+    "scenario:concurrency": "node tools/temp-hygiene.mjs node tools/scenario-concurrency.mjs",
+    "scenario:peak-memory": "node tools/temp-hygiene.mjs node tools/scenario-peak-memory.mjs",
+    "size:graph": "node tools/temp-hygiene.mjs node tools/graph-size.mjs && node tools/temp-hygiene.mjs node tools/graph-size.mjs --entry src/core/index.js",
+    "subpath:graphs": "node tools/temp-hygiene.mjs node tools/subpath-graphs.mjs",
+    "serve:0a": "node tools/browser-0a/serve.mjs",
+    "spike:placeholders": "node tools/temp-hygiene.mjs node spike/generated-placeholders/run.mjs",
+    "diff:language-range": "node tools/language-range-diff/run.mjs",
+    "diff:direct-tag": "node tools/direct-tag-diff/run.mjs",
+    "diff:tokenizer": "node tools/tokenizer-diff/run.mjs",
+    "diff:parse": "node tools/parse-diff/run.mjs",
+    "diff:phonetic": "node tools/phonetic-diff/run.mjs",
+    "diff:interpolate": "node tools/interpolate-diff/run.mjs",
+    "diff:lookup": "node tools/lookup-diff/run.mjs",
+    "diff:likely-subtag": "node tools/likely-subtag-diff/run.mjs",
+    "diff:load": "node tools/load-diff/run.mjs",
+    "clause:ledger": "node tools/temp-hygiene.mjs node tools/clause-ledger.mjs",
+    "declarations": "node tools/temp-hygiene.mjs node tools/declaration-probes/run.mjs",
+    "check:readonly": "node tools/temp-hygiene.mjs node tools/readonly-surface.mjs",
+    "check:dist": "node tools/temp-hygiene.mjs node tools/build-browser.mjs",
+    "subset": "node tools/subset-likely-subtags.mjs",
+    "check:release": "node tools/temp-hygiene.mjs node tools/release-check.mjs",
+    "smoke:worker": "node tools/temp-hygiene.mjs node tools/worker-smoke.mjs",
+    "build:browser": "node tools/build-browser.mjs --write",
+    "diff:all": "node tools/differentials.mjs --run",
+    "diff:check": "node tools/temp-hygiene.mjs node tools/differentials.mjs --check",
+    "diff:i18next": "node tools/i18next-diff/run.mjs",
+    "check:i18next": "node tools/temp-hygiene.mjs node tools/i18next-diff/run.mjs --check",
+    "check:bundle": "node tools/temp-hygiene.mjs node tools/bundle-sizes.mjs",
+    "parity": "node tools/parity-report.mjs",
+    "divergences": "node tools/temp-hygiene.mjs node tools/divergences.mjs",
+    "parity:check": "node tools/temp-hygiene.mjs node tools/parity-report.mjs --check",
+    "serve:0b": "node tools/browser-0b/serve.mjs",
+    "scenario:0b": "node tools/temp-hygiene.mjs node tools/scenario-0b.mjs",
+    "scenario:1-5": "node tools/temp-hygiene.mjs node tools/scenarios-1-5.mjs",
+    "check:reference-lock": "node tools/temp-hygiene.mjs node tools/reference-runtime-lock.mjs",
+    "reference-lock": "node tools/reference-runtime-lock.mjs --write"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "esbuild": "0.28.2",
+    "typedoc": "0.28.20",
+    "typescript": "^5.6.0",
+    "workerd": "1.20260922.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lokalized/lokalized-js.git"
+  },
+  "homepage": "https://www.lokalized.com",
+  "bugs": {
+    "url": "https://github.com/lokalized/lokalized-js/issues"
+  },
+  "publishConfig": {
+    "tag": "latest"
+  },
+  "keywords": [
+    "i18n",
+    "l10n",
+    "internationalization",
+    "localization",
+    "translation",
+    "cldr",
+    "plural"
+  ]
+}

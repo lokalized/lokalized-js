@@ -1,0 +1,22 @@
+{
+  "description": "Scenario 4. An ordinal placeholder, which needs lokalized/data/ordinal. 23 is FEW in English, so the render discriminates ordinal classification from cardinal (which would say OTHER) and from a missing data module (which refuses at construction).",
+  "options": {
+    "fallbackLocale": "en",
+    "locale": "en",
+    "strings": {
+      "en": {
+        "Place": {
+          "translation": "You finished {{p}}.",
+          "placeholders": {
+            "p": {
+              "value": "n",
+              "translations": { "ORDINALITY_ONE": "{{n}}st", "ORDINALITY_TWO": "{{n}}nd", "ORDINALITY_FEW": "{{n}}rd", "ORDINALITY_OTHER": "{{n}}th" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "call": { "key": "Place", "values": { "n": 23 } },
+  "expected": "You finished 23rd."
+}

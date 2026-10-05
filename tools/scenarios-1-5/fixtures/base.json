@@ -1,0 +1,26 @@
+{
+  "description": "Scenarios 1-3. A cardinal placeholder, a regional sibling (en-001) that construction refuses without the tiebreaker below, and a request (en-AU) whose chain is en-AU, en-001, en: en-001 lacks the rendered key, so it comes from en. The render discriminates plural classification: a port that classified every number as ONE would answer 'I read 3 book'.",
+  "options": {
+    "fallbackLocale": "en",
+    "locale": "en-AU",
+    "strings": {
+      "en": {
+        "Greeting": "Hello, {{name}}",
+        "I read {{bookCount}} books": {
+          "translation": "I read {{bookCount}} {{books}}",
+          "placeholders": {
+            "books": {
+              "value": "bookCount",
+              "translations": { "CARDINALITY_ONE": "book", "CARDINALITY_OTHER": "books" }
+            }
+          }
+        }
+      },
+      "en-001": { "Greeting": "Hello there, {{name}}" },
+      "fr": { "Greeting": "Bonjour, {{name}}" }
+    },
+    "tiebreakerLocalesByLanguageCode": { "en": ["en", "en-001"] }
+  },
+  "call": { "key": "I read {{bookCount}} books", "values": { "bookCount": 3 } },
+  "expected": "I read 3 books"
+}

@@ -1,0 +1,637 @@
+{
+  "formatVersion": 2,
+  "note": "Scenario 0b, measured against the real production host. RECORDED AND RATCHETED, never thresholded — A4 and A7 (restated as A33, 2026-09-25): each run of a revision is compared with the run before it in `history` and with its version's last run, a ratcheted figure that grew carries its reason there, every run's request count and decoded bytes are its version's published graph, and the timings are reported, never compared. Re-checked by tools/scenario-0b.mjs, which touches no network.",
+  "recipe": {
+    "revision": 5,
+    "packRecipe": "the published npm tarball of SUBJECT's version, unmodified, as the code origin serves it. Each run records the npm registry's integrity for that version, the sha256 of the registry's tarball verified against that integrity, and the module graph the tarball's dist/browser/ holds from the two entry points, each module at its size in the tarball",
+    "importRecipe": "ES module import of dist/browser/lokalized.js and dist/browser/load.js, plus their transitive chunks",
+    "loaderGraph": "loadStrings(manifest, 'fr') over a four-catalog manifest; requested fr, sibling fr-CA, fallback en",
+    "requiredResources": {
+      "entryPoints": [
+        "lokalized.js",
+        "load.js"
+      ],
+      "catalogs": [
+        "fr.json",
+        "fr-CA.json",
+        "en.json"
+      ]
+    },
+    "render": {
+      "locale": "fr",
+      "key": "Cart.Items",
+      "values": {
+        "count": 3
+      },
+      "expected": "Votre panier contient 3 livres."
+    },
+    "streamingLimitArm": "after the scenario and its controls, loadStrings(manifest, 'fr', { limits: { maximumInputBytes } }) twice, each on its own token: one byte under fr's manifest-declared decoded size (must refuse fr alone at stage `limit`) and at it (must load). The limit counts what the loader streams, which on a compressing host is the decoded body, so a wire-byte count would accept both",
+    "codeOriginRule": "https://cdn.jsdelivr.net/npm/lokalized@<version>/dist/browser/",
+    "catalogOrigin": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/",
+    "requiredHostHeaders": [
+      "timing-allow-origin",
+      "access-control-allow-origin",
+      "content-encoding",
+      "cache-control"
+    ],
+    "cacheState": "a cold browser HTTP cache over a warm CDN edge, which is what a first-time visitor meets. The page runs from a top-level site this browser has not visited (http://<name>.localhost:8713); Chromium keys its HTTP cache by top-level site, so that partition holds nothing for any URL here, the transitively-imported chunks included. A per-run `?0b=<run>` query additionally busts every URL the page controls. The cold-arm check VERIFIES the result per resource; DNS and connection state are not controlled, so latency is reported and never read as cold.",
+    "preloadState": "fr and fr-CA preloaded WITH crossorigin (CORS mode matches the loader, so reuse is expected); en preloaded WITHOUT it as the mismatch control, which must NOT be reused. The mismatch control's own entry is a harness arm, never a scenario request, and is summed in no figure",
+    "region": "RECORDED, never pinned: a CDN answers from the edge nearest the runner and this project does not select one",
+    "browser": "RECORDED, never pinned: each run keeps its user agent on its history entry. Pinning one would make every browser update a new revision; a ratcheted figure that a browser change moves — its per-response transfer accounting, since the graph fixes the rest — is recorded with its reason like any other growth",
+    "harness": "tools/browser-0b/{serve.mjs,index.html,manifest.json}, driven in a real browser. The summary covers requests STARTED before the render returns, less the mismatched preload's own entry; the other controls and the streaming-limit arm start after it and are recorded but not summed. harnessMethodSha256 freezes all three files: the page with its CODE constant normalized and the manifest without its seven build-identity fields, because those two follow SUBJECT, and serve.mjs whole",
+    "harnessMethodSha256": {
+      "page": "fec029b28855c05a3b2c59d1b3046fbc27d49ad5c46e521befe55c6c7bcfb718",
+      "manifestFixture": "f8073e9df923ff45c974abdd003e888310838385b808d15559de8773e1aaa65f",
+      "server": "a682139403318050e2a609abb37292e58c0a938b26939cdeb6c9eff088edc195"
+    },
+    "hostThresholds": {
+      "rule": "A RATCHET, NOT A NUMBER — A4 and A7 (restated as A33, 2026-09-25): recorded, ratcheted where a ratchet exists, reported where none does. Each run of this revision is compared with the run before it in the record's history and with the last run of its own version; a ratcheted figure that grew over either is recorded only with a stated reason, kept on that run; a reported figure must be present and is never compared. Every run's request count and decoded bytes must also EQUAL its version's published graph and the manifest's planned catalogs, an exit term, so within one version those two cannot move at all, and between versions they move only as the published files do",
+      "ratcheted": [
+        "requestCount",
+        "decodedBytes",
+        "encodedBytes",
+        "transferBytes"
+      ],
+      "reported": [
+        "firstUsableRenderMs",
+        "coldImportMs",
+        "loadMs"
+      ],
+      "invariants": {
+        "figures": "the four figures re-derived from the capture's resources, which requests are the scenario's re-derived from each one's start and the render's return, and the page's own summary and labels equal to that derivation",
+        "graph": "the counted resources exactly the subject's published graph from the two entry points, each module once at its size in the tarball, and the three planned catalogs, each once at the manifest's declared size — on every run, the request count and decoded bytes equal to that graph's",
+        "readable": "every counted resource readable",
+        "preload": "each matched preload one entry, the mismatched preload two or more",
+        "secondLoad": "the second load of fr served from the browser cache, having read fr's bytes",
+        "blind": "the page's own declared blind control, one entry, cross-origin, reading 0 bytes",
+        "coldArm": "every readable counted resource crossed the network: its transfer exceeds its encoded body, and it is never a cache delivery",
+        "streamingLimit": "two arms: fr refused alone by the loader at stage limit one byte under its decoded size, and loaded at it, with its wire size under the refused limit",
+        "render": "the render equal to render.expected, never the key, with all three timings finite, positive and consistent with each other and with the clock the render returned on",
+        "host": "every required host header present on both probes, each probe's stated length the capture's encoded size for the same file, the code pinned to a version and the catalogs to a commit",
+        "subject": "the run's version published, its registry integrity verified against the tarball, its graph read from that tarball, and one version never recorded with two digests or two graphs"
+      }
+    }
+  },
+  "recipeSha256": "ff00ea3dcf8efdf4028680936f5852595fd8aab97365e5f9c76dfc3844e86141",
+  "harnessSha256": {
+    "page": "3f660ce0d53206b5e75984c8b792700a457c79a46a9828bff66307f6c924d491",
+    "manifest": "9d3df0d19723a5f130f83e62dad0cf6e578b5d6c20700d6545de936f08ea2de0",
+    "server": "a682139403318050e2a609abb37292e58c0a938b26939cdeb6c9eff088edc195"
+  },
+  "hostPreconditions": {
+    "contentEncoding": "br",
+    "code": {
+      "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/lokalized.js",
+      "headers": {
+        "timing-allow-origin": "*",
+        "access-control-allow-origin": "*",
+        "content-encoding": "br",
+        "cache-control": "public, max-age=31536000, s-maxage=31536000, immutable",
+        "x-jsd-version-type": "version",
+        "content-length": "64728"
+      }
+    },
+    "catalogs": {
+      "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json",
+      "headers": {
+        "timing-allow-origin": "*",
+        "access-control-allow-origin": "*",
+        "content-encoding": "br",
+        "cache-control": "public, max-age=31536000, s-maxage=31536000, immutable",
+        "x-jsd-version-type": "commit",
+        "content-length": "387"
+      }
+    },
+    "codePinnedToVersion": true,
+    "catalogsPinnedToCommit": true
+  },
+  "history": [
+    {
+      "run": "http://zb-r5b.localhost:8713 r5b-1",
+      "subject": {
+        "version": "1.0.0-rc.2",
+        "integrity": "sha512-XnGDdXGwqrhm2kpxZwOpDP66G4ZYJrxS0/pg6kBVJEl24ytbkSN3Ex26FZR6aBVkwTi34lksYxyeomfLpiUdaw==",
+        "tarballSha256": "702833b0c3359e6469f31260d6caded98f2d9d67f18e83691aa99e4e35afd4b7",
+        "graph": {
+          "chunks/chunk-7WU4JE3E.js": 75744,
+          "chunks/chunk-LED5CWLB.js": 1355,
+          "chunks/chunk-LNGUQ7KN.js": 76894,
+          "chunks/chunk-NZVWUS27.js": 2481,
+          "chunks/chunk-QU3LBEYR.js": 659,
+          "chunks/chunk-ZSYPX2PV.js": 347,
+          "load.js": 20600,
+          "lokalized.js": 184494
+        }
+      },
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+      "contentEncoding": "br",
+      "ratcheted": {
+        "requestCount": 11,
+        "decodedBytes": 365198,
+        "encodedBytes": 131711,
+        "transferBytes": 135011
+      },
+      "reported": {
+        "firstUsableRenderMs": 596.7,
+        "coldImportMs": 533,
+        "loadMs": 60.4
+      },
+      "grew": [],
+      "reason": "Revision 5: createStrings lost its constant locale option before 1.0.0 (maintainer, 2026-09-27), so the page constructs with localeResolver: () => \"fr\", which every published version accepts. Taken in headless Chrome from a fresh profile, because the in-app browser now shares one HTTP cache across sites and served the chunks warm.",
+      "priorRevisionsSha256": "31f5fceaf3e08ca823192a2986f998cf77e71c9121bcb2035569cb9edb205fe6",
+      "timingsSha256": "08c489c105df372e10ec5b5033afbd384e5ac9d6ccb5ff08687d5da4eaeb5cf1",
+      "previousSha256": null
+    }
+  ],
+  "priorRevisions": [
+    {
+      "revision": 3,
+      "recipeSha256": "9c06237a3f5acc9eca17ff204e3fd642b0cd6c4b5680fb4e9cd59631f35ffe66",
+      "run": "http://zb-r3a.localhost:8713 r3a-1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.7032.0 Chrome/152.0.7977.130 Safari/537.36",
+      "figures": {
+        "requestCount": 12,
+        "decodedBytes": 365198,
+        "encodedBytes": 131711,
+        "transferBytes": 135011
+      },
+      "reported": {
+        "firstUsableRenderMs": 175.5,
+        "coldImportMs": 147.2,
+        "loadMs": 23.8
+      },
+      "comparable": false
+    },
+    {
+      "revision": 4,
+      "recipeSha256": "41bf3f32a25caffaaab811637a4d6cbfd74ce01f584d2f9428ae34b5a2ac8ae5",
+      "run": "http://zb-r4a.localhost:8713 r4a-1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.9939.2 Chrome/152.0.7977.130 Safari/537.36",
+      "figures": {
+        "requestCount": 11,
+        "decodedBytes": 365198,
+        "encodedBytes": 131711,
+        "transferBytes": 135011
+      },
+      "reported": {
+        "firstUsableRenderMs": 210.8,
+        "coldImportMs": 156.6,
+        "loadMs": 37.9
+      },
+      "comparable": false,
+      "timings": [
+        "12e9b16f0b751c9cc087179eb293b09d8e19c1fbc64b692d3887d834fc805599"
+      ]
+    }
+  ],
+  "capture": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+    "origins": {
+      "page": "http://zb-r5b.localhost:8713",
+      "code": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/",
+      "catalogs": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/",
+      "blindControl": "http://localhost:8714/no-timing-allow-origin.json"
+    },
+    "resources": [
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r5b-1",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": null,
+        "counted": true,
+        "startMs": 77.29999999701977,
+        "initiatorType": "link",
+        "transferSize": 687,
+        "encodedBodySize": 387,
+        "decodedBodySize": 909,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 226
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r5b-1",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": null,
+        "counted": true,
+        "startMs": 77.29999999701977,
+        "initiatorType": "link",
+        "transferSize": 671,
+        "encodedBodySize": 371,
+        "decodedBodySize": 876,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 226.4
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r5b-1",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": "mismatched-preload",
+        "counted": false,
+        "startMs": 77.29999999701977,
+        "initiatorType": "link",
+        "transferSize": 0,
+        "encodedBodySize": 0,
+        "decodedBodySize": 0,
+        "deliveryType": "",
+        "responseStatus": 0,
+        "readable": false,
+        "durationMs": 226.7
+      },
+      {
+        "url": "http://zb-r5b.localhost:8713/manifest.json",
+        "origin": "local-control",
+        "phase": "scenario",
+        "control": null,
+        "counted": false,
+        "startMs": 79.79999999701977,
+        "initiatorType": "fetch",
+        "transferSize": 1651,
+        "encodedBodySize": 1351,
+        "decodedBodySize": 1351,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 1.9
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/lokalized.js?0b=r5b-1",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": null,
+        "counted": true,
+        "startMs": 83.79999999701977,
+        "initiatorType": "script",
+        "transferSize": 65028,
+        "encodedBodySize": 64728,
+        "decodedBodySize": 184494,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 245.8
+      },
+      {
+        "url": "http://zb-r5b.localhost:8713/favicon.ico",
+        "origin": "local-control",
+        "phase": "scenario",
+        "control": null,
+        "counted": false,
+        "startMs": 113.5,
+        "initiatorType": "other",
+        "transferSize": 309,
+        "encodedBodySize": 9,
+        "decodedBodySize": 9,
+        "deliveryType": "",
+        "responseStatus": 404,
+        "readable": true,
+        "durationMs": 0.8
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/load.js?0b=r5b-1",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": null,
+        "counted": true,
+        "startMs": 336.5,
+        "initiatorType": "script",
+        "transferSize": 7731,
+        "encodedBodySize": 7431,
+        "decodedBodySize": 20600,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 168.1
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-QU3LBEYR.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": null,
+        "counted": true,
+        "startMs": 505.09999999403954,
+        "initiatorType": "script",
+        "transferSize": 779,
+        "encodedBodySize": 479,
+        "decodedBodySize": 659,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 80.7
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-NZVWUS27.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": null,
+        "counted": true,
+        "startMs": 505.09999999403954,
+        "initiatorType": "script",
+        "transferSize": 1501,
+        "encodedBodySize": 1201,
+        "decodedBodySize": 2481,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 81
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-LED5CWLB.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": null,
+        "counted": true,
+        "startMs": 505.20000000298023,
+        "initiatorType": "script",
+        "transferSize": 994,
+        "encodedBodySize": 694,
+        "decodedBodySize": 1355,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 63.2
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-ZSYPX2PV.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": null,
+        "counted": true,
+        "startMs": 505.20000000298023,
+        "initiatorType": "script",
+        "transferSize": 552,
+        "encodedBodySize": 252,
+        "decodedBodySize": 347,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 78.7
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-7WU4JE3E.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": null,
+        "counted": true,
+        "startMs": 505.20000000298023,
+        "initiatorType": "script",
+        "transferSize": 23067,
+        "encodedBodySize": 22767,
+        "decodedBodySize": 75744,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 100.4
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/lokalized@1.0.0-rc.2/dist/browser/chunks/chunk-LNGUQ7KN.js",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": null,
+        "counted": true,
+        "startMs": 505.20000000298023,
+        "initiatorType": "script",
+        "transferSize": 33342,
+        "encodedBodySize": 33042,
+        "decodedBodySize": 76894,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 106.5
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r5b-1",
+        "origin": "production-host",
+        "phase": "scenario",
+        "control": null,
+        "counted": true,
+        "startMs": 619.4000000059605,
+        "initiatorType": "fetch",
+        "transferSize": 659,
+        "encodedBodySize": 359,
+        "decodedBodySize": 839,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 56.9
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r5b-1",
+        "origin": "production-host",
+        "phase": "after-render",
+        "control": null,
+        "counted": false,
+        "startMs": 680.5,
+        "initiatorType": "fetch",
+        "transferSize": 0,
+        "encodedBodySize": 387,
+        "decodedBodySize": 909,
+        "deliveryType": "cache",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 0.5
+      },
+      {
+        "url": "http://localhost:8714/no-timing-allow-origin.json",
+        "origin": "local-control",
+        "phase": "after-render",
+        "control": null,
+        "counted": false,
+        "startMs": 681.2000000029802,
+        "initiatorType": "fetch",
+        "transferSize": 0,
+        "encodedBodySize": 0,
+        "decodedBodySize": 0,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": false,
+        "durationMs": 0.7
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r5b-1-limit-908",
+        "origin": "production-host",
+        "phase": "after-render",
+        "control": null,
+        "counted": false,
+        "startMs": 682.9000000059605,
+        "initiatorType": "fetch",
+        "transferSize": 687,
+        "encodedBodySize": 387,
+        "decodedBodySize": 909,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 45.8
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r5b-1-limit-908",
+        "origin": "production-host",
+        "phase": "after-render",
+        "control": null,
+        "counted": false,
+        "startMs": 682.9000000059605,
+        "initiatorType": "fetch",
+        "transferSize": 671,
+        "encodedBodySize": 371,
+        "decodedBodySize": 876,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 45.8
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r5b-1-limit-908",
+        "origin": "production-host",
+        "phase": "after-render",
+        "control": null,
+        "counted": false,
+        "startMs": 682.9000000059605,
+        "initiatorType": "fetch",
+        "transferSize": 659,
+        "encodedBodySize": 359,
+        "decodedBodySize": 839,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 53.9
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr.json?0b=r5b-1-limit-909",
+        "origin": "production-host",
+        "phase": "after-render",
+        "control": null,
+        "counted": false,
+        "startMs": 737.9000000059605,
+        "initiatorType": "fetch",
+        "transferSize": 687,
+        "encodedBodySize": 387,
+        "decodedBodySize": 909,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 61.5
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/fr-CA.json?0b=r5b-1-limit-909",
+        "origin": "production-host",
+        "phase": "after-render",
+        "control": null,
+        "counted": false,
+        "startMs": 738,
+        "initiatorType": "fetch",
+        "transferSize": 671,
+        "encodedBodySize": 371,
+        "decodedBodySize": 876,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 61.3
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/gh/lokalized/lokalized-js@2867bff2ca8867a6fd1984aeb1a5de36c983d4d4/examples/catalogs/en.json?0b=r5b-1-limit-909",
+        "origin": "production-host",
+        "phase": "after-render",
+        "control": null,
+        "counted": false,
+        "startMs": 738,
+        "initiatorType": "fetch",
+        "transferSize": 659,
+        "encodedBodySize": 359,
+        "decodedBodySize": 839,
+        "deliveryType": "",
+        "responseStatus": 200,
+        "readable": true,
+        "durationMs": 63.4
+      }
+    ],
+    "controls": {
+      "secondLoad": {
+        "newEntries": 1,
+        "transferSize": 0,
+        "servedFromCache": true,
+        "bytesRead": 909
+      },
+      "blind": {
+        "fetched": true,
+        "encodedBodySize": 0,
+        "decodedBodySize": 0,
+        "isBlind": true
+      },
+      "preload": {
+        "matched": {
+          "fr.json": 1,
+          "fr-CA.json": 1
+        },
+        "mismatched": {
+          "en.json": 2
+        }
+      }
+    },
+    "render": {
+      "locale": "fr",
+      "key": "Cart.Items",
+      "rendered": "Votre panier contient 3 livres.",
+      "renderedTheKeyBack": false,
+      "coldImportMs": 533,
+      "loadMs": 60.4,
+      "firstUsableRenderMs": 596.7,
+      "renderedAtMs": 680.5
+    },
+    "problems": [],
+    "cacheBuster": {
+      "parameter": "0b",
+      "value": "r5b-1",
+      "appliedTo": "every production-host URL"
+    },
+    "streamingLimits": {
+      "inEffect": {
+        "maximumInputBytes": 8388608,
+        "maximumReaderCharacters": 8388608,
+        "maximumJsonNestingDepth": 64,
+        "maximumTotalInputBytes": 33554432,
+        "maximumLocalizedStringsFiles": 256,
+        "maximumTranslationNodes": 100000,
+        "maximumWarnings": 1000
+      },
+      "subject": {
+        "locale": "fr",
+        "manifestDecodedBytes": 909
+      },
+      "arms": [
+        {
+          "maximumInputBytes": 908,
+          "outcome": "refused",
+          "error": "StringsLoadingError",
+          "failures": [
+            {
+              "locale": "fr",
+              "stage": "limit",
+              "message": "fr: body exceeds the maximum of 908 bytes"
+            }
+          ]
+        },
+        {
+          "maximumInputBytes": 909,
+          "outcome": "loaded",
+          "failures": []
+        }
+      ]
+    },
+    "coldArm": {
+      "contaminated": false,
+      "examined": 11,
+      "cachedResources": [],
+      "noteOnLimits": "the cache-buster cannot reach transitively-imported chunks; they are cold only if the page's top-level site is new to this browser, which is what this check verifies"
+    },
+    "summary": {
+      "requestCount": 11,
+      "requestsAfterRenderExcluded": 7,
+      "controlsExcluded": 1,
+      "encodedBytes": 131711,
+      "decodedBytes": 365198,
+      "transferBytes": 135011
+    }
+  }
+}

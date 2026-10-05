@@ -1,0 +1,912 @@
+{
+  "scenario": "0a",
+  "revision": 4,
+  "note": "Baseline, not a threshold. M2 is tracked by engineering measurement; no go/no-go line exists.",
+  "recipe": {
+    "scenario": "0a",
+    "revision": 4,
+    "description": "M2 static integration: the root with a fixed small embedded raw-text catalog, and lokalized/core with its fixed already-parsed equivalent",
+    "freeze": "LATE, and stated rather than smoothed over. Plan 9.2:2806 has 0a owned by M2 and frozen at M0. M0 certification was skipped and nothing here was frozen until 2026-09-25, during M-R, after 71 recorded rebaselines. Revision 1 declares the method the tool has used since M5a rather than choosing a new one; it does not make the M0 deadline met.",
+    "artifact": "the working tree's src/, which package.json#exports ships unbundled for '.' and './core'. Not a packed tarball, which plan 9.2's 'same packed artifact' asks for",
+    "variants": [
+      {
+        "label": "root + raw-text catalog",
+        "specifier": "lokalized",
+        "entry": "src/index.js",
+        "catalogInput": "raw-text",
+        "fixtureSha256": "f880b1003f9871a7b20cefa9768c5363a4a80d129a5856994e2d59a0ad1c5b08"
+      },
+      {
+        "label": "core + parsed equivalent",
+        "specifier": "lokalized/core",
+        "entry": "src/core/index.js",
+        "catalogInput": "parsed",
+        "fixtureSha256": "d8f29369a09f0fdd101caac13436635ebc2acd13fd1aa2e32b624345de6b9bb8"
+      }
+    ],
+    "construction": {
+      "fallbackLocale": "en",
+      "localeSupplierAnswers": "en-AU"
+    },
+    "render": {
+      "key": "I read {{bookCount}} books",
+      "values": {
+        "bookCount": 3
+      },
+      "expected": "I read 3 books"
+    },
+    "iterations": 9,
+    "method": "Node. Per variant, 9 iterations of: import the entry under a fresh ?m= query (which re-evaluates the entry module alone; its dependencies load once per process, so the median import is a warm figure), construct, first render — each timed with performance.now(), median reported. The raw-text variant's JSON.stringify of its three documents runs inside its construction window (about 2 microseconds against a recorded construction median of about 130, measured 2026-09-25). Retained heap is heapUsed across two forced collections around one more import and construction, which needs --expose-gc: a run without it fails. Modules and source bytes are tools/graph-walk.mjs over the entry's relative import graph. All of it is the code in harness.file, whose bytes are harness.sha256",
+    "harness": {
+      "file": "tools/0a-measure.mjs",
+      "sha256": "d7a216580145646fd4f280c67d34b12fb7269cd1854242c9089ff2c57823c267",
+      "command": "node --expose-gc tools/scenario-0a.mjs, which imports harness.file"
+    },
+    "gated": "modules and sourceBytes per variant ratchet: growth fails until re-recorded with --reason, and every --write needs a reason and appends a chained history entry. Each row's modules and sourceBytes, as the harness returned them and as the run records them, must equal tools/graph-walk.mjs over the variant's declared entry, walked again apart from the harness. The render must equal render.expected. Timings and heap are reported and never compared, and each must be present and finite, in the run and in the record (A33 (4))",
+    "browserHalf": "tools/browser-0a/index.html served by tools/browser-0a/serve.mjs, one variant per page load, merged by tools/browser-0a/record.mjs with a reason and a chained history entry. Never re-measured here; its staleness against the Node graph is reported, never gated; it is required present: a row per variant with its counts and finite timings; and it is bound by its digest to the newest history entry, so an edit by hand fails. The page hands the ALREADY-PARSED catalogs to BOTH variants, so its root row's construction does not include parsing, unlike the Node root variant above. Recorded rather than fixed: fixing it is a new browser capture",
+    "notFrozen": "thresholds and regression tolerances — none exist, by A3/A4/A7 (restated as A33, 2026-09-25); runtime version and hardware, which move only the reported timings; tools/graph-walk.mjs, which takes the ratcheted figures and is shared with other tools and tests (subpath-graphs, scenario 2k and scenario 6 among them), so a digest of it here would make every edit to it a 0a revision: a change to it moves the harness's rows and their re-derivation alike, the ratchet sees any growth, and writing a shrink needs a reason; and tools/scenario-0a.mjs, which orchestrates, judges and copies the harness's rows into the record: the modules and sourceBytes it copies are walked again from each declared entry, the timings it rounds are held only to being present and finite, as every timing is, and each of its rules is run by test/scenario-0a-recipe.test.js"
+  },
+  "recipeSha256": "36ee91632173a9ebb1bfacc91226b44d2089457b6836f5ab80448a656554b2a6",
+  "environments": [
+    "node",
+    "browser"
+  ],
+  "node": [
+    {
+      "label": "root + raw-text catalog",
+      "modules": 33,
+      "sourceBytes": 783003,
+      "importMs": 0.308,
+      "constructionMs": 0.1044,
+      "firstRenderMs": 0.3825,
+      "retainedBytes": 87424
+    },
+    {
+      "label": "core + parsed equivalent",
+      "modules": 32,
+      "sourceBytes": 769977,
+      "importMs": 0.718,
+      "constructionMs": 0.392,
+      "firstRenderMs": 0.3107,
+      "retainedBytes": 467248
+    }
+  ],
+  "browser": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "transferCompression": "none — the harness server does not compress; section 9.2's gzip/brotli ceilings are a separate measure",
+    "memoryKind": "performance.memory (coarse, whole-page)",
+    "note": "One variant per page load: measuring both in one document leaves the second with a warm module cache and zero cold-import, resource and transfer figures.",
+    "variants": [
+      {
+        "label": "root + raw-text catalog",
+        "resources": 32,
+        "encodedBytes": 775144,
+        "decodedBytes": 775144,
+        "coldImportMs": 18.7,
+        "importMs": 0.9,
+        "constructionMs": 0.1,
+        "firstRenderMs": 0.2,
+        "firstRender": "I read 3 books"
+      },
+      {
+        "label": "core + parsed equivalent",
+        "resources": 31,
+        "encodedBytes": 764112,
+        "decodedBytes": 764112,
+        "coldImportMs": 19.7,
+        "importMs": 1.4,
+        "constructionMs": 0.4,
+        "firstRenderMs": 0.4,
+        "firstRender": "I read 3 books"
+      }
+    ]
+  },
+  "rebaselines": [
+    {
+      "reason": "M4: src/internal/plural.js grew to 1,068 lines implementing exact BigInt decimal arithmetic, CLDR operands, compact exponents, and the pinned JDK double-to-decimal contract. The M4 gate requires exact numeric conversion 'with an explicit JS implementation rather than assuming Number.prototype.toString is identical', so this growth is the milestone's substance, not incidental. Module count is unchanged at 19: the optional ordinal and range data stayed out of the root graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 361714 -> 375500 bytes",
+        "core + parsed equivalent: source graph grew 356241 -> 369075 bytes"
+      ],
+      "previousSha256": null
+    },
+    {
+      "reason": "M6: the expression language enters the root graph. src/internal/expression.js (the eager compiler and tree-walking evaluator) and src/internal/expression-tokenizer.js are new root modules, and src/internal/interpolate.js grew to evaluate whole-message and generated-fragment alternatives, select ORDINALITY_* and range-driven cardinality through injected optional-data classifiers, and contextualize generated-placeholder failures. Root modules 19 -> 21; source graph 375500 -> 471405 bytes. No generated data table was added: the ordinal and cardinal-range tables remain outside the root, asserted by test/pinned-data-only.test.js.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 375500 -> 472214 bytes",
+        "root + raw-text catalog: module count grew 19 -> 21",
+        "core + parsed equivalent: source graph grew 369075 -> 465789 bytes",
+        "core + parsed equivalent: module count grew 18 -> 20"
+      ],
+      "previousSha256": "3e4ec0720d93393a367a55bdf6473784444e1d963828d47bbac8f0c2c3883ac2"
+    },
+    {
+      "reason": "M6: the expression language enters the root graph. src/internal/expression.js (eager compiler plus tree-walking evaluator) and src/internal/expression-tokenizer.js are new root modules, and src/internal/interpolate.js grew to select whole-message and generated-fragment alternatives, resolve ORDINALITY_* and range-driven cardinality through injected optional-data classifiers, and contextualize generated-placeholder failures. Root modules 19 -> 21. No generated data table was added: the ordinal and cardinal-range tables stay outside the root, asserted by test/pinned-data-only.test.js.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 472214 -> 473318 bytes",
+        "core + parsed equivalent: source graph grew 465789 -> 466893 bytes"
+      ],
+      "previousSha256": "d2b7e6b83c422e99826993218001667c03068e5b2d7ab6f100b88009546391fe"
+    },
+    {
+      "reason": "M6 review: +2498 bytes of source in the root graph, all of it expression-language code. src/internal/expression.js gains validateLimit() so a configured expression limit above EXPRESSION_LIMIT_CEILINGS is rejected rather than silently ignored (the ceilings were exported but unenforced), and src/core/index.js now hands the optional ordinal classifier to each evaluate() call instead of installing it on a module-level global, which was a cross-instance leak. Module count is unchanged at 21/20 and no generated data table was added.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 473318 -> 475817 bytes",
+        "core + parsed equivalent: source graph grew 466893 -> 469392 bytes"
+      ],
+      "previousSha256": "e108bf5f5dce593e0fb986a6f2c96bb2fc38d226465914342851dd35d1e4df1b"
+    },
+    {
+      "reason": "M6 adversarial review: two evaluator fixes grew the root graph by 2,498 bytes (src/internal/expression.js 53,333 -> 55,262, the rest in src/core/index.js and src/internal/expression-tokenizer.js). (1) effectiveLimits() now validates a caller-supplied limit the way TranslationRuntimeLimits.Builder.build() does - integer, positive (or non-negative for nesting depth), and at or under the exported hard ceiling - with Java's verbatim messages; previously EXPRESSION_LIMIT_CEILINGS was exported but enforced nowhere, so a configured limit above the ceiling was neither rejected nor clamped but silently honoured. (2) The ordinal-category classifier moved off a module-level registration onto a per-evaluation option, so a Strings built without pluralData.ordinal can no longer answer an ordinal question merely because some other instance in the process was built with it. No data table entered the root graph; test/pinned-data-only.test.js still asserts the ordinal and cardinal-range tables stay outside it.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 475817 -> 476361 bytes",
+        "core + parsed equivalent: source graph grew 469392 -> 469936 bytes"
+      ],
+      "previousSha256": "3502089896257a335d38619312d64bc44007a9bf72209ecf6ebded74e07e7cfb"
+    },
+    {
+      "reason": "M5a: the bounded duplicate-aware parser enters the root graph. src/internal/json-parse.js (strict UTF-8 decoding, a hand-written bounded JSON scanner, per-path duplicate detection, and limit enforcement before object materialization) plus parse-diagnostics.js and parse-warnings.js. JSON.parse cannot satisfy the M5a gate — it keeps the last duplicate silently, materializes before any limit can fire, and substitutes U+FFFD for invalid UTF-8 — so a real parser is the milestone's substance. Module count 21 -> 22.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 476361 -> 508616 bytes",
+        "root + raw-text catalog: module count grew 21 -> 22",
+        "core + parsed equivalent: source graph grew 469936 -> 502191 bytes",
+        "core + parsed equivalent: module count grew 20 -> 21"
+      ],
+      "previousSha256": "e13f23cddf07607af20fcdfe27b24ec299a1861b1938bcc2983aafa12e219923"
+    },
+    {
+      "reason": "M5a adversarial review: +5,432 bytes of comments and one behavioural fix in the root graph, from two concurrent review sessions sharing this tree. THIS session changed src/internal/json-parse.js only (+2,088 bytes, of which ~1,190 is mine): JsonReader now retains AT MOST ONE duplicate finding instead of every duplicate in the document. Only duplicates[0] was ever consumed — parseCatalogMembers stops at the first root member carrying a finding — while each retained finding materialised a fresh bounded JSON path of up to 4,096 UTF-16 units rebuilt from the whole container stack, so a 590 KB file holding 100,000 repetitions of one member name at depth 63 allocated 384 MB and took 172 ms; capped, the same file costs 4.7 MB and 7.5 ms and reports the identical diagnostic. That is an M5a bounded-work defect, not an optimisation, and test/json-parse.test.js now pins the cap alongside new both-sides boundary tests for the nesting, aggregate-byte and translation-node limits. The remaining growth (src/internal/catalog.js +3,344, src/internal/parse-warnings.js +615, src/parse/index.js -2,193) was made by a CO-RESIDENT M5a review session moving expression validation and incomplete-language-form warnings into the structural walk where Java runs them; it is included in this measurement because the tree is shared, and it is NOT covered by this session's review.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 508616 -> 514048 bytes",
+        "core + parsed equivalent: source graph grew 502191 -> 507623 bytes"
+      ],
+      "previousSha256": "4d0e1476d38a4844a8c474878a338aa5725f10e1a8a1a067e617350d7bb52635"
+    },
+    {
+      "reason": "M5a adversarial review (diagnostics, gate integrity, public surface), companion to the entry above. No new module and no new data table: 22/21 modules, unchanged. The growth is comments plus one behavioural fix. THE FIX: expression validation and incomplete-language-form warnings now run INSIDE the structural walk, at the two points LocalizedStringLoader runs them (validateWholeMessageAlternativeExpression and validateFragmentAlternativeExpression inside parseLocalizedString; warnOnIncompleteLanguageFormTranslations inside the root member loop), instead of in two passes afterwards. Both are INJECTED into catalog.js as optional hooks (ParseContext.validateExpression / onRootParsed) rather than imported, so catalog.js stays independent of the expression language and createStrings keeps exactly the structural walk, the message wording and the graph it had. The placement is behavioural, not cosmetic: measured against unmodified lokalized-java 3.0.0 on the pinned JDK through LocalizedStringLoader.parse(InputStream, ...), the two-pass version disagreed on 9 of 32 differential inputs, including one where Java delivered a warning to the caller's handler that this port silently dropped because a later key failed. All 32 now agree. test/parse.test.js pins six of them and test/json-parse.test.js pins the 4096-character diagnostic-path bound; none of the seven is reachable from the corpus, whose parse fixtures carry exactly one defect each -- deleting the path bound outright still leaves all 1965 corpus cases green.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 514048 -> 514376 bytes",
+        "core + parsed equivalent: source graph grew 507623 -> 507951 bytes"
+      ],
+      "previousSha256": "ff9a34dcb1750f1b6063d4f227c6e2b7743c7badec72d4ccc1fc6043e67f6053"
+    },
+    {
+      "reason": "M5a wiring + 0a measurement correction. (1) createStrings now dispatches on section 3.2's CatalogInput: string and Uint8Array go through the bounded parser, an already-parsed object does not. That was 2 of the 4 declared input forms previously unimplemented, and it is what puts the parser in the root graph legitimately. (2) scenario-0a was passing the IDENTICAL object to both variants, so they differed only by entry point and the measurement did not match section 9.2's description of them. Variant 1 now serializes the catalog and pays for parsing at construction, as specified. The byte movement is the corrected measurement, not new code.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 514376 -> 515605 bytes",
+        "core + parsed equivalent: source graph grew 507951 -> 509180 bytes"
+      ],
+      "previousSha256": "dcc4ad15d57132368f82e1d56c5086d5a06f06391df841dbab4eddc46f7ae348"
+    },
+    {
+      "reason": "M5b: the catalog model, warnings and bidi surfaces enter the root graph. Three new root modules: src/internal/parse-warnings.js, which construction now needs because `createStrings` raises the incomplete cardinality/ordinality warnings for the catalogs it is handed directly (plan 3.2/4.4) instead of returning an empty array; and src/internal/bidi.js with its generated src/data/rtl.js RTL-script table, which the default RTL_LOCALES isolation mode cannot answer without. src/internal/catalog.js also grew by the programmatic `LocalizedStringInput[]` model walk (plan 3.6: depth ceiling, identity cycles, and the greatest-validated-depth DAG memo), which is the fourth CatalogInput form and had no implementation at all. None of it is optional data: the ordinal and cardinal-range tables remain outside the root graph, which is what the module count is really guarding.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 515605 -> 572659 bytes",
+        "root + raw-text catalog: module count grew 22 -> 25",
+        "core + parsed equivalent: source graph grew 509180 -> 566234 bytes",
+        "core + parsed equivalent: module count grew 21 -> 24"
+      ],
+      "previousSha256": "2be86a6f52f2dd969a15209b4f26e3c20e646887e9281d3f7956310035edf1da"
+    },
+    {
+      "reason": "M5b (continued): +403 bytes of commentary in src/internal/catalog.js explaining why an explicitly-undefined member on a programmatic node counts as absent where the file door has no such case. Same milestone and same modules as the preceding entry; no new module enters the graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 572659 -> 574331 bytes",
+        "core + parsed equivalent: source graph grew 566234 -> 567906 bytes"
+      ],
+      "previousSha256": "d04879d58b7e258d8860c19beba860a885a8feb7ca4cc7bc6f1ebbc179e70d8a"
+    },
+    {
+      "reason": "M5b review: +443 bytes in src/internal/interpolate.js for javaSimpleNameOf, which fills the trailing getClass().getSimpleName() slot of the 'must be a Phonetic or CharSequence but was X' diagnostic from the tagged value's own axis (Gender, Cardinality, Phonetic) instead of the vaguer \"a tagged 'language-form' value\". Two more recorded Java cause messages now reproduce exactly (94 -> 96 of 126). Same 25 modules as the preceding entry; no new module enters the graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 574331 -> 574774 bytes",
+        "core + parsed equivalent: source graph grew 567906 -> 568349 bytes"
+      ],
+      "previousSha256": "9b953cd2c48615d885d9419656ec4ab32eacb5667929c33a2fffed5d3d350194"
+    },
+    {
+      "reason": "M5b (continued): +443 bytes in src/internal/interpolate.js, with no new module in the graph (25/24, unchanged). The bidi work that this session added -- src/internal/bidi.js and its generated src/data/rtl.js table -- was already accounted for two entries earlier; this delta arrived in interpolate.js between that re-record and this one, from M5b work landing in parallel in the same file (the phonetic-axis selection path), so it is recorded as milestone substance rather than attributed line by line, which the writer of this entry could not do honestly. The invariant the byte count is a proxy for is asserted directly and did not move: test/pinned-data-only.test.js still names the exact set of generated tables the root may reach, and neither optional plural module is reachable.",
+      "growth": [],
+      "previousSha256": "35cae9d2d3b20d3586b9fd136a0475594718f16ec32b46165f17b2e8729995ec"
+    },
+    {
+      "reason": "M5b close (bidi isolation, interpolation escapes, renderName, plus the concurrent M5b areas): src/internal/bidi.js and its pinned src/data/rtl.js enter the root graph out of necessity, not choice -- the library default is rtl-locales, so the 37 right-to-left scripts are consulted on lookups nobody configured. src/internal/interpolate.js grew the lenient scanner shared by the returned failure key, the IsolatedValue marker mirroring BidiUtils.BoundedIsolatedValue, and the renderName table built from the single generated LANGUAGE_FORM_NAMES list. Root modules 22 -> 25. test/pinned-data-only.test.js names data/rtl.js explicitly so a future table cannot slip in under a re-recorded byte ceiling.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 574774 -> 582855 bytes",
+        "core + parsed equivalent: source graph grew 568349 -> 576430 bytes"
+      ],
+      "previousSha256": "9d6a4bd561512eb3d8a7c2373fe3fb14cd8e37dc593af996ca585cd4ea2fe03c"
+    },
+    {
+      "reason": "M5b review: createStrings accepts plan 3.2's ReadonlyMap CatalogMap (a Map was silently read as zero catalogs), plus the concurrent bidi/interpolation and tiebreaker-validation work in the same milestone",
+      "growth": [
+        "root + raw-text catalog: source graph grew 582855 -> 583724 bytes",
+        "core + parsed equivalent: source graph grew 576430 -> 577299 bytes"
+      ],
+      "previousSha256": "81838ede08582e9447aa039ee2d8e315a0f939642605ccf3352e736f37d414fc"
+    },
+    {
+      "reason": "M3b close: +489 bytes in the root graph, all of it src/core/index.js, from the null-as-absent option fix — Java's setters are @Nullable and its getters return an Optional that is empty for null, so `options.bidiIsolation == null` must treat an explicit null identically to an omitted option (DefaultStrings.java:683-685). No new module (25/24, unchanged). Recorded jointly with the second staged fix of the same slice, src/parse/index.js +950 bytes (load-time expression validation now compiles against EXPRESSION_LIMIT_CEILINGS rather than the defaults, which had made the port stricter than Java on 6 corpus cases). That 950 is deliberately ABSENT from both graph totals, which moved by 489 and not 1439: src/parse/index.js is the lokalized/parse entry point and is not reachable from src/index.js. The equal delta across both variants is the evidence that the optional entry point stayed out of the root graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 583724 -> 584213 bytes",
+        "core + parsed equivalent: source graph grew 577299 -> 577788 bytes"
+      ],
+      "previousSha256": "7b55dfc1130ecdcf7e7182e830de19f4a40c9dcdd9a4d28c5ce71dfd278924b0"
+    },
+    {
+      "reason": "M7 A0-A2 (resolved fallback locale, the matchFor locale arm, raw-range single-member ingress): +15,338 bytes in BOTH graphs, 25/24 modules unchanged. Root and core grew by the identical delta, which is the load-bearing measurement: it decomposes exactly as src/core/index.js +7,193 (DefaultStrings:446-470 fallback resolution plus the :303-314 and :465 construction refusals) and src/internal/locale.js +8,145 (splitting the kernel so matchForRange takes the caller's RAW lowercased range, since Java builds member statics from the raw range for matchFor(List) and only matchFor(Locale) normalizes). The other 38,992 bytes this slice added -- src/negotiate/index.js +15,676 and the new pinned src/data/iana-range-equivalents.js +23,316 -- are DELIBERATELY ABSENT from both totals, and the equal delta across the two variants is the evidence: lokalized/negotiate and its IANA table are unreachable from src/index.js, which is the property the module-count ratchet exists to protect. Conformance 1,200 -> 1,384 passed, 0 FAILED.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 584213 -> 599551 bytes",
+        "core + parsed equivalent: source graph grew 577788 -> 593126 bytes"
+      ],
+      "previousSha256": "f6386699a1cbb8c7b6510c7be58e59a4555056dfbbf2e9fe07eebd6710fe4224"
+    },
+    {
+      "reason": "M7 slice batch A3 + B1 + the per-call-override-order oracle slice, re-recorded ONCE at batch close. MEASURED decomposition, root graph 599551 -> 636829 bytes (+37278): src/internal/locale.js +19243 (A3 N-member solver +18375, ablation-verified, plus 868 bytes of comment repair -- two dangling test-file references corrected and the -0 weight comparator divergence documented), src/core/index.js +14994 and src/internal/interpolate.js +3041 (B1 fallback-policy walk, failure handler and the rebuilt-fragment cause ladder). 19243 + 14994 + 3041 = 37278 exactly, so every byte is attributed to a named file. The core graph moved by the IDENTICAL delta, 593126 -> 630404, which is the proof that the growth is all in shared resolution code reachable from both entry points and that nothing new entered the root graph alone. src/negotiate/index.js changed by -824 bytes in the same batch and neither graph moved by it, which is the standing proof that the negotiator and its pinned IANA table stay unreachable from src/index.js. Module count UNCHANGED at 25 root / 24 core, the half of this ratchet a slice can genuinely break.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 599551 -> 636829 bytes",
+        "core + parsed equivalent: source graph grew 593126 -> 630404 bytes"
+      ],
+      "previousSha256": "aa73f7f3cd778da767b4b9c6856c911c7e5347195e1deaac4668a14c19d6e616"
+    },
+    {
+      "reason": "M7 B2+B3 batch (throw response, ambient resolvers, per-call locale/localeMatch, two-layer supplied-match validation) plus the B2/B3 review repairs. Re-recorded ONCE for the whole batch. MEASURED decomposition, +28774 bytes root / +27590 core: src/core/index.js +24986 (MissingTranslationError, throwForFailure's constructed arm, localeLookupFor's four ingress arms, both supplied-match validation layers), src/internal/locale.js +1904 (matchForRanges now emits languageRange as the { range, weight } pair Java's LanguageRange carries), src/internal/plural.js +700 (eager validateOperandOptions), src/index.js +1184 (pluralOperands' eager operand refusal). The two graphs differ by exactly 1184 bytes, which is src/index.js verbatim: the root entry point is in the root graph only, every other byte landed in code both graphs already reached, and NO new module entered either. Module count unchanged at 25 root / 24 core, which is what keeps lokalized/negotiate, lokalized/data/* and the 802-class table out of the root graph; MissingTranslationError was deliberately NOT declared in src/internal/parse-diagnostics.js, which is imported only by src/parse/index.js and sits in neither graph, because declaring it there would have pulled that module into both.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 636829 -> 665603 bytes",
+        "core + parsed equivalent: source graph grew 630404 -> 657994 bytes"
+      ],
+      "previousSha256": "86b443637a7c8100d0a6439204440b06d4407a09fcfe34217549fbc17ed19879"
+    },
+    {
+      "reason": "M7 A4+B4 batch close, ONE re-record for the batch. MEASURED DECOMPOSITION, not attributed by assumption: root + raw-text catalog 665,603 -> 669,991 (+4,388); core + parsed equivalent 657,994 -> 662,382 (+4,388). The two deltas are IDENTICAL, and that is the load-bearing fact rather than a coincidence: both graphs are the same file set as before, and enumerating all 25 root / 24 core modules with their mtimes against the previous record (15:42:18) shows src/core/index.js (98,012 bytes) is the ONLY module in either graph touched since. The other 24 root and 23 core modules are byte-unchanged, so the whole +4,388 is src/core/index.js and nothing else moved. That file's growth is B4's construction refusals (the five per-entry checks plus the locale-source XOR at :437-445, B3's at-most-one extended to exactly-one); A4 added source only in src/negotiate/index.js, which is outside BOTH graphs. MODULE COUNT UNCHANGED at 25 root / 24 core, which is the half of the ratchet A4 most endangered and the half that proves the containment: src/negotiate/index.js and the generated 802-class src/data/iana-range-equivalents.js are confirmed absent from both graphs by direct enumeration, so the header parser and the pinned IANA closure stay out of the root graph exactly as plan 3.1 requires. src drift 0.7% in both.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 665603 -> 669991 bytes",
+        "core + parsed equivalent: source graph grew 657994 -> 662382 bytes"
+      ],
+      "previousSha256": "910ea731f724b43ab27b72d47252d8104a7aba679db677cb79b92583090a5aac"
+    },
+    {
+      "reason": "M7 C1+C2 batch close, ONE re-record for the whole batch (the IANA re-pin, C1 bounded output, C2 chooser). MEASURED DECOMPOSITION, and it is exact in BOTH graphs rather than attributed by assumption. Root + raw-text catalog 669,991 -> 690,207 (+20,216); core + parsed equivalent 662,382 -> 681,962 (+19,580). The split was measured by materializing the pre-C2 tree with `git checkout-index` and running scenario:0a inside it: that tree reads 681,819 root / 674,210 core. So C1 contributes +11,828 to BOTH graphs (src/internal/interpolate.js and src/internal/bidi.js: the append-checked output builder, isolate(value, maximumCharacters, reportedMaximumCharacters) with Java pre-scan rejection ordered before the empty check, the IsolatedValue memo, and the per-candidate GeneratedExpansionBudget), and C2 contributes +8,388 root / +7,752 core. C2 splits exactly: src/core/index.js 98,012 -> 105,764 (+7,752 -- chooseLocaleForPreferredLanguages, chooseBrowserLocale, and the three-trap note that records why the strict kernel, the silent 32-entry truncation and the RESOLVED fallback each had to be chosen) and src/index.js 7,609 -> 8,245 (+636 -- the two re-exports plus the placement note). The core figure carries only the first because the core graph does not reach src/index.js: 674,210 + 7,752 = 681,962 exactly, which is the check that the decomposition is a measurement and not a story. The A4/B4 baseline recorded src/core/index.js at 98,012 bytes and the pre-C2 tree still reads 98,012 there, so C1 touched no root module other than the two named. THE 806-CLASS IANA TABLE CONTRIBUTES ZERO to either graph, and that is the load-bearing half of this record: the re-pin grew src/data/iana-range-equivalents.js (806 equivalence classes, 23,477 bytes) and neither number appears above, because that table is reachable only from lokalized/negotiate and test/pinned-data-only.test.js names it in the forbidden list that keeps it out of the root. The chooser exists so a browser can pick a locale without pulling it in, and it entered NO new module -- both symbols live in src/core/index.js, which the root graph already reaches. MODULE COUNT UNCHANGED at 25 root / 24 core, which is the half of this ratchet a slice can genuinely break.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 669991 -> 690207 bytes",
+        "core + parsed equivalent: source graph grew 662382 -> 681962 bytes"
+      ],
+      "previousSha256": "2d9060972bbc336985f1987c80f84faa53cd27fcc8e2e748e87983e9773a49e2"
+    },
+    {
+      "reason": "M7 close-out batch: the normalizeTag/x-lvariant/-u- slice, the onFallback observer slice, and the review-repair pass. MEASURED DECOMPOSITION, not estimated. Total +22671 bytes in BOTH graphs (root 690207 -> 712878, core 681962 -> 704633). Two src files moved and the arithmetic closes exactly on them. (1) src/internal/locale-jdk-tag.js +10105, measured by ABLATION: reverting only that file to HEAD and re-running 0a reads 702773 root / 694528 core, i.e. 712878-702773 = 704633-694528 = 10105. That is the normalizeTag slice whole. (2) src/core/index.js +12566, of which +2036 is this repair pass -- measured by reverse-applying its three edits (raw-key duplicate diagnostic, its comment, the getResult JSDoc bracket form): 118330 -> 116294 bytes -- leaving +10530 for the onFallback wiring. 10105 + 12566 = 22671, so no third src file contributed. ROOT AND CORE MOVED BY THE IDENTICAL DELTA, and that is the load-bearing observation rather than a coincidence: every byte landed in the SHARED graph both entry points reach, so neither slice put anything into the root-only raw-text parser half and neither pulled an optional data module (lokalized/data/ordinal, .../ranges) toward src/index.js. MODULE COUNT UNCHANGED at 25 root / 24 core, so the batch added no module, no import edge and no public export; symbol-allowlist.json needed no entry. Timings and heap are reported and never gated; the exact-floor browser half of 0a remains NOT MEASURED, by decision.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 690207 -> 712878 bytes",
+        "core + parsed equivalent: source graph grew 681962 -> 704633 bytes"
+      ],
+      "previousSha256": "61b3f1f43a9cfb62e218c8cc9de2ceb6013ce93c1a8ce078e6a66d676387c05f"
+    },
+    {
+      "reason": "owed-branch batch: the 32 owed M7-surface coverage branches. +5,853 bytes in BOTH graphs, all of it src/core/index.js and MEASURED rather than apportioned -- that file went 118,330 -> 124,183 = 5,853, and it is the only file under src/ this batch touched (git diff HEAD --stat -- src/ names exactly one). Root and core moved by the identical delta because every byte landed in the shared graph. Modules unchanged at 25 root / 24 core, so the batch added no module, no import edge and no public export. What the bytes bought: SIX measured port defects repaired [count word corrected 2026-09-06 at M7 close, and the edit is disclosed rather than silent because this artifact is a provenance trail: the word said \"five\" and the enumeration that follows it has always listed six. No figure moved -- root 712,878 -> 718,731 and core 704,633 -> 710,486, both +5,853, src/core/index.js 118,330 -> 124,183, 25 root / 24 core modules, all re-measured and all unchanged] against newly recorded Java behaviour -- DefaultStrings:329 tiebreaker language-code collision (absent entirely; the port answered the :394 permutation refusal), :349 duplicate tiebreaker locale (silently deduplicated and CONSTRUCTED where Java refuses), :335 null tiebreaker list and :2650 null tiebreaker language code (both diagnosed as something else), :343 null tiebreaker entry, and :690 a null placeholder name (silently ignored, so the entry vanished from the caller's map with no diagnostic).",
+      "growth": [
+        "root + raw-text catalog: source graph grew 712878 -> 718731 bytes",
+        "core + parsed equivalent: source graph grew 704633 -> 710486 bytes"
+      ],
+      "previousSha256": "63a5a1983fae9d3d5f65420036db44fbfc9195c7e204ca905b12f7dcf2e90c48"
+    },
+    {
+      "reason": "M7 close-out: +231 bytes in BOTH graphs, 25/24 modules unchanged. The equal delta is the measurement that matters — it is my correction to the stale comment in src/core/index.js at the fallbackPolicy null-return guard, which claimed the oracle had no return-null behavior. It now has one (plan open question 7, closed this batch), so the corpus records what Java actually does there instead of what a reading of DefaultStrings.java:735 predicted. The rest of this batch's source movement (src/core/index.js +6,084 and src/negotiate/index.js +2,369 against the pushed HEAD) was already in the baseline from the preceding slices. src/negotiate/index.js's bytes are ABSENT from both totals, as always: the equal root/core delta is the standing evidence that lokalized/negotiate and its 806-class IANA table stay unreachable from src/index.js, which is the containment the module-count half of this ratchet exists to prove. Conformance 1,947 passed / 0 FAILED / 221 unsupported after the oracle's new return-null behaviors closed plan open question 7.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 718731 -> 718962 bytes",
+        "core + parsed equivalent: source graph grew 710486 -> 710717 bytes"
+      ],
+      "previousSha256": "223293de9237b5cd21b23706f6c0f6817f05b982587e970e1c1271859024ab1a"
+    },
+    {
+      "reason": "M7 decision 1, resolved as option 1: the port now speaks ONE dialect for a callback that returns null. +866 bytes in BOTH graphs, 25/24 modules unchanged; the equal delta is the standing evidence that lokalized/negotiate and its IANA table remain unreachable from src/index.js. The fallbackPolicy and onFailure guards were each SPLIT into two arms: null reproduces Java's requireNonNull SHAPE with the JS option name ('fallbackPolicy returned null', 'onFailure returned null'), matching what localeResolver/localeMatchResolver already did at src/core/index.js:900/:914; a non-null wrong type keeps the port's own informative wording, because Java's type system makes that arm unreachable so there is no Java text to match. Both arms are now tested as a pair -- previously one arm stood for both. The remaining difference from Java is the IDENTIFIER alone (Java names translationFallbackPolicy / TranslationFailureHandler), still declared in conformance.mjs DECLARED_MESSAGE_DIVERGENCES with the JS string pinned exactly and gated STALE if it ever stops differing. Conformance 1,947 passed / 0 FAILED; 798 tests.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 718962 -> 719828 bytes",
+        "core + parsed equivalent: source graph grew 710717 -> 711583 bytes"
+      ],
+      "previousSha256": "447246b168bfef891c972bcb47541f3b33b0a8f4e9eb74a103ddf56214318568"
+    },
+    {
+      "reason": "M7 decision 3 (maintainer's call): getKeysForLocale fixed and getMissingKeys added. Equal delta in BOTH graphs, 25/24 modules unchanged, no new module and no new import — UnsupportedLocaleError was already reachable because src/core/index.js already imports from src/internal/plural.js. TWO MEASURED PORT DEFECTS CLOSED: an unsupported locale returned [] where Java throws (DefaultStrings.java:2718-2720), so the port refused nothing at all; and keys came back in catalog INSERTION order where Java's TreeSet returns them sorted. getMissingKeys did not exist and is now implemented, applying the support rule independently to source and target. The thrown type follows PLAN 3.3:771 (UnsupportedLocaleError), not Java's IllegalArgumentException, because no corpus row arbitrates and widening conformance.mjs's shared IllegalArgumentException row to settle it would weaken 34 unrelated comparisons. Verified by ablation: restoring the one-line pre-fix body turns 4 of the 9 new tests red while every paired control stays green. Conformance 1,947 passed / 0 FAILED; 807 tests.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 719828 -> 722263 bytes",
+        "core + parsed equivalent: source graph grew 711583 -> 714018 bytes"
+      ],
+      "previousSha256": "08e23eb8bb0c73b062a55e5d6d40ea0fcf7e8322c5074de42cb418ce3e6cf540"
+    },
+    {
+      "reason": "M7 clause 12 (attempted-locale chain refusal) plus this repair batch. +13,156 bytes in BOTH graphs, 25 root / 24 core modules UNCHANGED. The equal delta is the measurement, not the total: every added byte lands in a module both graphs contain, so src/index.js -- the one module root has and core does not -- is untouched, and lokalized/negotiate with its 806-class IANA table stays unreachable from src/index.js. That containment is what the module-count half of this ratchet exists to hold and it is intact.\n\nDECOMPOSITION, measured per file rather than inferred: src/core/index.js 127,715 -> 136,068 (+8,353) and src/internal/locale-jdk-tag.js 19,650 -> 24,453 (+4,803); 8,353 + 4,803 = 13,156 exactly, and those are the only two files under src/ that differ from HEAD, so nothing else can be hiding in the delta. Cross-check: the graph at HEAD computes to 718,962 B and the baseline being replaced is 722,263 B, a difference of 3,301 = the decision-1 (+866) and decision-3 (+2,435) rebaselines, both in src/core/index.js, which is exactly what the two preceding entries in this file record.\n\nWHAT THE BYTES ARE. (1) src/core/index.js gains attemptedLocaleRefusal and three call sites: inside the walk, where a refusal becomes THIS candidate the walk continues from, matching Java catching TranslationResult construction inside the try at DefaultStrings.java:713-726; and in failureResult and throwForFailure, where the second construction escapes to the caller. Java throws IllegalArgumentException for en-US-x-lvariant-POSIX, ja-JP-x-lvariant-JP and th-TH-x-lvariant-TH where the port previously answered the fallback -- measured end to end on pinned Corretto 21 against lokalized-3.0.0.jar with catalogs {nn, nb, fr}. Of the +8,353, 1,284 B is a docblock added by THIS repair batch recording a contradiction now proven in both directions: raising TypeError leaves .failures[0].causeType as the row lvariant.exhausting-walk.en-us-posix.duplicate-attempted-language-tag fails on, raising bare Error leaves .thrown.name as the only failing field, both runs 1,957/1/223 byte-identical -- so no value of that constructor makes the row green and the red row is a conformance.mjs CAUSE_NAME/ERROR_NAME inconsistency, not a port defect. (2) src/internal/locale-jdk-tag.js gains JdkTagParts.undetermined, recording whether the primary language subtag was spelled exactly \"und\" in lowercase BEFORE lowercasing, because InternalLocaleBuilder.setLanguageTag compares with equals and not equalsIgnoreCase. The old code was wrong in BOTH directions on the pinned JDK -- re-probed independently this session: Locale.forLanguageTag(\"UND-x-a\").toLanguageTag() is und-x-a and not x-a, and Locale.forLanguageTag(\"zh-und\").getLanguage() is und and not empty. This changes normalizeTag output for a public input class and is gated by test/lookup-differential-findings.test.js and by 25 new direct-tag probes (46,375 -> 46,400 well-formed, measured by diffing the two probe sets, 0 removed).\n\nNOT A TIMING RE-RECORD AND NOT DEFERRED. The browser half is re-reported as STALE by this run and stays uncaptured; it is reported, never gated. Gates at this recording: 832 tests pass, conformance 1,957 passed / 1 FAILED / 223 unsupported / 165 no counterpart, and the one FAILED row is decision 2 (see M7-STATUS.md), not a regression.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 722263 -> 735419 bytes",
+        "core + parsed equivalent: source graph grew 714018 -> 727174 bytes"
+      ],
+      "previousSha256": "10a822694aa372901dbff8116c5951a63a8292d2a967fb4945455ca7a7e49349"
+    },
+    {
+      "reason": "M7 clause-12 follow-up: all three of Java's lookup-reachable requireWellFormed ingress sites (Locale override, localeResolver result, Requested locale) plus the Instance locale surface, and the once-normalized matcher input the new diff:lookup matcher ingress uncovered. 25/24 modules unchanged; the growth is requireJdkWellFormedLocale, LOCALE_INGRESS_DESCRIPTION and the docblocks recording the measurements.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 735419 -> 746467 bytes",
+        "core + parsed equivalent: source graph grew 727174 -> 738222 bytes"
+      ],
+      "previousSha256": "fc484ecb8cd83d7666a6c6b0f7ec3cb7d802d5b4ef32a4aa9dd02c29f495e2d9"
+    },
+    {
+      "reason": "M7 clause-12 follow-up: the runner's WRAPPED-vs-RETHROWN model. Source delta is comment-only in src/core/index.js (attemptedLocaleRefusal's stale 'no value of this constructor makes the row green' paragraph, re-measured and rewritten). Modules unchanged at 25/24.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 746467 -> 746939 bytes",
+        "core + parsed equivalent: source graph grew 738222 -> 738694 bytes"
+      ],
+      "previousSha256": "46f76122871cf6e18631475084318e536f62b0ba014bad0ea072f73e26f64434"
+    },
+    {
+      "reason": "M7 clause 12 close: all three of Java's lookup-reachable requireWellFormed sites, plus the runner's wrapped-vs-rethrown distinction. +8,249 bytes in BOTH graphs, 25/24 modules unchanged; the equal delta is the standing evidence that lokalized/negotiate and its 806-class IANA table remain unreachable from src/index.js. Cumulative against the pushed HEAD this clause moved src/core/index.js +24,084 (the attempted-locale chain refusals at their Java cause in the TranslationResult constructor, plus the per-call and ambient ingress validations Java runs BEFORE the walk), src/internal/locale-jdk-tag.js +12,142 (jdkLocaleWellFormed, modelling Locale.Builder#setLocale) and src/negotiate/index.js +2,018 (the matchFor-reachable third site) -- of which only the first two are in either graph. THE BEHAVIOURAL POINT, measured: with a fallbackPolicy and onFailure installed over catalogs {fr}, Java records calls=[] for en-x-lvariant-NY because the options are never built, where the port previously ran a whole walk Java never starts. All seven differentials now exit 0, including diff:lookup at 283,962 end-to-end lookups; conformance 1,960 passed / 0 FAILED / 221 unsupported, 849 tests.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 746939 -> 755188 bytes",
+        "core + parsed equivalent: source graph grew 738694 -> 746943 bytes"
+      ],
+      "previousSha256": "954ef1968768565d707d361c4b46c1fd4b8ed666b1fb625e3233a2aae7b9518c"
+    },
+    {
+      "reason": "Close the last two requireWellFormed ingress surfaces' GATES: +1,063 B of comments in src/core/index.js only, correcting two gate-naming claims that were false — src/core/index.js named test/construction-ingress.test.js, which did not exist, and said no differential drives inspection, which is now untrue. No executable change: the five checks themselves shipped earlier and are byte-identical here. Modules unchanged 25/24; the delta lands in a module both graphs contain, so src/index.js is untouched.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 755188 -> 756251 bytes",
+        "core + parsed equivalent: source graph grew 746943 -> 748006 bytes"
+      ],
+      "previousSha256": "6bc0f2b1798cade6931171760bae918e92df2f52b11d58f8baa8a7588f93c9d5"
+    },
+    {
+      "reason": "Ingress repair batch, 2026-09-09: the three LocaleMatchResult requireWellFormed sites plus the getSupportedLocales ordering fix. Root 756251 -> 761288 B (+5037), core 748006 -> 753043 B (+5037); modules unchanged at 25 root / 24 core. The two deltas are IDENTICAL and that is the load-bearing fact, not a coincidence: every added byte lands in a module BOTH graphs contain. Decomposition, measured file by file against the previous baseline's tree: src/core/index.js +4019 (the three requireJdkWellFormedLocale wrappers in validateLocaleMatchStructure, two .sort(compareTags) at the getSupportedLocales and getLocaleConfiguration accessors, and the comment at :1845 that named a check which was not there) and src/internal/locale-jdk-tag.js +1018 (selectedLocale and consideredLocale added to LOCALE_INGRESS_DESCRIPTION, TEN -> TWELVE, and the caller-facing-site count corrected nine -> eleven). 4019 + 1018 = 5037, twice. src/negotiate/index.js also grew by 1543 for the negotiator's own construction ingress and appears in NEITHER graph, which is the module-count ratchet doing exactly the job it exists for: lokalized/negotiate and its 806-class IANA table stay out of the browser graph. Both halves are behaviour, not comment: the port accepted all three ill-formed locales Java's public LocaleMatchResult constructor refuses, and reported the caller's insertion order where Java and plan 3.3:759 both sort.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 756251 -> 761288 bytes",
+        "core + parsed equivalent: source graph grew 748006 -> 753043 bytes"
+      ],
+      "previousSha256": "c0fc2c8e76756f8b525e9ca2b944f042feea285e7fc79be9be82369332e45f87"
+    },
+    {
+      "reason": "M7 clause 2: the likely-subtag consumer inventory landed with a real port fix — bidi.js now reads the script through parseJdkTag (Locale#getScript()) instead of tagPartsFor, which elides the CLDR Zzzz placeholder, so ar-Zzzz no longer isolates where Java does not. Adds the locale-jdk-tag.js import edge to bidi.js (module count unchanged at 25/24) plus the finding's explanation.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 761288 -> 762706 bytes",
+        "core + parsed equivalent: source graph grew 753043 -> 754461 bytes"
+      ],
+      "previousSha256": "d004734af33353aad6342055daec098971337dfb6ca9384dc7acaec990cda643"
+    },
+    {
+      "reason": "M3b re-derivation slice: UnsupportedLocaleError gains an optional role so getMissingKeys names WHICH argument was unsupported (DefaultStrings.java:2738/:2741), closing the loss tools/lookup-diff/run.mjs had recorded as 'worth a maintainer's attention on its own'; the differential's rule now compares the role directly instead of by proxy. Source-only growth in src/internal/plural.js and src/core/index.js; modules unchanged at 25/24.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 762706 -> 765422 bytes",
+        "core + parsed equivalent: source graph grew 754461 -> 757177 bytes"
+      ],
+      "previousSha256": "335583319cac3148439133b8e78f059a6279b08edf9dd81a256025c9aa586b79"
+    },
+    {
+      "reason": "M7 defects 1 and 2, both fixed to match Java, both measured on the pinned Corretto 21 rather than read. +2,589 bytes in BOTH graphs, 25/24 modules unchanged; the equal delta is the standing evidence that lokalized/negotiate and its IANA table stay unreachable from src/index.js. DEFECT 1: createStrings threw the evaluator's ExpressionEvaluationError BARE -- no key, no locale, no cause -- where Java's LocalizedStringValidator wraps it (invalid() at :326 adding \"Invalid localized string '<key>' for locale '<tag>': \" around a per-shape sentence, retaining the ExpressionEvaluationException as cause). The port now reproduces Java's message BYTE-FOR-BYTE on all three shapes measured -- whole-message alternative, nested alternative (which reports the ROOT key and no path, byte-identical to depth 1), and generated-placeholder alternative (Java's OTHER sentence) -- with the cause retained by reference. The TYPE stays ExpressionEvaluationError where Java raises IllegalArgumentException, following the established rule of Java's SHAPE with the JS name. DEFECT 2: parseCatalog charged the JSON-nesting budget to an already-DECODED object; Java enforces that limit at exactly one place inside its JSON parser and applies none programmatically, so the decoded door now reaches Java's real boundary (128 constructs, 129 refuses) while the raw door keeps its bound. Ablation: the pre-fix sources turn exactly the 4 and 5 relevant tests red and nothing else. Conformance 1,967 passed / 0 FAILED; 897 tests.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 765422 -> 768011 bytes",
+        "core + parsed equivalent: source graph grew 757177 -> 759766 bytes"
+      ],
+      "previousSha256": "dd69687c0aa9d28935ec46acfbffe6266a6315de1b22cfa8dcf06dd72613bdda"
+    },
+    {
+      "reason": "M7 clause 13 (Java-equivalent automatic direct diagnostics) and its repair round. +9,746 B on both graphs, module count UNCHANGED at 25/24. Decomposed by file against the last baseline: src/internal/interpolate.js +8,659 B and src/core/index.js +1,087 B, which is the whole delta exactly. The interpolate half is the diagnostic port itself plus its argument -- Java's composed plural accept-set sentence hoisted into refusePluralValue(description, ...) so the RANGE arm can pass Java's own 'Range start placeholder' / 'Range end placeholder' descriptions (DefaultStrings.java:948-951 -> :1459-1462), javaSimpleNameOf reproducing BigDecimal and PluralOperands, the range arm's endpoint-naming absent-translation wording, the accept-set test reordered ahead of the optional ordinal module, the second absent-resolver sentence aligned onto the declared one, and the doc comments carrying why each is Java's shape rather than a paraphrase. The core half is the validator-wrapped createStrings refusal and the null-callback messages taking Java's shape with the JS option name. No new module, no new import edge; every byte is inside two files the graph already had.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 768011 -> 777757 bytes",
+        "core + parsed equivalent: source graph grew 759766 -> 769512 bytes"
+      ],
+      "previousSha256": "8a2f8b1dadb1c990cb22f21c2e20990815210c01bb45234aa44d81d6929f780e"
+    },
+    {
+      "reason": "M8 S2: the shared parse body moved to src/internal/parse-file.js so lokalized/node's directory loader can thread ONE LoadingSession across a directory, as Java does. The root graph grows by that module's header; no new runtime work is reachable from src/index.js.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 777757 -> 779126 bytes",
+        "core + parsed equivalent: source graph grew 769512 -> 770881 bytes"
+      ],
+      "previousSha256": "4567e956e56ef603dd25126879d2519661c47c20810629a448219dc0e16e19f3"
+    },
+    {
+      "reason": "M8 S9: createStrings' loaded branch. Root 25 -> 28 modules (+9.2 KB): loaded-input.js, the shared configuration-error factory, and data/provenance.js at 469 B, which plan 3.4 requires core to carry so a loader result can be checked against the rendering core's OWN pinned constants rather than ones a caller supplied.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 779126 -> 788580 bytes",
+        "root + raw-text catalog: module count grew 25 -> 28",
+        "core + parsed equivalent: source graph grew 770881 -> 780335 bytes",
+        "core + parsed equivalent: module count grew 24 -> 27"
+      ],
+      "previousSha256": "234ca69cdd4905d8f556ffb705bfa16d6bb5996982573b9819217775d5a0acf6"
+    },
+    {
+      "reason": "M8 S10: +src/internal/runtime-metadata.js in the root and core graphs — this build's producer/IANA/corpus identity. Plan 6.4 requires an SSR stamp's producer/data/mode fields to come from the RENDERING instance, never from the SSR helper's own constants, which is only possible if the renderer is the party holding them. Seven strings, no table; gated against package.json and the two lokalized-spec locks by test/runtime-metadata.test.js.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 788580 -> 803490 bytes",
+        "root + raw-text catalog: module count grew 28 -> 29",
+        "core + parsed equivalent: source graph grew 780335 -> 795245 bytes",
+        "core + parsed equivalent: module count grew 27 -> 28"
+      ],
+      "previousSha256": "abd266bc9d6c0e89e3c7fb5b44d0a6b8b81fbb94b9af278def605d9e51e632df"
+    },
+    {
+      "reason": "M8 S9-owed: the applicable-configuration split and the per-use lookup-coverage check land in core. +6,161 B of source, no new module — the diagnostic reads the manifest configuration the loaded branch already retained, and the walk is unchanged.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 803490 -> 809651 bytes",
+        "core + parsed equivalent: source graph grew 795245 -> 801406 bytes"
+      ],
+      "previousSha256": "51d0a780b3078b766d20cd68f3584f9adfd312ed13eb4e6b282b782c64c7d285"
+    },
+    {
+      "reason": "M8 close-out: the nine allowlisted type names the port declared nowhere are now declared (types are erased at runtime; the bytes are JSDoc), and src/data/provenance.js carries all five fields plan 2.2's DataProvenance declares instead of two, so the type asserts what the runtime actually has.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 809651 -> 811962 bytes",
+        "core + parsed equivalent: source graph grew 801406 -> 803717 bytes"
+      ],
+      "previousSha256": "badf5ffd7dc5da34c13139b4e91fe2db0ba742fbcc39a33b5a713a28f5e03cb5"
+    },
+    {
+      "reason": "M8 clause 19: createStrings({ loaded }) now refuses a record whose aggregate warnings list disagrees with the per-catalog copies it carries (src/internal/loaded-input.js, +3,725 B, no new modules).",
+      "growth": [
+        "root + raw-text catalog: source graph grew 811962 -> 815687 bytes",
+        "core + parsed equivalent: source graph grew 803717 -> 807442 bytes"
+      ],
+      "previousSha256": "9e6384208b1b011af22ae48241081802066d6b2f292546e7200a22cb8f3fbe8f"
+    },
+    {
+      "reason": "M8 clause 33: createStrings({ loaded }) now supplies loadingLimits under the name core reads; the key it used before was dead.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 815687 -> 816560 bytes",
+        "core + parsed equivalent: source graph grew 807442 -> 808315 bytes"
+      ],
+      "previousSha256": "542065c3abbb0c75983642679a15d7031fbf3cf1c3d5b6f8652a3dff0011fd4d"
+    },
+    {
+      "reason": "S29: exported the two plan-3.5 error classes the port had built and never published (DigestUnavailableError, ExpressionEvaluationError) and added the construction token plan 3.5:1107 requires. Module count unchanged at 29/28; the bytes are the guard, the factory and its docblock.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 816560 -> 818655 bytes",
+        "core + parsed equivalent: source graph grew 808315 -> 810410 bytes"
+      ],
+      "previousSha256": "2241144c2f166d75290e990f2c37a3cd8fd3c6fa334c95efc90b45065a3feedb"
+    },
+    {
+      "reason": "S29: the createStrings option union and the two plan-3.5 error-class exports. Module count unchanged at 29/28.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 818655 -> 822785 bytes",
+        "core + parsed equivalent: source graph grew 810410 -> 814540 bytes"
+      ],
+      "previousSha256": "3c633c2cd3c3010357d0e501c77200b366c68042237ca0dc6a8883b45bb4d20b"
+    },
+    {
+      "reason": "S30: the seven build-identity constant exports. Module count unchanged at 29/28 — src/data/provenance.js was already in core's graph via internal/loaded-input.js.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 822785 -> 825006 bytes",
+        "core + parsed equivalent: source graph grew 814540 -> 816761 bytes"
+      ],
+      "previousSha256": "f3970721dcba63784782d2a99c362f5a5a920b4c9dbf7a9b167b86d1b440ccbc"
+    },
+    {
+      "reason": "S34: the ConfigurationError class and export. Module count unchanged at 29/28.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 825006 -> 827410 bytes",
+        "core + parsed equivalent: source graph grew 816761 -> 819165 bytes"
+      ],
+      "previousSha256": "c7cc22aaefff7fe4aa742be7a2da2f75ee10764ef4be4bf383eb7354fa81362f"
+    },
+    {
+      "reason": "S35: the LokalizedError base. Module count 29->30 root, 28->29 core: a base class every error extends is reachable from every graph. Plan 3.5:1092 exports it for catching.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 827410 -> 833326 bytes",
+        "root + raw-text catalog: module count grew 29 -> 30",
+        "core + parsed equivalent: source graph grew 819165 -> 825081 bytes",
+        "core + parsed equivalent: module count grew 28 -> 29"
+      ],
+      "previousSha256": "00047b57731358d4a51c3bc156f3fe2f8e4f100edef7f59ea80fa8d8428ca429"
+    },
+    {
+      "reason": "BATCH: the tagged-value type family and seven promised symbols. Types only; module count unchanged at 30/29.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 833326 -> 846406 bytes",
+        "core + parsed equivalent: source graph grew 825081 -> 836157 bytes"
+      ],
+      "previousSha256": "6bed5138b2755105082a6253f471aaeeb8e1353f5ddda8f18c265b84e096e79f"
+    },
+    {
+      "reason": "Decision batch D1-D10. Module count unchanged at 30/29.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 846406 -> 851702 bytes",
+        "core + parsed equivalent: source graph grew 836157 -> 841453 bytes"
+      ],
+      "previousSha256": "17c2f2bcf4f0993adfdf5727d9bff811176c22231fe3bb8e759618af9c4bba3f"
+    },
+    {
+      "reason": "D8: the ResolutionError class. Module count 30->31 root, 29->30 core: a resolution error is reachable from every render path.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 851702 -> 862263 bytes",
+        "root + raw-text catalog: module count grew 30 -> 31",
+        "core + parsed equivalent: source graph grew 841453 -> 852014 bytes",
+        "core + parsed equivalent: module count grew 29 -> 30"
+      ],
+      "previousSha256": "e9fea04539e4f084098dfa0fa5a2841fd218b73c63ac4485bd5fee6da70c0238"
+    },
+    {
+      "reason": "M9 S5: the candidate-chain memo. Module counts unchanged (31/30) — the memo lives in modules both graphs already reach; source grew by the factory and its docblock.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 862263 -> 869917 bytes",
+        "core + parsed equivalent: source graph grew 852014 -> 859668 bytes"
+      ],
+      "previousSha256": "06c0e33bd3d8e0905af62f9ceb6831903c957a3ee2a9779d8e00957aae6a8fab"
+    },
+    {
+      "reason": "M9 S9: the ISO-code direction fix and its two corrected comments in src/internal/{locale-jdk-tag,locale}.js; module counts unchanged",
+      "growth": [
+        "root + raw-text catalog: source graph grew 869917 -> 872639 bytes",
+        "core + parsed equivalent: source graph grew 859668 -> 862390 bytes"
+      ],
+      "previousSha256": "a49474b20bee2a4bf0c45ea6a4e47cd0a325ed8181d60479dd619290186940e1"
+    },
+    {
+      "reason": "M-D S32: +295 source bytes from removing two stale graph counts from shipped docblocks (src/index.js and src/internal/interpolate.js). No module joins any graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 872639 -> 872930 bytes",
+        "core + parsed equivalent: source graph grew 862390 -> 862564 bytes"
+      ],
+      "previousSha256": "28f5bf547d808dca2029b3d496971c9b65d1a8477bdb33caf3975be210e411dd"
+    },
+    {
+      "reason": "M-D S33: four maintainer decisions land together — the manifest format carries all seven build-identity fields (runtime-metadata.js joins the load and node graphs, +1 module each), every public door refuses an unknown option (configuration-error.js joins the parse graph via catalog.js, +1 module), matchType is narrowed to plan 3.4's LocaleMatchType (JSDoc only), and the onWarning observer is documented. No behaviour moved that the corpus can see: conformance is 2,150/0/0 across all four.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 872930 -> 883653 bytes",
+        "core + parsed equivalent: source graph grew 862564 -> 873287 bytes"
+      ],
+      "previousSha256": "6004e89f4ff38deaca0d4a2e09b3dc8d4139a0ad7b28af6d4bd67d6a61342de7"
+    },
+    {
+      "reason": "M-D S34: the four aggregate load budgets are charged ACROSS a load at the manifest doors, as the types and README have always documented and as the directory door has always done. runPlan now gives each file its own LoadingSession (unchanged as a per-file bound, new as a measurement) and reconciles the four counters in FETCH-PLAN order after the workers finish, replaying through the session's own guarded methods so both door families raise one sentence. lokalized/load 39 -> 38 and lokalized/node 42 -> 41 modules: the runner calls the INTERNAL parseStringsWithSession, so the public parse door leaves both loader graphs. Root/core/parse grow by the shared LoadingSession.absorb. conformance byte-identical at 2,150/0/0.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 883653 -> 885858 bytes",
+        "core + parsed equivalent: source graph grew 873287 -> 875492 bytes"
+      ],
+      "previousSha256": "e0d092ce20b7fa15163cef1a79371f03fca8971fcd32bd00a003cd06039d87bb"
+    },
+    {
+      "reason": "M-R S3: localeMatch and LoadFailure declaration fixes; comments only, +1,232 bytes in core's graph and +1,819 in load's",
+      "growth": [
+        "root + raw-text catalog: source graph grew 885858 -> 887090 bytes",
+        "core + parsed equivalent: source graph grew 875492 -> 876724 bytes"
+      ],
+      "previousSha256": "3d7270924746bc7defeea22998e3e11e5d43b699ca6c6f3efdbb3d93daaf7987"
+    },
+    {
+      "reason": "M-R: every returned LocaleMatch and language-range list is deep-frozen at its one construction site in matchForRanges, and parseLanguageRanges freezes its members; LocaleMatch and WeightedLanguageRange are each a single Readonly<...> typedef that core and negotiate derive instead of authoring their own mutable copies.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 887090 -> 888822 bytes",
+        "core + parsed equivalent: source graph grew 876724 -> 878456 bytes"
+      ],
+      "previousSha256": "6a90bfc3d12caf886e0196586bb11bae2ecc026db75c14b5ae2290ae69cf5aa6"
+    },
+    {
+      "reason": "M-R S3: the consumer-facing contract defects the requirement registry exposed. Returned values are now frozen one level down — getResult().localeMatch's consideredLocales, languageRange and requestedLanguageRanges (and its members) were mutable, so a consumer could write into a record the library handed them; the typedef's arrays became readonly to match what the runtime now enforces. StringsLoadingError.failures is typed LoadFailure[] rather than any[], and the runner's internal cast narrowed from stage?: string to the seven-member union. TranslationFailure.localeMatch and FallbackEvent.localeMatch are typed Readonly<LocaleMatch> rather than unknown — both are handed to consumer callbacks. All JSDoc and freeze calls; conformance byte-identical at 2,150/0/0.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 888822 -> 890018 bytes",
+        "core + parsed equivalent: source graph grew 878456 -> 879652 bytes"
+      ],
+      "previousSha256": "95c93262abb6cfc83291d1facfe552d90d8732502e6b37f358fd7984048005d9"
+    },
+    {
+      "reason": "M-R S4: the readonly sweep — fourteen typedefs wrapped, nine error-class fields marked @readonly, the error code threaded through the base constructor. Docblock prose, not behaviour.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 890018 -> 894940 bytes",
+        "core + parsed equivalent: source graph grew 879652 -> 884327 bytes"
+      ],
+      "previousSha256": "c5d6ad96e35c30baf5f9190df58c0d565fa07cc98871e081f93939c821433495"
+    },
+    {
+      "reason": "M-R S5: the Unicode attribution is now a preserved legal comment on the fifteen generated CLDR modules. Comment bytes only; no module joined either graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 894940 -> 897709 bytes",
+        "core + parsed equivalent: source graph grew 884327 -> 887096 bytes"
+      ],
+      "previousSha256": "cd5e3f592c2916124fa2bd533d1d35edf8a34020468192c1bc745048519205cd"
+    },
+    {
+      "reason": "M-R S8: likely-subtags.js is re-encoded structurally — 7,788 rows in 25 KB of source instead of 158 KB, decoding to output byte-identical to the pinned CLDR artifact. The browser root bundle falls 322,509 -> 187,679 minified and 73,653 -> 55,610 brotli, -24.5% on the wire. Conformance byte-identical at 2,150/0/0.",
+      "growth": [],
+      "previousSha256": "7b266ce5d3156f3b5f5812bc98f0fceb360e7e288b458166d94eca82b9c9dc36"
+    },
+    {
+      "reason": "M-R S11: runtime-metadata.js gained the ianaClosureSource field and a real File-Date for ianaRegistryDate, after the maintainer took the pinned-IANA-snapshot decision. +1,572 source bytes; no module joined any graph.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 764556 -> 766128 bytes",
+        "core + parsed equivalent: source graph grew 753943 -> 755515 bytes"
+      ],
+      "previousSha256": "86af64b5a50ddbef0cab0192f8373d287c579a22442bd7305c0046454ad72cff"
+    },
+    {
+      "reason": "M-R S13: lokalized-java 3.1.0's registry-sourced IANA table — the reduced identity table in src/internal/locale.js grows 269 -> 277 rows (+955 B in every graph)",
+      "growth": [
+        "root + raw-text catalog: source graph grew 766128 -> 767083 bytes",
+        "core + parsed equivalent: source graph grew 755515 -> 756470 bytes"
+      ],
+      "previousSha256": "616c6a973fd7732c8cb299c6a8074e61b1cb4f38925e560194f12e0ba1f85529"
+    },
+    {
+      "reason": "M-R S13: the IANA closure 806 -> 818 classes (twelve JDK-absent tags; four recovered by seeding the probe space from the oracle's own key list) plus Java's prefix walk at the single-locale door in src/internal/locale.js",
+      "growth": [
+        "root + raw-text catalog: source graph grew 767083 -> 770591 bytes",
+        "core + parsed equivalent: source graph grew 756470 -> 759978 bytes"
+      ],
+      "previousSha256": "8a242a0aaa62e3deb3ef02b3cfbd81799420669498e01a3e495f10af791f8322"
+    },
+    {
+      "reason": "version 0.0.0 -> 1.0.0-rc.1 for the first publish: producerVersion is a source string, +5 bytes in every graph reaching src/internal/runtime-metadata.js",
+      "growth": [
+        "root + raw-text catalog: source graph grew 770591 -> 770596 bytes",
+        "core + parsed equivalent: source graph grew 759978 -> 759983 bytes"
+      ],
+      "previousSha256": "56120366931f1ba146cdf00f35a7f44e5a3f71786404678c1147b0446a0e5b4b"
+    },
+    {
+      "reason": "A30: +1 generated root module, src/data/iana-identity-equivalents.js (the IANA direct-match projection plus the 14 region/variant substitutions), replacing a 277-row table that was inlined in src/internal/locale.js; +77/+73 bytes net after the inline table left and the A30 docblocks arrived. The browser half is now STALE (reported, not gated)",
+      "growth": [
+        "root + raw-text catalog: source graph grew 770596 -> 770673 bytes",
+        "root + raw-text catalog: module count grew 31 -> 32",
+        "core + parsed equivalent: source graph grew 759983 -> 760056 bytes",
+        "core + parsed equivalent: module count grew 30 -> 31"
+      ],
+      "previousSha256": "a4d0ed9cdd3b4c69e3f339e20afc5c60ec5855d8b7841104216157dbef13040f"
+    },
+    {
+      "reason": "A30 follow-up: src/internal/locale.js's docblock re-states the 88 single-locale divergences from a re-measurement (22,493 door-grid pairs; mgp/mrd 28, mrh/shl 28, enm/yol 28, nsl/sgn-no 4), replacing an unreproducible 2,396-probe breakdown. +235 comment bytes; no code and no module moved",
+      "growth": [
+        "root + raw-text catalog: source graph grew 770673 -> 770908 bytes",
+        "core + parsed equivalent: source graph grew 760056 -> 760291 bytes"
+      ],
+      "previousSha256": "8720672e4a1c65ccff0dcf78a3cb7c346c96ca1094aae065735106c08b4a706c"
+    },
+    {
+      "reason": "M-D S33 follow-up: the doors the S33 sweep missed now refuse an unknown option through the shared refuseUnknownOptions helper — createLocaleNegotiator and the two root choosers (LocaleConfiguration), strings.get/t/getResult per-call options, chain/fetchSet (with the two loader forwards projected), pluralOperands; the root and core graphs grow by the chooser and per-call guards (no new module: both already reach configuration-error.js)",
+      "growth": [
+        "root + raw-text catalog: source graph grew 770908 -> 773958 bytes",
+        "core + parsed equivalent: source graph grew 760291 -> 762875 bytes"
+      ],
+      "previousSha256": "88d304ea5513c9dd60b1eb0770baaa76e45c5032c031811581a0cacc715de69d"
+    },
+    {
+      "reason": "M-R S26 pre-push follow-up (2026-09-23): src/internal/configuration-error.js refuses a non-object options argument and returns a normalized frozen {} that required and optional doors both take (maintainer decision), src/negotiate refuses language-range members other than range/weight (maintainer decision), src/load/run-plan.js stops a read still in flight across a rejection from writing its catalog into a cleared slot, src/load/index.js types the Fetch doors' fetch option as the call the loader makes (amendment A31), and comment corrections from three pre-push reviews. configuration-error.js is reached by every graph, so every graph grows; load, node and negotiate grow most. No module count moved.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 773958 -> 776357 bytes",
+        "core + parsed equivalent: source graph grew 762875 -> 765274 bytes"
+      ],
+      "previousSha256": "360cf4ba7dd46dea7f89248dfe5ae8cff5771288294b7862637ea4c05b4105e5"
+    },
+    {
+      "reason": "Promise refusal (maintainer decision, 2026-09-23): src/internal/configuration-error.js refuses a promise or other thenable in the options position, which an unawaited async options factory used to pass as 'no options'. configuration-error.js is reached by every graph, so every graph grows by the check and its comment. No module count moved.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 776357 -> 777038 bytes",
+        "core + parsed equivalent: source graph grew 765274 -> 765955 bytes"
+      ],
+      "previousSha256": "cc9c5249c96f62731b562439c97a4a1203cebe2e3c2c3086954aeb005c0543bc"
+    },
+    {
+      "reason": "2026-09-25, no re-measurement: this history was chained (tools/ratchet-chain.mjs), recipe revision 1 was declared (tools/0a-recipe.mjs), and the figures this record holds were bound to it. From this entry on, each entry records the figures its write stored and whether a browser half was held, and the record may hold no figure above the newest entry's, none missing, and not drop a browser half the newest entry recorded. tools/scenario-0a.mjs freezes this entry as its checkpoint, because the chain alone cannot see entries cut from its end. Nothing grew.",
+      "growth": [],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 777038
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 765955
+        }
+      },
+      "browserHalf": true,
+      "previousSha256": "1a91b1983c0216e003378d4c80d74dcc58d325f15c5cca50017934ef16845356"
+    },
+    {
+      "reason": "Recipe revision 2 and createStrings lost its constant locale option before 1.0.0 (maintainer, 2026-09-27): every instance takes exactly one resolver, as a Java instance takes exactly one supplier; the refusal naming the replacement adds source bytes.",
+      "growth": [
+        "the recipe moved from revision 1 to 2; figures either side are not comparable as the same scenario, so the move is recorded with a reason"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 776117
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 765034
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "d6c284010377182ec210e3e79fece7e6881bb3f437bdd662502486f3a870da84",
+      "previousSha256": "0f2419332f0c8ecb64f9891afe9fda94c75aa92cdbaa479c0c8dedf8dc4beb9d"
+    },
+    {
+      "reason": "Source shrank: two shipped error messages (the createStrings runtimeLimits refusal and the createSsrStamp direct-construction refusal) no longer cite internal planning sections.",
+      "growth": [],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 776106
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 765023
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "d6c284010377182ec210e3e79fece7e6881bb3f437bdd662502486f3a870da84",
+      "previousSha256": "dfa54ffd49ab319511cea6f5ab0936b98d99192c03ae15e2aa2d723d19f3f872"
+    },
+    {
+      "reason": "Source shrank: the JSDoc emitted into the published .d.ts files no longer cites internal planning sections.",
+      "growth": [],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 773869
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 762837
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "d6c284010377182ec210e3e79fece7e6881bb3f437bdd662502486f3a870da84",
+      "previousSha256": "8664287665192dd85146cb5ba3534d22f996c2c916876ff331375ee95e8c15c0"
+    },
+    {
+      "reason": "Fallback resolution and loader provenance checks increased the shipped source graph for the 1.0 review.",
+      "growth": [
+        "root + raw-text catalog: source graph grew 773869 -> 775144 bytes",
+        "core + parsed equivalent: source graph grew 762837 -> 764112 bytes"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 775144
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 764112
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "d6c284010377182ec210e3e79fece7e6881bb3f437bdd662502486f3a870da84",
+      "previousSha256": "d698bbe8eb55d48f816304fd403737cf0c7be3026d57bffc5115a8707cfed5e8"
+    },
+    {
+      "reason": "Refresh the browser measurement against the 1.0 review source and exclude favicon requests from its resource count.",
+      "growth": [],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 775144
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 764112
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "6213e1ba8a2ccaee8b045ea08a976f129f847edfc12a3d18265c10ca2736625c"
+    },
+    {
+      "reason": "Align shared public API names across ports before 1.0.0",
+      "growth": [
+        "the recipe moved from revision 2 to 3; figures either side are not comparable as the same scenario, so the move is recorded with a reason",
+        "root + raw-text catalog: source graph grew 775144 -> 778655 bytes",
+        "core + parsed equivalent: source graph grew 764112 -> 767623 bytes"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 778655
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 767623
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "6ac80acd85ed35135409a7c881e4f6efb96fa61d365dc696a029d4eabea7b565"
+    },
+    {
+      "reason": "Use localizedStringSupplier for construction-time catalogs, matching Java before 1.0.0",
+      "growth": [
+        "the recipe moved from revision 3 to 4; figures either side are not comparable as the same scenario, so the move is recorded with a reason"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 778315
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 767283
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "f8a10b5f741d4363c1c7683ce70a0a999324a5dd0ca5f58bb6fdce163af17cd9"
+    },
+    {
+      "reason": "Complete the approved Java/JS API alignment with consistent match-result and loading-error names",
+      "growth": [
+        "root + raw-text catalog: source graph grew 778315 -> 781720 bytes",
+        "core + parsed equivalent: source graph grew 767283 -> 768694 bytes"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 781720
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 768694
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "9e0dfb19c4c5a55a4e851ca83f32f4b5c52a65f63b5c9cb051d96658b05eaac8"
+    },
+    {
+      "reason": "Correct supplier documentation after approved cross-port API naming cleanup",
+      "growth": [
+        "root + raw-text catalog: source graph grew 781720 -> 781778 bytes",
+        "core + parsed equivalent: source graph grew 768694 -> 768752 bytes"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 781778
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 768752
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "6c69cf63f742fd425815e423c3995591ff3f3073e520e7e714ea69da2100ab34"
+    },
+    {
+      "reason": "Shared diagnostic-text profile 1.1 repairs split UTF-16 pairs and caps nested manifest member displays",
+      "growth": [
+        "root + raw-text catalog: source graph grew 781778 -> 782259 bytes",
+        "core + parsed equivalent: source graph grew 768752 -> 769233 bytes"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 32,
+          "sourceBytes": 782259
+        },
+        "core + parsed equivalent": {
+          "modules": 31,
+          "sourceBytes": 769233
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "64fffb2b95d6b62a70045160584ba4b1e7cc52938819c956232d47b811dab7a9"
+    },
+    {
+      "reason": "Manifest profile 1.1 aligns loaded-catalog and SSR coverage with stable private-use locale spelling through a pure wire projection",
+      "growth": [
+        "root + raw-text catalog: source graph grew 782259 -> 783003 bytes",
+        "root + raw-text catalog: module count grew 32 -> 33",
+        "core + parsed equivalent: source graph grew 769233 -> 769977 bytes",
+        "core + parsed equivalent: module count grew 31 -> 32"
+      ],
+      "recorded": {
+        "root + raw-text catalog": {
+          "modules": 33,
+          "sourceBytes": 783003
+        },
+        "core + parsed equivalent": {
+          "modules": 32,
+          "sourceBytes": 769977
+        }
+      },
+      "browserHalf": true,
+      "browserSha256": "74f376f552521f5b02a388c3a137fd16a0673796a243f5963c4bb1242e8857dd",
+      "previousSha256": "16d956d5d00e762a2651bea00dd09074601d425b8a240f942cb05c4c69d9af93"
+    }
+  ]
+}
