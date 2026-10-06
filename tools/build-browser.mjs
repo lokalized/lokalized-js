@@ -50,6 +50,7 @@
  * :2146-2147 puts its prohibitions on the BROWSER GRAPH, which after this slice is `dist/`. A built
  * artifact that violated every one of them would have passed every gate in this repository.
  */
+import { readDocumentation } from "./readme-documents.mjs";
 import * as esbuild from "esbuild";
 import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -278,7 +279,7 @@ if (importsOf("lokalized.js").length > 0)
  * this compares the build to the map.
  */
 const documented = new Set(
-  [...readFileSync(join(root, "README.md"), "utf8").matchAll(/"(lokalized(?:\/[a-z/]+)?)":\s*"\.\//g)]
+  [...readDocumentation(root).matchAll(/"(lokalized(?:\/[a-z/]+)?)":\s*"\.\//g)]
     .map((match) => match[1]));
 if (documented.size < 8)
   problems.push(`the README documents ${documented.size} browser specifier(s); the derivation is broken`);

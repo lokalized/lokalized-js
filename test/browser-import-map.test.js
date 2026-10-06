@@ -28,7 +28,7 @@ import { browserEntries } from "../tools/browser-entries.mjs";
  */
 
 const root = new URL("../", import.meta.url).pathname;
-const readme = readFileSync(`${root}README.md`, "utf8");
+const readme = readFileSync(`${root}Documentation/JAVASCRIPT-GUIDE.md`, "utf8");
 const manifest = JSON.parse(readFileSync(`${root}package.json`, "utf8"));
 
 /**

@@ -1,0 +1,33 @@
+{
+  "Search completed.": {
+    "translation": "Found {{resultSummary}} {{timing}}.",
+    "placeholders": {
+      "resultSummary": {
+        "translation": "{{formattedResultCount}} {{resultNoun}}",
+        "alternatives": [
+          {
+            "resultCount == 0": "no results"
+          },
+          {
+            "resultCount >= resultLimit": "at least {{formattedResultLimit}} results"
+          }
+        ]
+      },
+      "timing": {
+        "translation": "in {{formattedDuration}}",
+        "alternatives": [
+          {
+            "elapsedMilliseconds < 1000": "instantly"
+          }
+        ]
+      },
+      "resultNoun": {
+        "value": "resultCount",
+        "translations": {
+          "CARDINALITY_ONE": "result",
+          "CARDINALITY_OTHER": "results"
+        }
+      }
+    }
+  }
+}

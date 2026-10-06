@@ -1,0 +1,14 @@
+{
+  "I received a {{noun}}.": {
+    "translation": "I received {{article}} {{noun}}.",
+    "placeholders": {
+      "article": {
+        "value": "noun",
+        "translations": {
+          "PHONETIC_VOWEL": "an",
+          "PHONETIC_CONSONANT": "a"
+        }
+      }
+    }
+  }
+}

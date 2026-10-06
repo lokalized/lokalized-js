@@ -1,0 +1,15 @@
+{
+  "Open the document.": {
+    "translation": "افتح {{documentForm}}.",
+    "placeholders": {
+      "documentForm": {
+        "value": "definiteness",
+        "translations": {
+          "DEFINITENESS_DEFINITE": "الكتاب",
+          "DEFINITENESS_INDEFINITE": "كتابًا",
+          "DEFINITENESS_CONSTRUCT": "كتاب"
+        }
+      }
+    }
+  }
+}

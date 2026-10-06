@@ -154,7 +154,7 @@ test("the README carries the production guidance, and names both remedies", () =
   // GLOBAL — no groups at all, no assertions at all — so deleting one whole section leaves it at
   // exit 0. Measured. This assertion is the only thing that can see the section disappear, which is
   // what makes the clause's second sentence ratcheted rather than merely written down once.
-  const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+  const readme = readFileSync(new URL("../Documentation/JAVASCRIPT-GUIDE.md", import.meta.url), "utf8");
   const start = readme.indexOf("### What the digests protect");
   assert.notEqual(start, -1, "the digest scope-limit section is gone from the README");
 

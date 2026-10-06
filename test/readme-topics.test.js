@@ -31,7 +31,7 @@ import { test } from "node:test";
 import { parseReadme } from "../tools/readme-blocks.mjs";
 
 const root = new URL("../", import.meta.url).pathname;
-const readme = readFileSync(`${root}README.md`, "utf8");
+const readme = readFileSync(`${root}Documentation/JAVASCRIPT-GUIDE.md`, "utf8");
 const artifact = JSON.parse(readFileSync(`${root}../lokalized-spec/documentation-topics.json`, "utf8"));
 
 const obligationFor = (kind) =>
@@ -40,7 +40,7 @@ const obligation = obligationFor("documentation");
 const quickstarts = obligationFor("quickstarts");
 
 /** The groups `check:readme` actually executes, and how many outputs each one asserts. */
-const executed = parseReadme(readme).groups;
+const executed = parseReadme(readme, "Documentation/JAVASCRIPT-GUIDE.md").groups;
 
 /**
  * Heading text -> the lines that belong to it, INCLUDING its subsections.
@@ -196,7 +196,7 @@ test("the direct-browser quickstart is executed from its own `<script type=\"mod
   // a ```html block, made real library calls, and claimed its output in a trailing comment that
   // nothing compared to anything. Asserting the SHAPE here — that the group comes from an html block
   // rather than a js block someone added beside it — is what stops the gap reopening quietly.
-  const { htmlModules } = parseReadme(readme);
+  const { htmlModules } = parseReadme(readme, "Documentation/JAVASCRIPT-GUIDE.md");
   assert.ok(htmlModules.has(QUICKSTART["direct browser"]),
     `'${QUICKSTART["direct browser"]}' is not parsed from a \`\`\`html block. If the browser sample ` +
     `moved to a js block, the page a reader copies is once again unchecked.`);
@@ -223,12 +223,12 @@ test("the direct-browser quickstart is executed from its own `<script type=\"mod
 test("every covered topic's section contains an executed, asserting block", () => {
   const found = sections();
   const ranges = /** @type {Map<string, { from: number, to: number }>} */ (sections.ranges);
-  const { groups } = parseReadme(readme);
+  const { groups } = parseReadme(readme, "Documentation/JAVASCRIPT-GUIDE.md");
 
   /** Every README line a group's blocks were taken from, with how much that group asserts. */
   const stamped = [...groups.entries()].flatMap(([name, group]) =>
     group.code.flatMap((line) => {
-      const at = /^\/\/ --- README line (\d+) ---$/.exec(line);
+      const at = /^\/\/ --- Documentation\/JAVASCRIPT-GUIDE\.md line (\d+) ---$/.exec(line);
       return at ? [{ name, at: Number(at[1]), assertions: group.assertions }] : [];
     }));
   assert.ok(stamped.length >= 40, `only ${stamped.length} stamped blocks were found — the derivation is broken`);

@@ -1,0 +1,17 @@
+{
+  "The meeting will be {{minHours}}-{{maxHours}} hours long.": {
+    "translation": "La réunion aura une durée de {{minHours}} à {{maxHours}} {{heures}}.",
+    "placeholders": {
+      "heures": {
+        "range": {
+          "start": "minHours",
+          "end": "maxHours"
+        },
+        "translations": {
+          "CARDINALITY_ONE": "heure",
+          "CARDINALITY_OTHER": "heures"
+        }
+      }
+    }
+  }
+}

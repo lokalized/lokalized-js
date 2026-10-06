@@ -30,7 +30,7 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const readme = readFileSync(join(root, "README.md"), "utf8");
+const readme = readFileSync(join(root, "Documentation", "JAVASCRIPT-GUIDE.md"), "utf8");
 const record = JSON.parse(readFileSync(join(root, "measurements", "i18next.json"), "utf8"));
 
 const SECTION = "## How this differs from i18next";

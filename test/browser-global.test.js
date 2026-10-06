@@ -30,7 +30,7 @@ import { GLOBAL_FILE, GLOBAL_NAME, browserEntries, globalEntrySource } from "../
  */
 
 const root = new URL("../", import.meta.url).pathname;
-const readme = readFileSync(`${root}README.md`, "utf8");
+const readme = readFileSync(`${root}Documentation/JAVASCRIPT-GUIDE.md`, "utf8");
 
 /** The one ```html block whose `<script src>` names the classic build. */
 const classicBlock = (() => {

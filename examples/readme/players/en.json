@@ -1,0 +1,20 @@
+{
+  "{{heOrShe}} was one of the {{groupSize}} best baseball players.": {
+    "translation": "{{heOrShe}} was one of the {{groupSize}} best baseball players.",
+    "placeholders": {
+      "heOrShe": {
+        "value": "heOrShe",
+        "translations": {
+          "GENDER_MASCULINE": "He",
+          "GENDER_FEMININE": "She",
+          "GENDER_COMMON": "This person"
+        }
+      }
+    },
+    "alternatives": [
+      {
+        "groupSize <= 1": "{{heOrShe}} was the best baseball player."
+      }
+    ]
+  }
+}

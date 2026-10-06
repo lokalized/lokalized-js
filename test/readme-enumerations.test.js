@@ -27,7 +27,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const root = new URL("../", import.meta.url).pathname;
-const readme = readFileSync(`${root}README.md`, "utf8");
+const readme = readFileSync(`${root}Documentation/JAVASCRIPT-GUIDE.md`, "utf8");
 
 test("the built-ins the README names for `lokalized/node` are the ones `src/node/` reaches", () => {
   // A PROSE ENUMERATION THAT NOBODY DERIVES IS A LIST THAT ROTS, and this one already had. The
@@ -96,7 +96,7 @@ test("every authored copy of the eight `matchType` values agrees with every othe
       "the conformance runner's Java-enum spelling map"],
     ["test/locale.test.js", /const MATCH_TYPES = \/\*\* @type \{const\} \*\/ \(\{([\s\S]*?)\}\)/,
       "the locale suite's own enum map"],
-    ["README.md", /`matchType` has eight values[\s\S]*?They are ([^.]*)\./,
+    ["Documentation/JAVASCRIPT-GUIDE.md", /`matchType` has eight values[\s\S]*?They are ([^.]*)\./,
       "the README's prose list"],
     ["MODULE-CONTRACTS.md", /`matchType` values are the JS spellings:([^.]*)\./,
       "MODULE-CONTRACTS.md's prose list"],

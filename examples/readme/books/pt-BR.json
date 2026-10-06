@@ -1,0 +1,19 @@
+{
+  "I read {{bookCount}} books.": {
+    "translation": "Li {{bookCount}} {{books}}.",
+    "placeholders": {
+      "books": {
+        "value": "bookCount",
+        "translations": {
+          "CARDINALITY_ONE": "livro",
+          "CARDINALITY_OTHER": "livros"
+        }
+      }
+    },
+    "alternatives": [
+      {
+        "bookCount == 0": "Não li nenhum livro."
+      }
+    ]
+  }
+}

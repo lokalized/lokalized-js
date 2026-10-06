@@ -68,7 +68,7 @@ import * as esbuild from "esbuild";
 import { graphBytes } from "./graph-walk.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const readmePath = join(root, "README.md");
+const readmePath = join(root, "Documentation", "JAVASCRIPT-GUIDE.md");
 let readme = readFileSync(readmePath, "utf8");
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const problems = [];
@@ -389,7 +389,7 @@ const distTable = [
  * More than one match fails too, because `--write` would have to guess which one it meant.
  */
 /**
- * README.md is hard-wrapped, so a sentence carrying two numbers frequently spans a line break. Every
+ * Documentation/JAVASCRIPT-GUIDE.md is hard-wrapped, so a sentence carrying two numbers frequently spans a line break. Every
  * literal space in a pattern below therefore matches any run of whitespace — written once here
  * rather than as `\\s+` in five patterns, because the first draft of the `sideEffects` anchor
  * matched ZERO times for exactly this reason and reported the sentence as unbound.
@@ -437,7 +437,7 @@ if (write && process.env.CI) {
 const startAt = readme.indexOf(TABLE_START);
 const endAt = readme.indexOf(TABLE_END);
 if (startAt < 0 || endAt < 0) {
-  problems.push(`README.md carries no ${TABLE_START} … ${TABLE_END} region, so the size table is bound` +
+  problems.push(`Documentation/JAVASCRIPT-GUIDE.md carries no ${TABLE_START} … ${TABLE_END} region, so the size table is bound` +
     ` to nothing. A missing region is not agreement.`);
 } else {
   const present = readme.slice(startAt + TABLE_START.length, endAt).trim();
@@ -452,7 +452,7 @@ if (startAt < 0 || endAt < 0) {
   const startAt = readme.indexOf(DIST_START);
   const endAt = readme.indexOf(DIST_END);
   if (startAt < 0 || endAt < 0) {
-    problems.push(`README.md carries no ${DIST_START} … ${DIST_END} region, so the SHIPPED artifact's` +
+    problems.push(`Documentation/JAVASCRIPT-GUIDE.md carries no ${DIST_START} … ${DIST_END} region, so the SHIPPED artifact's` +
       ` sizes are stated nowhere. Plan :2153 wants the packed output measured, not only a re-bundle.`);
   } else {
     const present = readme.slice(startAt + DIST_START.length, endAt).trim();
@@ -470,7 +470,7 @@ if (distRows.length < 9)
 for (const anchor of ANCHORS) {
   const matches = [...readme.matchAll(wrapped(anchor.pattern))];
   if (matches.length !== 1) {
-    problems.push(`the '${anchor.id}' sentence matched ${matches.length} times in README.md; it must` +
+    problems.push(`the '${anchor.id}' sentence matched ${matches.length} times in Documentation/JAVASCRIPT-GUIDE.md; it must` +
       ` match exactly once, or the number it states is bound to nothing`);
     continue;
   }
@@ -638,7 +638,7 @@ for (const note of notes) console.log(`  note  ${note}`);
 
 if (write) {
   writeFileSync(readmePath, readme, "utf8");
-  console.log(`\nREADME.md rewritten from this measurement.`);
+  console.log(`\nDocumentation/JAVASCRIPT-GUIDE.md rewritten from this measurement.`);
 }
 
 if (problems.length) {

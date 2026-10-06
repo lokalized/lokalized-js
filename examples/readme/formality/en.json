@@ -1,0 +1,17 @@
+{
+  "Hello, {{name}}.": {
+    "translation": "{{greeting}}, {{name}}.",
+    "placeholders": {
+      "greeting": {
+        "value": "formality",
+        "translations": {
+          "FORMALITY_CASUAL": "Hey",
+          "FORMALITY_INFORMAL": "Hi",
+          "FORMALITY_FORMAL": "Hello",
+          "FORMALITY_HUMBLE": "I humbly greet you",
+          "FORMALITY_HONORIFIC": "Greetings"
+        }
+      }
+    }
+  }
+}

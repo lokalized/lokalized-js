@@ -17,6 +17,7 @@
  * The version is derived too. `src/data/provenance.js` is generated from the pinned data lock, so
  * the CLDR version the build really carries is a fact, not a number somebody typed into a notice.
  */
+import { readDocumentation } from "../tools/readme-documents.mjs";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -358,7 +359,7 @@ test("THIRD-PARTY-NOTICES.md's own claims are the ones that ship", () => {
 const surfaces = [
   { path: "NOTICE", text: notice },
   { path: "THIRD-PARTY-NOTICES.md", text: readFileSync(join(root, "THIRD-PARTY-NOTICES.md"), "utf8") },
-  { path: "README.md", text: readFileSync(join(root, "README.md"), "utf8") },
+  { path: "README.md", text: readDocumentation(root) },
 ];
 
 test("the shipped IANA provenance prose describes the registry-generated data, and none of the retired provenance", async () => {

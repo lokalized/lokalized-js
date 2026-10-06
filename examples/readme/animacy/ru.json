@@ -1,0 +1,14 @@
+{
+  "I see {{object}}.": {
+    "translation": "Я вижу {{object}}.",
+    "placeholders": {
+      "object": {
+        "value": "animacy",
+        "translations": {
+          "ANIMACY_ANIMATE": "брата",
+          "ANIMACY_INANIMATE": "стол"
+        }
+      }
+    }
+  }
+}

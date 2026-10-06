@@ -1,0 +1,15 @@
+{
+  "Send a message to the recipient.": {
+    "translation": "Отправить сообщение {{recipientForm}}.",
+    "placeholders": {
+      "recipientForm": {
+        "value": "grammaticalCase",
+        "translations": {
+          "CASE_NOMINATIVE": "Иван",
+          "CASE_DATIVE": "Ивану",
+          "CASE_ACCUSATIVE": "Ивана"
+        }
+      }
+    }
+  }
+}

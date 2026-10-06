@@ -57,12 +57,11 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { moduleFor, parseReadme } from "./readme-blocks.mjs";
+import { moduleFor, parseDocumentation } from "./readme-blocks.mjs";
 import { leftoversIn, temporaryEnvironment } from "./temp-hygiene.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const readmePath = join(root, "README.md");
-const { groups, htmlModules, catalogs, unmarkedBlocks, problems } = parseReadme(readFileSync(readmePath, "utf8"));
+const { groups, htmlModules, catalogs, unmarkedBlocks, problems } = parseDocumentation(root);
 
 let totalAssertions = 0;
 

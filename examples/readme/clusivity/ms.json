@@ -1,0 +1,14 @@
+{
+  "We will meet at noon.": {
+    "translation": "{{we}} akan bertemu pada tengah hari.",
+    "placeholders": {
+      "we": {
+        "value": "clusivity",
+        "translations": {
+          "CLUSIVITY_INCLUSIVE": "Kita",
+          "CLUSIVITY_EXCLUSIVE": "Kami"
+        }
+      }
+    }
+  }
+}

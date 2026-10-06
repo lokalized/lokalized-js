@@ -1,0 +1,42 @@
+{
+  "{{heOrShe}} was one of the {{groupSize}} best baseball players.": {
+    "translation": "Fue {{uno}} de {{los}} {{groupSize}} mejores {{jugadores}} de béisbol.",
+    "placeholders": {
+      "uno": {
+        "value": "heOrShe",
+        "translations": {
+          "GENDER_MASCULINE": "uno",
+          "GENDER_FEMININE": "una"
+        }
+      },
+      "los": {
+        "value": "heOrShe",
+        "translations": {
+          "GENDER_MASCULINE": "los",
+          "GENDER_FEMININE": "las"
+        }
+      },
+      "jugadores": {
+        "value": "heOrShe",
+        "translations": {
+          "GENDER_MASCULINE": "jugadores",
+          "GENDER_FEMININE": "jugadoras"
+        }
+      }
+    },
+    "alternatives": [
+      {
+        "heOrShe == GENDER_COMMON && groupSize <= 1": "Esta persona era quien mejor jugaba al béisbol."
+      },
+      {
+        "heOrShe == GENDER_COMMON": "Esta persona estaba entre las {{groupSize}} personas que mejor jugaban al béisbol."
+      },
+      {
+        "heOrShe == GENDER_MASCULINE && groupSize <= 1": "Él era el mejor jugador de béisbol."
+      },
+      {
+        "heOrShe == GENDER_FEMININE && groupSize <= 1": "Ella era la mejor jugadora de béisbol."
+      }
+    ]
+  }
+}

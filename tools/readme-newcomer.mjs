@@ -48,6 +48,7 @@
  * directory (otherwise materializing them is decoration), the run directory must contain nothing
  * beyond the three things above, and the tarball must contain the entry points the map names.
  */
+import { readDocumentation } from "./readme-documents.mjs";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -55,11 +56,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { graphBytes } from "./graph-walk.mjs";
 import { browserEntries } from "./browser-entries.mjs";
-import { moduleFor, parseReadme } from "./readme-blocks.mjs";
+import { moduleFor, parseDocumentation } from "./readme-blocks.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const readme = readFileSync(join(root, "README.md"), "utf8");
-const { groups, htmlModules, catalogs, problems } = parseReadme(readme);
+const readme = readDocumentation(root);
+const { groups, htmlModules, catalogs, problems } = parseDocumentation(root);
 
 const work = mkdtempSync(join(tmpdir(), "lokalized-newcomer-"));
 process.on("exit", () => rmSync(work, { recursive: true, force: true }));

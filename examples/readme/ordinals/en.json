@@ -1,0 +1,23 @@
+{
+  "{{hisOrHer}} {{year}}th birthday party is next week.": {
+    "translation": "{{hisOrHer}} {{year}}{{ordinal}} birthday party is next week.",
+    "placeholders": {
+      "hisOrHer": {
+        "value": "hisOrHer",
+        "translations": {
+          "GENDER_MASCULINE": "His",
+          "GENDER_FEMININE": "Her"
+        }
+      },
+      "ordinal": {
+        "value": "year",
+        "translations": {
+          "ORDINALITY_ONE": "st",
+          "ORDINALITY_TWO": "nd",
+          "ORDINALITY_FEW": "rd",
+          "ORDINALITY_OTHER": "th"
+        }
+      }
+    }
+  }
+}

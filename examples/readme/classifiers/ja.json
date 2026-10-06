@@ -1,0 +1,15 @@
+{
+  "I bought {{count}} items.": {
+    "translation": "{{count}}{{counter}}買いました。",
+    "placeholders": {
+      "counter": {
+        "value": "classifier",
+        "translations": {
+          "CLASSIFIER_GENERAL": "つ",
+          "CLASSIFIER_BOUND": "冊",
+          "CLASSIFIER_MACHINE": "台"
+        }
+      }
+    }
+  }
+}

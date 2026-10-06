@@ -1,4 +1,5 @@
 // @ts-check
+import { readDocumentation } from "../tools/readme-documents.mjs";
 import { builtinModules } from "node:module";
 import { execFileSync } from "node:child_process";
 import { withoutComments } from "../tools/graph-walk.mjs";
@@ -218,7 +219,7 @@ test("the M2 spike is not shipped", () => {
  */
 test("the `files` array the README quotes is the one package.json declares", async () => {
   const manifest = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
-  const readme = await readFile(new URL("README.md", root), "utf8");
+  const readme = readDocumentation(root.pathname);
 
   const quoted = /`package\.json`'s `files` is `(\[[^`]*\])`/s.exec(readme);
   assert.ok(quoted, "the README no longer quotes `files`; delete this test or restore the sentence");

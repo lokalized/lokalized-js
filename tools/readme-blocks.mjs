@@ -54,6 +54,7 @@
  * shape this documents — compute a value, hand it to the page — and the bound exists so that a
  * widened rule is reported rather than inferred from a crash.
  */
+import { README_DOCUMENTS } from "./readme-documents.mjs";
 import { readFileSync } from "node:fs";
 
 import { browserEntries } from "./browser-entries.mjs";
@@ -82,9 +83,9 @@ const __expect = (actual, expected, where) => { deepStrictEqual(actual, expected
  */
 const DECLARATION = /^(?<statement>\s*(?:const|let|var)\s+(?<binding>[A-Za-z_$][\w$]*)\s*=\s*.+;)\s*$/;
 
-/** @param {string} expr @param {string} want @param {number} line @param {string} name */
-function expect(expr, want, line, name) {
-  const where = JSON.stringify(`${name} (README:${line})`);
+/** @param {string} expr @param {string} want @param {number} line @param {string} name @param {string} document */
+function expect(expr, want, line, name, document) {
+  const where = JSON.stringify(`${name} (${document}:${line})`);
   const declaration = DECLARATION.exec(expr);
   if (declaration?.groups)
     return `${declaration.groups.statement}\n__expect(${declaration.groups.binding}, ${want.trim()}, ${where});`;
@@ -93,12 +94,13 @@ function expect(expr, want, line, name) {
 }
 
 /**
- * @param {string} source the README text
+ * @param {string} source the Markdown text
+ * @param {string} [document] source filename for diagnostics
  * @returns {{ groups: Map<string, { code: string[], assertions: number }>,
  *             catalogs: Map<string, string>, htmlModules: Map<string, number>,
  *             unmarkedBlocks: number, problems: string[] }}
  */
-export function parseReadme(source) {
+export function parseReadme(source, document = "README.md") {
   const lines = source.split("\n");
   /** @type {Map<string, { code: string[], assertions: number }>} */
   const groups = new Map();
@@ -123,13 +125,13 @@ export function parseReadme(source) {
   function appendBlock(name, body, start) {
     if (!groups.has(name)) groups.set(name, { code: [], assertions: 0 });
     const group = /** @type {{ code: string[], assertions: number }} */ (groups.get(name));
-    group.code.push(`// --- README line ${start} ---`);
+    group.code.push(`// --- ${document} line ${start} ---`);
 
     for (let offset = 0; offset < body.length; ++offset) {
       const text = /** @type {string} */ (body[offset]);
       const inline = INLINE.exec(text);
       if (inline?.groups) {
-        group.code.push(expect(inline.groups.expr ?? "", inline.groups.want ?? "", start + offset + 1, name));
+        group.code.push(expect(inline.groups.expr ?? "", inline.groups.want ?? "", start + offset + 1, name, document));
         group.assertions++;
         continue;
       }
@@ -139,13 +141,13 @@ export function parseReadme(source) {
         // would otherwise assert nothing while looking exactly like an assertion.
         const previous = group.code.pop();
         if (previous === undefined || !/;\s*$/.test(previous) || previous.startsWith("//")) {
-          problems.push(`README:${start + offset + 1}: a '// =>' comment with no single-line ` +
+          problems.push(`${document}:${start + offset + 1}: a '// =>' comment with no single-line ` +
             `expression before it. Put the expression and its expectation on one line, or end the ` +
             `expression with ';' on the line above.`);
           if (previous !== undefined) group.code.push(previous);
           continue;
         }
-        group.code.push(expect(previous, lone.groups.want ?? "", start + offset + 1, name));
+        group.code.push(expect(previous, lone.groups.want ?? "", start + offset + 1, name, document));
         group.assertions++;
         continue;
       }
@@ -180,7 +182,7 @@ export function parseReadme(source) {
       const html = lines.slice(start, end).join("\n");
       index = end;
       if (/<script\s+type="module"\s*>/.test(html))
-        problems.push(`README:${start}: an unmarked \`\`\`html block carries a ` +
+        problems.push(`${document}:${start}: an unmarked \`\`\`html block carries a ` +
           `<script type="module"> body, so it makes library calls that nothing executes. Mark it ` +
           `with <!-- example: … --> or move the calls out of it.`);
       else unmarkedBlocks++;
@@ -198,7 +200,7 @@ export function parseReadme(source) {
       const html = lines.slice(start, end).join("\n");
       const script = /<script\s+type="module"\s*>\n(?<body>[\s\S]*?)<\/script>/.exec(html);
       if (!script?.groups?.body) {
-        problems.push(`README:${start}: the \`\`\`html block marked '${name}' carries no ` +
+        problems.push(`${document}:${start}: the \`\`\`html block marked '${name}' carries no ` +
           `<script type="module"> body, so marking it executes nothing`);
         continue;
       }
@@ -212,7 +214,7 @@ export function parseReadme(source) {
         kept.push(text);
       }
       if (kept.every((text) => text.trim().length === 0)) {
-        problems.push(`README:${start}: every line of the '${name}' browser sample touches the DOM, ` +
+        problems.push(`${document}:${start}: every line of the '${name}' browser sample touches the DOM, ` +
           `so executing it would assert nothing`);
         continue;
       }
@@ -223,11 +225,11 @@ export function parseReadme(source) {
       // twice mistaken a crash for a regression; these name the cause instead.
       const importsDropped = removed.filter((text) => /^\s*import\b/.test(text));
       if (importsDropped.length > 0)
-        problems.push(`README:${start}: the host-only rule dropped an import from the '${name}' ` +
+        problems.push(`${document}:${start}: the host-only rule dropped an import from the '${name}' ` +
           `browser sample (${importsDropped[0]?.trim()}). It is meant to remove DOM statements, and ` +
           `it has widened past them.`);
       if (removed.filter((text) => text.trim().length > 0).length > MAXIMUM_HOST_ONLY)
-        problems.push(`README:${start}: the host-only rule dropped ` +
+        problems.push(`${document}:${start}: the host-only rule dropped ` +
           `${removed.filter((text) => text.trim().length > 0).length} statements from the '${name}' ` +
           `browser sample, more than the ${MAXIMUM_HOST_ONLY} a sample's DOM tail should need. ` +
           `Either the sample does its work in the DOM — in which case executing it proves little — ` +
@@ -242,7 +244,7 @@ export function parseReadme(source) {
       let end = start;
       while (end < lines.length && !/^```\s*$/.test(/** @type {string} */ (lines[end]))) ++end;
       if (catalogs.has(pendingCatalog))
-        problems.push(`README:${start}: the catalog '${pendingCatalog}' is published twice`);
+        problems.push(`${document}:${start}: the catalog '${pendingCatalog}' is published twice`);
       catalogs.set(pendingCatalog, `${lines.slice(start, end).join("\n")}\n`);
       pendingCatalog = null;
       index = end;
@@ -263,9 +265,35 @@ export function parseReadme(source) {
   }
 
   if (pendingCatalog !== null)
-    problems.push(`README: a '<!-- catalog: ${pendingCatalog} -->' marker is followed by no \`\`\`json block`);
+    problems.push(`${document}: a '<!-- catalog: ${pendingCatalog} -->' marker is followed by no \`\`\`json block`);
 
   return { groups, catalogs, htmlModules, unmarkedBlocks, problems };
+}
+
+
+/** @param {string} root @returns {ReturnType<typeof parseReadme>} */
+export function parseDocumentation(root) {
+  const result = parseReadme("");
+  /**
+   * @template T
+   * @param {Map<string, T>} target @param {Map<string, T>} entries
+   * @param {string} kind @param {string} document
+   */
+  function merge(target, entries, kind, document) {
+    for (const [name, value] of entries) {
+      if (target.has(name)) result.problems.push(`${document}: duplicate ${kind} name '${name}' across documents`);
+      else target.set(name, value);
+    }
+  }
+  for (const document of README_DOCUMENTS) {
+    const parsed = parseReadme(readFileSync(`${root}/${document}`, "utf8"), document);
+    merge(result.groups, parsed.groups, "example", document);
+    merge(result.catalogs, parsed.catalogs, "catalog", document);
+    merge(result.htmlModules, parsed.htmlModules, "browser example", document);
+    result.unmarkedBlocks += parsed.unmarkedBlocks;
+    result.problems.push(...parsed.problems);
+  }
+  return result;
 }
 
 const DIST_ENTRIES = browserEntries(JSON.parse(
@@ -296,6 +324,8 @@ const localizeDistUrls = (code) => code.replace(
     return JSON.stringify(entry.specifier);
   });
 
-/** The module text for one group, ready to write and execute. */
+/** The module text for one group, ready to write and execute.
+ * @param {{ code: string[], assertions: number }} group
+ */
 export const moduleFor = (group) =>
   `${PREAMBLE}${localizeDistUrls(group.code.join("\n"))}\nprocess.stdout.write(String(__checked));\n`;

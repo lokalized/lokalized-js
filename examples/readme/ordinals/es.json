@@ -1,0 +1,13 @@
+{
+  "{{hisOrHer}} {{year}}th birthday party is next week.": {
+    "translation": "Su fiesta de cumpleaños número {{year}} es la próxima semana.",
+    "alternatives": [
+      {
+        "year == 1": "Su primera fiesta de cumpleaños es la próxima semana."
+      },
+      {
+        "hisOrHer == GENDER_FEMININE && year == 15": "Su quinceañera es la próxima semana."
+      }
+    ]
+  }
+}
