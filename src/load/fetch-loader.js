@@ -60,14 +60,9 @@ export const DEFAULT_REQUEST = Object.freeze({ mode: "cors", credentials: "same-
 export { LocalizedStringLoadingError } from "./run-plan.js";
 
 /**
- * The loader fails CLOSED when WebCrypto is absent, before any catalog I/O.
- *
- * **A REAL CLASS, because it must be CATCHABLE.** This was a plain `Error` with its
- * `name` and `code` assigned after construction, so a consumer could only recognise it by string —
- * `error.name === "DigestUnavailableError"` — and never by `instanceof`. The name and code are
- * unchanged, so every string-matching consumer and every recorded message keeps working; what is
- * added is `instanceof`. The construction token mirrors `StringsParseError`
- * and `LocalizedStringLoadingError`.
+ * Digest verification is unavailable because the host does not provide WebCrypto.
+ * This error is raised before catalog I/O begins. Catch it with
+ * `instanceof DigestUnavailableError`; its code is `"DIGEST_UNAVAILABLE"`.
  */
   // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
@@ -93,6 +88,7 @@ export class DigestUnavailableError extends LokalizedError {
   }
 
   /**
+   * @internal
    * The one construction path, because the constructor above is private. Its parameters are the
    * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
    * the token it takes first is never exported from this package.

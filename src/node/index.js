@@ -18,9 +18,7 @@
  */
 
 /**
- * The option types for this subpath's loaders, surfaced HERE because a declaration file only
- * carries what its own entry point names — a typedef that lives in an implementation module is
- * invisible to a consumer and to `test/declared-surface.test.js` alike.
+ * Options for filesystem loading and directory manifest generation.
  *
  * @typedef {import("./file-loader.js").LoadStringsFromFilesOptions} LoadStringsFromFilesOptions
  * @typedef {import("./file-loader.js").LoadStringsFromDirectoryOptions} LoadStringsFromDirectoryOptions

@@ -39,6 +39,11 @@ import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "./lokalized-error.js";
 /** Unexported by design: only this package can hand it to the constructor. */
 const RESOLUTION_ERROR_TOKEN = Symbol("lokalized.ResolutionError");
 
+/**
+ * Invalid arguments or state prevented translation resolution. Inspect `code`
+ * and `cause` for the reason. Instances are created by the library; catch them
+ * with `instanceof ResolutionError`.
+ */
 export class ResolutionError extends LokalizedError {
   /**
    * @private
@@ -59,12 +64,17 @@ export class ResolutionError extends LokalizedError {
     // "every other `ResolutionError` omits `thrownValue`", and `"thrownValue" in error` is the
     // natural discriminator — an always-present key valued `undefined` would defeat it.
     if (options?.thrownValue !== undefined) {
-      /** BOOT-M0-0524. @type {"null" | "undefined" | undefined} @readonly */
+      /**
+       * Whether the original thrown value was `null` or `undefined`, when applicable.
+       * @type {"null" | "undefined" | undefined}
+       * @readonly
+       */
       this.thrownValue = options.thrownValue;
     }
   }
 
   /**
+   * @internal
    * @param {symbol} token
    * @param {"RESOLUTION_INVALID_ARGUMENT" | "RESOLUTION_INVALID_STATE"} code
    * @param {string} message

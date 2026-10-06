@@ -310,13 +310,9 @@ const RANGE_TABLE = createRuleTable(RANGE_GROUPS.map((group) => ({ locales: grou
 /* -------------------------------------------------------------------------- */
 
 /**
- * The provenance of the pinned CLDR cardinal-range data, carried so an application that opts into
- * this module can prove which generated data it linked, and so `createStrings` can compare it
- * against the rendering core's own constants.
- *
- * The generator emits the two fields the canonical data lock exposes to the optional modules; the
- * fuller `DataProvenance` (`formatVersion`, `generatorVersion`, `inputsSha256`) is a
- * generator gap shared with `lokalized/data/ordinal` and is reported rather than papered over here.
+ * Pinned CLDR version and fingerprint of this module's cardinal-range data.
+ * `createStrings` checks this provenance against its own data when the module
+ * is supplied through `pluralData`.
  *
  * @type {Readonly<{ $lokalized: "cardinal-range-data", provenance: Readonly<{ cldrVersion: string, dataFingerprint: string }> }>}
  */
@@ -358,24 +354,16 @@ function cardinalityNamed(name) {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The CLDR cardinality of a range whose endpoints have the given cardinalities.
+ * Classify a range from its start and end cardinalities under the requested locale.
+ * For example, for English "1–2 books", pass `CARDINALITY_ONE` and `CARDINALITY_OTHER`.
  *
- * For "1–2 books" in English you pass the cardinality of `1` and the cardinality of `2`; the answer
- * is the cardinality the whole range takes, which is what a translation's `CARDINALITY_*` branch
- * must be selected on. The endpoints are cardinalities, not numbers, because CLDR states the table
- * that way — every value that classifies as `one` behaves identically as a range endpoint. The end's
- * own cardinality does not decide the range's: English `0–1` is `one`..`one` and yet `other`.
- *
- * When CLDR states nothing about the pair — either the locale has no range data at all, or its group
- * has no row for this ordered pair — the range takes the cardinality of its END, which is CLDR's
- * documented default. A locale with no cardinal rules at all throws instead: an unsupported locale
- * is a caller error, not a range whose answer happens to be the end.
+ * If the locale has cardinal rules but no CLDR range rule for this pair, the result
+ * is the end cardinality. A locale with no cardinal rules throws.
  *
  * @param {Cardinality} start the cardinality of the range's start value
  * @param {Cardinality} end the cardinality of the range's end value
- * @param {string} locale a BCP 47 locale tag. An ill-formed tag is not an error here any more than
- *   it is in `Locale.forLanguageTag`: it resolves to the undetermined locale, exactly as it does for
- *   `cardinalityForNumber`, and only a non-string is rejected outright.
+ * @param {string} locale a BCP 47 locale tag. Malformed tags resolve to the
+ *   undetermined locale; a non-string argument is rejected.
  * @returns {Cardinality} one of the root's frozen `CARDINALITY_*` constants
  * @throws {TypeError} if an endpoint is not a `CARDINALITY_*` value, or the locale is not a string
  * @throws {UnsupportedLocaleError} if the locale has no CLDR cardinal rules

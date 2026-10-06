@@ -39,13 +39,9 @@ import { directoryLabel, discoverCatalogFiles, keyedByRenderedTag, resolveDiscov
 /** @typedef {import("../load/index.js").StringsManifestV1} StringsManifestV1 */
 
 /**
- * The options of `createStringsManifestFromDirectory`, plus the Node-owned discovery budget.
- *
- * `maximumDiscoveryEntries` is here for the reason maintainer decision D2 put it on
- * `readStringsFromDirectory`: `StringsLoadingLimits` is the portable parser's seven-field
- * contract, and discovery controls are deliberately not part of it. The two directory doors walk
- * the same directory with the same budget, so a knob on one and not the other would be a difference
- * with no reason behind it.
+ * Options for generating a directory manifest. `publicationBaseUrl` identifies
+ * where the catalogs will be served. `maximumDiscoveryEntries` bounds directory
+ * discovery independently of the catalog parsing limits.
  *
  * @typedef {object} DirectoryManifestOptions
  * @property {string} catalogVersion

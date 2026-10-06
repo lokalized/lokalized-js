@@ -34,31 +34,19 @@
  */
 
 /**
- * @typedef {"reject" | "allow-partial"} PartialFailurePolicy The partial-failure policy, read at
- *   `run-plan.js:236` as a bare string against an untyped literal until this named it. An
- *   adversarial pass classified it RENAMED; the plan-surface gate's "a RENAMED disposition names a
- *   spelling the port actually has" test refused, because there was no spelling at all.
+ * @typedef {"reject" | "allow-partial"} PartialFailurePolicy
+ *   `"reject"` fails the load if a file fails. `"allow-partial"` retains successfully
+ *   loaded catalogs and reports failures; the fallback catalog must still load.
  */
 
 /**
- * The option bag for BOTH Fetch doors, `loadStrings` and `loadEntireManifest`.
+ * Options for `loadStrings` and `loadEntireManifest`.
  *
- * `fetch` is the transport; an injected one is explicitly free to ignore the signal, which is why
- * the loader owns cancellation rather than delegating it. It is typed as the call the loader makes, a
- * string URL and an init object, rather than as `typeof globalThis.fetch`: that type refused a
- * custom transport typed
- * `(url: string) => Promise<Response>` (TS2322), and the global `fetch` is still assignable to this
- * one. The maintainer's decision of 2026-09-23 (amendment A31).
- * `partialFailure` defaults to `"reject"`, and the declared union is the ONLY guard a misspelled
- * policy has: `run-plan.js` reads `=== "allow-partial"`, so at run time any other string is the
- * default. `request` is declared with two members; the runtime forwards whatever
- * `RequestInit` members a JavaScript caller adds, and the declaration does not promise that.
- *
- * **WRAPPED AND APPLIED ON 2026-09-23.** Until then this type was declared and exported, and neither
- * door used it: both annotated their options `any`, so a TypeScript caller writing `{ transport }` or
- * `{ partialFailure: "allow_partial" }` got no error at all. Its members were also mutable where
- * every one should be `readonly` — the same wrap, for the same reason, as `ParseStringsOptions`.
- * `npm run declarations` carries the four probes that hold both.
+ * `fetch` supplies a custom transport; otherwise the global Fetch API is used.
+ * `signal` cancels the load, including when a custom transport ignores cancellation.
+ * `request` configures the request mode and credentials. `partialFailure` defaults
+ * to `"reject"`; select `"allow-partial"` to retain successfully loaded catalogs.
+ * `limits` bounds resource parsing and the total load.
  *
  * @typedef {Readonly<{
  *   fetch?: (url: string, init: RequestInit) => Promise<Response>,
@@ -85,24 +73,19 @@
  * @property {"pinned"} localeDataMode
  * @property {"exact"} cardinalityMode
  * @property {string} ianaRegistryDate
- *   The `File-Date` of the pinned IANA Language Subtag Registry snapshot, as `YYYY-MM-DD`. It
- *   carried `jdk-oracle:<version>` until that snapshot was pinned (M-R S11), and a manifest from
- *   before then still does. See `src/internal/runtime-metadata.js`.
+ *   The date of the pinned IANA Language Subtag Registry snapshot, as `YYYY-MM-DD`.
  * @property {string} ianaDataFingerprint
  * @property {string} fallbackLocale
  * @property {string} baseUrl
  * @property {Readonly<Record<string, Readonly<{ url: string, sha256: string, decodedBytes?: number }>>>} files
- *   Per locale: the URL, the full lowercase SHA-256 of the RESPONSE-BODY OCTETS (not of the decoded
- *   text — the digest is taken after any content coding and before decoding), and an optional
- *   expected decoded size.
+ *   Per locale: the URL, lowercase SHA-256 of the response body bytes after content
+ *   decoding and before text decoding, and an optional expected decoded byte count.
  * @property {Readonly<Record<string, readonly string[]>>} tiebreakerLocalesByLanguageCode
  */
 
 /**
- * One file the loader intends to fetch, after planning.
- *
- * `url` is the ABSOLUTE serialized URL — resolution
- * against the manifest's `baseUrl` happens during planning, so nothing downstream re-resolves it.
+ * A planned catalog file. `url` is absolute, resolved against the manifest's
+ * `baseUrl`. `sha256` is the expected lowercase SHA-256 digest.
  *
  * @typedef {object} FetchEntry
  * @property {string} locale
@@ -112,12 +95,9 @@
  */
 
 /**
- * The canonical projection a catalog fingerprint is computed over.
- *
- * What it OMITS is the point, with one negative test per omitted field: `baseUrl`, per-file `url`
- * and `decodedBytes` are all
- * absent, so moving a catalog to a different host or re-encoding it does NOT change its identity,
- * while changing a locale's bytes does.
+ * Catalog content and locale configuration used to compute its fingerprint.
+ * The identity excludes publication URLs and decoded byte counts, so relocating
+ * unchanged catalogs does not change their identity.
  *
  * @typedef {object} CatalogIdentityInputV1
  * @property {1} formatVersion
@@ -137,12 +117,9 @@
  */
 
 /**
- * One file that did not load.
- *
- * The `stage` is a seven-member sequence rather than a
- * boolean because the partial-failure policy and the diagnostics both discriminate on WHERE it went
- * wrong; collapsing it would make "the digest did not match" indistinguishable from "the JSON was
- * malformed", which are different problems for whoever published the catalog.
+ * A catalog file that failed to load. `stage` identifies whether the failure
+ * occurred during fetching, reading, limit checks, digest verification, text
+ * decoding, JSON parsing, or catalog validation. `cause` retains the original error.
  *
  * @typedef {object} LoadFailure
  * @property {string} locale
@@ -152,11 +129,9 @@
  */
 
 /**
- * The result of a load, and the input `createStrings({ loaded })` accepts.
- *
- * It carries its own provenance — identity, CLDR version, data fingerprint and the resolved limits —
- * because `createStrings` REVALIDATES all of it rather than trusting the caller: a fabricated
- * `LoadedStrings` is REJECTED with a `ConfigurationError` rather than downgraded.
+ * A loader-produced catalog snapshot accepted by `createStrings({ loaded })`.
+ * It includes catalogs, locale configuration, content identity, coverage, and
+ * diagnostics. Construction validates the snapshot and its provenance.
  *
  * @typedef {object} LoadedStrings
  * @property {Readonly<Record<string, ParsedStringsFile>>} catalogs

@@ -159,6 +159,11 @@ export function expressionEvaluationError(message, options) {
 
   // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
+/**
+ * An expression could not be compiled or evaluated. `cause` retains the
+ * underlying error when available. Instances are created by the library; catch
+ * them with `instanceof ExpressionEvaluationError`.
+ */
 export class ExpressionEvaluationError extends LokalizedError {
   /**
    * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** The contract requires
@@ -185,6 +190,7 @@ export class ExpressionEvaluationError extends LokalizedError {
   }
 
   /**
+   * @internal
    * The one construction path, because the constructor above is private. Its parameters are the
    * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
    * the token it takes first is never exported from this package.

@@ -41,18 +41,11 @@ import { markVerifiedLoad } from "../internal/runtime-metadata.js";
 /** @typedef {import("../load/index.js").FetchEntry} FetchEntry */
 
 /**
- * The options of `loadStringsFromFiles` and `loadEntireManifestFromFiles`.
+ * Options for `loadStringsFromFiles` and `loadEntireManifestFromFiles`.
  *
- * `readFile` may answer with the whole body or with a stream; the declared type says
- * `Promise<Uint8Array | AsyncIterable<Uint8Array>>` and both are honoured, because a test double has
- * no reason to build a stream and the default reader has every reason to be one.
- *
- * `partialFailure` is the Fetch doors' `PartialFailurePolicy`, referenced rather than spelled out,
- * because these options derive from `LoadStringsOptions`. Until 2026-09-23 this typedef and
- * `LoadStringsFromDirectoryOptions` below spelled it `"all-or-nothing" | "allow-partial"`, so the
- * documented `"reject"` failed to compile on these doors while `"all-or-nothing"` — a spelling the
- * policy does not have — compiled. At run time the two were always the same: `run-plan.js` reads
- * `=== "allow-partial"`.
+ * `readFile` supplies catalog bytes as a complete `Uint8Array` or an async stream
+ * of byte chunks. `partialFailure` defaults to `"reject"`; `"allow-partial"`
+ * retains successful catalogs and reports failures. The fallback catalog must load.
  *
  * @typedef {object} LoadStringsFromFilesOptions
  * @property {(url: string, signal?: AbortSignal) => Promise<Uint8Array | AsyncIterable<Uint8Array>>} [readFile]
@@ -166,11 +159,8 @@ const DIRECTORY_DOOR_OPTIONS = /** @type {const} */ ([
 const NODE_NEAR_MISSES = /** @type {const} */ ({ loadingLimits: "limits" });
 
 /**
- * Read a manifest from a filesystem path or `file:` URL, through the same bounded parser.
- *
- * It deliberately does NOT accept an HTTP URL: HTTP callers use Fetch plus `parseStringsManifest`
- * rather than hiding network I/O in the Node helper — a helper that quietly
- * fetched would put a network request behind a name that reads like a file read.
+ * Read and parse a manifest from a filesystem path or `file:` URL.
+ * For an HTTP resource, fetch the bytes and pass them to `parseStringsManifest`.
  *
  * @param {string | URL} path
  * @param {{ signal?: AbortSignal, limits?: import("../internal/catalog.js").ParseLimits }} [options]
@@ -244,8 +234,8 @@ export async function loadEntireManifestFromFiles(manifest, options = {}) {
 }
 
 /**
- * The options of `loadStringsFromDirectory` — the generator's options without a publication URL,
- * intersected with the file loaders' without their own `limits`.
+ * Options for directory loading, including parsing limits, cancellation,
+ * partial failures, and an optional custom reader for the loading step.
  *
  * @typedef {object} LoadStringsFromDirectoryOptions
  * @property {string} catalogVersion
@@ -259,24 +249,13 @@ export async function loadEntireManifestFromFiles(manifest, options = {}) {
  */
 
 /**
- * Generate an internal manifest against the directory's `file:` URL and whole-load it.
+ * Load all catalogs from a directory using an internal `file:` manifest and
+ * verify each file against its digest. Files are read during manifest generation
+ * and again during loading, so changes between those steps are detected.
  *
- * **IT HAS NO PUBLICATION URL OPTION, and one supplied is REFUSED rather than dropped.** The type
- * states the absence; refusing at runtime as well follows S11a's decision about
- * `fetch` and `request` for the same reason — a caller who passed a publication base believes the
- * manifest they get back is publishable, and this one is internal to a local load.
- *
- * **EVERY FILE IS READ TWICE, DELIBERATELY.** The generation half hashes the bytes on disk; the load
- * half reads them again and verifies that digest. Caching the first read into the second would halve
- * the I/O and make the digest a TAUTOLOGY — it would be checking bytes against a hash taken from
- * those same bytes, in the same call. Re-reading is what makes the check real: it catches a catalog
- * that changes between the scan and the load, which is exactly the race a directory-based publish
- * runs. `test/node-directory-manifest.test.js` pins it with a file that changes between the two
- * halves.
- *
- * An injected `readFile` therefore serves the LOAD half only. The generation half is a directory
- * scan — it stats and enumerates entries, which no per-URL reader can express — so routing it
- * through the hook would mean an injected reader saw some files and not others.
+ * `publicationBaseUrl` is not accepted for this local load. An injected `readFile`
+ * is used during loading; directory discovery and manifest generation use the
+ * filesystem directly.
  *
  * @param {string | URL} directory
  * @param {LoadStringsFromDirectoryOptions} options

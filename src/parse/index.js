@@ -58,9 +58,8 @@ const freeze = Object.freeze;
 /** @typedef {import("../internal/catalog.js").ParseLimits} StringsLoadingLimits */
 /**
  * @typedef {Pick<StringsLoadingLimits, "maximumLocalizedStringsFiles" | "maximumTranslationNodes"
- *   | "maximumWarnings">} ParsedCatalogLimits The three limits that apply to an ALREADY-PARSED
- *   catalog. The raw boundaries — input bytes, reader characters, JSON nesting — have no text left to
- *   bound by the time one exists, which is the distinction the name carries.
+ *   | "maximumWarnings">} ParsedCatalogLimits
+ *   Limits for parsed catalogs: file count, translation node count, and warning count.
  */
 
 /** @typedef {import("../internal/catalog.js").PlaceholderDefinition} PlaceholderDefinition */
@@ -69,11 +68,10 @@ const freeze = Object.freeze;
 /** @typedef {import("../internal/parse-warnings.js").LocalizedStringWarning} LocalizedStringWarning */
 
 /**
- * `locale` is the locale this resource represents; `source` is the label every diagnostic and
- * warning reports and defaults to `<input>`; `pluralData` takes the OPTIONAL plural modules'
- * exported data objects, of which only `ordinal` is consulted and only to report ordinality gaps,
- * because this module is in the ratcheted root graph and cannot import `lokalized/data/ordinal`
- * for itself.
+ * Options for parsing a localized strings resource. `locale` identifies its
+ * language; `source` labels diagnostics and defaults to `<input>`. `limits` bounds
+ * parsing, and `warningHandler` receives validation warnings. Supply optional
+ * ordinal data through `pluralData` to report missing ordinal forms.
  *
  * @typedef {Readonly<{
  *   locale: string,
@@ -85,11 +83,9 @@ const freeze = Object.freeze;
  */
 
 /**
- * The readonly parsed model of one localized strings file.
- *
- * It is an OUTPUT of `parseStrings` and an INPUT to `mergeParsedStringsFiles`, so the wrap has to
- * hold in both directions: a caller may still build one and hand it over, because readonly members
- * accept a mutable source, and the arrays inside were already `readonly`.
+ * A parsed localized strings file, including its normalized locale, source labels,
+ * validated definitions, origins, and warnings. Pass it to `createStrings` or
+ * merge same-locale shards with `mergeParsedStringsFiles`.
  *
  * @typedef {Readonly<{
  *   $lokalized: "parsed-strings-file",
@@ -159,8 +155,7 @@ const PARSE_STRINGS_OPTIONS = /** @type {const} */ ([
  * @param {string | Uint8Array} input raw resource text, or its bytes
  * @param {ParseStringsOptions} options
  * @returns {ParsedStringsFile}
- * @throws {RangeError} if a limit is outside its permitted band — thrown before the input is read,
- *   exactly as `LocalizedStringLoadingOptions.Builder` rejects it before a loader ever runs
+ * @throws {RangeError} if a limit is outside its permitted range, before reading input
  * @throws {StringsParseError} if the resource cannot be read, decoded, parsed, or validated
  */
 export function parseStrings(input, options) {
@@ -184,25 +179,12 @@ export function parseStrings(input, options) {
 const DEFINE_SOURCE = "<defined>";
 
 /**
- * Validate, defensively copy, and freeze one programmatic localized string.
+ * Validate, defensively copy, and freeze a programmatic localized string using
+ * the same rules as file parsing. Expressions are compiled immediately, so invalid
+ * predicates fail at definition time. The result shares no mutable data with the
+ * input; keys such as `__proto__` are treated as ordinary record members.
  *
- * The validation is not a second implementation of the file rules; it IS the file rules. The input
- * is run through the shared model walk, and the frozen result is projected back out of the internal
- * model, so a defined value and the same string parsed from a strings file are structurally
- * identical — and an authoring mistake produces one diagnostic rather than two dialects of one.
- *
- * Three properties follow from taking the round trip rather than copying the argument:
- *
- *   - every expression is COMPILED here, so a malformed predicate fails at the definition site
- *     instead of at whichever `createStrings` later consumed it;
- *   - the returned graph shares nothing with the caller's object, so mutating the argument
- *     afterwards cannot change what was defined;
- *   - every keyed record in it is a frozen null-prototype object, so `__proto__` in a placeholder or
- *     translation map is an ordinary member.
- *
- * @param {LocalizedStringInput} input BOOT-M0-0582. It was `unknown` — which is honest about the
- *   runtime, since the walk refuses anything it does not recognise, and silent at the one moment a
- *   compiler could have spoken. The refusals all remain: a declared type is not a validation
+ * @param {LocalizedStringInput} input the localized string definition
  * @returns {Readonly<LocalizedStringInput>}
  * @throws {StringsParseError} if the value is not a valid localized string
  */
@@ -214,12 +196,9 @@ export function defineLocalizedString(input) {
 
 /**
  * Validate, defensively copy, and freeze a programmatic catalog.
+ * Duplicate keys are rejected and every localized string is validated.
  *
- * Validated as ONE catalog rather than as N independent strings, which is the difference that
- * matters: duplicate keys are rejected, and a subtree shared between two root keys is proved once.
- *
- * @param {readonly LocalizedStringInput[]} inputs BOOT-M0-0584. `unknown[]` admitted anything and
- *   the walk below refuses it at run time; the element type says so at compile time instead
+ * @param {readonly LocalizedStringInput[]} inputs the localized string definitions
  * @returns {readonly Readonly<LocalizedStringInput>[]}
  * @throws {StringsParseError} if any value is not a valid localized string
  */
@@ -330,34 +309,16 @@ function requireParsedStringsFile(file, index) {
 }
 
 /**
- * MERGE EXACT-LOCALE SHARDS.
+ * Merge parsed shards for one normalized locale. For example, `en-us` and `en-US`
+ * can be merged, while `pt` and `pt-PT` remain separate catalogs.
  *
- * An application whose translations are split by route or namespace parses each shard separately and
- * merges before construction; V1 manifests and the runtime loader model ONE assembled resource per
- * locale, so the splitting is the application's and the assembly happens here.
- *
- * **THE LOCALE RULE IS EXACT, AND ONE EXAMPLE SAYS WHY.** Matching primary language, likely script,
- * or `equivalent(a, b)` is insufficient: `pt` and `pt-PT` must remain separate because their
- * cardinal rules differ for `0`, `0.0`, and `1.5`. An entry is evaluated
- * under the locale of the file that supplied it, so merging across two tags silently re-evaluates
- * half the catalog under the wrong plural rules. Tags are NORMALIZED first — `en-us` and `en-US` are
- * one locale — and then compared exactly.
- *
- * **LAST-WRITE-WINS IS FORBIDDEN.** A repeated key is either the same definition,
- * which unions its origins, or a conflict, which is refused with both origins named. There is no
- * third behaviour, and the absence of one is the point: shards that disagree are an authoring bug
- * that a silent winner turns into a mystery at render time.
- *
- * **WHAT IT REVALIDATES, AND WHAT IT CANNOT.** Raw input-byte, reader-character, total-byte, and
- * JSON-nesting limits are enforceable only where the original string/bytes or stream is observed;
- * normalized `ParsedStringsFile` values do not pretend to reconstruct them from lost whitespace,
- * escapes, or BOMs. So the three limits that survive are the model ones, and the merged
- * catalog is walked once against them rather than each input being re-charged: after dedup the merged
- * set IS what exists, and charging the pre-dedup sum would refuse a merge of two identical shards at
- * a budget the result fits inside.
+ * Identical repeated keys are deduplicated and their origins combined. Conflicting
+ * definitions throw with both origins identified. Limits apply to the merged
+ * model after deduplication; original byte counts and JSON nesting cannot be
+ * checked from parsed values.
  *
  * @param {readonly ParsedStringsFile[]} files the shards, in the order their sources should appear
- * @param {Readonly<{ limits?: ParsedCatalogLimits }>} [options] BOOT-M0-0729
+ * @param {Readonly<{ limits?: ParsedCatalogLimits }>} [options] limits for the merged catalog
  * @returns {ParsedStringsFile}
  * @throws {StringsParseError} on no input, a locale disagreement, a conflicting repeated key, a
  *   value that is not a parsed strings file, or a limit the merged catalog exceeds

@@ -783,44 +783,86 @@
         }
       },
       "previousSha256": "f486552c759564784b344d0f131b8cdb1f1dc1352435ed248dffb78b8ab81fe8"
+    },
+    {
+      "reason": "Replace public API maintenance notes with consumer documentation and exclude library-only error construction helpers from TypeDoc; runtime and declarations match v1.0.0, and source graphs shrink without changing module sets.",
+      "recorded": {
+        "lokalized": {
+          "modules": 33,
+          "bytes": 756709
+        },
+        "lokalized/core": {
+          "modules": 32,
+          "bytes": 744197
+        },
+        "lokalized/parse": {
+          "modules": 30,
+          "bytes": 571337
+        },
+        "lokalized/load": {
+          "modules": 41,
+          "bytes": 664472
+        },
+        "lokalized/ssr": {
+          "modules": 4,
+          "bytes": 30235
+        },
+        "lokalized/negotiate": {
+          "modules": 19,
+          "bytes": 271522
+        },
+        "lokalized/node": {
+          "modules": 44,
+          "bytes": 698036
+        },
+        "lokalized/data/ordinal": {
+          "modules": 35,
+          "bytes": 775599
+        },
+        "lokalized/data/ranges": {
+          "modules": 35,
+          "bytes": 780096
+        }
+      },
+      "previousSha256": "4893a1b62dad427c1c9902e910615446c15dc4431b447da86d634dde1268424b"
     }
   ],
   "subpaths": {
     "lokalized": {
       "modules": 33,
-      "bytes": 783003
+      "bytes": 756709
     },
     "lokalized/core": {
       "modules": 32,
-      "bytes": 769977
+      "bytes": 744197
     },
     "lokalized/parse": {
       "modules": 30,
-      "bytes": 582598
+      "bytes": 571337
     },
     "lokalized/load": {
       "modules": 41,
-      "bytes": 675816
+      "bytes": 664472
     },
     "lokalized/ssr": {
       "modules": 4,
-      "bytes": 37293
+      "bytes": 30235
     },
     "lokalized/negotiate": {
       "modules": 19,
-      "bytes": 287911
+      "bytes": 271522
     },
     "lokalized/node": {
       "modules": 44,
-      "bytes": 709436
+      "bytes": 698036
     },
     "lokalized/data/ordinal": {
       "modules": 35,
-      "bytes": 802621
+      "bytes": 775599
     },
     "lokalized/data/ranges": {
       "modules": 35,
-      "bytes": 807496
+      "bytes": 780096
     }
   }
 }

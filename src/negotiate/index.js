@@ -271,55 +271,18 @@ function javaDoubleText(value) {
 }
 
 /**
- * lokalized-java 3.1.0's `LocaleMatcher#parseLanguageRanges(String)` on its default
- * `LanguageRangeEquivalents.IANA_REGISTRY` setting — which is `java.util.Locale.LanguageRange#parse`
- * (`sun.util.locale.LocaleMatcher:440`) with ONE substitution: the language equivalences come from the
- * pinned IANA registry instead of the running JDK's table.
+ * Parse an `Accept-Language` field value or language range into a frozen array
+ * of weighted ranges, expanded using the pinned IANA equivalence data.
  *
- * **THAT IS AMENDMENT A30, AND IT IS A DELIBERATE CHANGE.** Until 1.0.0-rc.1 this door modelled the
- * JDK's own `LanguageRange.parse`, which on JDK 21 lacks twelve registry tags (`bh`, `bih`, `dyl`,
- * `enm`, `mgp`, `mrd`, `mrh`, `sgn-dyl`, `sgn-zhk`, `shl`, `yol`, `zhk`), while the header door and the
- * identity channel already used the registry. There is one parse now: `parseLanguageRanges("yol")` is
- * `[yol, enm]`, as Java's public parse answers on every JDK. The JavaScript package has no JDK setting
- * — a "JDK" table could only ever mean JDK 21's, frozen — so this is the whole of it. The spec's
- * `tools/iana-oracle/model.mjs` states the same algorithm and `test/iana-model-parity.test.js` holds
- * this function to it over the spec's probe space, with no JDK.
- *
- * This is the whole reason `lokalized/negotiate` exists as a separate subpath: it is the door an
- * `Accept-Language` field value comes through, and it drags the full IANA language table in with it.
- * `DefaultStrings#addParsedLanguageRangeIdentities` calls the same parse, so the table and the
- * region/variant substitutions reach MEMBER IDENTITIES too, not only headers.
- *
- * Five details are each a recorded case, and each is the kind that reads as a detail until it moves
- * an answer:
- *
- * 1. THE SPACE STRIP IS GLOBAL, not a per-member trim. `"not a header!"` becomes `notaheader!` and
- *    is refused as `range=notaheader!` — one member, not three — and `"de;q=0.8,\tfr;q=0.9"` keeps
- *    its TAB, because a tab is not a space, and is refused as `range=\tfr`. Both messages are
- *    recorded verbatim. A per-member trim answers both instead of refusing them.
- * 2. THE DEDUP KEY IS THE RANGE STRING and the FIRST occurrence wins the whole equivalence class.
- *    `iw;q=0.9,he;q=0.4` is `[iw@0.9, he@0.9]` — `he` arrives as `iw`'s IANA equivalent at `iw`'s
- *    weight, and the later explicit `he;q=0.4` is dropped by `tempList` — while `he;q=0.4,iw;q=0.9`
- *    is `[he@0.4, iw@0.4]`. Neither a group-maximum nor a last-wins rule produces either.
- * 3. THE SORT IS A STABLE INSERTION at the first strictly-lower weight, over the members placed SO
- *    FAR. Equal weights keep list order, which is what four `browser-chooser.shape.*` rows pin.
- * 4. EQUIVALENTS GO IN AT `index + 1`, so a class lands directly after its representative and in
- *    reverse of the map's own order. The `sgn-BE-FR` -> `[sgn-be-fr, sgn-sfb, sfb, sgn-be-fx]` order
- *    is not incidental; `requestedLanguageRanges` is compared field for field.
- * 5. THE WEIGHT CHECK RUNS BEFORE THE GRAMMAR CHECK, so `fr;q=1.5` reports the weight and never
- *    reaches `range=`, and a NON-NUMERIC weight has its own wording with the raw text QUOTED.
- *
- * FROZEN ON THE WAY OUT, members included. This door returns `readonly LanguageRange[]` where
- * `LanguageRange` is `Readonly<{ range, weight }>`, and every returned array is frozen; the port
- * once returned a plain array of plain objects, so a caller
- * could `sort` or `push` the list the library handed them. The freeze is at the RETURN rather than
- * per member, because `list` is built by `splice` — the insertion position IS the contract here
- * (member order is compared field for field) and a frozen array cannot be spliced into.
+ * Ranges are lowercase and sorted by descending weight, preserving input order
+ * for equal weights. The first occurrence of a range or its equivalent wins.
+ * For example, `iw;q=0.9,he;q=0.4` produces `iw` and `he`, both at weight `0.9`.
+ * ASCII spaces are removed throughout the input; tabs are not removed.
+ * Malformed ranges or invalid weights throw `RangeError`.
  *
  * @param {string} header an `Accept-Language` field value, or a single language range
- * @returns {readonly WeightedLanguageRange[]} the parsed members, in the order the grammar above
- *   defines
- * @throws {RangeError} `IllegalArgumentException`, with Java's message
+ * @returns {readonly WeightedLanguageRange[]} parsed ranges, in descending weight order
+ * @throws {RangeError} if a range or weight is invalid
  */
 export function parseLanguageRanges(header) {
 	if (typeof header !== "string") throw new RangeError("An Accept-Language header must be a string");
@@ -435,26 +398,10 @@ function pinnedRangeEquivalents(range) {
 /** @typedef {import("../internal/locale.js").WeightedLanguageRange} WeightedLanguageRange */
 
 /**
- * The applicable locale configuration a negotiator matches against — the exact shape
- * `strings.getLocaleConfiguration()` returns.
- *
- * `fallbackLocale` is taken as ALREADY RESOLVED to a loaded catalog, which is what that method
- * yields (`DefaultStrings.java:446-470`, ported in `createStrings`). A hand-built configuration must
- * therefore name a locale it also supports, and is refused below when it does not, rather than
- * silently negotiating against a fallback no catalog answers to.
- *
- * **THE THREE MEMBERS ARE `readonly`, AND THIS COPY WAS THE ONE THAT WAS NOT.** The registry states
- * it three times (BOOT-M0-0296 through BOOT-M0-0298) and `lokalized/core` already declared its own
- * copy wrapped. Measured by `tools/readonly-surface.mjs` on its first run: the SAME public name was
- * readonly through `lokalized/core` and writable through `lokalized/negotiate`, so which subpath a
- * consumer imported from decided whether their editor stopped them. That is S28's asymmetry, and it
- * is exactly why that tool probes every subpath a name is published on rather than the first one.
- *
- * The SHAPE still differs from core's deliberately and is left alone: here `tiebreakerLocalesByLanguageCode` is optional
- * and may be a `ReadonlyMap`, because `createLocaleMatcher({ fallbackLocale, supportedLocales })`
- * with no tiebreakerLocalesByLanguageCode at all is the ordinary call. Narrowing it to core's required-record form to
- * make the two identical would refuse that call, which is a real consumer pattern and one the
- * declaration probes themselves use.
+ * Locale configuration used for negotiation. `fallbackLocale` must be a supported
+ * catalog locale. `supportedLocales` lists available catalogs; optional
+ * `tiebreakerLocalesByLanguageCode` supplies ordered preferences for ambiguous
+ * languages as a record or readonly Map.
  *
  * @typedef {Readonly<{
  *   fallbackLocale: string,
@@ -678,24 +625,13 @@ function normalizeAcceptLanguage(acceptLanguage) {
 }
 
 /**
- * The two allowlisted `negotiate` type names the port declared nowhere until M8.
- *
- * **BOTH ARE DERIVED FROM WHAT SHIPS.** `DirectLocaleMatcher` is the two-method interface, taken
- * as a `Pick` of the negotiator this module actually returns rather than retyped — so a signature
- * change in the runtime moves the declared type with it instead of leaving the two to disagree.
- * `LanguageRange` is core's type re-exported: a second definition here would be a second thing to
- * keep in step.
+ * Types for locale negotiation and weighted language ranges.
  *
  * @typedef {import("../core/index.js").LanguageRange} LanguageRange
  * @typedef {import("../core/index.js").LocaleMatchResult} LocaleMatchResult
  * @typedef {ReturnType<typeof createLocaleMatcher>} LocaleMatcher
- *   `interface LocaleMatcher extends DirectLocaleMatcher` — the whole object
- *   `createLocaleMatcher` returns, where `DirectLocaleMatcher` below is the two-method narrowing of it.
- *   DERIVED from the factory rather than restated, so a method added to one and not the other is
- *   impossible by construction; the allowlist has named it since M7 and `declared-surface.test.js`
- *   has carried it in OWED ever since.
+ *   Matcher returned by `createLocaleMatcher`, supporting locale tags and language ranges.
  *
-
  * @typedef {Pick<ReturnType<typeof createLocaleMatcher>, "matchFor" | "bestMatchFor">} DirectLocaleMatcher
  */
 
@@ -750,11 +686,11 @@ function usableAcceptLanguageRanges(acceptLanguage) {
 }
 
 /**
- * A matcher over one applicable locale configuration.
+ * Create a locale matcher over a supported locale configuration.
  *
- * Every `matchFor*` is STRICT: no acceptable candidate reports an unmatched result rather than
- * fabricating a configured-fallback match. Every `bestMatchFor*` returns the selection or, when
- * there is none, the configured fallback — the fabrication happens there and only there.
+ * The `matchFor*` methods return a result with `isMatch: false` and `locale: null`
+ * when no supported locale matches. The `bestMatchFor*` methods return the
+ * configured fallback in that case.
  *
  * @param {LocaleConfiguration} configuration
  */
@@ -815,21 +751,8 @@ export function createLocaleMatcher(configuration) {
 
 	return Object.freeze({
 		/**
-		 * The NORMALIZING ingress, unchanged and deliberately separate: a locale is a locale, and
-		 * Java builds its range from `toLanguageTag()`.
-		 *
-		 * `LocaleMatcher.java:64` — `requireWellFormed(locale, "Requested locale")` — is the FIRST
-		 * statement of the `matchFor(Locale)` default method, before the `LanguageRange` is built,
-		 * and `bestMatchFor(Locale)` reaches it through `matchFor` (`DefaultStrings.java:1532`), so
-		 * both doors carry it and neither is a wrapper around the other here. Measured on the pinned
-		 * JDK: `matchFor(Locale.forLanguageTag("en-x-lvariant-NY"))` throws
-		 * `Requested locale 'en__NY' is not a well-formed IETF BCP 47 locale` while
-		 * `en-US-x-lvariant-POSIX`, `ja-JP-x-lvariant-JP` and `th-TH-x-lvariant-TH` all ANSWER — the
-		 * three the corpus already keeps as controls against overcorrecting this at the tag layer.
-		 *
-		 * THE RANGE DOORS BELOW DO NOT GET THIS CHECK, and that is Java's line rather than an
-		 * omission: `matchFor(List<LanguageRange>)` takes ranges, never a `Locale`, and validates
-		 * only their count.
+		 * Match a well-formed locale tag against the supported locales. Return an
+		 * unmatched result when no supported locale matches.
 		 *
 		 * @param {string} locale
 		 */
@@ -840,26 +763,20 @@ export function createLocaleMatcher(configuration) {
 			matchFor(requestedLocale(locale), supportedLocales, fallbackLocale, tiebreakerLocalesByLanguageCode).locale
 			?? fallbackLocale,
 		matchForLanguageRanges,
-		/** BOOT-M0-0449, the same element type as its sibling above.
-		 * @param {Iterable<Readonly<{ range: string, weight?: number }>>} ranges */
+		/**
+		 * Return the best supported match for a language-range list, or the configured fallback.
+		 *
+		 * @param {Iterable<Readonly<{ range: string, weight?: number }>>} ranges
+		 */
 		bestMatchForLanguageRanges: (ranges) => matchForLanguageRanges(ranges).locale ?? fallbackLocale,
 		/**
-		 * `LocaleMatcher#bestMatchForAcceptLanguage` (`:117-139`), the FAIL-SOFT request-handling door.
+		 * Return the best supported locale for an `Accept-Language` header, or the
+		 * configured fallback when it cannot be used. Missing, blank, malformed, or
+		 * oversized input returns the fallback.
 		 *
-		 * Every unusable input answers the configured fallback rather than throwing: absent, over the
-		 * length cap, blank, normalizing to nothing, unparseable, or parsing to more than 32 members.
-		 * It is the mirror image of `matchForLanguageRanges`, which is strict about all of those, and
-		 * THE CONTRADICTION IS THE POINT — the corpus records the same 13-member header
-		 * (`he,id,yi,cmn,yue,nan,hak,jbo,tlh,gan,wuu,hsn,ase,fr;q=0.1`, which the IANA table expands
-		 * to 33) THROWING through `matchFor(List)` at `browser-chooser.limit.alias-expansion-crosses-
-		 * thirty-two` and RETURNING `ja` here at `accept-language.limit.thirty-three-expanded-ranges`.
-		 * A single shared limit rule cannot produce both. Its 32-member sibling
-		 * (`.thirty-two-expanded-ranges`) is accepted WHOLE by both doors: nothing is ever truncated,
-		 * so a "keep the first 32" reading answers that pair identically and this one wrongly.
-		 *
-		 * THE ORDER OF THE GUARDS IS OBSERVABLE. The length cap is applied to the RAW value, before
-		 * `trim` and before normalization; a 4,097-character header of commas normalizes to `fr` and
-		 * would answer `fr` if the cap ran later.
+		 * The raw header is limited to 4,096 UTF-16 code units and the parsed list to
+		 * 32 ranges, including IANA equivalents. An oversized list is rejected as a
+		 * whole rather than truncated.
 		 *
 		 * @param {string | null | undefined} acceptLanguage the raw, already-combined field value
 		 * @returns {string} the best-matching supported locale, or the configured fallback
@@ -896,14 +813,9 @@ export function createLocaleMatcher(configuration) {
  */
 
 /**
- * Negotiate a whole list STRICTLY and return the per-call options core consumes.
- *
- * Strict means what it means everywhere else in this module: a list longer than 32 members, or one
- * holding a member `LanguageRange.parse` would refuse, throws `RangeError`. A caller that wants the
- * request-handling contract instead wants `forAcceptLanguage`.
- *
- * BOOT-M0-0457 asks for a `readonly LanguageRange[]` here; an `Iterable` of the same element
- * accepts one and keeps the `Set` a caller may already hold.
+ * Create per-call translation options by negotiating a language-range list.
+ * Malformed ranges or a list longer than 32 members throw `RangeError`.
+ * Use `forAcceptLanguage` for tolerant request-header handling.
  *
  * @param {LocaleMatcher} negotiator
  * @param {Iterable<Readonly<{ range: string, weight?: number }>>} ranges
@@ -914,22 +826,13 @@ export function forLanguageRanges(negotiator, ranges) {
 }
 
 /**
- * Negotiate an `Accept-Language` field value FAIL-SOFT and return the per-call options core consumes.
+ * Create per-call translation options by negotiating an `Accept-Language` header.
+ * Unusable input produces an unmatched result (`locale: null`, `matchType: "none"`),
+ * so the runtime uses its configured fallback while preserving that diagnostic.
  *
- * **THE UNMATCHED ANSWER IS A DIAGNOSTIC, NOT A FABRICATED MATCH, and the difference is
- * precise.** Unusable input makes `bestMatchForAcceptLanguage` return the configured
- * fallback TAG; it makes this return an unmatched result whose own `locale` remains null, which
- * core then consumes by using the configured fallback as the lookup locale. So the two doors agree
- * on which catalog answers and disagree — deliberately — on what the caller can see about why.
- * Handing back `{ locale: fallbackLocale, matchType: "exact" }` would be the fabrication this
- * module's every `matchFor*` exists to refuse, and it would tell a page that the visitor asked for
- * the language it is being served.
- *
- * The five refusals are `usableAcceptLanguageRanges`'s, shared verbatim with
- * `bestMatchForAcceptLanguage` rather than restated. An empty range list is what produces the
- * unmatched result: `matchForLanguageRanges([])` is Java's `matchFor(List.of())`, which is
- * `noLocaleMatch`. Nothing here truncates — a 33-expanded-range header is refused whole, and the
- * result's `requestedLanguageRanges` is EMPTY rather than the first 32.
+ * The raw header is limited to 4,096 UTF-16 code units and the parsed list to
+ * 32 ranges, including IANA equivalents. Oversized lists are rejected as a whole;
+ * no preferences are retained in the unmatched result.
  *
  * @param {LocaleMatcher} negotiator
  * @param {string | null | undefined} acceptLanguage the raw, already-combined field value
@@ -942,27 +845,9 @@ export function forAcceptLanguage(negotiator, acceptLanguage) {
 }
 
 /**
- * THE TWO IANA CONSTANTS, re-exported here because this is the subpath that owns the table they
- * describe.
- *
- * This subpath promises to re-export core's `LanguageRange` type and IANA metadata, and S28's
- * category gate recorded the metadata half as
- * UNDELIVERED with the reason "nothing to re-export, because core exports none". **That reason went
- * stale the day M8's final batch landed the seven build-identity constants on `core`**, and nothing
- * re-checked it: the staleness arm of that gate fires when a category gains a MEMBER, never when its
- * excuse stops being true. Twelfth text on this project found asserting something that had ceased to
- * hold. The entry is deleted with this export.
- *
- * THEY COME FROM `internal/runtime-metadata.js`, NOT FROM `core`, for the graph reason above: that
- * module has zero imports of its own, so this costs the subpath one leaf. Both values are therefore
- * the SAME constants core exports rather than a second copy, and `test/negotiate-options.test.js`
- * asserts the equality so a future divergence is a red test rather than two plausible strings.
- *
- * `ianaRegistryDate` is the pinned IANA registry snapshot's `File-Date`, a real `YYYY-MM-DD`. It
- * read `jdk-oracle:21.0.11` until that snapshot existed — A11 refused to invent a date for a snapshot
- * that did not — and M-R S11 pinned one, which is when it became a date.
+ * The date of the pinned IANA Language Subtag Registry snapshot, as `YYYY-MM-DD`.
  */
 export const ianaRegistryDate = RUNTIME_METADATA.ianaRegistryDate;
 
-/** @see {@link ianaRegistryDate} — the pinned IANA data's content fingerprint. */
+/** Content fingerprint of the pinned IANA language data. */
 export const ianaDataFingerprint = RUNTIME_METADATA.ianaDataFingerprint;

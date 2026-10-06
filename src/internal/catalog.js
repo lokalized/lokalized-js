@@ -56,10 +56,9 @@ const MAXIMUM_ALTERNATIVE_DEPTH = 128;
  */
 
 /**
- * A per-language-form translation set: `LocalizedString.LanguageFormTranslation`.
- *
- * Exactly one of `value` and `range` is non-null. `axis` is the single axis every key of
- * `translations` belongs to, recorded at parse time so rendering never re-derives it.
+ * Placeholder translations selected by a language-form value or range.
+ * Exactly one of `value` and `range` is non-null. All `translations` keys belong
+ * to the same language-form `axis`.
  *
  * @typedef {object} LanguageFormPlaceholder
  * @property {"language-form"} kind
@@ -70,7 +69,7 @@ const MAXIMUM_ALTERNATIVE_DEPTH = 128;
  */
 
 /**
- * A generated template fragment: `LocalizedString.ExpressionTranslation`.
+ * A placeholder with a default translation and conditional expression alternatives.
  *
  * @typedef {object} ExpressionPlaceholder
  * @property {"expression"} kind
@@ -87,10 +86,8 @@ const MAXIMUM_ALTERNATIVE_DEPTH = 128;
  */
 
 /**
- * One catalog entry, or one whole-message alternative branch of it.
- *
- * `translation` is null only for a node that carries at least one alternative; the corpus keeps
- * such entries (an alternatives-only entry loads cleanly in Java).
+ * A catalog entry or whole-message alternative. `translation` can be null
+ * when the node has at least one alternative.
  *
  * @typedef {object} Definition
  * @property {string | null} translation
@@ -100,14 +97,10 @@ const MAXIMUM_ALTERNATIVE_DEPTH = 128;
  */
 
 /**
- * The seven-field `StringsLoadingLimits`, which is the name both `lokalized/parse` and
- * `lokalized/load` publish this type under. Four of the seven are AGGREGATE, across a whole load —
- * `maximumTotalInputBytes`, `maximumLocalizedStringsFiles`, `maximumTranslationNodes` and
- * `maximumWarnings` — and the two byte/character bounds are per-resource.
- *
- * BOOT-M0-0710 through BOOT-M0-0716 declare all seven `readonly`, and both published spellings were
- * writable until this wrap. A limits object is supplied by a caller and read by the loader; nothing
- * on either side writes a member back.
+ * Limits for localized strings resources. `maximumInputBytes` and
+ * `maximumReaderCharacters` apply per resource; `maximumJsonNestingDepth` bounds
+ * JSON structure. `maximumTotalInputBytes`, `maximumLocalizedStringsFiles`,
+ * `maximumTranslationNodes`, and `maximumWarnings` apply across a whole load.
  *
  * @typedef {Readonly<{
  *   maximumInputBytes?: number,
@@ -1350,10 +1343,8 @@ export function parseCatalogSource(input, context) {
 // -------------------------------------------------------------------------------------------------
 
 /**
- * BOOT-M0-0559 through BOOT-M0-0564. `placeholders` and `alternatives` stay `unknown` here on
- * purpose — this is the door the programmatic `define` family enters through, and it accepts an
- * arbitrary object graph that the walk below validates leaf by leaf rather than a shape the type
- * system can state.
+ * A localized string definition accepted by the programmatic definition helpers.
+ * Placeholder and alternative structures are validated when the definition is created.
  *
  * @typedef {Readonly<{
  *   translation?: string,

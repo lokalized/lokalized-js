@@ -51,10 +51,9 @@ const POP_DIRECTIONAL_ISOLATE = "⁩";
 const RIGHT_TO_LEFT_SCRIPTS = new Set(decodeRightToLeftScripts().map((script) => script.toLowerCase()));
 
 /**
- * The three modes.
- *
- * Java's enum members are `NONE`, `ALWAYS` and `RTL_LOCALES`; JavaScript uses the same words
- * as lowercase strings with hyphens
+ * Placeholder isolation modes: `"disabled"`, `"always"`, or `"rtl-locales"`.
+ * The default is `"rtl-locales"`, which isolates placeholders when rendering a
+ * locale that uses a right-to-left script.
  *
  * @typedef {"none" | "rtl-locales" | "always"} BidiIsolation
  */

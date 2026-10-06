@@ -222,7 +222,7 @@ import { ResolutionError, invalidState, nullishThrow } from "../internal/resolut
  */
 
 /**
- * Public runtime result and locale-context types, derived from their methods.
+ * Translation results, locale context, and weighted language ranges.
  *
  * @typedef {ReturnType<Strings["getResult"]>} TranslationResult
  * @typedef {TranslationResult["status"]} TranslationResultStatus
@@ -310,24 +310,18 @@ function THROWING_PHONETIC_RESOLVER(term, locale) {
 }
 
 /**
- * The three failure responses.
+ * Return the interpolated key when translation fails.
  *
- * DISCRIMINATED STRUCTURALLY — correctness never depends on singleton identity, so a handler
- * returning `{ action: "return-key" }` written by hand is treated exactly
- * as one returning this constant. The constants exist so the common cases are allocation-free and
- * spelled once; the dispatch in `getResult` reads `.action` and never compares by reference.
+ * Failure responses are selected by their `action` field. A handler may return
+ * this constant or an equivalent `{ action: "return-key" }` object.
  */
 export const RETURN_KEY = freeze({ action: /** @type {const} */ ("return-key") });
+/** Failure response that raises `MissingTranslationError`. */
 export const THROW_EXCEPTION = freeze({ action: /** @type {const} */ ("throw") });
 
 /**
- * `TranslationFailureResponse.returnString(...)`.
- *
- * The string is returned VERBATIM — not interpolated and not bidi-isolated, which is the whole
- * difference between this response and `RETURN_KEY`. The corpus pins both halves against one
- * another: `bidi-isolation.failure-response.return-string-is-not-interpolated-or-isolated` records
- * `Fallback for {{name}}` with the braces intact while its `return-key` neighbour records
- * `Farewell ⁨Sarah⁩` with the isolate controls in place.
+ * Create a failure response that returns `translation` verbatim.
+ * The replacement is not interpolated or wrapped in bidi isolation controls.
  *
  * @param {string} translation
  */
@@ -759,6 +753,11 @@ export const ianaDataFingerprint = RUNTIME_METADATA.ianaDataFingerprint;
 
   // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
+/**
+ * No translation could be returned after the configured failure handler requested
+ * an exception. `failure` contains the lookup diagnostics. Instances are
+ * created by the library; catch them with `instanceof MissingTranslationError`.
+ */
 export class MissingTranslationError extends LokalizedError {
   /**
    * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** The contract requires
@@ -785,11 +784,16 @@ export class MissingTranslationError extends LokalizedError {
 
     /** @type {"MissingTranslationError"} */
     this.name = "MissingTranslationError";
-    /** The frozen failure the handler saw, by reference. BOOT-M0-0515. @type {TranslationFailure} @readonly */
+    /**
+     * The translation failure passed to the failure handler.
+     * @type {TranslationFailure}
+     * @readonly
+     */
     this.failure = failure;
   }
 
   /**
+   * @internal
    * The one construction path, because the constructor above is private. Its parameters are the
    * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
    * the token it takes first is never exported from this package.
@@ -2044,29 +2048,19 @@ export function createStrings(options) {
     // order, which is what `String.compareTo` gives Java's comparator.
     getSupportedLocales: () => freeze([...supported].sort(compareTags)),
     /**
-     * INSPECTION IS EXACT-LOCALE-ONLY: normalize, then look the tag up exactly. No
-     * equivalence, no negotiation, no fallback — which is what separates this from every other
-     * locale-taking member here.
+     * Return the keys in the catalog for the normalized locale tag, sorted by
+     * UTF-16 code unit order. The returned array is frozen.
      *
-     * Two defects were measured against Java on 2026-09-06 and are fixed here. (1) An unsupported
-     * locale returned `[]`, where Java throws (`DefaultStrings.java:2718-2720`); the port refused
-     * nothing at all, so a caller inspecting a locale it had never loaded got silence instead of an
-     * answer. (2) Keys came back in catalog INSERTION order, where Java's `TreeSet` returns them
-     * sorted; `sort()` on UTF-16 code units is `String.compareTo`'s ordering, so the two agree.
-     *
-     * The thrown type is `UnsupportedLocaleError` where Java raises `IllegalArgumentException`,
-     * because this is a JS-facing inspection API. No corpus row exercises
-     * it, so nothing arbitrates between them today — deliberately NOT papered over by widening
-     * `conformance.mjs`'s shared `IllegalArgumentException` row, which would weaken 34 unrelated
-     * comparisons to settle one unmeasured case.
+     * Inspection requires an exact loaded locale; it does not negotiate or use
+     * fallback catalogs. Throws `UnsupportedLocaleError` if that locale is not loaded.
      */
     getKeysForLocale: (/** @type {string} */ locale) =>
       freeze(keysForExactLocale(locale, LOCALE_INGRESS_DESCRIPTION.inspectionLocale, undefined)),
 
     /**
-     * The same exact-locale rule applied INDEPENDENTLY to source and target, so an
-     * unsupported target is refused even when the source is fine. Java validates in that order too
-     * (`DefaultStrings.java:2735-2741`).
+     * Return the source catalog keys absent from the target catalog, in sorted
+     * order, as a frozen array. Both tags are normalized and must identify exact
+     * loaded locales. Throws `UnsupportedLocaleError` if either locale is not loaded.
      */
     getMissingKeys: (/** @type {string} */ sourceLocale, /** @type {string} */ targetLocale) => {
       // BOTH WELL-FORMEDNESS CHECKS RUN BEFORE EITHER SUPPORT CHECK, because that is Java's order
@@ -2106,37 +2100,23 @@ export function createStrings(options) {
         tiebreakerLocalesByLanguageCode: applicableTiebreakers ?? EMPTY_TIEBREAKERS,
       }),
     /**
-     * The three loading seams, and all three answer for the DIRECT branch too.
+     * Return this catalog set's identity, or `null` if no identity was supplied.
      *
-     * `isCatalogComplete()` is `true` for a directly constructed instance and that is not a
-     * placeholder: a caller who handed core its catalogs handed it all of them, so there is nothing
-     * partial about the set. Completeness is a statement about a LOAD, and a direct instance's load
-     * is the argument list. The identity and the verification record are `null` for the same reason
-     * in reverse — neither exists unless a verified manifest loader produced one, and that absence
-     * is the thing `createSsrStamp` refuses on.
+     * A manifest loader supplies the verified identity. Direct construction can
+     * carry a caller-supplied identity, which does not establish verified delivery.
      */
     getCatalogIdentity: () =>
       (loadVerification === null ? suppliedIdentity : loadVerification.catalogIdentity),
+    /** Whether the loaded catalog set is complete. Direct construction returns `true`. */
     isCatalogComplete: () => (loadVerification === null ? true : loadVerification.complete),
+    /** The loader's verification record, or `null` for direct construction. */
     getLoadVerification: () => loadVerification,
+    /** Construction warnings, returned as a frozen array. */
     getWarnings: () => freeze([...warnings]),
     /**
-     * The narrow, side-effect-free observation of core's automatic direct-locale path.
-     *
-     * This is the counterpart of `Strings#matchFor(Locale)`, so it carries that
-     * method's ingress check: `LocaleUtils.requireWellFormed(locale, "Requested locale")` at
-     * `LocaleMatcher.java:64`, the default interface method every `matchFor(Locale)` and
-     * `bestMatchFor(Locale)` call enters through. `src/negotiate/index.js` carries the same check
-     * on the same locale for the standalone negotiator's two locale doors.
-     *
-     * INVISIBLE FROM THE LOOKUP SITES ABOVE, which is why implementing only those would have been
-     * the probe-space trap: `localeLookupFor` validates first, so Java's `matchFor(requestedLocale)`
-     * at `DefaultStrings.java:2439` and `:2458` can never be the refusal a lookup observes. This
-     * site is only reachable when a caller asks the SELECTION channel directly, and the corpus
-     * already carries three controls that must keep ANSWERING it —
-     * `lvariant.exhausting-walk.{en-us-posix,ja-jp,th-th}.selection-channel-does-not-refuse`, whose
-     * locales denote `en_US_POSIX`, `ja_JP_JP` and `th_TH_TH`, all three of which
-     * `Locale.Builder#setLocale` accepts (the last two by explicit legacy special case).
+     * Return the normalized lookup locale and its match against this instance's
+     * locale configuration. This does not render a string or consult an ambient
+     * locale supplier. The requested tag must be well formed.
      */
     getDirectLocaleContext: (/** @type {string} */ locale) => {
       const lookupLocale = requireJdkWellFormedLocale(
@@ -2156,20 +2136,15 @@ export function createStrings(options) {
 }
 
 /**
- * The per-call options object naming one explicit locale:
- * `strings.get(key, undefined, forLocale("fr-CA"))`.
+ * Create per-call options for an explicit locale.
  *
- * Its entire behavior is one rule: `forLocale` performs syntactic normalization IMMEDIATELY. A
- * caller who writes the object by hand —
- * `{ locale: "fr-ca" }` — is equally valid and normalizes inside `getResult` instead, so the only
- * thing this function buys is WHERE a malformed tag is reported: at the site that spelled it, rather
- * than at whichever unrelated lookup later consumed it. That difference is the reason it exists, and
- * it is the thing `test/for-locale.test.js` discriminates — nothing in the corpus can, because the
- * oracle has no counterpart operation for it and every recorded ingress spells its tag well-formed.
+ * ```js
+ * strings.get(key, undefined, forLocale("fr-CA"));
+ * ```
  *
- * It deliberately knows nothing about any catalog. The instance-dependent match and coverage
- * validation stays at consumption by a `Strings`, so one options object
- * stays reusable across instances that load different locales.
+ * The tag is normalized immediately; malformed tags throw here. Matching and
+ * catalog coverage are checked when an instance consumes the options, so the
+ * same options object can be reused with different instances.
  *
  * @param {string} locale
  * @returns {Readonly<{ locale: string }>}
@@ -2183,54 +2158,16 @@ export function forLocale(locale) {
 const MAXIMUM_PREFERRED_LANGUAGES = 32;
 
 /**
- * The small browser chooser, and it is EXPLICITLY NON-PARITY: it ranks nothing.
+ * Choose the first supported match from an ordered list of preferred language
+ * tags, examining at most 32 entries. Malformed or unmatched entries are skipped;
+ * if none match, return the resolved fallback locale.
  *
- * Java has no counterpart, so there is no oracle for it and the corpus has zero cases that call it.
- * What the corpus does carry is the two halves the chooser is assembled from — every
- * `browser-chooser.*.locale` row is the strict single-locale kernel this walks the list with, and
- * the matching `.ranges` row is what the whole-list solver in `lokalized/negotiate` answers for the
- * same preference. Those two disagree on purpose, and the disagreement is why this function is
- * allowed to be small rather than wrong: `browser-chooser.conflict.sgn-no-solvers-diverge.locale`
- * records `sgn-NO` selecting `nsl` while its `.ranges` twin selects `nsi`, and
- * `browser-chooser.collision.zh-cmn-solvers-diverge.locale` records `cmn` against the solver's `zh`.
- * A chooser that quietly answered like the solver would be a second, undeclared implementation of
- * RFC 4647 living in the root graph — which is the one thing the root graph is kept free of.
- *
- * THREE TRAPS, each of which produces a plausible answer if it is fallen into:
- *
- *  1. **The kernel must be the STRICT one.** `matchFor` reports an unmatched preference as
- *     unmatched; `bestMatchFor` manufactures the configured fallback for it. Built on the latter,
- *     the very first preference always "matches" and the list never advances past entry one —
- *     `["xx", "fr"]` answers the fallback instead of `fr`, and looks like a matcher bug rather than
- *     a chooser bug.
- *  2. **Over-32 TRUNCATES SILENTLY, and that is a third behaviour.** The same overflow is a throw
- *     through `matchForLanguageRanges` (`browser-chooser.limit.explicit-thirty-three-ranges-
- *     rejected` records `IllegalArgumentException`) and a fail-soft fallback through
- *     `bestMatchForAcceptLanguage` (`accept-language.limit.thirty-three-expanded-ranges`). Neither
- *     is this one. `navigator.languages` is attacker-influenced in a browser and the chooser
- *     examines at most 32 entries in order, so entry 33 is not looked at — it is not an error
- *     either, and turning it into one would make a page fail on a preference list the user set.
- *  3. **Exhaustion returns the RESOLVED fallback, never the configured tag.** This is A0's
- *     resolution (`DefaultStrings.java:446-470`), and it is reachable here because a
- *     `LocaleConfiguration` may be hand-built rather than taken from `getLocaleConfiguration()`,
- *     whose `fallbackLocale` is already resolved. Configured `hy-810` over loaded `{hy-AM, hy-SU}`
- *     is canonically equivalent to BOTH, so the configured spelling names no catalog at all: a
- *     chooser returning it hands the caller a tag every subsequent lookup misses on, and the
- *     tiebreaker that decides between the two is never consulted. `test/browser-chooser.test.js`
- *     pins it by REVERSING that tiebreaker and requiring the answer to move.
- *
- * The two refusals below are `createStrings`' own, deliberately: a configuration is a configuration
- * whichever door it arrives at, and a fallback naming no loaded catalog is the mistake `createStrings`
- * refuses at construction. `lokalized/negotiate`'s `applicableConfiguration` refuses the same shape
- * differently — it requires an ALREADY-resolved fallback and will not resolve one — so this is not a
- * duplicated rule but the other half of the pair: the negotiator is handed a `Strings` instance's
- * configuration, and this is the door a hand-built one comes through.
+ * Use this for preference lists such as `navigator.languages`. For weighted
+ * `Accept-Language` negotiation, use `lokalized/negotiate`.
  *
  * @param {{ fallbackLocale: string, supportedLocales: readonly string[],
  *   tiebreakerLocalesByLanguageCode?: Readonly<Record<string, readonly string[]>> | ReadonlyMap<string, readonly string[]> | null }} configuration
  * @param {Iterable<string>} languages the caller's preference list, most-preferred first.
- *   BOOT-M0-0467 states `readonly string[]`; an iterable of strings accepts one, and the guard
- *   below already refuses a bare string, which is the mistake this element type now catches first
  * @returns {string} the selected supported locale, or the resolved fallback
  */
 export function chooseLocaleForPreferredLanguages(configuration, languages) {
@@ -2305,16 +2242,9 @@ export function chooseLocaleForPreferredLanguages(configuration, languages) {
 }
 
 /**
- * The browser convenience: `navigator.languages`, or `[]` when the host has none.
- *
- * It reads the global lazily rather than at module scope, so the module still evaluates in a worker,
- * on a server, and under SSR — where there is no `navigator` at all and the honest answer is the
- * configured fallback.
- *
- * `navigator.languages` is an ARRAY of tags; `navigator.language` is a single STRING. Spreading the
- * latter by accident yields one-character "preferences" that are all malformed, so the chooser would
- * silently answer the fallback for every request — which is why a string is refused here rather than
- * iterated, and why the pure helper above refuses one too.
+ * Choose a supported locale using `navigator.languages`. If the host does not
+ * provide browser language preferences, return the resolved fallback locale.
+ * Safe to call in a browser, worker, or server environment.
  *
  * @param {Parameters<typeof chooseLocaleForPreferredLanguages>[0]} configuration
  * @returns {string} the selected supported locale, or the resolved fallback
@@ -2497,17 +2427,14 @@ function validateLocaleMatchStructure(supplied, where) {
 }
 
 /**
- * The per-call options object naming one precomputed negotiation result:
- * `strings.get(key, undefined, forLocaleMatch(negotiator.matchForLanguageRanges(ranges)))`.
+ * Create per-call options from a precomputed locale match.
  *
- * It earns its place the same way `forLocale` does: the
- * INSTANCE-INDEPENDENT half of the validation runs at the site that spelled the value, so a
- * fabricated or stale match is reported where it was written rather than at whichever unrelated
- * lookup later consumed it. The instance-dependent half — the fallback and considered-set
- * comparison — stays at consumption, so one options object remains reusable across instances.
+ * ```js
+ * strings.get(key, undefined, forLocaleMatch(negotiator.matchForLanguageRanges(ranges)));
+ * ```
  *
- * A caller writing `{ localeMatchResult: … }` by hand is equally valid and is validated inside
- * `getResult`, exactly as `{ locale: "fr-ca" }` is.
+ * The match structure is validated immediately. Its fallback and considered
+ * locales are checked against the instance when the options are consumed.
  *
  * @param {LocaleMatchResult} localeMatchResult
  * @returns {Readonly<{ localeMatchResult: LocaleMatchResult }>}
@@ -3041,7 +2968,7 @@ function compileDefinitionExpressions(definition, compiled, visited = new Set(),
 }
 
 /**
- * The classifiers an optional plural-data carrier hands over.
+ * Plural classifiers provided by an optional plural-data module.
  *
  * @typedef {object} PluralDataRuntime
  * @property {(value: unknown, locale: string) => string} [ordinalityNameFor]

@@ -12,7 +12,7 @@
   "procedure": "npm pack -> npm install the tarball into a clean ESM project -> serve node_modules/lokalized over HTTP -> import map pointing `lokalized` at dist/browser/lokalized.js -> import and render.",
   "browser": {
     "engine": "Chromium 154 (Codex in-app browser)",
-    "capturedFrom": "the packed 1.0.0 tarball, installed into a clean ESM project and served over HTTP from localhost with no caching; all eight import-map entries and the classic bundle loaded",
+    "capturedFrom": "The current documentation-corrected source, packed as lokalized@1.0.0 and installed into a clean ESM project; runtime code and declarations verified against v1.0.0. Served over localhost without caching; all eight entries and the classic script loaded.",
     "isSecureContext": true,
     "cryptoSubtle": "object",
     "rendered": "Bonjour, Ada",
@@ -40,7 +40,7 @@
         "file": "dist/browser/core.js",
         "files": 8,
         "rawBytes": 185767,
-        "brotliBytes": 55088,
+        "brotliBytes": 55138,
         "exports": 21,
         "loadedInBrowser": true
       },
@@ -49,7 +49,7 @@
         "file": "dist/browser/parse.js",
         "files": 5,
         "rawBytes": 159872,
-        "brotliBytes": 49064,
+        "brotliBytes": 48818,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -58,7 +58,7 @@
         "file": "dist/browser/load.js",
         "files": 8,
         "rawBytes": 179631,
-        "brotliBytes": 54121,
+        "brotliBytes": 54119,
         "exports": 10,
         "loadedInBrowser": true
       },
@@ -67,7 +67,7 @@
         "file": "dist/browser/ssr.js",
         "files": 3,
         "rawBytes": 7844,
-        "brotliBytes": 2437,
+        "brotliBytes": 2436,
         "exports": 2,
         "loadedInBrowser": true
       },
@@ -76,7 +76,7 @@
         "file": "dist/browser/negotiate.js",
         "files": 4,
         "rawBytes": 91162,
-        "brotliBytes": 31769,
+        "brotliBytes": 31782,
         "exports": 6,
         "loadedInBrowser": true
       },
@@ -85,7 +85,7 @@
         "file": "dist/browser/data/ordinal.js",
         "files": 9,
         "rawBytes": 192476,
-        "brotliBytes": 56701,
+        "brotliBytes": 56637,
         "exports": 5,
         "loadedInBrowser": true
       },
@@ -94,34 +94,34 @@
         "file": "dist/browser/data/ranges.js",
         "files": 9,
         "rawBytes": 195004,
-        "brotliBytes": 56749,
+        "brotliBytes": 56923,
         "exports": 2,
         "loadedInBrowser": true
       }
     ],
-    "sizesRecordedFor": "Re-drove all eight browser entry points and the classic script from the packed 1.0.0 release preparation in Chromium 154; French, singular and plural renders passed with 18 bundle requests and no failed bundle requests.",
+    "sizesRecordedFor": "Re-drove all eight entry points and the classic script from the packed documentation cleanup in Chromium 154; Bonjour, Ada, 1 item, and 2 items rendered, with 18 bundle requests and zero failures. Comment-only edits changed source-map fingerprints and chunk filenames; runtime and declarations match v1.0.0.",
     "capturedAgainst": {
       "files": {
-        "dist/browser/chunks/chunk-2Q4SBLTM.js": "6173110a4e18adde9b401890316e8334173a2040d3c0bba35164aad1c9f6ecb3",
-        "dist/browser/chunks/chunk-4LAQU2SK.js": "5069690648bb0488a62efe522626f3e17ad47ee989436a7e03950d5f1856a96e",
+        "dist/browser/chunks/chunk-2L2PAYFI.js": "faee6c83c9cd2645901467fc224edac0f8d0664d440d15d256036eb16c675285",
         "dist/browser/chunks/chunk-6Z5SN5NW.js": "e0a371dc8db737ed6e2fa68168c102d1aaf6a4a504bcc3a770e534653136a0dd",
-        "dist/browser/chunks/chunk-EVMCUX6Z.js": "44323bca28a605e02c4b5c9651c4b6bce51508d1b559621330b485208d377a6a",
+        "dist/browser/chunks/chunk-CXWZJBNE.js": "7c4d559f978148827796ba289580478480550f1e3e7c55ba31a20680186d11d4",
         "dist/browser/chunks/chunk-HYRKH33S.js": "c521d3d0c00072aade76be44d315d99869fe8da5fc2084cf79a8a0f18ca3d1ab",
-        "dist/browser/chunks/chunk-LJCYBSJ6.js": "bd80762efeaa223572112dac4032a8f16e65dc57a7616be528158187a07818da",
+        "dist/browser/chunks/chunk-IX55UFR7.js": "7cac6bc78bf22f0eb604c5b4094f90428b4b4831b7f58d2147b5516fee33026b",
+        "dist/browser/chunks/chunk-K45IXPTN.js": "bd428ac2c281d1f7be687bc77f3b57faddb97ae4b339d6d71105dd6dfecfc0c1",
+        "dist/browser/chunks/chunk-L3AQ5Z6P.js": "81607db917fefaadfdd3fa35ed306f9ec32fc98e3e4711c9269a7bb908eaa937",
+        "dist/browser/chunks/chunk-NEI3E5EM.js": "95eb8125249b7a86ade15b03b4e9a2b0e208ba676468218936ebb35a52800473",
         "dist/browser/chunks/chunk-QU3LBEYR.js": "7b795ba5ae65818645e708f3022ebfd44c26a90da7cbe3553430fac72b25b194",
-        "dist/browser/chunks/chunk-YOEZMB6G.js": "7eb4d3440a5bbb1edb31e1cb0b8e319ea207c9507d83588f5c9da018aedfdcf6",
-        "dist/browser/chunks/chunk-ZKOUENNF.js": "2a26d9a25729f8420dca457b5c8dbe273922a3ab39afc84f454d754ccce60e03",
-        "dist/browser/core.js": "b1f82ef79a2869a3592ef0250df611acf0151c9e5acb8e08d60c3e0e9d0c5f50",
-        "dist/browser/data/ordinal.js": "03c835ec3c2b69b75b40b2bf1a4b578f3a53c5a23022902251567e7a2edf9bcd",
-        "dist/browser/data/ranges.js": "d096fee78f85fc38db90e8fef9736fed0b870ad6fa195f3c019680a51ceb1e35",
-        "dist/browser/load.js": "209eb4df8aae7baa1759082f7f71298804d381b4745526fbefd77805e09855ad",
+        "dist/browser/core.js": "e1e984887d18bfc9fa19bd911c2430f42892a73bb4fa540be756888dbe2cf9c6",
+        "dist/browser/data/ordinal.js": "6c605f4cea3534338155335ccadb5bc46ab242de55b140f4201ee0174231a32a",
+        "dist/browser/data/ranges.js": "30fd984ae53bb067375aabcb7bab5b1df1e8fccd80e8e0222e67811491aa14da",
+        "dist/browser/load.js": "eff860c21d4a15c60f57b109ab9602877d099a5aeab50d23fcd9bc8fb2a91b03",
         "dist/browser/lokalized.global.js": "7d7e2904eba5d9ec8bd885dcced513ce5dd7ff4d71cc78f59e5d4742f22e0976",
         "dist/browser/lokalized.js": "52f215f87f4a34cd18e5dad444df1d1233bb4838697c10360b1ec5efd084065b",
-        "dist/browser/negotiate.js": "41848250399193f67e79e8bc03984b2a19c53a77aedf3c22c8bc7300c46cffcd",
-        "dist/browser/parse.js": "4221cf48289ba9fdf01fadb1d520b8232d768e590fb4b3192fc8eab7b31c47f8",
-        "dist/browser/ssr.js": "d658893252edbc15a66acb3ec740eeaba4bbd1a7b0e972a01903aa4bec45c347"
+        "dist/browser/negotiate.js": "ca73eed8d5a1473ea4eec64cb1511f1c11d15416b970010b03a36a5a5f2f55b5",
+        "dist/browser/parse.js": "0c8631c5f6113a2c0ad0ed7a4aa5ce13503615ab10759f2b10742bdc10c67ffa",
+        "dist/browser/ssr.js": "fc50ef5e8729e995f0060fa9634c7323eff95cee43d0e3a24d3994a144639950"
       },
-      "stampedFor": "Re-drove all eight browser entry points and the classic script from the packed 1.0.0 release preparation in Chromium 154; French, singular and plural renders passed with 18 bundle requests and no failed bundle requests."
+      "stampedFor": "Re-drove all eight entry points and the classic script from the packed documentation cleanup in Chromium 154; Bonjour, Ada, 1 item, and 2 items rendered, with 18 bundle requests and zero failures. Comment-only edits changed source-map fingerprints and chunk filenames; runtime and declarations match v1.0.0."
     }
   }
 }

@@ -28,11 +28,7 @@ export { createStrings } from "./core/index.js";
 export { chooseBrowserLocale, chooseLocaleForPreferredLanguages } from "./core/index.js";
 
 /**
- * The tagged-value TYPES live on `core` and the CONSTANTS on the root, so the root names the type
- * through its owner rather than redeclaring it.
- *
- * The third parameter defaults here too, or the root would publish a stricter arity than the
- * subpath it forwards to — see core's own block for the registry statements that ask for it.
+ * A language-form value with its axis, canonical token, and display name.
  *
  * @template {import("./core/index.js").LanguageFormAxis} A
  * @template {import("./core/index.js").LanguageFormName} N
@@ -151,7 +147,7 @@ export function decimal(value) {
  *
  * @param {string} value
  * @param {Readonly<{ visibleDecimalPlaces?: number, compactExponent?: number }>} [options]
- *   BOOT-M0-0595 and BOOT-M0-0596
+ *   optional compact-decimal exponent
  */
 export function pluralOperands(value, options) {
   decimal(value); // reuse the grammar check
@@ -215,12 +211,9 @@ export function cardinalityForOperands(value, locale) {
 }
 
 /**
- * The cardinal categories a locale's CLDR rules can produce, in `CARDINALITY_*` declaration order.
- *
- * This is a probe, not a classifier: a well-formed locale with no CLDR cardinal rules returns an
- * empty array, where `cardinalityForNumber` would throw. Only a malformed tag is an error. Java
- * draws the same line — `supportedCardinalitiesForLocale` returns an empty `SortedSet` and
- * `Cardinality.forNumber` throws `UnsupportedLocaleException`.
+ * Return the frozen array of cardinal categories this locale can produce, in
+ * `CARDINALITY_*` declaration order. A well-formed but unsupported locale returns
+ * an empty array; a malformed tag throws.
  *
  * @param {string} locale
  */

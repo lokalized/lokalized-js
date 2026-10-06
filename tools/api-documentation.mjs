@@ -1,10 +1,12 @@
 /* Copyright 2026 Revetware LLC. Licensed under the Apache License, Version 2.0. */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Application, ReflectionKind, ReferenceType } from "typedoc";
+import ts from "typescript";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?$/;
@@ -31,6 +33,80 @@ export function validateReleaseSource(release, dirty, tags) {
   if (!release) return;
   if (dirty) throw new Error("Release documentation requires a clean checkout of the release tag");
   if (!tags.includes(release) && !tags.includes(`v${release}`)) throw new Error(`HEAD has no ${release} or v${release} release tag`);
+}
+
+export function withoutComments(text, filename) {
+  const source = ts.createSourceFile(filename, text, ts.ScriptTarget.Latest, true);
+  if (source.parseDiagnostics.length) throw new Error(`Invalid documentation input: ${filename}`);
+  return ts.createPrinter({ removeComments: true }).printFile(source);
+}
+
+function filesUnder(root, directory) {
+  return readdirSync(join(root, directory), { withFileTypes: true }).flatMap((entry) => {
+    const path = `${directory}/${entry.name}`;
+    return entry.isDirectory() ? filesUnder(root, path) : [path];
+  }).sort();
+}
+
+export function compareDocumentationInputs(current, baseline, directory) {
+  const paths = filesUnder(current, directory);
+  if (JSON.stringify(paths) !== JSON.stringify(filesUnder(baseline, directory)))
+    throw new Error(`Release documentation correction changes the ${directory} file inventory`);
+  for (const path of paths) {
+    const original = readFileSync(join(baseline, path), "utf8");
+    const corrected = readFileSync(join(current, path), "utf8");
+    const code = /\.(?:js|ts)$/.test(path);
+    if ((code ? withoutComments(original, path) : original) !== (code ? withoutComments(corrected, path) : corrected))
+      throw new Error(`Release documentation correction changes runtime or declarations: ${path}`);
+  }
+}
+
+function verifyDocumentationCorrection(release, reason) {
+  if (!release || !reason.trim()) throw new Error("A documentation correction requires --release and a nonempty --correction-reason");
+  const tags = git("tag", "--list").split("\n").filter((tag) => tag === release || tag === `v${release}`);
+  if (!tags.length) throw new Error(`No ${release} or v${release} release tag`);
+  const refs = [...new Set(tags.map((tag) => git("rev-parse", `${tag}^{commit}`)))];
+  if (refs.length !== 1) throw new Error("Release tags point to different commits");
+  const scratch = mkdtempSync(join(tmpdir(), "lokalized-doc-correction-"));
+  try {
+    const baseline = join(scratch, "release");
+    mkdirSync(baseline);
+    const archive = execFileSync("git", ["archive", refs[0]], { cwd: ROOT, maxBuffer: 32 * 1024 * 1024 });
+    execFileSync("tar", ["-xf", "-", "-C", baseline], { input: archive });
+    symlinkSync(join(ROOT, "node_modules"), join(baseline, "node_modules"), "dir");
+    for (const path of ["package.json", "package-lock.json", "tsconfig.json", "tsconfig.documentation.json"]) {
+      if (!readFileSync(join(ROOT, path)).equals(readFileSync(join(baseline, path))))
+        throw new Error(`Release documentation correction changes ${path}`);
+    }
+    compareDocumentationInputs(ROOT, baseline, "src");
+    const supportingTypes = "Documentation/SupportingTypes.d.ts";
+    if (withoutComments(readFileSync(join(ROOT, supportingTypes), "utf8"), supportingTypes) !==
+        withoutComments(readFileSync(join(baseline, supportingTypes), "utf8"), supportingTypes))
+      throw new Error("Release documentation correction changes supporting types");
+    // JSDoc can change types while leaving JavaScript unchanged. Emit both sets
+    // afresh and compare the complete declaration trees, ignoring prose only.
+    for (const root of [ROOT, baseline]) {
+      const outDir = root === ROOT ? join(scratch, "current/types") : join(baseline, "types");
+      execFileSync(process.execPath, [join(ROOT, "node_modules/typescript/bin/tsc"),
+        "--project", join(root, "tsconfig.json"), "--outDir", outDir], { cwd: root, stdio: "pipe" });
+    }
+    compareDocumentationInputs(join(scratch, "current"), baseline, "types");
+    compareDocumentationInputs(ROOT, join(scratch, "current"), "types");
+    return { releaseSourceRef: refs[0], correctionReason: reason, runtimeAndDeclarations: "unchanged" };
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+export function validatePublicComments(model) {
+  const internalNote = /BOOT-M0-\d+|\bM-R S\d+\b|\bamendment A\d+\b|\b[A-Za-z]+\.java:\d+|\b(?:test|tools)\/[\w/-]+\.(?:test\.js|mjs)|\bconformance\.mjs\b/i;
+  function visit(value) {
+    if (!value || typeof value !== "object") return;
+    if (value.comment && internalNote.test(JSON.stringify(value.comment)))
+      throw new Error(`Internal maintenance notes in public documentation: ${value.name}`);
+    for (const [key, child] of Object.entries(value)) if (key !== "comment") visit(child);
+  }
+  visit(model);
 }
 
 export function prepareDeclarationInputs(packageRoot, output) {
@@ -83,13 +159,14 @@ function writeLanding(site) {
 <p><a href="https://www.lokalized.com/?platform=javascript">Guides and examples</a> · <a href="https://github.com/lokalized/lokalized-js">Source repository</a></p></body></html>\n`);
 }
 
-export async function buildDocumentation({ release, output = join(ROOT, ".build/api-documentation") } = {}) {
+export async function buildDocumentation({ release, correctionReason, output = join(ROOT, ".build/api-documentation") } = {}) {
   const packageJson = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
   const entries = publicEntryPoints(packageJson);
   const edition = editionFor(release, packageJson.version);
   const sourceRef = git("rev-parse", "HEAD");
   const dirty = git("status", "--porcelain").length > 0;
-  if (release) {
+  const correction = correctionReason === undefined ? undefined : verifyDocumentationCorrection(release, correctionReason);
+  if (release && !correction) {
     const tags = git("tag", "--points-at", "HEAD").split("\n");
     validateReleaseSource(release, dirty, tags);
   }
@@ -134,6 +211,7 @@ export async function buildDocumentation({ release, output = join(ROOT, ".build/
   for (const signature of factory.signatures) signature.type = ReferenceType.createResolvedReference("Strings", strings, project);
   app.validate(project);
   if (app.logger.hasWarnings() || app.logger.hasErrors()) throw new Error("TypeDoc reference validation failed");
+  validatePublicComments(app.serializer.projectToObject(project, ROOT));
   rmSync(destination, { recursive: true, force: true });
   mkdirSync(destination, { recursive: true });
   await app.generateDocs(project, destination);
@@ -145,6 +223,7 @@ export async function buildDocumentation({ release, output = join(ROOT, ".build/
   const declarations = reflections.filter((reflection) => reflection.kindOf(ReflectionKind.All) && project.children?.includes(reflection.parent));
   const report = { status: "passed", generator: `TypeDoc ${JSON.parse(readFileSync(join(ROOT, "node_modules/typedoc/package.json"), "utf8")).version}`,
     edition, label, packageVersion: packageJson.version, sourceRef, dirty, sourceSha256: fingerprint,
+    ...(correction ? { documentationCorrection: correction } : {}),
     entry: "index.html", publicEntryPoints: entries.map((entry) => entry.name),
     declarationOccurrences: declarations.length,
     documentedDeclarationOccurrences: declarations.filter((reflection) => reflection.comment?.hasVisibleComponent()).length,
@@ -159,8 +238,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const options = {};
   for (let index = 2; index < process.argv.length; index += 2) {
     const flag = process.argv[index], value = process.argv[index + 1];
-    if (!["--release", "--output"].includes(flag) || !value) throw new Error("Usage: node tools/api-documentation.mjs [--release VERSION] [--output DIRECTORY]");
-    options[flag === "--release" ? "release" : "output"] = value;
+    if (!["--release", "--output", "--correction-reason"].includes(flag) || !value)
+      throw new Error("Usage: node tools/api-documentation.mjs [--release VERSION] [--correction-reason REASON] [--output DIRECTORY]");
+    options[{ "--release": "release", "--output": "output", "--correction-reason": "correctionReason" }[flag]] = value;
   }
   await buildDocumentation(options);
 }

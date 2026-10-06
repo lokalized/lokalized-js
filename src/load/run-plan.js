@@ -59,13 +59,12 @@ export function requirePartialFailurePolicy(policy, door) {
 }
 
 /**
- * The declared failure for a load that got past planning.
+ * A catalog load failed. The `failures` array describes each failed file in
+ * planned file order, regardless of request completion order. The same error
+ * class is used by network and filesystem loaders.
  *
- * Its `failures` are in PLAN order. A consumer diagnosing a broken deployment reads them against the
- * manifest, and completion order would reshuffle that list on every run.
- *
- * ONE CLASS FOR BOTH DOORS, deliberately: a caller that catches `LocalizedStringLoadingError` around a load
- * should not have to know whether the bytes came from the network or the disk.
+ * Catch it with `instanceof LocalizedStringLoadingError`; its code is
+ * `"STRINGS_LOADING"`. Instances are created by the library.
  */
   // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
@@ -96,14 +95,7 @@ export class LocalizedStringLoadingError extends LokalizedError {
     super(LOKALIZED_ERROR_TOKEN, "STRINGS_LOADING", message);
     this.name = "LocalizedStringLoadingError";
     /**
-     * **`LoadFailure[]`, NOT `any[]` — it was `any[]` until M-R S3.** This is the field a consumer
-     * reads while diagnosing a broken deployment, and `failures[0].stage` is the whole reason the
-     * stage is a seven-member sequence rather than a boolean (see `LoadFailure` in `./index.js`).
-     * Typed `any` it answered every spelling: `failures[0].staeg` compiled, and so did assigning a
-     * stage to a `number`. Measured through the package on 2026-09-18, all three ways.
-     *
-     * The array is frozen at run time, and BOOT-M0-0533 asks the declaration to say so about the
-     * FIELD as well: `readonly LoadFailure[]` stopped an element write and not a whole-array one.
+     * A frozen array of per-file failures, in planned file order.
      *
      * @type {readonly LoadFailure[]}
      * @readonly
@@ -112,6 +104,7 @@ export class LocalizedStringLoadingError extends LokalizedError {
   }
 
   /**
+   * @internal
    * The one construction path, because the constructor above is private. Its parameters are the
    * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
    * the token it takes first is never exported from this package.

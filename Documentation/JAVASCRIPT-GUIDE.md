@@ -3085,13 +3085,13 @@ what a browser fetches for that entry: the entry plus every chunk it imports.
 | load | files | raw | brotli |
 |---|---|---|---|
 | `lokalized` | 1 | 186,476 | 55,320 |
-| `lokalized/core` | 8 | 185,767 | 55,088 |
-| `lokalized/parse` | 5 | 159,872 | 49,064 |
-| `lokalized/load` | 8 | 179,631 | 54,121 |
-| `lokalized/ssr` | 3 | 7,844 | 2,437 |
-| `lokalized/negotiate` | 4 | 91,162 | 31,769 |
-| `lokalized/data/ordinal` | 9 | 192,476 | 56,701 |
-| `lokalized/data/ranges` | 9 | 195,004 | 56,749 |
+| `lokalized/core` | 8 | 185,767 | 55,138 |
+| `lokalized/parse` | 5 | 159,872 | 48,818 |
+| `lokalized/load` | 8 | 179,631 | 54,119 |
+| `lokalized/ssr` | 3 | 7,844 | 2,436 |
+| `lokalized/negotiate` | 4 | 91,162 | 31,782 |
+| `lokalized/data/ordinal` | 9 | 192,476 | 56,637 |
+| `lokalized/data/ranges` | 9 | 195,004 | 56,923 |
 | `lokalized.global.js`, the classic script | 1 | 246,479 | 69,370 |
 <!-- dist-table:end -->
 

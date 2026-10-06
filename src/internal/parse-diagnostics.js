@@ -16,13 +16,11 @@ import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "./lokalized-error.js";
  */
 
 /**
- * A parse failure, carrying the source it came from and — when the failure is lexical — where.
+ * A resource could not be parsed or validated. `source` identifies the resource;
+ * `line`, `column`, and `path` locate the failure when available.
  *
- * This is catch-only: consumers may `catch` it and test `instanceof`, but
- * constructing one is a library-internal act, so the constructor demands a module-private token no
- * consumer can obtain. That is stricter than a documented convention and cheaper than a
- * factory-only export, because it also refuses `class Mine extends StringsParseError` at
- * instantiation time rather than merely discouraging it.
+ * Catch this error with `instanceof StringsParseError`; its code is
+ * `"STRINGS_PARSE"`. Instances are created by the library.
  */
   // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
@@ -65,6 +63,7 @@ export class StringsParseError extends LokalizedError {
   }
 
   /**
+   * @internal
    * The one construction path, because the constructor above is private. Its parameters are the
    * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
    * the token it takes first is never exported from this package.

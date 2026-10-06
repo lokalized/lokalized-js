@@ -176,7 +176,7 @@ const PROVENANCE = freeze({ ...decodeProvenance() });
 validateProvenance(PROVENANCE);
 
 /**
- * The pinned-data provenance of this module, for `createStrings` to compare against the root's.
+ * Pinned CLDR version and fingerprint of this module's ordinal data.
  *
  * @type {Readonly<{ $lokalized: "ordinal-data", provenance: Readonly<{ cldrVersion: string, dataFingerprint: string }> }>}
  */
@@ -267,11 +267,9 @@ function ordinalityForCount(count) {
 }
 
 /**
- * The CLDR ordinal category for a value under a locale — `Ordinality.forNumber`.
- *
- * Negative values are classified by their absolute value, and the visible form of the number is part
- * of the question: `decimal("1.0")` is not `1`. A locale with no CLDR plural rules at all throws
- * rather than quietly reporting `ORDINALITY_OTHER`.
+ * Classify a number using the locale's CLDR ordinal rules. Negative values are
+ * classified by their absolute value. Use `decimal` to preserve visible decimal
+ * places. Throws if the locale has no supported plural rules.
  *
  * @param {number | bigint | Readonly<{ $lokalized: string, value: string }>} value
  * @param {string} locale
@@ -293,10 +291,8 @@ export function ordinalityForNumber(value, locale) {
 }
 
 /**
- * The CLDR ordinal category for explicit plural operands — `Ordinality.forOperands`.
- *
- * This is the route for a displayed number carrying detail the value alone does not: trailing zeros
- * (`v`/`w`) or a compact-decimal exponent (`c`/`e`), both of which are rule inputs in their own right.
+ * Classify explicit plural operands using the locale's CLDR ordinal rules.
+ * Use operands when trailing zeros or a compact-decimal exponent affect selection.
  *
  * @param {Readonly<{ $lokalized: string, value: string }>} value
  * @param {string} locale
@@ -307,11 +303,9 @@ export function ordinalityForOperands(value, locale) {
 }
 
 /**
- * The ordinalities a locale can produce — `Ordinality.supportedOrdinalitiesForLocale`.
- *
- * In `Ordinality` declaration order, deduplicated, frozen. A well-formed but unsupported locale
- * yields an EMPTY array rather than throwing; only a malformed tag is an error. `ordinalityForNumber`
- * throws for that same locale, and the difference is Java's.
+ * Return the frozen array of ordinal categories this locale can produce, in
+ * `ORDINALITY_*` declaration order, without duplicates. A well-formed but
+ * unsupported locale returns an empty array; a malformed tag throws.
  *
  * @param {string} locale
  * @returns {readonly Ordinality[]}
@@ -333,13 +327,9 @@ const SUPPORTED_LOCALE_TAGS = freeze(
 );
 
 /**
- * `Ordinality.getSupportedLocaleTags`: the union of the tags the generated CARDINAL and ORDINAL
- * tables represent directly, in natural string order.
- *
- * The cardinal tags belong here because of the undetermined-group fallback — every locale the
- * cardinal table knows is answerable for ordinals too. This is not the exhaustive set of tags
- * accepted: `en-GB` is supported through fallback and is not listed. Java's `remove("root")` /
- * `add("und")` has no work left to do, because the generator already spells that group `und`.
+ * Return the sorted tags represented directly by the cardinal or ordinal rule
+ * tables. Other locale tags can also be supported through locale fallback; use
+ * `supportedOrdinalitiesForLocale` to inspect a specific tag.
  *
  * @returns {readonly string[]}
  */

@@ -25,7 +25,7 @@ import { directoryLabel, discoverCatalogFiles, keyedByRenderedTag, resolveDiscov
 /** @typedef {import("../parse/index.js").ParsedStringsFile} ParsedStringsFile */
 
 /**
- * Load every localized strings file in one directory, as Java's filesystem loader does.
+ * Read and parse every localized strings file in one directory.
  *
  * @param {string} directory
  * @param {{

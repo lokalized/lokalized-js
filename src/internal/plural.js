@@ -108,6 +108,11 @@ export function unsupportedLocaleError(localeTag, role) {
   return UnsupportedLocaleError.raise(LOKALIZED_ERROR_TOKEN, localeTag, role);
 }
 
+/**
+ * The requested locale is unsupported by the API. `locale` contains its tag.
+ * Instances are created by the library; catch them with
+ * `instanceof UnsupportedLocaleError`.
+ */
 export class UnsupportedLocaleError extends LokalizedError {
   /**
    * **PRIVATE, WHICH IS HOW THE DECLARATION STOPS EXPOSING A CONSTRUCTOR.** The contract requires
@@ -138,11 +143,8 @@ export class UnsupportedLocaleError extends LokalizedError {
     );
     this.name = "UnsupportedLocaleError";
     /**
-     * THE PUBLIC NAME OF THIS FIELD IS `locale`, and the port called it `localeTag` — a private
-     * spelling, because the class was exported from no subpath until S35 and one test read it. The
-     * public name wins now that a consumer can see it: `interface UnsupportedLocaleError extends
-     * LokalizedError { readonly code: "UNSUPPORTED_LOCALE"; readonly locale: LocaleTag; }`.
-     * BOOT-M0-0518 declares it `readonly` with the rest of the record.
+     * The requested locale tag that is unsupported.
+     *
      * @type {string}
      * @readonly
      */
@@ -152,6 +154,7 @@ export class UnsupportedLocaleError extends LokalizedError {
   }
 
   /**
+   * @internal
    * The one construction path, because the constructor above is private. Its parameters are the
    * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
    * the token it takes first is never exported from this package.

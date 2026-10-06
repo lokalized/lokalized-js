@@ -196,29 +196,16 @@ export function languageRangeExpansions(range, languageEquivalents) {
 }
 
 /**
- * `Readonly`, because the runtime freezes every one of these it hands a caller — `matchForRanges`
- * freezes each member of `requestedLanguageRanges` and the elected `languageRange`, and
- * `parseLanguageRanges` freezes each member of its list. `LanguageRange` is the same shape,
- * `Readonly<{ range, weight }>`.
- *
- * THE SOLE AUTHORED COPY. `src/core/index.js` and `src/negotiate/index.js` each declared their own
- * mutable one, so all three subpaths published a type that permitted a write the runtime refuses;
- * both now derive this. It appears in OUTPUT position only — measured across the emitted
- * declarations, no parameter takes it — so the narrowing cannot refuse a caller's own object.
+ * A language range and its weight, between zero and one.
+ * Library-produced range records are frozen.
  *
  * @typedef {Readonly<{ range: string, weight: number }>} WeightedLanguageRange
  */
 
 /**
- * `READONLY IN EVERY MEMBER`, which is plan 3.4:788-796's own spelling of `LocaleMatchResult` and
- * which the runtime now enforces: `matchForRanges` freezes the record, both arrays and the
- * `languageRange` pair. The declaration was mutable in all of them, so a consumer who wrote to a
- * returned match compiled clean and threw at runtime under `"use strict"` — the module system's
- * default for every ESM consumer of this package.
- *
- * It stays assignable FROM a caller's mutable object, which is what keeps the narrowing free: a
- * supplied `{ localeMatchResult }` is an INPUT here as well as an output, and `readonly` members accept a
- * mutable source.
+ * Locale negotiation result. `languageRange` identifies the selected request
+ * range and accepts either a string (weight 1) or a `{ range, weight }` record.
+ * Library-produced results use the weighted record.
  *
  * @typedef {Readonly<{
  *   matchType: "none"|"exact"|"canonical"|"cldr-fallback"|"likely-subtag"|"extended-range"|"primary-language"|"wildcard",
@@ -231,10 +218,6 @@ export function languageRangeExpansions(range, languageEquivalents) {
  *   requestedLanguageRanges: readonly WeightedLanguageRange[],
  * }>} LocaleMatchResult
  *
- * `languageRange` is the range that WON, spelled either as a bare string — the one-argument
- * `LanguageRange` spelling, whose weight is 1.0 by definition — or as the `{ range, weight }` pair.
- * Java's field is a `LanguageRange`, which always carries its weight; the port PRODUCES the pair for
- * that reason, and accepts either from a caller.
  */
 
 /**

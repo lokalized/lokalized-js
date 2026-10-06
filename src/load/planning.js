@@ -36,12 +36,9 @@ import { validateStringsManifest } from "./manifest.js";
 /** @typedef {import("./index.js").FetchEntry} FetchEntry */
 
 /**
- * The candidates a lookup would attempt, in order — INCLUDING those the manifest cannot serve.
- *
- * The chain includes attempted candidates without files. A candidate that resolves to no file
- * stays in the list as its own normalized tag, because it was still attempted: a caller reasoning
- * about coverage needs to see the locale that was tried and missed, not a list silently narrowed to
- * the ones that happened to exist.
+ * Return candidate locale tags in lookup order, including candidates with no
+ * manifest file. Tags are normalized; the returned list describes the complete
+ * fallback path for the requested locale.
  *
  * @param {StringsManifestV1} manifest
  * @param {string} lookupLocale any input that normalizes to a well-formed tag
@@ -68,13 +65,8 @@ export function chain(manifest, lookupLocale, options = {}) {
 }
 
 /**
- * The files a lookup would actually fetch, in first-use order.
- *
- * The fetch set contains only manifest-backed files, deduplicated in first-use order. The
- * dedup is already first-wins on the POST-RESOLUTION tag inside the candidate walk — two candidates
- * that resolve to one file collapse there — so this filter does not re-deduplicate; it selects. Said
- * out loud because a second dedup here would be dead code that LOOKS like the rule being enforced,
- * and a later reader could delete the real one without any test noticing.
+ * Return manifest-backed files needed for a lookup, in first-use order.
+ * Candidates that resolve to the same file are included only once.
  *
  * @param {StringsManifestV1} manifest
  * @param {string} lookupLocale

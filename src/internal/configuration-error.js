@@ -2,30 +2,11 @@ import { LOKALIZED_ERROR_TOKEN, LokalizedError } from "../internal/lokalized-err
 
 // @ts-check
 /**
- * The library-owned failure for a configuration a caller supplied that cannot be honoured.
+ * Invalid configuration supplied to a Lokalized API.
  *
- * EXTRACTED from `src/data/ordinal.js` when `lokalized/load` needed the same failure, because two
- * factories that must produce the SAME `name` and `code` are two dialects of one thing — and the one
- * that drifts is the one nobody is looking at. These are construction-time
- * `ConfigurationError`s. The public catch-only hierarchy (`LokalizedError` and friends) is core's to
- * land; this carries the eventual `code` already, so that swap stays invisible to a consumer who
- * checks it.
- *
- * **IT IS A REAL CLASS AS OF S34, and the docblock above had already designed for the swap** — "the
- * public catch-only hierarchy is core's to land; this carries the eventual `code` already, so that
- * swap stays invisible to a consumer who checks it". It was a plain `Error` with `name` and `code`
- * assigned afterwards, so **119 call sites across `src/` produced a failure no `instanceof` could
- * recognise** — a consumer could only match it by string. That is the THIRD instance of exactly the
- * shape S22 fixed for `LocalizedStringLoadingError` and `DigestUnavailableError`, and the largest: it reaches
- * a caller from `core`, `load`, `ssr` and `node` alike.
- *
- * It is a package export, and its runtime constructor takes an unexported token so plain-JavaScript
- * direct construction and subclass instantiation fail rather than creating partially initialized
- * library errors. The FACTORY is what keeps the token
- * private while 119 sites raise one, the same arrangement `loadingError` and `parseError` use.
- *
- * `name` and `code` are unchanged, so the fourteen places that match on the string keep working —
- * measured before the change, and that is the whole point of the docblock's promise.
+ * Catch this error with `instanceof ConfigurationError` or inspect its
+ * `code`, which is `"CONFIGURATION"`. Instances are created by the library;
+ * applications cannot construct or subclass them.
  */
   // Extends `LokalizedError` as of S35, so one `instanceof` answers "did this come from
   // lokalized" — plan 3.5:1039-1042 and :1092. The token travels up; it never leaves the package.
@@ -51,6 +32,7 @@ export class ConfigurationError extends LokalizedError {
   }
 
   /**
+   * @internal
    * The one construction path, because the constructor above is private. Its parameters are the
    * constructor's, so the module's own factory keeps its types; a consumer cannot reach it, because
    * the token it takes first is never exported from this package.

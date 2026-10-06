@@ -28,18 +28,9 @@ import { configurationError } from "../internal/configuration-error.js";
 import { manifestLocaleTag } from "../internal/manifest-locale.js";
 
 /**
- * The narrow serialized match projection.
- *
- * It intentionally contains only the selected locale and match type. It never leaks requested
- * ranges, q-values, fallback configuration, or the supported/considered locale inventory. A full
- * `LocaleMatchResult` carries all four — `requestedLanguageRanges`, `effectiveWeight`,
- * `fallbackLocale`, `consideredLocales` — so the narrowing is a privacy boundary rather than a
- * convenience, and `test/ssr-stamp.test.js` checks it by diffing the WHOLE serialized object against
- * an expected key set rather than by spot-checking fields.
- *
- * The match type is core's `LocaleMatchType`, referenced through core rather than spelled
- * out again — a JSDoc `import(...)` sits in a comment, so `tools/graph-walk.mjs` strips it before
- * matching and this adds NO module edge. `test/ssr-graph.test.js` pins the complete module set and forbids any locale kernel or data edge.
+ * Locale selection included in an SSR stamp: the selected locale and match type.
+ * Requested language ranges, weights, fallback configuration, and supported
+ * locale inventory are omitted from the serialized record.
  *
  * @typedef {Readonly<{ locale: string | null, matchType: import("../core/index.js").LocaleMatchType }>} SsrLocaleMatchV1
  */
@@ -320,20 +311,9 @@ export function createSsrStamp(strings, context) {
 }
 
 /**
- * Validate a server's stamp against the client instance about to hydrate.
- *
- * **THE LOCAL INSTANCE IS VERIFIED FIRST, and the order is the contract rather than an
- * implementation detail.** Validation performs the same local-instance verification BEFORE
- * comparing the serialized fields, so a caller cannot validate against incomplete or
- * direct-construction state merely by presenting a well-shaped stamp. Building the local stamp is
- * how that is guaranteed structurally: there is no route to the comparison that skips it.
- *
- * **THE COMPARISON IS EXHAUSTIVE OVER THE STAMP, not a maintained field list.** The stamp carries
- * fifteen values, counting `localeMatchResult`'s two members; a hand-copied list of fifteen is precisely
- * the kind of text this project has
- * repeatedly found asserting the inverse of what it described, and it would silently stop covering a
- * sixteenth. So every own field of the locally built stamp is compared, `localeMatchResult` by its two
- * members, and `test/ssr-stamp.test.js` asserts that the set of compared paths IS those fifteen.
+ * Validate a server's stamp against the client instance before hydration.
+ * The client must have a complete, verified manifest load. All stamp fields,
+ * including locale selection and catalog identity, must match the client context.
  *
  * @param {LokalizedSsrStampV1} stamp the stamp the server serialized into the page
  * @param {Pick<import("../core/index.js").Strings, "getLoadVerification" | "getCatalogIdentity" | "isCatalogComplete" | "getLocaleConfiguration" | "getSupportedLocales" | "getDirectLocaleContext">} strings the client `Strings` about to hydrate

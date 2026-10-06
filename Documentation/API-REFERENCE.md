@@ -5,6 +5,10 @@ points from `package.json`. The declarations are emitted from checked source
 JSDoc immediately before generation. Supporting definitions referenced by
 public signatures are documented separately; that group is not an import path.
 Generation fails on unresolved symbol links and omitted referenced types.
+Public comments describe usage, arguments, results, and errors. Keep implementation
+history, audit IDs, porting notes, and test references in ordinary source comments
+or maintenance documentation. Generation rejects known maintenance-note markers
+in the public reference. Library-only error construction helpers are excluded.
 Generation copies the declarations into its ignored build directory and adds
 TypeDoc's `@interface` presentation tag to the derived `Strings` alias. The
 factory links to that shape, whose methods are navigable. The alias's actual
@@ -41,6 +45,24 @@ It does not create tags, commits, GitHub releases, or npm publications.
 The release output lives under `VERSION/` rather than overwriting the development
 reference. Existing editions in the same output tree are retained and listed
 on its root index. Release candidates receive their own versioned directories.
+
+## Correcting documentation for an existing release
+
+To correct prose for a published release without moving its tag or republishing
+the package:
+
+```sh
+npm run docs:api -- --release 1.0.0 --correction-reason "Describe the documentation correction"
+```
+
+This explicit mode compares all runtime source and freshly emitted declarations
+against the release tag, ignoring comments. It also requires unchanged package
+metadata, dependency lock, compiler settings, and supporting type definitions.
+Changing JSDoc types fails the declaration comparison even if the JavaScript
+is unchanged. Runtime or API changes require documentation for a new release.
+The build report records the tagged release revision, correction reason, actual
+checkout revision, dirty state, and documentation input fingerprint. The normal
+release build continues to require a clean tagged checkout.
 
 ## Hosting at jsdoc.lokalized.com
 

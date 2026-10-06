@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { editionFor, escapeHtml, prepareDeclarationInputs, publicEntryPoints, validateReleaseSource } from "../tools/api-documentation.mjs";
+import { compareDocumentationInputs, editionFor, escapeHtml, prepareDeclarationInputs, publicEntryPoints, validatePublicComments, validateReleaseSource, withoutComments } from "../tools/api-documentation.mjs";
 
 test("development source cannot be labelled as a tagged release", () => {
   assert.equal(editionFor(undefined, "1.0.0-rc.2"), "development");
@@ -33,6 +33,37 @@ test("the reference follows every actual consumer entry point", () => {
 
 test("edition labels are escaped in the generated hosting index", () => {
   assert.equal(escapeHtml('<a href="x">&\'</a>'), "&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;");
+});
+
+test("release doc corrections accept prose edits and reject runtime or type changes", () => {
+  const scratch = mkdtempSync(join(tmpdir(), "lokalized-doc-comparison-"));
+  try {
+    const baseline = join(scratch, "baseline"), current = join(scratch, "current");
+    for (const root of [baseline, current]) mkdirSync(join(root, "types"), { recursive: true });
+    writeFileSync(join(baseline, "types/index.d.ts"), "/** Old note. */\nexport declare function get(key: string): string;\n");
+    writeFileSync(join(current, "types/index.d.ts"), "/** Translate a key. */\nexport declare function get(key: string): string;\n");
+    assert.doesNotThrow(() => compareDocumentationInputs(current, baseline, "types"));
+    writeFileSync(join(current, "types/index.d.ts"), "export declare function get(key: number): string;\n");
+    assert.throws(() => compareDocumentationInputs(current, baseline, "types"), /changes runtime or declarations/);
+    writeFileSync(join(current, "types/extra.d.ts"), "export type Extra = string;\n");
+    assert.throws(() => compareDocumentationInputs(current, baseline, "types"), /file inventory/);
+    assert.equal(withoutComments('/** Docs */\nexport const value = "/* literal */";', "index.js"),
+      withoutComments('// Note\nexport const value = "/* literal */";', "index.js"));
+    assert.notEqual(withoutComments('export const value = "old";', "index.js"),
+      withoutComments('export const value = "new";', "index.js"));
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test("public reference rejects maintenance notes without rejecting normal usage guidance", () => {
+  const model = (text) => ({ children: [{ name: "Strings", children: [{ name: "get", comment: {
+    summary: [{ kind: "text", text }]
+  } }] }] });
+  for (const text of ["BOOT-M0-0518", "DefaultStrings.java:2718", "See test/inspection.test.js",
+    "amendment A31", "M-R S11", "conformance.mjs", "See tools/readonly-surface.mjs"])
+    assert.throws(() => validatePublicComments(model(text)), /Internal maintenance notes/, text);
+  assert.doesNotThrow(() => validatePublicComments(model("Return sorted keys. An unsupported locale throws UnsupportedLocaleError.")));
 });
 
 test("reference presentation retains the derived type and leaves consumer declarations untouched", () => {
