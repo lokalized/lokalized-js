@@ -128,7 +128,8 @@ const MINIMUM_ASSERTIONS = 305;
 // `<script type="module">` — cannot execute it. The classic-script block is NOT left unchecked:
 // `test/browser-global.test.js` extracts it from this README and runs it against a real build of
 // `dist/browser/lokalized.global.js` in a browser-shaped sandbox.
-const MAXIMUM_UNMARKED = 3;
+// The README's plain-script page is also executed by test/browser-global.test.js.
+const MAXIMUM_UNMARKED = 4;
 if (groups.size < MINIMUM_GROUPS)
   problems.push(`${groups.size} executed group(s), and this README had ${MINIMUM_GROUPS}. A sample ` +
     `stopped being executed; if that was deliberate, lower MINIMUM_GROUPS and say why`);

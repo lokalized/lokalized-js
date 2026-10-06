@@ -39,6 +39,19 @@ const classicBlock = (() => {
   return null;
 })();
 
+async function buildGlobal() {
+  const pkg = JSON.parse(readFileSync(`${root}package.json`, "utf8"));
+  const entries = browserEntries(pkg.exports).map((entry) => ({ ...entry, source: `${root}${entry.source.slice(2)}` }));
+  return esbuild.build({
+    bundle: true, format: "iife", globalName: GLOBAL_NAME, platform: "browser",
+    minify: true, target: ["safari16.4", "chrome111", "firefox111"], legalComments: "eof", write: false,
+    stdin: {
+      contents: globalEntrySource(entries, (entry) => entry.source),
+      resolveDir: root, sourcefile: "global-entry.js", loader: "js",
+    },
+  });
+}
+
 test("the README documents the classic-script route at all", () => {
   // ANTI-VACUITY FIRST. Everything below is satisfied trivially by a README that stopped showing
   // this route, and a deleted sample must fail loudly rather than quietly stop being checked.
@@ -57,16 +70,7 @@ test("the documented src URL names the file the build actually produces", () => 
 });
 
 test("the sample runs against a real classic build and prints what the README claims", async () => {
-  const pkg = JSON.parse(readFileSync(`${root}package.json`, "utf8"));
-  const entries = browserEntries(pkg.exports).map((entry) => ({ ...entry, source: `${root}${entry.source.slice(2)}` }));
-  const built = await esbuild.build({
-    bundle: true, format: "iife", globalName: GLOBAL_NAME, platform: "browser",
-    minify: true, target: ["safari16.4", "chrome111", "firefox111"], legalComments: "eof", write: false,
-    stdin: {
-      contents: globalEntrySource(entries, (entry) => entry.source),
-      resolveDir: root, sourcefile: "global-entry.js", loader: "js",
-    },
-  });
+  const built = await buildGlobal();
 
   // A browser-shaped host. `atob` is the one non-ECMAScript global the rendering path needs, and in
   // a classic script its absence is a load-time error rather than a render-time one, because the
@@ -101,13 +105,8 @@ test("every browser-safe subpath is reachable from the one global", async () => 
   // top level, everything else namespaced. It is checked here because a reader following the
   // README's list of namespaces has no other guarantee, and because one bundle meaning ONE copy is
   // the property that makes the classic route better than eight separate globals.
-  const pkg = JSON.parse(readFileSync(`${root}package.json`, "utf8"));
-  const entries = browserEntries(pkg.exports).map((entry) => ({ ...entry, source: `${root}${entry.source.slice(2)}` }));
-  const built = await esbuild.build({
-    bundle: true, format: "iife", globalName: GLOBAL_NAME, platform: "browser",
-    minify: true, target: ["safari16.4", "chrome111", "firefox111"], legalComments: "eof", write: false,
-    stdin: { contents: globalEntrySource(entries, (entry) => entry.source), resolveDir: root, sourcefile: "global-entry.js", loader: "js" },
-  });
+  const built = await buildGlobal();
+  const entries = browserEntries(JSON.parse(readFileSync(`${root}package.json`, "utf8")).exports);
   const sandbox = { console, atob, TextDecoder, TextEncoder, URL, structuredClone, navigator: { languages: ["en"] } };
   sandbox.globalThis = sandbox;
   createContext(sandbox);
@@ -128,4 +127,38 @@ test("every browser-safe subpath is reachable from the one global", async () => 
     "the root and core expose different function objects, so the bundle carries two copies");
   assert.equal(api.core.LokalizedError, Object.getPrototypeOf(api.core.ConfigurationError),
     "the error hierarchy did not survive the combined build");
+});
+
+
+test("the README's plain script page honors browser preferences and later app language changes", async () => {
+  const overview = readFileSync(`${root}README.md`, "utf8");
+  const block = [...overview.matchAll(/```html\n([\s\S]*?)```/g)]
+    .map((match) => match[1]).find((html) => html.includes(GLOBAL_FILE));
+  assert.ok(block, "the README shows a plain script tag example");
+  assert.doesNotMatch(block, /type="module"|\bimport\b/);
+  assert.ok(block.includes(`/lokalized@${JSON.parse(readFileSync(`${root}package.json`, "utf8")).version}/dist/browser/${GLOBAL_FILE}`));
+  const built = await buildGlobal();
+  const script = /<script>\n([\s\S]*?)<\/script>/.exec(block)[1];
+  for (const [languages, selected, greeting] of [
+    [["fr-CH", "en"], "fr", "Bonjour, Ada!"],
+    [["ja", "en-GB"], "en", "Hello, Ada!"],
+    [["ja"], "en", "Hello, Ada!"],
+    [[], "en", "Hello, Ada!"],
+  ]) {
+    const welcome = { textContent: "" };
+    const documentElement = { lang: /<html lang="([^"]+)"/.exec(block)[1] };
+    const sandbox = createContext({
+      console, atob, TextDecoder, TextEncoder, URL, structuredClone,
+      navigator: { languages },
+      document: { documentElement, querySelector: (selector) => selector === "#welcome" ? welcome : null },
+    });
+    runInContext(built.outputFiles[0].text, sandbox, { filename: GLOBAL_FILE });
+    runInContext(script, sandbox, { filename: "README.md#plain-script-tag" });
+    assert.equal(documentElement.lang, selected, "the page language matches the selected translation");
+    assert.equal(welcome.textContent, greeting);
+    for (const [locale, expected] of [["fr", "Bonjour, Ada!"], ["en", "Hello, Ada!"], ["de", "Hello, Ada!"], ["", "Hello, Ada!"]]) {
+      documentElement.lang = locale;
+      assert.equal(runInContext('strings.get("welcome", { name: "Ada" })', sandbox), expected);
+    }
+  }
 });

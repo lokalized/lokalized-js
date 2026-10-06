@@ -79,7 +79,7 @@ introStrings.get("I read {{bookCount}} books.", { bookCount: 0 }); // => "I didn
 Lokalized has proudly powered production systems since 2017. The Java, JavaScript, and Swift libraries share the same translation-file format; platform APIs adapt how applications supply values and load files.
 
 **Note: this README provides a high-level overview of Lokalized.**<br/>
-**For details, please refer to the official documentation at [lokalized.com](https://www.lokalized.com/?platform=javascript).**
+**For details, see the [official documentation](https://www.lokalized.com/?platform=javascript) and [JavaScript API reference](https://jsdoc.lokalized.com/1.0.0/).**
 
 ## Why Lokalized?
 
@@ -93,8 +93,8 @@ Lokalized has proudly powered production systems since 2017. The Java, JavaScrip
 
 ## Non-Goals
 
-- Date/time, number, percentage, and currency formatting or parsing: use JavaScript `Intl` formatters.
-- Collation: use `Intl.Collator`.
+- Date/time, number, percentage, and currency formatting or parsing: use JavaScript [`Intl`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl) formatters.
+- Collation: use [`Intl.Collator`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Collator).
 - CommonJS or older JavaScript runtimes: use Node.js 20+ or a modern browser with ES module support.
 
 ## Do Zero-Dependency Libraries Interest You?
@@ -116,11 +116,11 @@ For Node.js or a browser application with a bundler:
 npm install lokalized@1.0.0
 ```
 
-The package is ESM-only and includes TypeScript declarations. Installing with npm does not mean your application must run on Node.js.
+The npm entry points use ES modules and include TypeScript declarations. A standalone [classic script](#plain-script-tag) is also included. Installing with npm does not mean your application must run on Node.js.
 
 ## Browser and Node.js
 
-The translation API works in both environments. Node.js can read local files through `lokalized/node`. Browsers can supply inline translations or fetch published files through `lokalized/load`. Use the [browser integration example](#browser-integration) below for a page with no Node.js server or build step.
+The translation API works in both environments. Node.js can read local files through `lokalized/node`. Browsers can supply inline translations or fetch published files through `lokalized/load`. Use a [plain script tag](#plain-script-tag) or [ES module](#es-modules) for a page with no Node.js server or build step.
 
 ## Direct Download
 
@@ -172,7 +172,7 @@ Save this as `examples/readme/books/pt-BR.json`:
 
 ### 2. Create a Strings Instance
 
-Load the localized strings once. Supply the application's current language on each lookup. This factory accepts an app-owned getter, so changing language does not require reloading the files:
+Load the localized strings once, then construct a reusable [`Strings`](https://jsdoc.lokalized.com/1.0.0/interfaces/lokalized_core.Strings.html) instance with [`createStrings`](https://jsdoc.lokalized.com/1.0.0/functions/lokalized_core.createStrings.html). Supply the application's current language on each lookup. This factory accepts an app-owned getter, so changing language does not require reloading the files:
 
 <!-- example: overview-books -->
 
@@ -260,7 +260,7 @@ const options = forAcceptLanguage(negotiator, "pt-BR,pt;q=0.8");
 strings.get("I read {{bookCount}} books.", { bookCount: 1 }, options); // => "Li 1 livro."
 ```
 
-Browsers can use `chooseBrowserLocale`; servers and jobs can use explicit per-call preferences. The [platform guide](Documentation/JAVASCRIPT-GUIDE.md#negotiating-from-accept-language) explains full-list negotiation and request-scoped use.
+In a browser, [`chooseBrowserLocale`](https://jsdoc.lokalized.com/1.0.0/functions/lokalized_core.chooseBrowserLocale.html) matches the ordered [`navigator.languages`](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/languages) list against the loaded locales, returning the configured fallback when none match. With a [plain script tag](#plain-script-tag), call `lokalized.chooseBrowserLocale(strings.getLocaleConfiguration())`; with ES modules, import `chooseBrowserLocale` from `lokalized`. Use the browser's choice as the initial language when your app has no saved language preference, then let the app's language settings control later lookups. Servers and jobs can use explicit per-call preferences. The [platform guide](Documentation/JAVASCRIPT-GUIDE.md#negotiating-from-accept-language) explains full-list negotiation and request-scoped use.
 
 ### Locale Matching Behavior
 
@@ -284,7 +284,7 @@ Parsed range lists are bounded at 32 entries. The raw-header helper bounds input
 
 ## Loading Localized Strings
 
-Node.js loaders discover locale-named files in a directory and return both parsed `catalogs` and `warnings`. They do not recursively scan child directories. Process warnings at the load boundary instead of discarding them:
+Node.js loaders such as [`readStringsFromDirectory`](https://jsdoc.lokalized.com/1.0.0/functions/lokalized_node.readStringsFromDirectory.html) discover locale-named files in a directory and return both parsed `catalogs` and `warnings`. They do not recursively scan child directories. Process warnings at the load boundary instead of discarding them:
 
 <!-- example: overview-loading -->
 
@@ -297,13 +297,13 @@ const loaded = await readStringsFromDirectory("examples/readme/books", {
 Object.keys(loaded.catalogs); // => ["pt-BR"]
 ```
 
-Browser delivery uses `lokalized/load`: parse a manifest, fetch the required locale set, verify SHA-256 digests, and provide the resulting catalogs to `createStrings`. A manifest's fingerprints verify byte identity; a trusted publishing origin or app-owned identity pin supplies authenticity. The [platform guide](Documentation/JAVASCRIPT-GUIDE.md#over-the-network-browser-edge-or-server) has the complete fetch and SSR hand-off flows.
+Browser delivery uses [`lokalized/load`](https://jsdoc.lokalized.com/1.0.0/modules/lokalized_load.html): parse a manifest, fetch the required locale set, verify SHA-256 digests, and provide the resulting catalogs to `createStrings`. A manifest's fingerprints verify byte identity; a trusted publishing origin or app-owned identity pin supplies authenticity. The [platform guide](Documentation/JAVASCRIPT-GUIDE.md#over-the-network-browser-edge-or-server) has the complete fetch and SSR hand-off flows.
 
 Loading is bounded per input and per aggregate load. Malformed UTF-8/JSON, duplicate members, invalid expressions, and invalid localized strings fail validation. A blank or BOM-only file is invalid; use `{}` for an intentionally empty file. Missing locale-specific plural forms produce structured warnings; they are not silently filled from an unrelated language.
 
 ## Per-Invocation Options
 
-The configured locale supplier is useful for an app's shared language settings. For independent views, requests, batch jobs, or alternate output sinks, override the language for one call:
+The configured locale supplier is useful for an app's shared language settings. For independent views, requests, batch jobs, or alternate output sinks, override the language for one call with [`forLocale`](https://jsdoc.lokalized.com/1.0.0/functions/lokalized_core.forLocale.html):
 
 <!-- example: overview-books -->
 
@@ -957,7 +957,7 @@ A successful translation from a later candidate is not an exhausted failure. Att
 
 ## Translation Diagnostics
 
-`get` returns text. `getResult` also reports how the key was resolved, including the matched and resolved locales, fallback status, outcome status, and any retained failure. Negotiation and per-key fallback are separate: the file chosen for the user may lack a key that exists in a later candidate.
+[`get`](https://jsdoc.lokalized.com/1.0.0/interfaces/lokalized_core.Strings.html#get) returns text. [`getResult`](https://jsdoc.lokalized.com/1.0.0/interfaces/lokalized_core.Strings.html#getresult) also reports how the key was resolved, including the matched and resolved locales, fallback status, outcome status, and any retained failure. Negotiation and per-key fallback are separate: the file chosen for the user may lack a key that exists in a later candidate.
 
 <!-- example: overview-books -->
 
@@ -1153,6 +1153,45 @@ Lokalized was created by [Mark Allen](https://www.revetkn.com). Development is s
 
 ## Browser Integration
 
+### Plain Script Tag
+
+The [https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/lokalized.global.js](https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/lokalized.global.js) script exposes `window.lokalized`, with no module imports, npm installation, Node.js server, or build step required:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Lokalized example</title>
+  </head>
+  <body>
+    <p id="welcome"></p>
+    <script src="https://cdn.jsdelivr.net/npm/lokalized@1.0.0/dist/browser/lokalized.global.js"></script>
+    <script>
+      const strings = lokalized.createStrings({
+        localizedStringSupplier: () => ({
+          en: { welcome: "Hello, {{name}}!" },
+          fr: { welcome: "Bonjour, {{name}}!" },
+        }),
+        fallbackLocale: "en",
+        localeSupplier: () => document.documentElement.lang || "en",
+      });
+
+      // Start with the browser's preferred language among the loaded translations
+      document.documentElement.lang =
+        lokalized.chooseBrowserLocale(strings.getLocaleConfiguration());
+      document.querySelector("#welcome").textContent = strings.get("welcome", { name: "Ada" });
+    </script>
+  </body>
+</html>
+```
+
+The example selects an initial language from `navigator.languages`, with English as the fallback, and sets `<html lang="…">` accordingly. If your app has a saved language preference, use that instead of the browser's choice. The supplier reads the page language on each lookup, so later lookups use the updated language after your app's language picker changes it. This example displays `Hello, Ada!` in English and `Bonjour, Ada!` in French.
+
+You can also serve `dist/browser/lokalized.global.js` from your own site. The single file includes all browser-safe functionality: root methods such as `lokalized.createStrings`, plus namespaces such as `lokalized.load`, `lokalized.negotiate`, and `lokalized.ssr`. Pin an exact package version when using a CDN.
+
+### ES Modules
+
 Save this HTML on a static host. The catalog is inline; no Node.js server, manifest, or build step is required. The browser preferences select among loaded locales, with English as fallback:
 
 <!-- example: overview-browser -->
@@ -1183,4 +1222,4 @@ document.querySelector("#welcome").textContent = greeting;
 
 With a bundler, replace the CDN import with `import { createStrings, chooseBrowserLocale } from "lokalized"`. Put request-specific locale options on each server lookup rather than mutating one shared current-language variable.
 
-The [JavaScript platform guide](Documentation/JAVASCRIPT-GUIDE.md) retains the full Node/browser walkthroughs, verified fetching, SSR and React Server Component boundaries, cache-key guidance, bidi/accessibility advice, CSP, entry-point and bundle tables, and the measured i18next comparison. [API.md](Documentation/API.md) documents the public API; [generated API documentation](Documentation/API-REFERENCE.md) describes the reference at **jsdoc.lokalized.com**.
+The [JavaScript platform guide](Documentation/JAVASCRIPT-GUIDE.md) retains the full Node/browser walkthroughs, verified fetching, SSR and React Server Component boundaries, cache-key guidance, bidi/accessibility advice, CSP, entry-point and bundle tables, and the measured i18next comparison. [API.md](Documentation/API.md) documents the public API. Browse the [JavaScript API reference](https://jsdoc.lokalized.com/1.0.0/) or read how the [generated documentation](Documentation/API-REFERENCE.md) is built.
